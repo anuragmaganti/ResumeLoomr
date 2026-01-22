@@ -9,13 +9,13 @@ function App() {
   const [activeTab,setActiveTab] = useState("personal");
 
   return (
-    <>
-    <Header></Header>
-    <div className="main">
-      <EditorPanel></EditorPanel>
-      <ResumePreview></ResumePreview>
+    <div className="app">
+      <Header></Header>
+      <div className="main">
+        <EditorPanel></EditorPanel>
+        <ResumePreview></ResumePreview>
+      </div>
     </div>
-    </>
   )
 }
 

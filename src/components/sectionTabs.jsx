@@ -1,5 +1,5 @@
 export default function SectionTabs() {
     return(
-        <>SECTION TABS.........</>
+        <div>SECTION TABS.........</div>
     )
 }

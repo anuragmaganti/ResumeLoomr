@@ -1,5 +1,5 @@
 export default function ResumePreview() {
     return (
-        <>......RESUME PREVIEW</>
+        <div>......RESUME PREVIEW</div>
     )
 }
