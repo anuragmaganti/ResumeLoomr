@@ -1,4 +1,4 @@
-import { Children, useState } from 'react'
+import { useState } from 'react'
 import './App.css'
 import Header from './components/header';
 import ResumePreview from './components/resumePreview';
@@ -12,7 +12,7 @@ function App() {
     <div className="app">
       <Header></Header>
       <div className="main">
-        <EditorPanel></EditorPanel>
+        <EditorPanel activeTab={activeTab} setActiveTab={setActiveTab}></EditorPanel>
         <ResumePreview></ResumePreview>
       </div>
     </div>
