@@ -1,4 +1,7 @@
 import SectionTabs from "./sectionTabs"
+import PersonalForm from "./forms/personalForm";
+import EducationForm from "./forms/educationForm";
+import ExperienceForm from "./forms/experienceForm";
 
 export default function EditorPanel({activeTab,setActiveTab}) {
     return (
@@ -6,9 +9,9 @@ export default function EditorPanel({activeTab,setActiveTab}) {
             <div>Editor Panel</div>
             <SectionTabs activeTab={activeTab} setActiveTab={setActiveTab}></SectionTabs>
 
-            {activeTab === "personal" && <div>personal</div>}
-            {activeTab === "education" && <div>education</div>}
-            {activeTab === "experience" && <div>experience</div>}
+            {activeTab === "personal" && <PersonalForm></PersonalForm>}
+            {activeTab === "education" && <EducationForm></EducationForm>}
+            {activeTab === "experience" && <ExperienceForm></ExperienceForm>}
 
         </div>
     );
