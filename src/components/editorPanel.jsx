@@ -3,15 +3,15 @@ import PersonalForm from "./forms/personalForm";
 import EducationForm from "./forms/educationForm";
 import ExperienceForm from "./forms/experienceForm";
 
-export default function EditorPanel({activeTab,setActiveTab}) {
+export default function EditorPanel({activeTab,setActiveTab,resume,setResume}) {
     return (
         <div>
             <div>Editor Panel</div>
             <SectionTabs activeTab={activeTab} setActiveTab={setActiveTab}></SectionTabs>
 
-            {activeTab === "personal" && <PersonalForm></PersonalForm>}
-            {activeTab === "education" && <EducationForm></EducationForm>}
-            {activeTab === "experience" && <ExperienceForm></ExperienceForm>}
+            {activeTab === "personal" && <PersonalForm resume={resume} setResume={setResume}></PersonalForm>}
+            {activeTab === "education" && <EducationForm resume={resume} setResume={setResume}></EducationForm>}
+            {activeTab === "experience" && <ExperienceForm resume={resume} setResume={setResume}></ExperienceForm>}
 
         </div>
     );
