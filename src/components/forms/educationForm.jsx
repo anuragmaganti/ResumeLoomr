@@ -15,14 +15,14 @@ export default function EducationForm() {
             {educationEntries.map((entry)=>(
             <fieldset key={entry.id}>
                 <form onSubmit={handleSubmit}>
-                    <label htmlFor="school">Institution: </label>
-                    <input type="text" id="school" name="school"/>
+                    <label htmlFor={"school"+entry.id}>Institution: </label>
+                    <input type="text" id={"school"+entry.id} name="school"/>
                     <div></div>
-                    <label htmlFor="degree">Degree: </label>
-                    <input type="text" id="degree" name="degree" />
+                    <label htmlFor={"degree"+entry.id}>Degree: </label>
+                    <input type="text" id={"degree"+entry.id} name="degree" />
                     <div></div>
-                    <label htmlFor="yearsEdu">Years active: </label>
-                    <input type="text" id="yearsEdu" name="yearsEdu"/>
+                    <label htmlFor={"yearsEdu"+entry.id}>Years active: </label>
+                    <input type="text" id={"yearsEdu"+entry.id} name="yearsEdu"/>
                     <div></div>
                     <button type="button" onClick={()=>setEducationEntries(educationEntries.filter(item => item.id !== entry.id))}>Delete</button>
                 </form>
@@ -31,7 +31,7 @@ export default function EducationForm() {
            
             <button type="button" onClick={()=>setEducationEntries([...educationEntries,{id: crypto.randomUUID(),school:"",degree:"",yearsActive:""}])}>Add Another</button>
             <div></div>
-            <button type="submit">Update</button>
+            <button type="button">Update</button>
 
         </div>
     )
