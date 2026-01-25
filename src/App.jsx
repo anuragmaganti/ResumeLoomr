@@ -4,6 +4,16 @@ import Header from './components/header';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/EditorPanel';
 
+const [resume,setResume] = useState(
+
+  {
+  personal:{name:"",phone:"",email:""},
+  education:[{school:"",degree:"",yearsActive:""}],
+  experience:[{company:"",activites:"",yearsExp:""}]
+  }
+
+)
+
 function App() {
 
   const [activeTab,setActiveTab] = useState("personal");
