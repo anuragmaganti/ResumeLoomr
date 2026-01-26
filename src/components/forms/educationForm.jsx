@@ -52,7 +52,17 @@ export default function EducationForm({education,setResume}) {
                         )
                         }/>
                     <div></div>
-                    <button type="button" onClick={()=>setEducationEntries(educationEntries.filter(item => item.id !== entry.id))}>Delete</button>
+                    <button type="button" onClick={()=> setResume(
+                        prev => (
+                            {...prev,
+                                education: prev.education.filter(
+                                    item => 
+                                        item.id !== entry.id
+                                )
+                            }
+                        )
+                    )}>Delete</button>
+
                 </form>
                 <div>Entry #{entry.id}</div>
             </fieldset>))}
