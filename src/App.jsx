@@ -4,7 +4,10 @@ import Header from './components/header';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/EditorPanel';
 
-const [resume,setResume] = useState(
+
+function App() {
+
+  const [resume,setResume] = useState(
 
   {
   personal:{name:"",phone:"",email:""},
@@ -12,9 +15,7 @@ const [resume,setResume] = useState(
   experience:[{company:"",activites:"",yearsExp:""}]
   }
 
-)
-
-function App() {
+  );
 
   const [activeTab,setActiveTab] = useState("personal");
 
