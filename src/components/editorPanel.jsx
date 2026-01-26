@@ -9,9 +9,9 @@ export default function EditorPanel({activeTab,setActiveTab,resume,setResume}) {
             <div>Editor Panel</div>
             <SectionTabs activeTab={activeTab} setActiveTab={setActiveTab}></SectionTabs>
 
-            {activeTab === "personal" && <PersonalForm resume={resume} setResume={setResume}></PersonalForm>}
-            {activeTab === "education" && <EducationForm resume={resume} setResume={setResume}></EducationForm>}
-            {activeTab === "experience" && <ExperienceForm resume={resume} setResume={setResume}></ExperienceForm>}
+            {activeTab === "personal" && <PersonalForm personal={resume.personal} setResume={setResume}></PersonalForm>}
+            {activeTab === "education" && <EducationForm education={resume.education} setResume={setResume}></EducationForm>}
+            {activeTab === "experience" && <ExperienceForm experience={resume.experience} setResume={setResume}></ExperienceForm>}
 
         </div>
     );
