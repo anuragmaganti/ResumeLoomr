@@ -1,4 +1,4 @@
-export default function SectionTabs({activeTab, setActiveTab}) {
+export default function SectionTabs({setActiveTab}) {
     return(
         <div>
             <button onClick={()=>setActiveTab("personal")}>Personal</button>
