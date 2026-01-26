@@ -1,10 +1,5 @@
-import { useState } from "react";
+export default function EducationForm({education,setResume}) {
 
-export default function EducationForm() {
-
-    const [educationEntries,setEducationEntries] = useState([
-        {id: crypto.randomUUID(), school:"",degree:"",yearsActive:""}
-    ])
 
     function handleSubmit(e) {
         e.preventDefault();
@@ -12,17 +7,50 @@ export default function EducationForm() {
 
     return (
         <div>
-            {educationEntries.map((entry)=>(
+            {education.map((entry)=>(
             <fieldset key={entry.id}>
                 <form onSubmit={handleSubmit}>
                     <label htmlFor={"school"+entry.id}>Institution: </label>
-                    <input type="text" id={"school"+entry.id} name="school"/>
+                    <input type="text" id={"school"+entry.id} name="school" value={entry.school} onChange={
+                        (e)=>setResume(
+                            prev => (
+                                {...prev,
+                                education: prev.education.map( item =>
+                                    item.id === entry.id ? {...item, school: e.target.value} : item
+                                )
+                                }
+                            )
+                            
+                        )
+                        }/>
                     <div></div>
                     <label htmlFor={"degree"+entry.id}>Degree: </label>
-                    <input type="text" id={"degree"+entry.id} name="degree" />
+                    <input type="text" id={"degree"+entry.id} name="degree" value={entry.degree} onChange={
+                        (e)=>setResume(
+                            prev => (
+                                {...prev,
+                                education: prev.education.map( item =>
+                                    item.id === entry.id ? {...item, degree: e.target.value} : item
+                                )
+                                }
+                            )
+                            
+                        )
+                        }/>
                     <div></div>
                     <label htmlFor={"yearsEdu"+entry.id}>Years active: </label>
-                    <input type="text" id={"yearsEdu"+entry.id} name="yearsEdu"/>
+                    <input type="text" id={"yearsEdu"+entry.id} name="yearsEdu"value={entry.yearsEdu} onChange={
+                        (e)=>setResume(
+                            prev => (
+                                {...prev,
+                                education: prev.education.map( item =>
+                                    item.id === entry.id ? {...item, yearsEdu: e.target.value} : item
+                                )
+                                }
+                            )
+                            
+                        )
+                        }/>
                     <div></div>
                     <button type="button" onClick={()=>setEducationEntries(educationEntries.filter(item => item.id !== entry.id))}>Delete</button>
                 </form>
