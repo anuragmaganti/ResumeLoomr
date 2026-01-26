@@ -28,7 +28,6 @@ export default function PersonalForm({personal,setResume}) {
                     <label htmlFor="email">Email Address: </label>
                     <input type="text" id="email" name="email" value={personal.email} onChange={(e)=>updatePersonal(e)}/>
                     <div></div>
-                    <button type="submit">Update</button>
                 </form>
             </fieldset>
         </div>
