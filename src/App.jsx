@@ -11,8 +11,8 @@ function App() {
 
   {
   personal:{name:"",phone:"",email:""},
-  education:[{school:"",degree:"",yearsActive:""}],
-  experience:[{company:"",activites:"",yearsExp:""}]
+  education:[{id: crypto.randomUUID(), school:"",degree:"",yearsEdu:""}],
+  experience:[{id: crypto.randomUUID(),company:"",activites:"",yearsExp:""}]
   }
 
   );
