@@ -64,7 +64,6 @@ export default function EducationForm({education,setResume}) {
                     )}>Delete</button>
 
                 </form>
-                <div>Entry #{entry.id}</div>
             </fieldset>))}
            
             <button type="button" onClick={()=>setResume(
@@ -75,7 +74,6 @@ export default function EducationForm({education,setResume}) {
                 )
             )}>Add Another</button>
             <div></div>
-            <button type="button">Update</button>
 
         </div>
     )

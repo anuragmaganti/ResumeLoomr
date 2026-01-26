@@ -88,7 +88,6 @@ export default function ExperienceForm({experience,setResume}) {
                     )}>Delete</button>
 
                 </form>
-                <div>Entry #{entry.id}</div>
             </fieldset>))}
            
             <button type="button" onClick={()=>setResume(
@@ -99,7 +98,6 @@ export default function ExperienceForm({experience,setResume}) {
                 )
             )}>Add Another</button>
             <div></div>
-            <button type="button">Update</button>
 
         </div>
     )
