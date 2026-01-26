@@ -67,7 +67,13 @@ export default function EducationForm({education,setResume}) {
                 <div>Entry #{entry.id}</div>
             </fieldset>))}
            
-            <button type="button" onClick={()=>setEducationEntries([...educationEntries,{id: crypto.randomUUID(),school:"",degree:"",yearsActive:""}])}>Add Another</button>
+            <button type="button" onClick={()=>setResume(
+                prev=> (
+                    {...prev,
+                        education: [...prev.education,{id: crypto.randomUUID(),company:"",activites:"",yearsExp:""}]
+                    }
+                )
+            )}>Add Another</button>
             <div></div>
             <button type="button">Update</button>
 
