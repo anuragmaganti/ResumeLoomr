@@ -24,7 +24,7 @@ function App() {
       <Header></Header>
       <div className="main">
         <EditorPanel activeTab={activeTab} setActiveTab={setActiveTab} resume={resume} setResume={setResume}></EditorPanel>
-        <ResumePreview></ResumePreview>
+        <ResumePreview resume={resume}></ResumePreview>
       </div>
     </div>
   )
