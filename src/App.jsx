@@ -4,10 +4,6 @@ import Header from './components/header';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/EditorPanel';
 
-import resumeObject from "./components/getDataFromResume";
-window.resume = resumeObject;
-
-
 
 function App() {
 
