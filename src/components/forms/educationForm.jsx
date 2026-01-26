@@ -70,7 +70,7 @@ export default function EducationForm({education,setResume}) {
             <button type="button" onClick={()=>setResume(
                 prev=> (
                     {...prev,
-                        education: [...prev.education,{id: crypto.randomUUID(),company:"",activites:"",yearsExp:""}]
+                        education: [...prev.education,{id: crypto.randomUUID(),school:"",degree:"",yearsEdu:""}]
                     }
                 )
             )}>Add Another</button>
