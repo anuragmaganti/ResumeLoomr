@@ -8,7 +8,7 @@ export default function EducationForm({education,setResume}) {
     return (
         <div>
             {education.map((entry)=>(
-            <fieldset key={entry.id}>
+            <fieldset key={entry.id} className="eduForm">
                 <form onSubmit={handleSubmit}>
                     <label htmlFor={"school"+entry.id}>Institution: </label>
                     <input type="text" id={"school"+entry.id} name="school" value={entry.school} onChange={

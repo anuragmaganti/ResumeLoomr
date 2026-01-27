@@ -54,7 +54,7 @@ export default function ExperienceForm({experience,setResume}) {
         <div>
             {experience.map((entry)=>(
 
-            <fieldset key={entry.id}>
+            <fieldset key={entry.id} className="expForm">
 
                 <form onSubmit={handleSubmit}>
                     <label htmlFor={"company"+entry.id}>Company: </label>

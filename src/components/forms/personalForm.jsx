@@ -16,7 +16,7 @@ export default function PersonalForm({personal,setResume}) {
 
 
     return (
-        <div>
+        <div className="perForm">
             <fieldset>
                 <form onSubmit={handleSubmit}>
                     <label htmlFor="name">First and Last Name: </label>

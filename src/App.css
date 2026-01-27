@@ -1,6 +1,7 @@
 .header {
   display: flex;
   align-items: center;
+  font-family: monospace,system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 .app {
@@ -12,6 +13,7 @@
 .main {
   display: flex;
   flex: 1;
+  
 }
 
 .main > * {
@@ -25,4 +27,10 @@ fieldset {
 
 h3 {
   margin: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
 }
