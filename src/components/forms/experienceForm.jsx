@@ -93,15 +93,15 @@ export default function ExperienceForm({experience,setResume}) {
                     <div className="field">
                         <label htmlFor={"activities"+entry.id}>Activities: </label>
                         {entry.activities.map((activity, activityIndex) => (
-                            <div key={activityIndex}>
+                            <div className="actInputAndBtn" key={activityIndex}>
                                 <textarea type="text" value={activity} onChange={(e) => updateActivity(entry.id, activityIndex, e.target.value) }/>
-                                <button className="delBtn delBtnAct" type="button" onClick={() => deleteActivity(entry.id, activityIndex)}> Delete activity </button>
+                                <button className="delBtn delBtnAct" type="button" onClick={() => deleteActivity(entry.id, activityIndex)}> X </button>
                             </div>
                         ))}
                     </div>
 
                     <button className="addBtn addBtnAct" type="button" onClick={() => addActivity(entry.id)}>
-                    Add activity
+                    +
                     </button>
 
 

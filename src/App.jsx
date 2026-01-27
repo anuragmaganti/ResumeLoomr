@@ -25,8 +25,8 @@ function App() {
     <div className="app">
       <Header></Header>
       <div className="main">
-        <EditorPanel activeTab={activeTab} setActiveTab={setActiveTab} resume={resume} setResume={setResume} className="editorPanel"></EditorPanel>
-        <ResumePreview resume={resume} className="sectionTabs"></ResumePreview>
+        <EditorPanel activeTab={activeTab} setActiveTab={setActiveTab} resume={resume} setResume={setResume}></EditorPanel>
+        <ResumePreview resume={resume}></ResumePreview>
       </div>
     </div>
   )
