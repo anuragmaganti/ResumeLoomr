@@ -1,10 +1,6 @@
 .header {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding-left: 15px;
-  border-bottom: 1px solid black;
-
 }
 
 .app {
@@ -20,6 +16,13 @@
 
 .main > * {
   flex: 1;
-  border: 1px solid black;
   min-width: 0;
+}
+
+fieldset {
+  border: none;
+}
+
+h3 {
+  margin: 0;
 }
