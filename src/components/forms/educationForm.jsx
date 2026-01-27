@@ -7,52 +7,61 @@ export default function EducationForm({education,setResume}) {
 
     return (
         <div>
+
             {education.map((entry)=>(
             <fieldset key={entry.id} className="eduForm">
                 <form onSubmit={handleSubmit}>
-                    <label htmlFor={"school"+entry.id}>Institution: </label>
-                    <input type="text" id={"school"+entry.id} name="school" value={entry.school} onChange={
-                        (e)=>setResume(
-                            prev => (
-                                {...prev,
-                                education: prev.education.map( item =>
-                                    item.id === entry.id ? {...item, school: e.target.value} : item
+
+                    <div className="field">
+
+                        <label htmlFor={"school"+entry.id}>Institution: </label>
+                        <input type="text" id={"school"+entry.id} name="school" value={entry.school} onChange={
+                            (e)=>setResume(
+                                prev => (
+                                    {...prev,
+                                    education: prev.education.map( item =>
+                                        item.id === entry.id ? {...item, school: e.target.value} : item
+                                    )
+                                    }
                                 )
-                                }
+                        
                             )
-                            
-                        )
-                        }/>
-                    <div></div>
-                    <label htmlFor={"degree"+entry.id}>Degree: </label>
-                    <input type="text" id={"degree"+entry.id} name="degree" value={entry.degree} onChange={
-                        (e)=>setResume(
-                            prev => (
-                                {...prev,
-                                education: prev.education.map( item =>
-                                    item.id === entry.id ? {...item, degree: e.target.value} : item
+                            }/>
+                    </div>
+                 
+                    <div className="field">
+                        <label htmlFor={"degree"+entry.id}>Degree: </label>
+                        <input type="text" id={"degree"+entry.id} name="degree" value={entry.degree} onChange={
+                            (e)=>setResume(
+                                prev => (
+                                    {...prev,
+                                    education: prev.education.map( item =>
+                                        item.id === entry.id ? {...item, degree: e.target.value} : item
+                                    )
+                                    }
                                 )
-                                }
+                        
                             )
-                            
-                        )
                         }/>
-                    <div></div>
-                    <label htmlFor={"yearsEdu"+entry.id}>Years active: </label>
-                    <input type="text" id={"yearsEdu"+entry.id} name="yearsEdu"value={entry.yearsEdu} onChange={
-                        (e)=>setResume(
-                            prev => (
-                                {...prev,
-                                education: prev.education.map( item =>
-                                    item.id === entry.id ? {...item, yearsEdu: e.target.value} : item
+                    </div>
+          
+                    <div className="field">
+                        <label htmlFor={"yearsEdu"+entry.id}>Years active: </label>
+                        <input type="text" id={"yearsEdu"+entry.id} name="yearsEdu"value={entry.yearsEdu} onChange={
+                            (e)=>setResume(
+                                prev => (
+                                    {...prev,
+                                    education: prev.education.map( item =>
+                                        item.id === entry.id ? {...item, yearsEdu: e.target.value} : item
+                                    )
+                                    }
                                 )
-                                }
+                        
                             )
-                            
-                        )
                         }/>
-                    <div></div>
-                    <button type="button" onClick={()=> setResume(
+                    </div>
+    
+                    <button className="delBtn delBtnEdu" type="button" onClick={()=> setResume(
                         prev => (
                             {...prev,
                                 education: prev.education.filter(
@@ -66,14 +75,14 @@ export default function EducationForm({education,setResume}) {
                 </form>
             </fieldset>))}
            
-            <button type="button" onClick={()=>setResume(
+            <button className="addBtn addBtnEdu" type="button" onClick={()=>setResume(
                 prev=> (
                     {...prev,
                         education: [...prev.education,{id: crypto.randomUUID(),school:"",degree:"",yearsEdu:""}]
                     }
                 )
             )}>Add Another</button>
-            <div></div>
+  
 
         </div>
     )

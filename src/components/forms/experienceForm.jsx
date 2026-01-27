@@ -57,68 +57,72 @@ export default function ExperienceForm({experience,setResume}) {
             <fieldset key={entry.id} className="expForm">
 
                 <form onSubmit={handleSubmit}>
-                    <label htmlFor={"company"+entry.id}>Company: </label>
-                    <input type="text" id={"company"+entry.id} name="company" value={entry.company} onChange={
-                        (e)=>setResume(
-                            prev => (
-                                {...prev,
-                                experience: prev.experience.map( item =>
-                                    item.id === entry.id ? {...item, company: e.target.value} : item
-                                )
-                                }
-                            )
-                            
-                        )
-                    }/>
 
-                    <div></div>
+                    <div className="field">
+                        <label htmlFor={"company"+entry.id}>Company: </label>
+                        <input type="text" id={"company"+entry.id} name="company" value={entry.company} onChange={
+                            (e)=>setResume(
+                                prev => (
+                                    {...prev,
+                                    experience: prev.experience.map( item =>
+                                        item.id === entry.id ? {...item, company: e.target.value} : item
+                                    )
+                                    }
+                                )
+                        
+                            )
+                        }/>
+                    </div>
                     
-                    <label htmlFor={"role"+entry.id}>Role: </label>
-                    <input type="text" id={"role"+entry.id} name="role" value={entry.role} onChange={
-                        (e)=>setResume(
-                            prev => (
-                                {...prev,
-                                experience: prev.experience.map( item =>
-                                    item.id === entry.id ? {...item, role: e.target.value} : item
+                    <div className="field">
+                        <label htmlFor={"role"+entry.id}>Role: </label>
+                        <input type="text" id={"role"+entry.id} name="role" value={entry.role} onChange={
+                            (e)=>setResume(
+                                prev => (
+                                    {...prev,
+                                    experience: prev.experience.map( item =>
+                                        item.id === entry.id ? {...item, role: e.target.value} : item
+                                    )
+                                    }
                                 )
-                                }
+                        
                             )
-                            
-                        )
-                    }/>
+                        }/>
+                    </div>
 
-                    <div></div>
+                    <div className="field">
+                        <label htmlFor={"activities"+entry.id}>Activities: </label>
+                        {entry.activities.map((activity, activityIndex) => (
+                            <div key={activityIndex}>
+                                <textarea type="text" value={activity} onChange={(e) => updateActivity(entry.id, activityIndex, e.target.value) }/>
+                                <button className="delBtn delBtnAct" type="button" onClick={() => deleteActivity(entry.id, activityIndex)}> Delete activity </button>
+                            </div>
+                        ))}
+                    </div>
 
-                    <label htmlFor={"activities"+entry.id}>Activities: </label>
-
-                    {entry.activities.map((activity, activityIndex) => (
-                        <div key={activityIndex} >
-                            <textarea type="text" value={activity} onChange={(e) => updateActivity(entry.id, activityIndex, e.target.value) }/>
-                            <button type="button" onClick={() => deleteActivity(entry.id, activityIndex)}> Delete activity </button>
-                        </div>
-                    ))}
-
-                    <button type="button" onClick={() => addActivity(entry.id)}>
+                    <button className="addBtn addBtnAct" type="button" onClick={() => addActivity(entry.id)}>
                     Add activity
                     </button>
-                    <div></div>
-                    <label htmlFor={"yearsExp"+entry.id}>Years active: </label>
-                    <input type="text" id={"yearsExp"+entry.id} name="yearsExp"value={entry.yearsExp} onChange={
-                        (e)=>setResume(
-                            prev => (
-                                {...prev,
-                                experience: prev.experience.map( item =>
-                                    item.id === entry.id ? {...item, yearsExp: e.target.value} : item
+
+
+                    <div className="field">
+                        <label htmlFor={"yearsExp"+entry.id}>Years active: </label>
+                        <input type="text" id={"yearsExp"+entry.id} name="yearsExp"value={entry.yearsExp} onChange={
+                            (e)=>setResume(
+                                prev => (
+                                    {...prev,
+                                    experience: prev.experience.map( item =>
+                                        item.id === entry.id ? {...item, yearsExp: e.target.value} : item
+                                    )
+                                    }
                                 )
-                                }
+                        
                             )
-                            
-                        )
-                    }/>
+                        }/>
+                    </div>
 
-                    <div></div>
 
-                    <button type="button" onClick={()=> setResume(
+                    <button className="delBtn delBtnExp" type="button" onClick={()=> setResume(
                         prev => (
                             {...prev,
                                 experience: prev.experience.filter(
@@ -133,14 +137,14 @@ export default function ExperienceForm({experience,setResume}) {
 
             </fieldset>))}
            
-            <button type="button" onClick={()=>setResume(
+            <button className="addBtn addBtnExp" type="button" onClick={()=>setResume(
                 prev=> (
                     {...prev,
                         experience: [...prev.experience,{id: crypto.randomUUID(),company:"",role:"",activities:[""],yearsExp:""}]
                     }
                 )
             )}>Add Another</button>
-            <div></div>
+
 
         </div>
     )
