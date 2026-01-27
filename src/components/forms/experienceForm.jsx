@@ -53,7 +53,9 @@ export default function ExperienceForm({experience,setResume}) {
     return (
         <div>
             {experience.map((entry)=>(
+
             <fieldset key={entry.id}>
+
                 <form onSubmit={handleSubmit}>
                     <label htmlFor={"company"+entry.id}>Company: </label>
                     <input type="text" id={"company"+entry.id} name="company" value={entry.company} onChange={
@@ -70,8 +72,25 @@ export default function ExperienceForm({experience,setResume}) {
                     }/>
 
                     <div></div>
+                    
+                    <label htmlFor={"role"+entry.id}>Role: </label>
+                    <input type="text" id={"role"+entry.id} name="role" value={entry.role} onChange={
+                        (e)=>setResume(
+                            prev => (
+                                {...prev,
+                                experience: prev.experience.map( item =>
+                                    item.id === entry.id ? {...item, role: e.target.value} : item
+                                )
+                                }
+                            )
+                            
+                        )
+                    }/>
+
+                    <div></div>
 
                     <label htmlFor={"activities"+entry.id}>Activities: </label>
+
                     {entry.activities.map((activity, activityIndex) => (
                         <div key={activityIndex} >
                             <textarea type="text" value={activity} onChange={(e) => updateActivity(entry.id, activityIndex, e.target.value) }/>
@@ -111,6 +130,7 @@ export default function ExperienceForm({experience,setResume}) {
                     )}>Delete</button>
 
                 </form>
+
             </fieldset>))}
            
             <button type="button" onClick={()=>setResume(

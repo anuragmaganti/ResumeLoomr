@@ -1,5 +1,4 @@
 export default function ResumePreview({resume}) {
-    
 
     return (
         <div>
@@ -29,6 +28,7 @@ export default function ResumePreview({resume}) {
                 {resume.experience.map((job) => (
                     <div key={job.id}>
                     <h3>{job.company}</h3>
+                    <div>{job.role}</div>
                     <div>{job.yearsExp}</div>
 
                     <ul>
