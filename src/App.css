@@ -23,9 +23,3 @@
   border: 1px solid black;
   min-width: 0;
 }
-
-.activityRow {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
