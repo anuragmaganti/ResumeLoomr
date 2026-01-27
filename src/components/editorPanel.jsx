@@ -6,7 +6,7 @@ import ExperienceForm from "./forms/experienceForm";
 export default function EditorPanel({activeTab,setActiveTab,resume,setResume}) {
     return (
         <div>
-            <div>Editor Panel</div>
+            
             <SectionTabs activeTab={activeTab} setActiveTab={setActiveTab}></SectionTabs>
 
             {activeTab === "personal" && <PersonalForm personal={resume.personal} setResume={setResume}></PersonalForm>}

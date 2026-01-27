@@ -12,7 +12,7 @@ function App() {
   {
   personal:{name:"",phone:"",email:""},
   education:[{id: crypto.randomUUID(), school:"",degree:"",yearsEdu:""}],
-  experience:[{id: crypto.randomUUID(),company:"",activities:"",yearsExp:""}]
+  experience:[{id: crypto.randomUUID(),company:"",role:"",activities:[""],yearsExp:""}]
   }
 
   );

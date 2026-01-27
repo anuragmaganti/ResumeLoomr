@@ -1,33 +1,54 @@
 export default function ExperienceForm({experience,setResume}) {
 
+    function updateActivity(entryId, activityIndex, newValue) {
+        setResume(prev => ({
+            ...prev,
+            experience: prev.experience.map(item =>
+            item.id === entryId
+                ? {
+                    ...item,
+                    activities: item.activities.map((activity, i) =>
+                    i === activityIndex ? newValue : activity
+                    )
+                }
+                : item
+            )
+        }));
+    }
+
+    function addActivity(entryId) {
+        setResume(prev => ({
+            ...prev,
+            experience: prev.experience.map(item =>
+            item.id === entryId
+                ? { ...item, activities: [...item.activities, ""] }
+                : item
+            )
+        }));
+    }
+
+    function deleteActivity(entryId, activityIndex) {
+        setResume(prev => ({
+            ...prev,
+            experience: prev.experience.map(item =>
+            item.id === entryId
+                ? {
+                    ...item,
+                    activities: [
+                    ...item.activities.slice(0, activityIndex),
+                    ...item.activities.slice(activityIndex + 1)
+                    ]
+                }
+                : item
+            )
+        }));
+    }
+
+
 
     function handleSubmit(e) {
         e.preventDefault();
     }
-
-    // return (
-    //     <div>
-    //         {experienceEntries.map((entry)=> (
-    //         <fieldset key={entry.id}>
-    //             <form onSubmit={handleSubmit}>
-    //                 <label htmlFor={"company"+entry.id}>Company: </label>
-    //                 <input type="text" id={"company"+entry.id} name="company"/>
-    //                 <div></div>
-    //                 <label htmlFor={"activites"+entry.id}>Description of activites: </label>
-    //                 <textarea id={"activites"+entry.id} name="activites"></textarea>
-    //                 <div></div>
-    //                 <label htmlFor={"yearsExp"+entry.id}>Years active: </label>
-    //                 <input type="text" id={"yearsExp"+entry.id} name="yearsExp"/>
-    //                 <div></div>
-    //                 <button type="button" onClick={()=>setExperienceEntries(experienceEntries.filter(item => item.id !== entry.id))}>Delete</button>
-    //             </form>
-    //             <div>Entry #{entry.id}</div>
-    //         </fieldset> ))}
-    //         <button type="button" onClick={()=>setExperienceEntries([...experienceEntries,{id: crypto.randomUUID(),company:"",activites:"",yearsExp:""}])}>Add Another</button>
-    //         <div></div>
-    //         <button type="button">Update Resume</button>
-    //     </div>
-    // )
 
     return (
         <div>
@@ -46,21 +67,21 @@ export default function ExperienceForm({experience,setResume}) {
                             )
                             
                         )
-                        }/>
+                    }/>
+
                     <div></div>
+
                     <label htmlFor={"activities"+entry.id}>Activities: </label>
-                    <input type="text" id={"activities"+entry.id} name="activities" value={entry.activities} onChange={
-                        (e)=>setResume(
-                            prev => (
-                                {...prev,
-                                experience: prev.experience.map( item =>
-                                    item.id === entry.id ? {...item, activities: e.target.value} : item
-                                )
-                                }
-                            )
-                            
-                        )
-                        }/>
+                    {entry.activities.map((activity, activityIndex) => (
+                        <div key={activityIndex} >
+                            <textarea type="text" value={activity} onChange={(e) => updateActivity(entry.id, activityIndex, e.target.value) }/>
+                            <button type="button" onClick={() => deleteActivity(entry.id, activityIndex)}> Delete activity </button>
+                        </div>
+                    ))}
+
+                    <button type="button" onClick={() => addActivity(entry.id)}>
+                    Add activity
+                    </button>
                     <div></div>
                     <label htmlFor={"yearsExp"+entry.id}>Years active: </label>
                     <input type="text" id={"yearsExp"+entry.id} name="yearsExp"value={entry.yearsExp} onChange={
@@ -74,8 +95,10 @@ export default function ExperienceForm({experience,setResume}) {
                             )
                             
                         )
-                        }/>
+                    }/>
+
                     <div></div>
+
                     <button type="button" onClick={()=> setResume(
                         prev => (
                             {...prev,
@@ -93,7 +116,7 @@ export default function ExperienceForm({experience,setResume}) {
             <button type="button" onClick={()=>setResume(
                 prev=> (
                     {...prev,
-                        experience: [...prev.experience,{id: crypto.randomUUID(),company:"",activities:"",yearsExp:""}]
+                        experience: [...prev.experience,{id: crypto.randomUUID(),company:"",role:"",activities:[""],yearsExp:""}]
                     }
                 )
             )}>Add Another</button>

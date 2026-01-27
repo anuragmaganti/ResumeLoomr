@@ -13,11 +13,11 @@ export default function ResumePreview({resume}) {
 
             <div>
                 <h2>Education</h2>
-                {resume.education.map((item) => (
-                    <div>
-                        <div>{item.school}</div>
-                        <div>{item.yearsEdu}</div>
-                        <div>{item.degree}</div>
+                {resume.education.map((institution) => (
+                    <div key={institution.id}>
+                        <h3>{institution.school}</h3>
+                        <div>{institution.yearsEdu}</div>
+                        <div>{institution.degree}</div>
                     </div>
                 ))}
             </div>
@@ -25,15 +25,21 @@ export default function ResumePreview({resume}) {
             <div></div>
             
             <div>
-                <h2>Experience</h2>
-                {resume.experience.map((item) => (
-                    <div>
-                        <div>{item.company}</div>
-                        <div>{item.yearsExp}</div>
-                        <div>{item.activities}</div>
+            <h2>Experience</h2>
+                {resume.experience.map((job) => (
+                    <div key={job.id}>
+                    <h3>{job.company}</h3>
+                    <div>{job.yearsExp}</div>
+
+                    <ul>
+                        {job.activities .filter(a => a.trim() !== "").map((activity, i) => (
+                        <li key={i}>{activity}</li>
+                        ))}
+                    </ul>
                     </div>
                 ))}
             </div>
+
         </div>
     )
 }
