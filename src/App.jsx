@@ -5,7 +5,7 @@ import './styles/forms.css'
 import './styles/preview.css'
 import Header from './components/header';
 import ResumePreview from './components/resumePreview';
-import EditorPanel from './components/EditorPanel';
+import EditorPanel from './components/editorPanel';
 
 
 function App() {
@@ -24,7 +24,11 @@ function App() {
 
   return (
     <div className="app">
-      <Header></Header>
+      <div className='headerAndPrint'>
+        <Header></Header>
+       
+        <button className="printButton" onClick={() => window.print()}><span class="printIcon"></span></button>
+      </div>
       <div className="main">
         <EditorPanel activeTab={activeTab} setActiveTab={setActiveTab} resume={resume} setResume={setResume}></EditorPanel>
         <ResumePreview resume={resume}></ResumePreview>

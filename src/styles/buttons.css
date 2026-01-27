@@ -3,7 +3,7 @@
 /* editor panel buttons styling*/
 .button-55 {
   align-self: center;
-  background-color: rgb(215, 245, 255);
+  background-color: rgb(255, 255, 255);
   background-image: none;
   background-position: 0 90%;
   background-repeat: repeat no-repeat;
@@ -133,4 +133,128 @@
 
 .actInputAndBtn {
   display: flex;
+}
+
+.headerAndPrint {
+  display: flex;
+  justify-content: space-between;
+}
+
+/*printing*/
+
+@media print {
+
+  .headerAndPrint,
+  .editorPanel {
+    display: none;
+  }
+
+  .app {
+    min-height: auto !important;
+    margin: 0 !important;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .resumePage {
+    margin: 0 auto;   /* center on page */
+    border: none;
+    box-shadow: none;
+  }
+
+}
+
+@page {
+  margin: 0.15;
+}
+
+/*print button styling*/
+
+button.printButton {
+  width: 75px;
+  height: 75px;
+}
+span.printIcon, span.printIcon::before, span.printIcon::after, button.printButton:hover .printIcon::after {
+  border: solid 4px #333;
+}
+span.printIcon::after {
+  border-width: 2px;
+}
+
+button.printButton {
+  position: relative;
+  padding: 0;
+  border: 0;
+  
+  border: none;
+  background: transparent;
+}
+
+span.printIcon, span.printIcon::before, span.printIcon::after, button.printButton:hover .printIcon::after {
+  box-sizing: border-box;
+  background-color: #fff;
+}
+
+span.printIcon {
+  position: relative;
+  display: inline-block;  
+  padding: 0;
+  margin-top: 20%;
+
+  width: 60%;
+  height: 35%;
+  background: #fff;
+  border-radius: 20% 20% 0 0;
+}
+
+span.printIcon::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 12%;
+  right: 12%;
+  height: 110%;
+
+  transition: height .2s .15s;
+}
+
+span.printIcon::after {
+  content: "";
+  position: absolute;
+  top: 55%;
+  left: 12%;
+  right: 12%;
+  height: 0%;
+  background: #fff;
+  background-repeat: no-repeat;
+  background-size: 70% 90%;
+  background-position: center;
+  background-image: linear-gradient(
+    to top,
+    #fff 0, #fff 14%,
+    #333 14%, #333 28%,
+    #fff 28%, #fff 42%,
+    #333 42%, #333 56%,
+    #fff 56%, #fff 70%,
+    #333 70%, #333 84%,
+    #fff 84%, #fff 100%
+  );
+
+  transition: height .2s, border-width 0s .2s, width 0s .2s;
+}
+
+button.printButton:hover {
+  cursor: pointer;
+}
+
+button.printButton:hover .printIcon::before {
+  height:0px;
+  transition: height .2s;
+}
+button.printButton:hover .printIcon::after {
+  height:120%;
+  transition: height .2s .15s, border-width 0s .16s;
 }
