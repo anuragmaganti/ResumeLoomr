@@ -1,0 +1,69 @@
+h1 {
+    font-size:30px;
+}
+
+.phoneEmail > * {
+    font-size: 17px;
+}
+
+h2 {
+    font-size: 20px;
+}
+
+.degree, .company {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.school, .role {
+    font-size: 15px;
+}
+
+.personalSection > h1 {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 7px;
+
+}
+
+.phoneEmail {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid black;
+
+}
+
+
+.educationDiv, .experienceDiv {
+    padding-bottom: 7px;
+    
+    
+}
+
+.educationDiv{
+    border-bottom: 1px solid black;
+}
+
+
+.educationSection, .experienceSection {
+
+    margin-bottom: 15px;
+    margin-left: 7px;
+    margin-right: 7px;
+}
+
+.degreeYearsEduFlex, .companyYearsExpFlex {
+    margin-right: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+li {
+    font-size: 15px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}

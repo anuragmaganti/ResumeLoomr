@@ -2,40 +2,46 @@ export default function ResumePreview({resume}) {
 
     return (
         <div className="resumePage">
+
             <div className="personalSection">
                 <h1>{resume.personal.name}</h1>
-                <h3>{resume.personal.phone}</h3>
-                <h3>{resume.personal.email}</h3>
+                <div className="phoneEmail">
+                    <div>{resume.personal.phone}</div>
+                    <div>{resume.personal.email}</div>
+                </div>
             </div>
 
-            <div></div>
-
-            <div>
+            <div className="educationDiv">
                 <h2>Education</h2>
                 {resume.education.map((institution) => (
-                    <div key={institution.id}>
-                        <h3>{institution.school}</h3>
-                        <div>{institution.yearsEdu}</div>
-                        <div>{institution.degree}</div>
+                    <div className="educationSection" key={institution.id}>
+                        <div className="degreeYearsEduFlex">
+                            <div className="degree">{institution.degree}</div>
+                            <div className="yearsEdu">{institution.yearsEdu}</div>
+                        </div>
+                        <div className="school" >{institution.school}</div>
                     </div>
                 ))}
             </div>
-
-            <div></div>
             
-            <div>
+            <div className="experienceDiv">
                 <h2>Experience</h2>
                 {resume.experience.map((job) => (
-                    <div key={job.id}>
-                    <h3>{job.company}</h3>
-                    <div>{job.role}</div>
-                    <div>{job.yearsExp}</div>
-
-                    <ul>
-                        {job.activities .filter(a => a.trim() !== "").map((activity, i) => (
-                        <li key={i}>{activity}</li>
-                        ))}
-                    </ul>
+                    <div className="experienceSection">
+                        <div key={job.id}>
+                        <div className="companyYearsExpFlex">
+                            <div className="company">{job.company}</div>
+                            <div className="yearsExp">{job.yearsExp}</div>
+                        </div>
+                        <div className="role">{job.role}</div>
+                        <ul>
+                            {job.activities .filter(a => a.trim() !== "").map((activity, i) => (
+                            <div className="activityDiv">
+                                <li key={i}>{activity}</li>
+                            </div>
+                            ))}
+                        </ul>
+                    </div>
                     </div>
                 ))}
             </div>

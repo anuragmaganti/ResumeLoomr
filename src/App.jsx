@@ -2,6 +2,7 @@ import { useState } from 'react'
 import './App.css'
 import './styles/buttons.css'
 import './styles/forms.css'
+import './styles/preview.css'
 import Header from './components/header';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/EditorPanel';
