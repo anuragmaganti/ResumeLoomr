@@ -13,14 +13,9 @@
 
 .main {
   display: flex;
-  flex: 1;
-  
 }
 
-.main > * {
-  flex: 1;
-  min-width: 0;
-}
+
 
 fieldset {
   border: none;
@@ -37,8 +32,13 @@ h3 {
   margin-left: 12px;
 }
 
+.editorPanel {
+  flex: 2;
+}
+
 /*border styling*/
 .resumePage {
+  flex: 4;
   padding: 1rem 2.5rem;
   margin-top: 68px;
   border: 2.5px solid #333333;
