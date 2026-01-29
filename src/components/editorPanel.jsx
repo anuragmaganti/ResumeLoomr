@@ -9,9 +9,11 @@ export default function EditorPanel({activeTab,setActiveTab,resume,setResume}) {
             
             <SectionTabs activeTab={activeTab} setActiveTab={setActiveTab}></SectionTabs>
 
-            {activeTab === "personal" && <PersonalForm personal={resume.personal} setResume={setResume}></PersonalForm>}
-            {activeTab === "education" && <EducationForm education={resume.education} setResume={setResume}></EducationForm>}
-            {activeTab === "experience" && <ExperienceForm experience={resume.experience} setResume={setResume}></ExperienceForm>}
+            <div className="formContainer">
+                {activeTab === "personal" && <PersonalForm personal={resume.personal} setResume={setResume}></PersonalForm>}
+                {activeTab === "education" && <EducationForm education={resume.education} setResume={setResume}></EducationForm>}
+                {activeTab === "experience" && <ExperienceForm experience={resume.experience} setResume={setResume}></ExperienceForm>}
+            </div>
 
         </div>
     );
