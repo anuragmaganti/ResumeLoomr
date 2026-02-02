@@ -1,3 +1,13 @@
-:root{
-background-color: white;
+:root {
+  --bg0: #b2f9ce;
+  --bg1: #78a1ee;
+}
+
+
+body {
+  margin: 0;
+  background: radial-gradient(1200px 900px at 20% 10%, #c5cff5 0%, transparent 60%),
+              radial-gradient(900px 700px at 80% 20%, #9bb5f7 0%, transparent 55%),
+              radial-gradient(1000px 800px at 50% 85%, #79c0f7 0%, transparent 60%),
+              linear-gradient(180deg, var(--bg0), var(--bg1));
 }
