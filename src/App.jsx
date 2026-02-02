@@ -6,7 +6,6 @@ import './styles/preview.css'
 import Header from './components/header';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/editorPanel';
-import { Analytics } from "@vercel/analytics/react";
 
 
 
@@ -35,7 +34,6 @@ function App() {
         <EditorPanel activeTab={activeTab} setActiveTab={setActiveTab} resume={resume} setResume={setResume}></EditorPanel>
         <ResumePreview resume={resume}></ResumePreview>
       </div>
-      <Analytics></Analytics>
     </div>
   )
 }
