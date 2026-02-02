@@ -33,6 +33,12 @@ export default function PersonalForm({personal,setResume}) {
                     <label htmlFor="email">Email Address: </label>
                     <input type="text" id="email" name="email" value={personal.email} onChange={(e)=>updatePersonal(e)}/>
                 </div>
+
+                <div className="field">
+                    <label htmlFor="aboutMe">About Me / Resume objective: </label>
+                    <textarea type="text" id="aboutMe" name="aboutMe" value={personal.aboutMe} onChange={(e)=>updatePersonal(e)} rows="6"/>
+                </div>
+                
    
             </form>
         </fieldset>

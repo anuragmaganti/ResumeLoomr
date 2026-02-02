@@ -9,6 +9,7 @@ export default function ResumePreview({resume}) {
                     <div>{resume.personal.phone}</div>
                     <div>{resume.personal.email}</div>
                 </div>
+                <div className="aboutMe">{resume.personal.aboutMe}</div>
             </div>
 
             <div className="educationDiv">

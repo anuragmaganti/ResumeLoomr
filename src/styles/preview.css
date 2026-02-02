@@ -67,3 +67,14 @@ li {
     margin-top: 5px;
     margin-bottom: 5px;
 }
+
+.aboutMe {
+    width: 90%;
+    justify-self: center;
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.personalSection {
+    border-bottom: 1px solid black;
+}

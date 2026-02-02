@@ -13,7 +13,7 @@ function App() {
   const [resume,setResume] = useState(
 
   {
-  personal:{name:"",phone:"",email:""},
+  personal:{name:"",phone:"",email:"",aboutMe:""},
   education:[{id: crypto.randomUUID(), school:"",degree:"",yearsEdu:""}],
   experience:[{id: crypto.randomUUID(),company:"",role:"",activities:[""],yearsExp:""}]
   }
