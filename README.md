@@ -1,16 +1,28 @@
-# React + Vite
+# Resume Builder (React)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A simple resume builder web app built with React that lets users enter their information and see a live resume preview as they type. The goal of this project was to practice component design, controlled inputs, and state management while building something practical and easy to extend.
 
-Currently, two official plugins are available:
+## Features
+- Live resume preview that updates in real time
+- Form-based editor for common resume sections (personal info, education, experience, etc.)
+- Add/edit/remove entries for repeatable sections
+- Clean, printable layout (export/print-ready styling if applicable)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Built With
+- React
+- JavaScript (ES6+)
+- HTML/CSS
+- Vite (if you used Vite)
 
-## React Compiler
+## What I Learned
+- Structuring a React app with reusable components
+- Managing nested and repeatable form state (arrays of education/experience entries)
+- Controlled inputs and predictable data flow
+- Conditional rendering and handling empty states
+- Basic UI/UX decisions for readability and layout
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Getting Started
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Prerequisites
+- Node.js (LTS recommended)
+- npm (or yarn/pnpm)
