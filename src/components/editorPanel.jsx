@@ -29,7 +29,7 @@ export default function EditorPanel({ activeTab, setActiveTab, resume, actions, 
                 <p className="panelDescription editorPanelDescription">{currentSection.description}</p>
                 <div className="editorPanelMeta">
                     <span className={`statusBadge ${issueCount > 0 ? 'statusBadge--warning' : 'statusBadge--success'}`}>
-                        {issueCount > 0 ? `${issueCount} open validation ${issueCount === 1 ? 'item' : 'items'}` : 'All key fields look good'}
+                        {issueCount > 0 ? `${issueCount} thing${issueCount === 1 ? '' : 's'} to review` : 'All key fields look good'}
                     </span>
                 </div>
             </div>

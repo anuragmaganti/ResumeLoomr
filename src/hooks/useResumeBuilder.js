@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import {
   DRAFT_STORAGE_KEY,
   DEFAULT_TEMPLATE,
@@ -94,6 +95,7 @@ export function useResumeBuilder() {
       : null
   );
   const hasMounted = useRef(false);
+  const printViewRef = useRef(null);
   const errors = useMemo(() => validateResume(resume), [resume]);
   const previewModel = useMemo(() => getPreviewModel(resume), [resume]);
 
@@ -117,6 +119,22 @@ export function useResumeBuilder() {
 
     return () => window.clearTimeout(timeoutId);
   }, [resume, template]);
+
+  useEffect(() => {
+    function handleAfterPrint() {
+      if (printViewRef.current !== null) {
+        const previousView = printViewRef.current;
+        printViewRef.current = null;
+        setMobileView(previousView);
+      }
+    }
+
+    window.addEventListener('afterprint', handleAfterPrint);
+
+    return () => {
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+  }, []);
 
   function updateResume(transform) {
     setSaveState('saving');
@@ -208,7 +226,17 @@ export function useResumeBuilder() {
 
   function printResume() {
     revealAllErrors();
-    window.print();
+    printViewRef.current = mobileView;
+
+    flushSync(() => {
+      setMobileView('preview');
+    });
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.print();
+      });
+    });
   }
 
   const actions = {
