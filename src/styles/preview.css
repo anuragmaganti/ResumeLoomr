@@ -1,80 +1,255 @@
-h1 {
-    font-size:30px;
+.resumePage {
+  width: min(100%, 820px);
+  min-height: 980px;
+  margin: 0 auto;
+  padding: 58px 58px 64px;
+  border: 1px solid #dce4ef;
+  border-radius: 22px;
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
 }
 
-.phoneEmail > * {
-    font-size: 17px;
+.resumePage h1,
+.resumePage h2 {
+  margin: 0;
 }
 
-h2 {
-    font-size: 20px;
+.resumePage h1 {
+  font-size: 2.08rem;
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+  text-align: center;
 }
 
-.degree, .company {
-    font-size: 17px;
-    font-weight: 600;
-    margin-bottom: 5px;
+.resumePage h2 {
+  margin-bottom: 18px;
+  color: #334155;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
-.school, .role {
-    font-size: 15px;
+.personalSection,
+.educationDiv,
+.experienceDiv,
+.educationSection,
+.experienceSection {
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
-.personalSection > h1 {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 7px;
+.personalSection,
+.educationDiv,
+.experienceDiv {
+  margin-bottom: 28px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid #e2e8f0;
+}
 
+.experienceDiv {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .phoneEmail {
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid black;
-
-}
-
-
-.educationDiv, .experienceDiv {
-    padding-bottom: 7px;
-    
-    
-}
-
-.educationDiv{
-    border-bottom: 1px solid black;
-}
-
-
-.educationSection, .experienceSection {
-
-    margin-bottom: 15px;
-    margin-left: 7px;
-    margin-right: 7px;
-}
-
-.degreeYearsEduFlex, .companyYearsExpFlex {
-    margin-right: 5px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-li {
-    font-size: 15px;
-    margin-top: 5px;
-    margin-bottom: 5px;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  color: #475569;
+  font-size: 0.9375rem;
 }
 
 .aboutMe {
-    width: 90%;
-    justify-self: center;
-    padding-top: 10px;
-    padding-bottom: 10px;
+  width: min(100%, 560px);
+  margin: 18px auto 0;
+  color: #334155;
+  font-size: 0.9875rem;
+  line-height: 1.7;
+  text-align: center;
 }
 
-.personalSection {
-    border-bottom: 1px solid black;
+.educationSection,
+.experienceSection {
+  margin-top: 18px;
+}
+
+.degreeYearsEduFlex,
+.companyYearsExpFlex {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: baseline;
+}
+
+.degree,
+.company {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.yearsEdu,
+.yearsExp {
+  color: #64748b;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.school,
+.role {
+  margin-top: 4px;
+  color: #475569;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.experienceSection ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.experienceSection li {
+  margin-top: 0;
+  color: #1f2937;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.experienceSection li + li {
+  margin-top: 4px;
+}
+
+.resumeEmptyState {
+  display: grid;
+  place-items: center;
+  min-height: 720px;
+  padding: var(--space-8);
+  text-align: center;
+}
+
+.resumeEmptyEyebrow {
+  margin: 0 0 10px;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.resumeEmptyState h3 {
+  margin: 0 0 12px;
+  font-size: 1.65rem;
+  letter-spacing: -0.04em;
+}
+
+.resumeEmptyState p {
+  max-width: 28rem;
+  margin: 0;
+  color: var(--color-text-subtle);
+  line-height: 1.65;
+}
+
+.resumePage--executive {
+  border-color: #d7dce5;
+  box-shadow: 0 26px 68px rgba(15, 23, 42, 0.09);
+}
+
+.resumePage--executive h1,
+.resumePage--executive h2 {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.resumePage--executive h1,
+.resumePage--executive .aboutMe,
+.resumePage--executive .phoneEmail {
+  text-align: left;
+  justify-content: flex-start;
+  margin-left: 0;
+}
+
+.resumePage--executive .personalSection {
+  border-bottom-width: 2px;
+}
+
+.resumePage--compact {
+  min-height: 920px;
+  padding: 46px 48px 52px;
+}
+
+.resumePage--compact h1 {
+  font-size: 1.82rem;
+}
+
+.resumePage--compact .personalSection,
+.resumePage--compact .educationDiv,
+.resumePage--compact .experienceDiv {
+  margin-bottom: 22px;
+  padding-bottom: 22px;
+}
+
+.resumePage--compact .aboutMe,
+.resumePage--compact .school,
+.resumePage--compact .role,
+.resumePage--compact .experienceSection li {
+  line-height: 1.5;
+}
+
+@media (max-width: 1100px) {
+  .resumePage {
+    min-height: auto;
+    padding: 46px 42px 50px;
+  }
+}
+
+@media (max-width: 720px) {
+  .resumePage {
+    padding: 30px 24px 36px;
+    border-radius: 18px;
+  }
+
+  .degreeYearsEduFlex,
+  .companyYearsExpFlex {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .phoneEmail {
+    gap: 10px;
+  }
+
+  .resumeEmptyState {
+    min-height: 420px;
+    padding: var(--space-6);
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .previewPanelHeader {
+    display: none;
+  }
+
+  .resumePage {
+    width: 100%;
+    min-height: auto;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+@page {
+  margin: 0.5in;
 }

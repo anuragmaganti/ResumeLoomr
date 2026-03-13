@@ -1,151 +1,151 @@
-export default function ExperienceForm({experience,setResume}) {
-
-    function updateActivity(entryId, activityIndex, newValue) {
-        setResume(prev => ({
-            ...prev,
-            experience: prev.experience.map(item =>
-            item.id === entryId
-                ? {
-                    ...item,
-                    activities: item.activities.map((activity, i) =>
-                    i === activityIndex ? newValue : activity
-                    )
-                }
-                : item
-            )
-        }));
+function FieldError({ message }) {
+    if (!message) {
+        return null;
     }
 
-    function addActivity(entryId) {
-        setResume(prev => ({
-            ...prev,
-            experience: prev.experience.map(item =>
-            item.id === entryId
-                ? { ...item, activities: [...item.activities, ""] }
-                : item
-            )
-        }));
-    }
+    return <p className="fieldError">{message}</p>;
+}
 
-    function deleteActivity(entryId, activityIndex) {
-        setResume(prev => ({
-            ...prev,
-            experience: prev.experience.map(item =>
-            item.id === entryId
-                ? {
-                    ...item,
-                    activities: [
-                    ...item.activities.slice(0, activityIndex),
-                    ...item.activities.slice(activityIndex + 1)
-                    ]
-                }
-                : item
-            )
-        }));
-    }
-
-
-
-    function handleSubmit(e) {
-        e.preventDefault();
-    }
-
+export default function ExperienceForm({ experience, actions, getFieldError, markTouched }) {
     return (
-        <div>
-            {experience.map((entry)=>(
-
-            <fieldset key={entry.id} className="expForm">
-
-                <form onSubmit={handleSubmit}>
-
-                    <div className="field">
-                        <label htmlFor={"company"+entry.id}>Company: </label>
-                        <input type="text" id={"company"+entry.id} name="company" value={entry.company} onChange={
-                            (e)=>setResume(
-                                prev => (
-                                    {...prev,
-                                    experience: prev.experience.map( item =>
-                                        item.id === entry.id ? {...item, company: e.target.value} : item
-                                    )
-                                    }
-                                )
-                        
-                            )
-                        }/>
+        <div className="formStack">
+            {experience.map((entry, index) => (
+                <fieldset key={entry.id} className="formSection entryCard">
+                    <div className="entryHeader">
+                        <div>
+                            <h3>Experience {index + 1}</h3>
+                            <p className="entryDescription">Keep each role concise, then use highlight bullets for measurable impact.</p>
+                        </div>
+                        <div className="entryActions">
+                            <button
+                                className="button buttonSecondary actionButton"
+                                type="button"
+                                onClick={() => actions.moveExperience(entry.id, -1)}
+                                disabled={index === 0}
+                                aria-label={`Move experience ${index + 1} up`}
+                            >
+                                Up
+                            </button>
+                            <button
+                                className="button buttonSecondary actionButton"
+                                type="button"
+                                onClick={() => actions.moveExperience(entry.id, 1)}
+                                disabled={index === experience.length - 1}
+                                aria-label={`Move experience ${index + 1} down`}
+                            >
+                                Down
+                            </button>
+                            <button
+                                className="button buttonGhost actionButton"
+                                type="button"
+                                onClick={() => actions.removeExperience(entry.id)}
+                                disabled={experience.length === 1}
+                            >
+                                Remove
+                            </button>
+                        </div>
                     </div>
-                    
-                    <div className="field">
-                        <label htmlFor={"role"+entry.id}>Role: </label>
-                        <input type="text" id={"role"+entry.id} name="role" value={entry.role} onChange={
-                            (e)=>setResume(
-                                prev => (
-                                    {...prev,
-                                    experience: prev.experience.map( item =>
-                                        item.id === entry.id ? {...item, role: e.target.value} : item
-                                    )
-                                    }
-                                )
-                        
-                            )
-                        }/>
-                    </div>
 
-                    <div className="field">
-                        <label htmlFor={"activities"+entry.id}>Activities: </label>
-                        {entry.activities.map((activity, activityIndex) => (
-                            <div className="actInputAndBtn" key={activityIndex}>
-                                <textarea type="text" value={activity} onChange={(e) => updateActivity(entry.id, activityIndex, e.target.value) }/>
-                                <button className="delBtn delBtnAct" type="button" onClick={() => deleteActivity(entry.id, activityIndex)}> X </button>
+                    <form onSubmit={(event) => event.preventDefault()}>
+                        <div className="fieldGrid fieldGridTwo">
+                            <div className="field">
+                                <label htmlFor={`company-${entry.id}`}>Company</label>
+                                <input
+                                    type="text"
+                                    id={`company-${entry.id}`}
+                                    value={entry.company}
+                                    onChange={(event) => actions.updateExperienceField(entry.id, 'company', event.target.value)}
+                                    onBlur={() => markTouched(`experience.${entry.id}.company`)}
+                                    placeholder="Company name"
+                                />
+                                <FieldError message={getFieldError(`experience.${entry.id}.company`)} />
                             </div>
-                        ))}
-                    </div>
 
-                    <button className="addBtn addBtnAct" type="button" onClick={() => addActivity(entry.id)}>
-                    +
-                    </button>
+                            <div className="field">
+                                <label htmlFor={`yearsExp-${entry.id}`}>Dates</label>
+                                <input
+                                    type="text"
+                                    id={`yearsExp-${entry.id}`}
+                                    value={entry.yearsExp}
+                                    onChange={(event) => actions.updateExperienceField(entry.id, 'yearsExp', event.target.value)}
+                                    onBlur={() => markTouched(`experience.${entry.id}.yearsExp`)}
+                                    placeholder="2022 - Present"
+                                />
+                                <FieldError message={getFieldError(`experience.${entry.id}.yearsExp`)} />
+                            </div>
+                        </div>
 
+                        <div className="field">
+                            <label htmlFor={`role-${entry.id}`}>Role</label>
+                            <input
+                                type="text"
+                                id={`role-${entry.id}`}
+                                value={entry.role}
+                                onChange={(event) => actions.updateExperienceField(entry.id, 'role', event.target.value)}
+                                onBlur={() => markTouched(`experience.${entry.id}.role`)}
+                                placeholder="Senior Product Designer"
+                            />
+                            <FieldError message={getFieldError(`experience.${entry.id}.role`)} />
+                        </div>
 
-                    <div className="field">
-                        <label htmlFor={"yearsExp"+entry.id}>Years active: </label>
-                        <input type="text" id={"yearsExp"+entry.id} name="yearsExp"value={entry.yearsExp} onChange={
-                            (e)=>setResume(
-                                prev => (
-                                    {...prev,
-                                    experience: prev.experience.map( item =>
-                                        item.id === entry.id ? {...item, yearsExp: e.target.value} : item
-                                    )
-                                    }
-                                )
-                        
-                            )
-                        }/>
-                    </div>
+                        <div className="field">
+                            <label htmlFor={`activities-${entry.id}`}>Highlights</label>
 
+                            {entry.activities.map((activity, activityIndex) => (
+                                <div className="activityRow" key={`${entry.id}-${activityIndex}`}>
+                                    <div className="activityInputWrap">
+                                        <textarea
+                                            id={`activities-${entry.id}-${activityIndex}`}
+                                            value={activity}
+                                            onChange={(event) => actions.updateActivity(entry.id, activityIndex, event.target.value)}
+                                            onBlur={() => markTouched(`experience.${entry.id}.activities.${activityIndex}`)}
+                                            rows="3"
+                                            placeholder="Describe a measurable accomplishment or core responsibility."
+                                        />
+                                        <FieldError message={getFieldError(`experience.${entry.id}.activities.${activityIndex}`)} />
+                                    </div>
 
-                    <button className="delBtn delBtnExp" type="button" onClick={()=> setResume(
-                        prev => (
-                            {...prev,
-                                experience: prev.experience.filter(
-                                    item => 
-                                        item.id !== entry.id
-                                )
-                            }
-                        )
-                    )}>Delete</button>
+                                    <div className="activityActions">
+                                        <button
+                                            className="button buttonSecondary iconButton"
+                                            type="button"
+                                            onClick={() => actions.moveActivity(entry.id, activityIndex, -1)}
+                                            disabled={activityIndex === 0}
+                                            aria-label={`Move highlight ${activityIndex + 1} up`}
+                                        >
+                                            Up
+                                        </button>
+                                        <button
+                                            className="button buttonSecondary iconButton"
+                                            type="button"
+                                            onClick={() => actions.moveActivity(entry.id, activityIndex, 1)}
+                                            disabled={activityIndex === entry.activities.length - 1}
+                                            aria-label={`Move highlight ${activityIndex + 1} down`}
+                                        >
+                                            Down
+                                        </button>
+                                        <button
+                                            className="button buttonGhost iconButton"
+                                            type="button"
+                                            onClick={() => actions.removeActivity(entry.id, activityIndex)}
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
 
-                </form>
+                        <button className="button buttonSecondary addInlineButton" type="button" onClick={() => actions.addActivity(entry.id)}>
+                            Add highlight
+                        </button>
+                    </form>
+                </fieldset>
+            ))}
 
-            </fieldset>))}
-           
-            <button className="addBtn addBtnExp" type="button" onClick={()=>setResume(
-                prev=> (
-                    {...prev,
-                        experience: [...prev.experience,{id: crypto.randomUUID(),company:"",role:"",activities:[""],yearsExp:""}]
-                    }
-                )
-            )}>Add Another</button>
-
-
+            <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addExperience()}>
+                Add experience
+            </button>
         </div>
     )
 }

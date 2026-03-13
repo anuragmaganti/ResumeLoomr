@@ -1,89 +1,99 @@
-export default function EducationForm({education,setResume}) {
-
-
-    function handleSubmit(e) {
-        e.preventDefault();
+function FieldError({ message }) {
+    if (!message) {
+        return null;
     }
 
+    return <p className="fieldError">{message}</p>;
+}
+
+export default function EducationForm({ education, actions, getFieldError, markTouched }) {
     return (
-        <div>
-
-            {education.map((entry)=>(
-            <fieldset key={entry.id} className="eduForm">
-                <form onSubmit={handleSubmit}>
-
-                    <div className="field">
-
-                        <label htmlFor={"school"+entry.id}>Institution: </label>
-                        <input type="text" id={"school"+entry.id} name="school" value={entry.school} onChange={
-                            (e)=>setResume(
-                                prev => (
-                                    {...prev,
-                                    education: prev.education.map( item =>
-                                        item.id === entry.id ? {...item, school: e.target.value} : item
-                                    )
-                                    }
-                                )
-                        
-                            )
-                            }/>
+        <div className="formStack">
+            {education.map((entry, index) => (
+                <fieldset key={entry.id} className="formSection entryCard">
+                    <div className="entryHeader">
+                        <div>
+                            <h3>Education {index + 1}</h3>
+                            <p className="entryDescription">Each card maps directly to one clean block in the resume preview.</p>
+                        </div>
+                        <div className="entryActions">
+                            <button
+                                className="button buttonSecondary actionButton"
+                                type="button"
+                                onClick={() => actions.moveEducation(entry.id, -1)}
+                                disabled={index === 0}
+                                aria-label={`Move education ${index + 1} up`}
+                            >
+                                Up
+                            </button>
+                            <button
+                                className="button buttonSecondary actionButton"
+                                type="button"
+                                onClick={() => actions.moveEducation(entry.id, 1)}
+                                disabled={index === education.length - 1}
+                                aria-label={`Move education ${index + 1} down`}
+                            >
+                                Down
+                            </button>
+                            <button
+                                className="button buttonGhost actionButton"
+                                type="button"
+                                onClick={() => actions.removeEducation(entry.id)}
+                                disabled={education.length === 1}
+                            >
+                                Remove
+                            </button>
+                        </div>
                     </div>
-                 
-                    <div className="field">
-                        <label htmlFor={"degree"+entry.id}>Degree: </label>
-                        <input type="text" id={"degree"+entry.id} name="degree" value={entry.degree} onChange={
-                            (e)=>setResume(
-                                prev => (
-                                    {...prev,
-                                    education: prev.education.map( item =>
-                                        item.id === entry.id ? {...item, degree: e.target.value} : item
-                                    )
-                                    }
-                                )
-                        
-                            )
-                        }/>
-                    </div>
-          
-                    <div className="field">
-                        <label htmlFor={"yearsEdu"+entry.id}>Years active: </label>
-                        <input type="text" id={"yearsEdu"+entry.id} name="yearsEdu"value={entry.yearsEdu} onChange={
-                            (e)=>setResume(
-                                prev => (
-                                    {...prev,
-                                    education: prev.education.map( item =>
-                                        item.id === entry.id ? {...item, yearsEdu: e.target.value} : item
-                                    )
-                                    }
-                                )
-                        
-                            )
-                        }/>
-                    </div>
-    
-                    <button className="delBtn delBtnEdu" type="button" onClick={()=> setResume(
-                        prev => (
-                            {...prev,
-                                education: prev.education.filter(
-                                    item => 
-                                        item.id !== entry.id
-                                )
-                            }
-                        )
-                    )}>Delete</button>
 
-                </form>
-            </fieldset>))}
-           
-            <button className="addBtn addBtnEdu" type="button" onClick={()=>setResume(
-                prev=> (
-                    {...prev,
-                        education: [...prev.education,{id: crypto.randomUUID(),school:"",degree:"",yearsEdu:""}]
-                    }
-                )
-            )}>Add Another</button>
-  
+                    <form onSubmit={(event) => event.preventDefault()}>
+                        <div className="field">
+                            <label htmlFor={`school-${entry.id}`}>Institution</label>
+                            <input
+                                type="text"
+                                id={`school-${entry.id}`}
+                                value={entry.school}
+                                onChange={(event) => actions.updateEducationField(entry.id, 'school', event.target.value)}
+                                onBlur={() => markTouched(`education.${entry.id}.school`)}
+                                placeholder="University or school name"
+                            />
+                            <FieldError message={getFieldError(`education.${entry.id}.school`)} />
+                        </div>
 
+                        <div className="fieldGrid fieldGridTwo">
+                            <div className="field">
+                                <label htmlFor={`degree-${entry.id}`}>Degree or program</label>
+                                <input
+                                    type="text"
+                                    id={`degree-${entry.id}`}
+                                    value={entry.degree}
+                                    onChange={(event) => actions.updateEducationField(entry.id, 'degree', event.target.value)}
+                                    onBlur={() => markTouched(`education.${entry.id}.degree`)}
+                                    placeholder="B.S. Computer Science"
+                                />
+                                <FieldError message={getFieldError(`education.${entry.id}.degree`)} />
+                            </div>
+
+                            <div className="field">
+                                <label htmlFor={`yearsEdu-${entry.id}`}>Dates</label>
+                                <input
+                                    type="text"
+                                    id={`yearsEdu-${entry.id}`}
+                                    value={entry.yearsEdu}
+                                    onChange={(event) => actions.updateEducationField(entry.id, 'yearsEdu', event.target.value)}
+                                    onBlur={() => markTouched(`education.${entry.id}.yearsEdu`)}
+                                    placeholder="2020 - 2024"
+                                />
+                                <FieldError message={getFieldError(`education.${entry.id}.yearsEdu`)} />
+                            </div>
+                        </div>
+                    </form>
+                </fieldset>
+            ))}
+
+            <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addEducation()}>
+                Add education
+            </button>
         </div>
     )
 }

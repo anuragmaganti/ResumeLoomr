@@ -1,25 +1,182 @@
-/* border styling from https://freefrontend.com/css-borders/  */
+fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
 
-.perForm, .eduForm, .expForm {
+form {
+  display: grid;
+  gap: var(--space-4);
+}
 
-  padding: 2rem 2rem;
-  margin: 0.5rem;
-  border: 1.5px solid #333333;
-  border-radius: 2% 6% 5% 4% / 1% 1% 2% 4%;
-  background-color: rgb(216, 245, 252);
-  font-family: monospace,system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 
-  Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-    
-    
+.formStack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.formSection {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  box-shadow: var(--shadow-xs);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-base),
+    border-color var(--transition-base);
+}
+
+.formSectionSingle {
+  padding-top: var(--space-6);
+}
+
+.entryCard {
+  border-color: #d6dfeb;
+}
+
+@media (hover: hover) {
+  .formSection:hover {
+    transform: translateY(-1px);
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+.entryHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.entryHeader h3 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.entryDescription {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.entryActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.fieldGrid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.fieldGridTwo {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
 }
 
-textarea {
-  flex:1
+.field label {
+  color: var(--color-text-subtle);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  color: var(--color-text);
+  padding: 13px 14px;
+  line-height: 1.5;
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    background-color var(--transition-base);
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: #94a3b8;
+}
+
+.field input:hover,
+.field textarea:hover {
+  border-color: var(--color-border-strong);
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-soft);
+}
+
+.field textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--color-error);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.activityRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.activityInputWrap {
+  min-width: 0;
+}
+
+.activityActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+@media (max-width: 860px) {
+  .fieldGridTwo {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .formSection {
+    padding: var(--space-4);
+  }
+
+  .entryHeader,
+  .activityRow {
+    grid-template-columns: 1fr;
+  }
+
+  .entryActions,
+  .activityActions {
+    justify-content: stretch;
+  }
+
+  .entryActions .button,
+  .activityActions .button {
+    width: 100%;
+  }
 }

@@ -1,260 +1,163 @@
-/* editor panel buttons styling from https://getcssscan.com/css-buttons-examples*/
-
-/* editor panel buttons styling*/
-.button-55 {
-  align-self: center;
-  background-color: rgb(217, 247, 251);
-  background-image: none;
-  background-position: 0 90%;
-  background-repeat: repeat no-repeat;
-  background-size: 4px 3px;
-  border-radius: 15px 225px 255px 15px 15px 255px 225px 15px;
-  border-style: solid;
-  border-width: 1.5px;
-  box-shadow: rgba(0, 0, 0, .2) 15px 28px 25px -18px;
-  box-sizing: border-box;
-  color: #41403e;
+.button,
+.tabButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
-  display: inline-block;
-  font-family: Neucha, sans-serif;
-  font-size: 1rem;
-  line-height: 23px;
-  outline: none;
-  padding: .75rem;
-  text-decoration: none;
-  transition: all 150ms ease-in-out;
-  border-bottom-left-radius: 15px 255px;
-  border-bottom-right-radius: 225px 15px;
-  border-top-left-radius: 255px 15px;
-  border-top-right-radius: 15px 225px;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: manipulation;
+  transition:
+    transform var(--transition-fast),
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    color var(--transition-base),
+    opacity var(--transition-base);
 }
 
-.button-55:hover {
-  box-shadow: rgb(199, 235, 248) 2px 8px 8px -5px;
-  transform: translate3d(0, 2px, 0);
+.button:disabled,
+.tabButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.button-55:focus {
-  box-shadow: rgb(215, 240, 248) 2px 8px 4px -6px;
+.button:not(:disabled):hover,
+.tabButton:not(:disabled):hover {
+  transform: translateY(-1px);
 }
 
-/* delete button styling */
-
-.delBtn {
-  align-self: center;
-  background-color: #fdebeb;
-  background-image: none;
-  background-position: 0 90%;
-  background-repeat: repeat no-repeat;
-  background-size: 4px 3px;
-  border-radius: 15px 225px 255px 15px 15px 255px 225px 15px;
-  border-style: solid;
-  border-width: 1.25px;
-  box-shadow: rgba(0, 0, 0, .2) 15px 28px 25px -18px;
-  box-sizing: border-box;
-  color: #41403e;
-  cursor: pointer;
-  display: inline-block;
-  font-family: Neucha, sans-serif;
-  font-size: 1rem;
-  line-height: 23px;
-  outline: none;
-  margin: .5rem;
-  text-decoration: none;
-  transition: all 150ms ease-in-out;
-  border-bottom-left-radius: 15px 255px;
-  border-bottom-right-radius: 225px 15px;
-  border-top-left-radius: 255px 15px;
-  border-top-right-radius: 15px 225px;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: manipulation;
+.button:not(:disabled):active,
+.tabButton:not(:disabled):active {
+  transform: translateY(0);
 }
 
-.delBtn:hover {
-  box-shadow: rgb(252, 189, 189) 2px 8px 8px -5px;
-  transform: translate3d(0, 2px, 0);
+.button:focus-visible,
+.tabButton:focus-visible,
+.toolbarSelect:focus-visible,
+.mobileWorkspaceButton:focus-visible,
+.noticeDismiss:focus-visible {
+  outline: 3px solid var(--color-accent-soft);
+  outline-offset: 0;
 }
 
-.delBtn:focus {
-  box-shadow: lightsalmon 2px 8px 4px -6px;
+.buttonPrimary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(49, 88, 213, 0.2);
 }
 
-/* add button styling */
-
-.addBtn {
-  align-self: center;
-  background-color: #d6fff1;
-  background-image: none;
-  background-position: 0 90%;
-  background-repeat: repeat no-repeat;
-  background-size: 4px 3px;
-  border-radius: 15px 225px 255px 15px 15px 255px 225px 15px;
-  border-style: solid;
-  border-width: 1.25px;
-  box-shadow: rgba(0, 0, 0, .2) 15px 28px 25px -18px;
-  box-sizing: border-box;
-  color: #41403e;
-  cursor: pointer;
-  display: inline-block;
-  font-family: Neucha, sans-serif;
-  font-size: 1rem;
-  line-height: 23px;
-  outline: none;
-  margin: .5rem;
-  text-decoration: none;
-  transition: all 150ms ease-in-out;
-  border-bottom-left-radius: 15px 255px;
-  border-bottom-right-radius: 225px 15px;
-  border-top-left-radius: 255px 15px;
-  border-top-right-radius: 15px 225px;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: manipulation;
+.buttonPrimary:not(:disabled):hover {
+  border-color: var(--color-accent-strong);
+  background: var(--color-accent-strong);
 }
 
-.addBtn:hover {
-  box-shadow: lightgreen 2px 8px 8px -5px;
-  transform: translate3d(0, 2px, 0);
+.buttonSecondary {
+  border-color: var(--color-border);
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  color: var(--color-text);
+  box-shadow: var(--shadow-xs);
 }
 
-.addBtn:focus {
-  box-shadow: lightgreen 2px 8px 4px -6px;
+.buttonSecondary:not(:disabled):hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-muted);
 }
 
-.addBtnAct {
-  margin-top: 0px;
-  margin-bottom: 10px;
-  margin-left: 0px;
-}
-
-.actInputAndBtn {
-  display: flex;
-}
-
-.headerAndPrint {
-  display: flex;
-  justify-content: space-between;
-}
-
-/*printing*/
-
-@media print {
-
-  .headerAndPrint,
-  .editorPanel {
-    display: none;
-  }
-
-  .app {
-    min-height: auto !important;
-    margin: 0 !important;
-  }
-
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  .resumePage {
-    margin: 0 auto;   /* center on page */
-    border: none;
-    box-shadow: none;
-  }
-
-}
-
-@page {
-  margin: 0;
-}
-
-/*print button styling*/
-
-button.printButton {
-  width: 75px;
-  height: 75px;
-}
-span.printIcon, span.printIcon::before, span.printIcon::after, button.printButton:hover .printIcon::after {
-  border: solid 4px #333;
-}
-span.printIcon::after {
-  border-width: 2px;
-}
-
-button.printButton {
-  position: relative;
-  padding: 0;
-  border: 0;
-  
-  border: none;
+.buttonGhost {
+  border-color: transparent;
   background: transparent;
+  color: var(--color-text-subtle);
 }
 
-span.printIcon, span.printIcon::before, span.printIcon::after, button.printButton:hover .printIcon::after {
-  box-sizing: border-box;
-  background-color: #fff;
+.buttonGhost:not(:disabled):hover {
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
 }
 
-span.printIcon {
-  position: relative;
-  display: inline-block;  
-  padding: 0;
-  margin-top: 20%;
-
-  width: 60%;
-  height: 35%;
-  background: #fff;
-  border-radius: 20% 20% 0 0;
+.tabButton {
+  background: transparent;
+  color: var(--color-text-subtle);
 }
 
-span.printIcon::before {
-  content: "";
-  position: absolute;
-  bottom: 100%;
-  left: 12%;
-  right: 12%;
-  height: 110%;
-
-  transition: height .2s .15s;
+.tabButton.isActive {
+  border-color: var(--color-border);
+  background: #ffffff;
+  color: var(--color-text);
+  box-shadow: var(--shadow-xs);
 }
 
-span.printIcon::after {
-  content: "";
-  position: absolute;
-  top: 55%;
-  left: 12%;
-  right: 12%;
-  height: 0%;
-  background: #fff;
-  background-repeat: no-repeat;
-  background-size: 70% 90%;
-  background-position: center;
-  background-image: linear-gradient(
-    to top,
-    #fff 0, #fff 14%,
-    #333 14%, #333 28%,
-    #fff 28%, #fff 42%,
-    #333 42%, #333 56%,
-    #fff 56%, #fff 70%,
-    #333 70%, #333 84%,
-    #fff 84%, #fff 100%
-  );
-
-  transition: height .2s, border-width 0s .2s, width 0s .2s;
+.addEntryButton,
+.addInlineButton {
+  width: 100%;
 }
 
-button.printButton:hover {
-  cursor: pointer;
+.addInlineButton {
+  justify-content: flex-start;
 }
 
-button.printButton:hover .printIcon::before {
-  height:0px;
-  transition: height .2s;
+.actionButton,
+.iconButton {
+  min-height: 36px;
+  padding-inline: 12px;
+  font-size: 0.875rem;
 }
-button.printButton:hover .printIcon::after {
-  height:120%;
-  transition: height .2s .15s, border-width 0s .16s;
+
+.printButton {
+  white-space: nowrap;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.statusBadge--neutral,
+.statusBadge--idle,
+.statusBadge--saved {
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text-subtle);
+}
+
+.statusBadge--saving,
+.statusBadge--info,
+.statusBadge--restored {
+  border-color: #d7e4ff;
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+.statusBadge--success {
+  border-color: #cfe8da;
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.statusBadge--warning {
+  border-color: #f0ddb8;
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.statusBadge--error {
+  border-color: #f2c5bf;
+  background: var(--color-error-soft);
+  color: var(--color-error);
 }
