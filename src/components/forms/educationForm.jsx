@@ -1,3 +1,5 @@
+import AutoResizeTextarea from "../autoResizeTextarea";
+
 function FieldError({ message }) {
     if (!message) {
         return null;
@@ -87,6 +89,139 @@ export default function EducationForm({ education, actions, getFieldError, markT
                                 <FieldError message={getFieldError(`education.${entry.id}.yearsEdu`)} />
                             </div>
                         </div>
+
+                        <div className="fieldGrid fieldGridTwo">
+                            <div className="field">
+                                <label htmlFor={`location-${entry.id}`}>Location</label>
+                                <input
+                                    type="text"
+                                    id={`location-${entry.id}`}
+                                    value={entry.location}
+                                    onChange={(event) => actions.updateEducationField(entry.id, 'location', event.target.value)}
+                                    onBlur={() => markTouched(`education.${entry.id}.location`)}
+                                    placeholder="Cambridge, MA"
+                                />
+                            </div>
+
+                            <div className="field">
+                                <label htmlFor={`gpa-${entry.id}`}>GPA</label>
+                                <input
+                                    type="text"
+                                    id={`gpa-${entry.id}`}
+                                    value={entry.gpa}
+                                    onChange={(event) => actions.updateEducationField(entry.id, 'gpa', event.target.value)}
+                                    onBlur={() => markTouched(`education.${entry.id}.gpa`)}
+                                    placeholder="3.9 / 4.0"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="field">
+                            <label htmlFor={`honors-${entry.id}`}>Honors</label>
+                            <input
+                                type="text"
+                                id={`honors-${entry.id}`}
+                                value={entry.honors}
+                                onChange={(event) => actions.updateEducationField(entry.id, 'honors', event.target.value)}
+                                onBlur={() => markTouched(`education.${entry.id}.honors`)}
+                                placeholder="Magna Cum Laude, Dean's List"
+                            />
+                        </div>
+
+                        <div className="field">
+                            <label htmlFor={`coursework-${entry.id}`}>Relevant coursework</label>
+                            <AutoResizeTextarea
+                                id={`coursework-${entry.id}`}
+                                value={entry.coursework}
+                                onChange={(event) => actions.updateEducationField(entry.id, 'coursework', event.target.value)}
+                                onBlur={() => markTouched(`education.${entry.id}.coursework`)}
+                                rows={2}
+                                placeholder="Human-Computer Interaction, Algorithms, Product Strategy"
+                            />
+                        </div>
+
+                        <div className="field">
+                            <label htmlFor={`awards-${entry.id}`}>Awards</label>
+                            <AutoResizeTextarea
+                                id={`awards-${entry.id}`}
+                                value={entry.awards}
+                                onChange={(event) => actions.updateEducationField(entry.id, 'awards', event.target.value)}
+                                onBlur={() => markTouched(`education.${entry.id}.awards`)}
+                                rows={2}
+                                placeholder="Scholarships, distinctions, academic awards"
+                            />
+                        </div>
+
+                        <div className="field">
+                            <label>Custom sections</label>
+
+                            <div className="nestedEntryStack">
+                                {entry.customSections.map((section, sectionIndex) => (
+                                    <div className="nestedEntryCard" key={section.id}>
+                                        <div className="nestedEntryRow">
+                                            <div className="nestedEntryContent">
+                                                <div className="field">
+                                                    <label htmlFor={`customSectionLabel-${entry.id}-${section.id}`}>Section title</label>
+                                                    <input
+                                                        type="text"
+                                                        id={`customSectionLabel-${entry.id}-${section.id}`}
+                                                        value={section.label}
+                                                        onChange={(event) => actions.updateEducationCustomSection(entry.id, sectionIndex, 'label', event.target.value)}
+                                                        onBlur={() => markTouched(`education.${entry.id}.customSections.${sectionIndex}.label`)}
+                                                        placeholder="Capstone project"
+                                                    />
+                                                </div>
+
+                                                <div className="field">
+                                                    <label htmlFor={`customSection-${entry.id}-${section.id}`}>Section content</label>
+                                                    <AutoResizeTextarea
+                                                        id={`customSection-${entry.id}-${section.id}`}
+                                                        value={section.content}
+                                                        onChange={(event) => actions.updateEducationCustomSection(entry.id, sectionIndex, 'content', event.target.value)}
+                                                        onBlur={() => markTouched(`education.${entry.id}.customSections.${sectionIndex}.content`)}
+                                                        rows={2}
+                                                        placeholder="Add the details you want to show under this custom section."
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="activityActions nestedEntryActions">
+                                                <button
+                                                    className="button buttonSecondary iconButton"
+                                                    type="button"
+                                                    onClick={() => actions.moveEducationCustomSection(entry.id, sectionIndex, -1)}
+                                                    disabled={sectionIndex === 0}
+                                                    aria-label={`Move custom section ${sectionIndex + 1} up`}
+                                                >
+                                                    ↑
+                                                </button>
+                                                <button
+                                                    className="button buttonSecondary iconButton"
+                                                    type="button"
+                                                    onClick={() => actions.moveEducationCustomSection(entry.id, sectionIndex, 1)}
+                                                    disabled={sectionIndex === entry.customSections.length - 1}
+                                                    aria-label={`Move custom section ${sectionIndex + 1} down`}
+                                                >
+                                                    ↓
+                                                </button>
+                                                <button
+                                                    className="button buttonDanger iconButton"
+                                                    type="button"
+                                                    onClick={() => actions.removeEducationCustomSection(entry.id, sectionIndex)}
+                                                    aria-label={`Remove custom section ${sectionIndex + 1}`}
+                                                >
+                                                    x
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <button className="button buttonSecondary addInlineButton" type="button" onClick={() => actions.addEducationCustomSection(entry.id)}>
+                            Add custom section
+                        </button>
                     </form>
                 </fieldset>
             ))}

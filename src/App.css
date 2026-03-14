@@ -278,13 +278,13 @@
 
 @media (min-width: 721px) {
   .editorWorkspace {
-    grid-template-columns: 148px minmax(0, 1fr);
+    grid-template-columns: 168px minmax(0, 1fr);
     gap: var(--space-4);
   }
 
   .editorRail {
     gap: var(--space-3);
-    padding: 12px;
+    padding: 16px;
   }
 
   .editorRailHeader {
@@ -294,6 +294,11 @@
   .editorRailHeader h2 {
     font-size: 1rem;
     letter-spacing: -0.02em;
+  }
+
+  .tabs {
+    --tabs-inset: 6px;
+    gap: 6px;
   }
 }
 

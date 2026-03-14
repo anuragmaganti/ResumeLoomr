@@ -13,6 +13,14 @@ export default function ResumePreview({ previewModel, template, templateOptions,
         () => templateOptions.find((option) => option.id === template)?.label ?? 'Modern',
         [template, templateOptions]
     );
+    const personalDetails = useMemo(() => (
+        [
+            previewModel.personal.location,
+            previewModel.personal.phone,
+            previewModel.personal.email,
+            ...previewModel.personal.links.map((link) => link.text)
+        ].filter(Boolean)
+    ), [previewModel.personal]);
 
     useEffect(() => {
         const resumeElement = resumeRef.current;
@@ -91,18 +99,10 @@ export default function ResumePreview({ previewModel, template, templateOptions,
                                         <div className="personalHeadline">{previewModel.personal.headline}</div>
                                     )}
 
-                                    {(previewModel.personal.location || previewModel.personal.phone || previewModel.personal.email) && (
-                                        <div className="phoneEmail">
-                                            {previewModel.personal.location && <div>{previewModel.personal.location}</div>}
-                                            {previewModel.personal.phone && <div>{previewModel.personal.phone}</div>}
-                                            {previewModel.personal.email && <div>{previewModel.personal.email}</div>}
-                                        </div>
-                                    )}
-
-                                    {previewModel.personal.links.length > 0 && (
-                                        <div className="personalLinks">
-                                            {previewModel.personal.links.map((link) => (
-                                                <span key={link.id}>{link.text}</span>
+                                    {personalDetails.length > 0 && (
+                                        <div className={`personalDetails ${personalDetails.length >= 4 ? 'personalDetails--wrap' : ''}`}>
+                                            {personalDetails.map((detail, index) => (
+                                                <span key={`${detail}-${index}`}>{detail}</span>
                                             ))}
                                         </div>
                                     )}
@@ -118,11 +118,45 @@ export default function ResumePreview({ previewModel, template, templateOptions,
                                     <h2>Education</h2>
                                     {previewModel.educationEntries.map((institution) => (
                                         <div className="educationSection" key={institution.id}>
-                                            <div className="degreeYearsEduFlex">
-                                                {institution.degree && <div className="degree">{institution.degree}</div>}
-                                                {institution.yearsEdu && <div className="yearsEdu">{institution.yearsEdu}</div>}
-                                            </div>
-                                            {institution.school && <div className="school">{institution.school}</div>}
+                                            {(institution.school || institution.location || institution.yearsEdu) && (
+                                                <div className="degreeYearsEduFlex">
+                                                    {(institution.school || institution.location) && (
+                                                        <div className="schoolLocation">
+                                                            {institution.school && <span className="school">{institution.school}</span>}
+                                                            {institution.location && <span className="eduLocation">{institution.location}</span>}
+                                                        </div>
+                                                    )}
+                                                    {institution.yearsEdu && <div className="yearsEdu">{institution.yearsEdu}</div>}
+                                                </div>
+                                            )}
+                                            {(institution.degree || institution.honors || institution.gpa) && (
+                                                <div className="schoolLocationRow">
+                                                    <div className="educationDegreeRow">
+                                                        {institution.degree && <div className="degree">{institution.degree}</div>}
+                                                        {institution.honors && (
+                                                            <div className="educationMeta">
+                                                                <span>{institution.honors}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {institution.gpa && <div className="yearsEdu educationGpa">GPA: {institution.gpa}</div>}
+                                                </div>
+                                            )}
+                                            {institution.coursework && (
+                                                <div className="educationDetail">
+                                                    <span className="educationDetailLabel">Relevant coursework:</span> {institution.coursework}
+                                                </div>
+                                            )}
+                                            {institution.awards && (
+                                                <div className="educationDescription">
+                                                    <span className="educationDetailLabel">Awards:</span> {institution.awards}
+                                                </div>
+                                            )}
+                                            {institution.customSections.map((section) => (
+                                                <div className="educationDescription" key={section.id}>
+                                                    <span className="educationDetailLabel">{section.label || 'Custom section'}:</span> {section.content}
+                                                </div>
+                                            ))}
                                         </div>
                                     ))}
                                 </div>

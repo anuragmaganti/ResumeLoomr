@@ -5,19 +5,23 @@ import {
   DEFAULT_TEMPLATE,
   TEMPLATE_OPTIONS,
   addActivity,
+  addEducationCustomSection,
   addEducation,
   addExperience,
   createDraftPayload,
   createEmptyResume,
   getPreviewModel,
   moveActivity,
+  moveEducationCustomSection,
   moveEducation,
   moveExperience,
   normalizeDraftPayload,
   removeActivity,
+  removeEducationCustomSection,
   removeEducation,
   removeExperience,
   updateActivity,
+  updateEducationCustomSection,
   updateEducationField,
   updateExperienceField,
   updatePersonalField,
@@ -191,6 +195,18 @@ export function useResumeBuilder() {
     },
     removeEducation(entryId) {
       updateResume((currentResume) => removeEducation(currentResume, entryId));
+    },
+    updateEducationCustomSection(entryId, sectionIndex, field, value) {
+      updateResume((currentResume) => updateEducationCustomSection(currentResume, entryId, sectionIndex, field, value));
+    },
+    addEducationCustomSection(entryId) {
+      updateResume((currentResume) => addEducationCustomSection(currentResume, entryId));
+    },
+    moveEducationCustomSection(entryId, sectionIndex, direction) {
+      updateResume((currentResume) => moveEducationCustomSection(currentResume, entryId, sectionIndex, direction));
+    },
+    removeEducationCustomSection(entryId, sectionIndex) {
+      updateResume((currentResume) => removeEducationCustomSection(currentResume, entryId, sectionIndex));
     },
     updateExperienceField(entryId, field, value) {
       updateResume((currentResume) => updateExperienceField(currentResume, entryId, field, value));

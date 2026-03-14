@@ -67,12 +67,45 @@ export function normalizeBulletText(value) {
   return trimText(value).replace(/^[\s\-*•]+/, '');
 }
 
+function createEducationCustomSection(overrides = {}) {
+  return {
+    id: overrides.id || createId(),
+    label: asText(overrides.label),
+    content: asText(overrides.content)
+  };
+}
+
+function normalizeEducationCustomSections(overrides = {}) {
+  const explicitSections = Array.isArray(overrides.customSections)
+    ? overrides.customSections.map((section) => createEducationCustomSection(section))
+    : [];
+  const legacyDescription = asText(overrides.description);
+  const legacyContent = asText(overrides.customSection) || legacyDescription;
+  const legacyLabel = asText(overrides.customSectionLabel);
+
+  if (explicitSections.length > 0) {
+    return explicitSections;
+  }
+
+  if (legacyLabel || legacyContent) {
+    return [createEducationCustomSection({ label: legacyLabel, content: legacyContent })];
+  }
+
+  return [createEducationCustomSection()];
+}
+
 export function createEducationEntry(overrides = {}) {
   return {
     id: overrides.id || createId(),
     school: asText(overrides.school),
     degree: asText(overrides.degree),
-    yearsEdu: asText(overrides.yearsEdu)
+    yearsEdu: asText(overrides.yearsEdu),
+    location: asText(overrides.location),
+    gpa: asText(overrides.gpa),
+    honors: asText(overrides.honors),
+    coursework: asText(overrides.coursework),
+    awards: asText(overrides.awards),
+    customSections: normalizeEducationCustomSections(overrides)
   };
 }
 
@@ -220,6 +253,67 @@ export function removeEducation(resume, entryId) {
   };
 }
 
+export function updateEducationCustomSection(resume, entryId, sectionIndex, field, value) {
+  return {
+    ...resume,
+    education: resume.education.map((entry) => (
+      entry.id === entryId
+        ? {
+            ...entry,
+            customSections: entry.customSections.map((section, index) => (
+              index === sectionIndex ? { ...section, [field]: value } : section
+            ))
+          }
+        : entry
+    ))
+  };
+}
+
+export function addEducationCustomSection(resume, entryId) {
+  return {
+    ...resume,
+    education: resume.education.map((entry) => (
+      entry.id === entryId
+        ? { ...entry, customSections: [...entry.customSections, createEducationCustomSection()] }
+        : entry
+    ))
+  };
+}
+
+export function moveEducationCustomSection(resume, entryId, sectionIndex, direction) {
+  return {
+    ...resume,
+    education: resume.education.map((entry) => (
+      entry.id === entryId
+        ? {
+            ...entry,
+            customSections: reorderList(entry.customSections, sectionIndex, sectionIndex + direction)
+          }
+        : entry
+    ))
+  };
+}
+
+export function removeEducationCustomSection(resume, entryId, sectionIndex) {
+  return {
+    ...resume,
+    education: resume.education.map((entry) => {
+      if (entry.id !== entryId) {
+        return entry;
+      }
+
+      if (entry.customSections.length <= 1) {
+        return { ...entry, customSections: [createEducationCustomSection()] };
+      }
+
+      return {
+        ...entry,
+        customSections: entry.customSections.filter((_, index) => index !== sectionIndex)
+      };
+    })
+  };
+}
+
 export function updateExperienceField(resume, entryId, field, value) {
   return {
     ...resume,
@@ -331,7 +425,20 @@ export function personalHasContent(personal) {
 }
 
 export function educationEntryHasContent(entry) {
-  return [entry.school, entry.degree, entry.yearsEdu].some((value) => trimText(value) !== '');
+  const hasCustomSectionContent = entry.customSections.some((section) => (
+    trimText(section.label) !== '' || trimText(section.content) !== ''
+  ));
+
+  return [
+    entry.school,
+    entry.degree,
+    entry.yearsEdu,
+    entry.location,
+    entry.gpa,
+    entry.honors,
+    entry.coursework,
+    entry.awards
+  ].some((value) => trimText(value) !== '') || hasCustomSectionContent;
 }
 
 export function experienceEntryHasContent(entry) {
@@ -385,7 +492,19 @@ export function getPreviewModel(resume) {
       id: entry.id,
       school: trimText(entry.school),
       degree: trimText(entry.degree),
-      yearsEdu: trimText(entry.yearsEdu)
+      yearsEdu: trimText(entry.yearsEdu),
+      location: trimText(entry.location),
+      gpa: trimText(entry.gpa),
+      honors: trimText(entry.honors),
+      coursework: trimText(entry.coursework),
+      awards: trimText(entry.awards),
+      customSections: entry.customSections
+        .map((section) => ({
+          id: section.id,
+          label: trimText(section.label),
+          content: trimText(section.content)
+        }))
+        .filter((section) => section.content !== '')
     }));
 
   const experienceEntries = resume.experience
