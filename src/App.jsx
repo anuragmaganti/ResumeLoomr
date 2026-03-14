@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import './App.css'
 import './styles/buttons.css'
 import './styles/forms.css'
@@ -8,6 +9,8 @@ import EditorPanel from './components/editorPanel';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 
 function App() {
+  const previewPanelRef = useRef(null);
+  const [editorStageMaxHeight, setEditorStageMaxHeight] = useState(null);
   const {
     resume,
     template,
@@ -30,6 +33,40 @@ function App() {
   } = useResumeBuilder();
 
   const issueCount = Object.keys(errors).length;
+
+  useEffect(() => {
+    function syncEditorHeight() {
+      if (window.innerWidth <= 980) {
+        setEditorStageMaxHeight(null);
+        return;
+      }
+
+      const previewPanelHeight = previewPanelRef.current?.offsetHeight ?? 0;
+      setEditorStageMaxHeight(previewPanelHeight > 0 ? previewPanelHeight : null);
+    }
+
+    syncEditorHeight();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', syncEditorHeight);
+      return () => window.removeEventListener('resize', syncEditorHeight);
+    }
+
+    const observer = new ResizeObserver(() => {
+      syncEditorHeight();
+    });
+
+    if (previewPanelRef.current) {
+      observer.observe(previewPanelRef.current);
+    }
+
+    window.addEventListener('resize', syncEditorHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', syncEditorHeight);
+    };
+  }, [template, previewModel]);
 
   return (
     <div className="app">
@@ -82,6 +119,7 @@ function App() {
               getFieldError={getFieldError}
               markTouched={markTouched}
               issueCount={issueCount}
+              maxHeight={editorStageMaxHeight}
             />
           </div>
 
@@ -90,6 +128,7 @@ function App() {
               previewModel={previewModel}
               template={template}
               templateOptions={templateOptions}
+              panelRef={previewPanelRef}
             />
           </div>
         </main>

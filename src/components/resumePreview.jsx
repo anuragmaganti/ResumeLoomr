@@ -6,7 +6,7 @@ function templateClassName(template) {
     return `resumePage--${template}`;
 }
 
-export default function ResumePreview({ previewModel, template, templateOptions }) {
+export default function ResumePreview({ previewModel, template, templateOptions, panelRef }) {
     const resumeRef = useRef(null);
     const [estimatedPages, setEstimatedPages] = useState(1);
     const templateLabel = useMemo(
@@ -42,7 +42,7 @@ export default function ResumePreview({ previewModel, template, templateOptions 
     }, [previewModel, template]);
 
     return (
-        <section className="previewPanel panel">
+        <section ref={panelRef} className="previewPanel panel">
             <div className="previewPanelHeader">
                 <p className="kicker">Preview</p>
                 <div className="previewMeta">

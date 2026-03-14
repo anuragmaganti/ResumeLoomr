@@ -1,4 +1,5 @@
 .app {
+  --workspace-sticky-top: 24px;
   min-height: 100vh;
   background:
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.8), transparent 32%),
@@ -234,10 +235,12 @@
 
 .editorRail {
   position: sticky;
-  top: 24px;
+  top: var(--workspace-sticky-top);
   display: grid;
   gap: var(--space-5);
   align-self: start;
+  min-width: 0;
+  overflow: hidden;
   padding: var(--space-5);
 }
 
@@ -259,8 +262,36 @@
 }
 
 .editorStage {
+  position: sticky;
+  top: var(--workspace-sticky-top);
+  display: flex;
+  flex-direction: column;
+  align-self: start;
   min-width: 0;
+  max-height: min(var(--editor-stage-max-height, 999rem), calc(100dvh - var(--workspace-sticky-top) - 24px));
+  overflow: hidden;
   padding: var(--space-6);
+}
+
+@media (min-width: 721px) {
+  .editorWorkspace {
+    grid-template-columns: 148px minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+
+  .editorRail {
+    gap: var(--space-3);
+    padding: 12px;
+  }
+
+  .editorRailHeader {
+    gap: 6px;
+  }
+
+  .editorRailHeader h2 {
+    font-size: 1rem;
+    letter-spacing: -0.02em;
+  }
 }
 
 .editorPanelHeader,
@@ -273,6 +304,7 @@
 }
 
 .editorPanelHeader {
+  flex: 0 0 auto;
   margin-bottom: var(--space-5);
   justify-items: start;
   padding-inline: 0;
@@ -312,6 +344,7 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-2);
+  overflow: hidden;
   padding: 4px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -319,7 +352,8 @@
 }
 
 .formContainer {
-  max-height: calc(100vh - 320px);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
   padding-right: 4px;
 }
@@ -336,7 +370,7 @@
 
 .previewFrame {
   position: sticky;
-  top: 24px;
+  top: var(--workspace-sticky-top);
 }
 
 .visuallyHidden {
@@ -385,6 +419,11 @@
 
   .editorRail {
     position: static;
+  }
+
+  .editorStage {
+    position: static;
+    max-height: none;
   }
 
   .formContainer {

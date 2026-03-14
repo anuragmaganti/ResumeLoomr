@@ -24,17 +24,23 @@ const sectionMeta = {
     }
 };
 
-export default function EditorPanel({ activeTab, setActiveTab, resume, actions, getFieldError, markTouched, issueCount }) {
+export default function EditorPanel({ activeTab, setActiveTab, resume, actions, getFieldError, markTouched, issueCount, maxHeight }) {
     const currentSection = sectionMeta[activeTab];
     const sections = Object.entries(sectionMeta).map(([id, meta]) => ({
         id,
         navLabel: meta.navLabel,
         navHint: meta.navHint
     }));
+    const editorWorkspaceStyle = maxHeight
+        ? {
+            minHeight: `${maxHeight}px`,
+            '--editor-stage-max-height': `${maxHeight}px`
+        }
+        : undefined;
 
     return (
         <section className="editorPanel">
-            <div className="editorWorkspace">
+            <div className="editorWorkspace" style={editorWorkspaceStyle}>
                 <aside className="editorRail panel">
                     <div className="editorRailHeader">
                         <p className="kicker">Editor</p>
