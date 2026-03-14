@@ -15,6 +15,7 @@ import {
   moveEducationCustomSection,
   moveEducation,
   moveExperience,
+  moveSectionOrder,
   normalizeDraftPayload,
   removeActivity,
   removeEducationCustomSection,
@@ -44,6 +45,7 @@ function loadStoredDraft() {
       return {
         resume: createEmptyResume(),
         template: DEFAULT_TEMPLATE,
+        sectionOrder: ['personal', 'education', 'experience'],
         savedAt: null,
       };
     }
@@ -54,12 +56,14 @@ function loadStoredDraft() {
     return {
       resume: normalizedDraft.resume,
       template: normalizedDraft.template,
+      sectionOrder: normalizedDraft.sectionOrder,
       savedAt: parsedDraft.savedAt || null,
     };
   } catch {
     return {
       resume: createEmptyResume(),
       template: DEFAULT_TEMPLATE,
+      sectionOrder: ['personal', 'education', 'experience'],
       savedAt: null,
     };
   }
@@ -83,6 +87,7 @@ export function useResumeBuilder() {
   const initialDraft = useMemo(() => loadStoredDraft(), []);
   const [resume, setResume] = useState(initialDraft.resume);
   const [template, setTemplate] = useState(initialDraft.template);
+  const [sectionOrder, setSectionOrder] = useState(initialDraft.sectionOrder);
   const [activeTab, setActiveTab] = useState('personal');
   const [mobileView, setMobileView] = useState('editor');
   const [touched, setTouched] = useState({});
@@ -103,7 +108,7 @@ export function useResumeBuilder() {
 
     const timeoutId = window.setTimeout(() => {
       try {
-        const payload = createDraftPayload({ resume, template });
+        const payload = createDraftPayload({ resume, template, sectionOrder });
         window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
         setSavedAt(payload.savedAt);
         setSaveState('saved');
@@ -114,7 +119,7 @@ export function useResumeBuilder() {
     }, 180);
 
     return () => window.clearTimeout(timeoutId);
-  }, [resume, template]);
+  }, [resume, template, sectionOrder]);
 
   useEffect(() => {
     function handleAfterPrint() {
@@ -140,6 +145,11 @@ export function useResumeBuilder() {
   function changeTemplate(nextTemplate) {
     setSaveState('saving');
     setTemplate(nextTemplate);
+  }
+
+  function moveSection(sectionId, direction) {
+    setSaveState('saving');
+    setSectionOrder((currentOrder) => moveSectionOrder(currentOrder, sectionId, direction));
   }
 
   function markTouched(path) {
@@ -240,6 +250,8 @@ export function useResumeBuilder() {
     setTemplate: changeTemplate,
     activeTab,
     setActiveTab,
+    sectionOrder,
+    moveSection,
     mobileView,
     setMobileView,
     previewModel,

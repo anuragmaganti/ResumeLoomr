@@ -324,6 +324,13 @@
 .editorPanelHeading {
   display: grid;
   gap: var(--space-2);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.editorPanelHeading .kicker,
+.editorPanelHeading h3 {
+  white-space: nowrap;
 }
 
 .previewPanelHeader {
@@ -367,7 +374,41 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
   gap: var(--space-2);
+}
+
+.sectionOrderControl {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  gap: 8px;
+  padding: 0 8px 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+}
+
+.sectionOrderLabel {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sectionOrderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sectionOrderActions .iconButton {
+  min-height: 20px;
+  min-width: 20px;
+  padding-inline: 0;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  box-shadow: none;
 }
 
 .previewMeta {
@@ -492,6 +533,10 @@
   }
 
   .editorPanelMeta {
+    justify-content: center;
+  }
+
+  .sectionOrderControl {
     justify-content: center;
   }
 

@@ -5,6 +5,7 @@ export const TEMPLATE_OPTIONS = [
   { id: 'executive', label: 'Executive' },
   { id: 'compact', label: 'Compact' }
 ];
+export const SECTION_IDS = ['personal', 'education', 'experience'];
 
 function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2, 10)}`;
@@ -94,6 +95,17 @@ function normalizeEducationCustomSections(overrides = {}) {
   return [createEducationCustomSection()];
 }
 
+export function normalizeSectionOrder(candidate) {
+  const requestedOrder = Array.isArray(candidate)
+    ? candidate.filter((sectionId) => SECTION_IDS.includes(sectionId))
+    : [];
+  const dedupedOrder = Array.from(new Set(requestedOrder));
+  const remainingSections = SECTION_IDS.filter((sectionId) => !dedupedOrder.includes(sectionId));
+  const nextOrder = [...dedupedOrder, ...remainingSections].filter((sectionId) => sectionId !== 'personal');
+
+  return ['personal', ...nextOrder];
+}
+
 export function createEducationEntry(overrides = {}) {
   return {
     id: overrides.id || createId(),
@@ -178,7 +190,8 @@ export function normalizeDraftPayload(payload) {
 
   return {
     template,
-    resume: normalizeResume(candidateResume)
+    resume: normalizeResume(candidateResume),
+    sectionOrder: normalizeSectionOrder(draft.sectionOrder)
   };
 }
 
@@ -207,6 +220,23 @@ export function moveItemById(list, entryId, direction) {
   }
 
   return reorderList(list, currentIndex, currentIndex + direction);
+}
+
+export function moveSectionOrder(sectionOrder, sectionId, direction) {
+  const normalizedOrder = normalizeSectionOrder(sectionOrder);
+
+  if (sectionId === 'personal') {
+    return normalizedOrder;
+  }
+
+  const currentIndex = normalizedOrder.indexOf(sectionId);
+  const nextIndex = currentIndex + direction;
+
+  if (currentIndex < 0 || nextIndex < 1 || nextIndex >= normalizedOrder.length) {
+    return normalizedOrder;
+  }
+
+  return reorderList(normalizedOrder, currentIndex, nextIndex);
 }
 
 export function updatePersonalField(resume, field, value) {
@@ -618,11 +648,12 @@ export function validateResume(resume) {
   return errors;
 }
 
-export function createDraftPayload({ resume, template }) {
+export function createDraftPayload({ resume, template, sectionOrder }) {
   return {
     version: 2,
     savedAt: new Date().toISOString(),
     template,
+    sectionOrder: normalizeSectionOrder(sectionOrder),
     resume
   };
 }

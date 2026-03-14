@@ -17,6 +17,8 @@ function App() {
     setTemplate,
     activeTab,
     setActiveTab,
+    sectionOrder,
+    moveSection,
     mobileView,
     setMobileView,
     previewModel,
@@ -110,6 +112,8 @@ function App() {
             <EditorPanel
               activeTab={activeTab}
               setActiveTab={setActiveTab}
+              sectionOrder={sectionOrder}
+              onMoveSection={moveSection}
               resume={resume}
               actions={actions}
               getFieldError={getFieldError}
@@ -122,6 +126,7 @@ function App() {
           <div className={`workspaceColumn workspaceColumnPreview ${mobileView === 'editor' ? 'isMobileHidden' : ''}`}>
             <ResumePreview
               previewModel={previewModel}
+              sectionOrder={sectionOrder}
               template={template}
               templateOptions={templateOptions}
               onTemplateChange={setTemplate}

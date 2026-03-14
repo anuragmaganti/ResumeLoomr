@@ -41,15 +41,13 @@
   page-break-inside: avoid;
 }
 
-.personalSection,
-.educationDiv,
-.experienceDiv {
+.resumeSection {
   margin-bottom: 20px;
   padding-bottom: 20px;
   border-bottom: 1px solid #e2e8f0;
 }
 
-.experienceDiv {
+.resumeSection:last-child {
   margin-bottom: 0;
   padding-bottom: 0;
   border-bottom: none;
@@ -280,11 +278,14 @@
   font-size: 1.3125rem;
 }
 
-.resumePage--compact .personalSection,
-.resumePage--compact .educationDiv,
-.resumePage--compact .experienceDiv {
+.resumePage--compact .resumeSection {
   margin-bottom: 18px;
   padding-bottom: 18px;
+}
+
+.resumePage--compact .resumeSection:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 .resumePage--compact .aboutMe,

@@ -8,6 +8,7 @@ import {
   getPreviewModel,
   moveActivity,
   moveEducationCustomSection,
+  moveSectionOrder,
   normalizeDraftPayload,
   normalizeBulletText,
   removeEducationCustomSection,
@@ -68,6 +69,17 @@ test('moveActivity reorders highlight bullets', () => {
 
   const nextResume = moveActivity(resume, entryId, 0, 2);
   assert.deepEqual(nextResume.experience[0].activities, ['Second', 'Third', 'First']);
+});
+
+test('moveSectionOrder keeps personal first and reorders the remaining sections', () => {
+  assert.deepEqual(
+    moveSectionOrder(['personal', 'education', 'experience'], 'education', 1),
+    ['personal', 'experience', 'education']
+  );
+  assert.deepEqual(
+    moveSectionOrder(['personal', 'education', 'experience'], 'personal', 1),
+    ['personal', 'education', 'experience']
+  );
 });
 
 test('validateResume flags missing core fields and partial entries', () => {
@@ -135,6 +147,7 @@ test('getPreviewModel hides empty sections, formats personal links, shapes educa
 test('normalizeDraftPayload accepts bare resume objects and valid templates', () => {
   const normalized = normalizeDraftPayload({
     template: 'compact',
+    sectionOrder: ['experience', 'personal', 'education'],
     resume: {
       personal: { name: 'Jordan', phone: '', email: '', aboutMe: '' },
       education: [],
@@ -143,6 +156,7 @@ test('normalizeDraftPayload accepts bare resume objects and valid templates', ()
   });
 
   assert.equal(normalized.template, 'compact');
+  assert.deepEqual(normalized.sectionOrder, ['personal', 'experience', 'education']);
   assert.equal(normalized.resume.personal.name, 'Jordan');
   assert.equal(normalized.resume.personal.linkedinUrl, '');
   assert.equal(normalized.resume.education[0].location, '');

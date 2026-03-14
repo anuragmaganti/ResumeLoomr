@@ -1,4 +1,4 @@
-import SectionTabs from "./sectionTabs"
+import SectionTabs from "./sectionTabs";
 import PersonalForm from "./forms/personalForm";
 import EducationForm from "./forms/educationForm";
 import ExperienceForm from "./forms/experienceForm";
@@ -24,13 +24,27 @@ const sectionMeta = {
     }
 };
 
-export default function EditorPanel({ activeTab, setActiveTab, resume, actions, getFieldError, markTouched, issueCount, maxHeight }) {
+export default function EditorPanel({
+    activeTab,
+    setActiveTab,
+    sectionOrder,
+    onMoveSection,
+    resume,
+    actions,
+    getFieldError,
+    markTouched,
+    issueCount,
+    maxHeight
+}) {
     const currentSection = sectionMeta[activeTab];
-    const sections = Object.entries(sectionMeta).map(([id, meta]) => ({
+    const sections = sectionOrder.map((id) => ({
         id,
-        navLabel: meta.navLabel,
-        navHint: meta.navHint
+        navLabel: sectionMeta[id].navLabel,
+        navHint: sectionMeta[id].navHint
     }));
+    const activeSectionIndex = sectionOrder.indexOf(activeTab);
+    const canMoveSectionUp = activeTab !== "personal" && activeSectionIndex > 1;
+    const canMoveSectionDown = activeTab !== "personal" && activeSectionIndex < sectionOrder.length - 1;
     const editorWorkspaceStyle = maxHeight
         ? {
             minHeight: `${maxHeight}px`,
@@ -62,6 +76,30 @@ export default function EditorPanel({ activeTab, setActiveTab, resume, actions, 
                         </div>
 
                         <div className="editorPanelMeta">
+                            <div className="sectionOrderControl">
+                                <span className="sectionOrderLabel">Section order</span>
+                                <div className="sectionOrderActions">
+                                    <button
+                                        className="button buttonSecondary iconButton"
+                                        type="button"
+                                        onClick={() => onMoveSection(activeTab, -1)}
+                                        disabled={!canMoveSectionUp}
+                                        aria-label={`Move ${currentSection.label} up in the resume order`}
+                                    >
+                                        ↑
+                                    </button>
+                                    <button
+                                        className="button buttonSecondary iconButton"
+                                        type="button"
+                                        onClick={() => onMoveSection(activeTab, 1)}
+                                        disabled={!canMoveSectionDown}
+                                        aria-label={`Move ${currentSection.label} down in the resume order`}
+                                    >
+                                        ↓
+                                    </button>
+                                </div>
+                            </div>
+
                             <span className={`statusBadge ${issueCount > 0 ? 'statusBadge--warning' : 'statusBadge--success'}`}>
                                 {issueCount > 0 ? `${issueCount} thing${issueCount === 1 ? '' : 's'} to review` : 'All key fields look good'}
                             </span>
@@ -98,4 +136,4 @@ export default function EditorPanel({ activeTab, setActiveTab, resume, actions, 
             </div>
         </section>
     );
-};
+}
