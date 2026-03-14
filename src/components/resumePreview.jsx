@@ -45,8 +45,6 @@ export default function ResumePreview({ previewModel, template, templateOptions 
         <section className="previewPanel panel">
             <div className="previewPanelHeader">
                 <p className="kicker">Preview</p>
-                <h2>Live resume</h2>
-                <p className="panelDescription previewPanelDescription">A clean, professional layout optimized for readability, print output, and multi-template presentation.</p>
                 <div className="previewMeta">
                     <span className={`statusBadge ${estimatedPages > 1 ? 'statusBadge--warning' : 'statusBadge--success'}`}>
                         {estimatedPages > 1 ? `Estimated ${estimatedPages} pages` : 'Estimated 1 page'}
