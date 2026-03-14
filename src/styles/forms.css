@@ -45,14 +45,14 @@ form {
 
 .entryHeader {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
 }
 
 .entryHeader h3 {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 1.05rem;
   line-height: 1.2;
 }
@@ -66,9 +66,10 @@ form {
 
 .entryActions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   gap: var(--space-2);
+  flex-shrink: 0;
 }
 
 .fieldGrid {
@@ -138,8 +139,8 @@ form {
 
 .activityRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-3);
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
   align-items: start;
 }
 
@@ -151,7 +152,17 @@ form {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  align-items: flex-start;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+@media (min-width: 721px) {
+  .actionButton,
+  .iconButton {
+    min-height: 32px;
+    padding-inline: 10px;
+    font-size: 0.8125rem;
+  }
 }
 
 @media (max-width: 860px) {
@@ -165,13 +176,14 @@ form {
     padding: var(--space-4);
   }
 
-  .entryHeader,
-  .activityRow {
-    grid-template-columns: 1fr;
+  .entryHeader {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .entryActions,
   .activityActions {
+    flex-wrap: wrap;
     justify-content: stretch;
   }
 

@@ -169,61 +169,6 @@ export function useResumeBuilder() {
     return errors[path] && (showAllErrors || touched[path]) ? errors[path] : '';
   }
 
-  async function importDraftFile(file) {
-    if (!file) {
-      return;
-    }
-
-    try {
-      const rawDraft = await file.text();
-      const parsedDraft = JSON.parse(rawDraft);
-      const normalizedDraft = normalizeDraftPayload(parsedDraft);
-
-      setResume(normalizedDraft.resume);
-      setTemplate(normalizedDraft.template);
-      setTouched({});
-      setShowAllErrors(false);
-      setSaveState('saving');
-      setNotice({ tone: 'success', message: 'Draft imported successfully.' });
-      setMobileView('editor');
-    } catch {
-      setNotice({ tone: 'error', message: 'Import failed. Use a valid ResumeLoomr JSON file.' });
-    }
-  }
-
-  function exportDraft() {
-    const payload = createDraftPayload({ resume, template });
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const stamp = new Date().toISOString().slice(0, 10);
-
-    link.href = url;
-    link.download = `resumeloomr-${stamp}.json`;
-    link.click();
-    window.URL.revokeObjectURL(url);
-    setNotice({ tone: 'success', message: 'JSON export downloaded.' });
-  }
-
-  function resetDraft() {
-    const nextResume = createEmptyResume();
-
-    setResume(nextResume);
-    setTemplate(DEFAULT_TEMPLATE);
-    setActiveTab('personal');
-    setMobileView('editor');
-    setTouched({});
-    setShowAllErrors(false);
-    setSaveState('saving');
-    setNotice({ tone: 'info', message: 'Started a fresh draft.' });
-
-    try {
-      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-    } catch {
-      // Ignore storage cleanup failures; the new draft will be autosaved on the next change.
-    }
-  }
-
   function printResume() {
     revealAllErrors();
     printViewRef.current = mobileView;
@@ -297,9 +242,6 @@ export function useResumeBuilder() {
     showAllErrors,
     actions,
     printResume,
-    importDraftFile,
-    exportDraft,
-    resetDraft,
     notice,
     dismissNotice() {
       setNotice(null);

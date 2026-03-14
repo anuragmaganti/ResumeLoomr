@@ -22,9 +22,6 @@ function App() {
     markTouched,
     actions,
     printResume,
-    importDraftFile,
-    exportDraft,
-    resetDraft,
     notice,
     dismissNotice,
     saveState,
@@ -41,9 +38,6 @@ function App() {
           template={template}
           templateOptions={templateOptions}
           onTemplateChange={setTemplate}
-          onImportFile={importDraftFile}
-          onExport={exportDraft}
-          onReset={resetDraft}
           onPrint={printResume}
           saveState={saveState}
           saveLabel={saveLabel}

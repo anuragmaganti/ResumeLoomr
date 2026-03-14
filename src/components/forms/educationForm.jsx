@@ -14,7 +14,6 @@ export default function EducationForm({ education, actions, getFieldError, markT
                     <div className="entryHeader">
                         <div>
                             <h3>Education {index + 1}</h3>
-                            <p className="entryDescription">Each card maps directly to one clean block in the resume preview.</p>
                         </div>
                         <div className="entryActions">
                             <button

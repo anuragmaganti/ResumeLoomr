@@ -221,8 +221,45 @@
   min-width: 0;
 }
 
-.editorPanel,
 .previewPanel {
+  padding: var(--space-6);
+}
+
+.editorWorkspace {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.editorRail {
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: var(--space-5);
+  align-self: start;
+  padding: var(--space-5);
+}
+
+.editorRailHeader {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.editorRailHeader h2,
+.editorPanelHeader h3 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+
+.editorRailDescription {
+  max-width: 18rem;
+}
+
+.editorStage {
+  min-width: 0;
   padding: var(--space-6);
 }
 
@@ -237,6 +274,9 @@
 
 .editorPanelHeader {
   margin-bottom: var(--space-5);
+  justify-items: start;
+  padding-inline: 0;
+  text-align: left;
 }
 
 .previewPanelHeader {
@@ -244,6 +284,7 @@
 }
 
 .editorPanelHeader h2,
+.editorPanelHeader h3,
 .previewPanelHeader h2 {
   margin: 0;
   font-size: 1.5rem;
@@ -263,15 +304,14 @@
 .previewMeta {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
   gap: var(--space-2);
 }
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--space-2);
-  margin-bottom: var(--space-5);
   padding: 4px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -338,6 +378,15 @@
     grid-template-columns: 1fr;
   }
 
+  .editorWorkspace {
+    grid-template-columns: 1fr;
+    gap: var(--space-5);
+  }
+
+  .editorRail {
+    position: static;
+  }
+
   .formContainer {
     max-height: none;
   }
@@ -354,6 +403,20 @@
   .workspaceColumn.isMobileHidden {
     display: none;
   }
+
+  .editorPanelHeader {
+    justify-items: center;
+    padding-inline: var(--space-2);
+    text-align: center;
+  }
+
+  .editorPanelMeta {
+    justify-content: center;
+  }
+
+  .tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -364,7 +427,8 @@
   }
 
   .topbar,
-  .editorPanel,
+  .editorRail,
+  .editorStage,
   .previewPanel {
     padding: var(--space-4);
   }

@@ -14,7 +14,6 @@ export default function ExperienceForm({ experience, actions, getFieldError, mar
                     <div className="entryHeader">
                         <div>
                             <h3>Experience {index + 1}</h3>
-                            <p className="entryDescription">Keep each role concise, then use highlight bullets for measurable impact.</p>
                         </div>
                         <div className="entryActions">
                             <button

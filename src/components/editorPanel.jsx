@@ -5,14 +5,20 @@ import ExperienceForm from "./forms/experienceForm";
 
 const sectionMeta = {
     personal: {
+        navLabel: "Personal",
+        navHint: "Name, contact, summary",
         label: "Personal details",
         description: "Add your name, contact details, and summary with clear validation and polished defaults."
     },
     education: {
+        navLabel: "Education",
+        navHint: "Schools, degree, dates",
         label: "Education",
         description: "Organize institutions, degrees, and dates in a structure that stays easy to scan."
     },
     experience: {
+        navLabel: "Experience",
+        navHint: "Roles and highlights",
         label: "Experience",
         description: "Shape concise, high-signal role entries with reorderable highlights for stronger storytelling."
     }
@@ -20,47 +26,66 @@ const sectionMeta = {
 
 export default function EditorPanel({ activeTab, setActiveTab, resume, actions, getFieldError, markTouched, issueCount }) {
     const currentSection = sectionMeta[activeTab];
+    const sections = Object.entries(sectionMeta).map(([id, meta]) => ({
+        id,
+        navLabel: meta.navLabel,
+        navHint: meta.navHint
+    }));
 
     return (
-        <section className="editorPanel panel">
-            <div className="editorPanelHeader">
-                <p className="kicker">Editor</p>
-                <h2>{currentSection.label}</h2>
-                <p className="panelDescription editorPanelDescription">{currentSection.description}</p>
-                <div className="editorPanelMeta">
-                    <span className={`statusBadge ${issueCount > 0 ? 'statusBadge--warning' : 'statusBadge--success'}`}>
-                        {issueCount > 0 ? `${issueCount} thing${issueCount === 1 ? '' : 's'} to review` : 'All key fields look good'}
-                    </span>
+        <section className="editorPanel">
+            <div className="editorWorkspace">
+                <aside className="editorRail panel">
+                    <div className="editorRailHeader">
+                        <p className="kicker">Editor</p>
+                        <h2>Sections</h2>
+                    </div>
+
+                    <SectionTabs
+                        activeTab={activeTab}
+                        setActiveTab={setActiveTab}
+                        sections={sections}
+                    />
+                </aside>
+
+                <div className="editorStage panel">
+                    <div className="editorPanelHeader">
+                        <p className="kicker">Current section</p>
+                        <h3>{currentSection.label}</h3>
+                        <div className="editorPanelMeta">
+                            <span className={`statusBadge ${issueCount > 0 ? 'statusBadge--warning' : 'statusBadge--success'}`}>
+                                {issueCount > 0 ? `${issueCount} thing${issueCount === 1 ? '' : 's'} to review` : 'All key fields look good'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="formContainer">
+                        {activeTab === "personal" && (
+                            <PersonalForm
+                                personal={resume.personal}
+                                actions={actions}
+                                getFieldError={getFieldError}
+                                markTouched={markTouched}
+                            />
+                        )}
+                        {activeTab === "education" && (
+                            <EducationForm
+                                education={resume.education}
+                                actions={actions}
+                                getFieldError={getFieldError}
+                                markTouched={markTouched}
+                            />
+                        )}
+                        {activeTab === "experience" && (
+                            <ExperienceForm
+                                experience={resume.experience}
+                                actions={actions}
+                                getFieldError={getFieldError}
+                                markTouched={markTouched}
+                            />
+                        )}
+                    </div>
                 </div>
-            </div>
-
-            <SectionTabs activeTab={activeTab} setActiveTab={setActiveTab}></SectionTabs>
-
-            <div className="formContainer">
-                {activeTab === "personal" && (
-                    <PersonalForm
-                        personal={resume.personal}
-                        actions={actions}
-                        getFieldError={getFieldError}
-                        markTouched={markTouched}
-                    />
-                )}
-                {activeTab === "education" && (
-                    <EducationForm
-                        education={resume.education}
-                        actions={actions}
-                        getFieldError={getFieldError}
-                        markTouched={markTouched}
-                    />
-                )}
-                {activeTab === "experience" && (
-                    <ExperienceForm
-                        experience={resume.experience}
-                        actions={actions}
-                        getFieldError={getFieldError}
-                        markTouched={markTouched}
-                    />
-                )}
             </div>
         </section>
     );

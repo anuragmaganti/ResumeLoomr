@@ -12,7 +12,6 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
             <div className="entryHeader">
                 <div>
                     <h3>Core information</h3>
-                    <p className="entryDescription">A strong first section makes the preview feel complete immediately and improves the exported result.</p>
                 </div>
             </div>
 
