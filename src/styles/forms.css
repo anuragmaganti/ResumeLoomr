@@ -130,6 +130,12 @@ form {
   resize: vertical;
 }
 
+.field textarea.autoResizeTextarea {
+  min-height: 0;
+  overflow: hidden;
+  resize: none;
+}
+
 .fieldError {
   margin: 0;
   color: var(--color-error);

@@ -56,8 +56,11 @@ export default function EditorPanel({ activeTab, setActiveTab, resume, actions, 
 
                 <div className="editorStage panel">
                     <div className="editorPanelHeader">
-                        <p className="kicker">Current section</p>
-                        <h3>{currentSection.label}</h3>
+                        <div className="editorPanelHeading">
+                            <p className="kicker">Current section</p>
+                            <h3>{currentSection.label}</h3>
+                        </div>
+
                         <div className="editorPanelMeta">
                             <span className={`statusBadge ${issueCount > 0 ? 'statusBadge--warning' : 'statusBadge--success'}`}>
                                 {issueCount > 0 ? `${issueCount} thing${issueCount === 1 ? '' : 's'} to review` : 'All key fields look good'}

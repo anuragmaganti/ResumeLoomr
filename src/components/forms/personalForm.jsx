@@ -1,3 +1,5 @@
+import AutoResizeTextarea from "../autoResizeTextarea";
+
 function FieldError({ message }) {
     if (!message) {
         return null;
@@ -62,13 +64,13 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
 
                 <div className="field">
                     <label htmlFor="aboutMe">Professional summary</label>
-                    <textarea
+                    <AutoResizeTextarea
                         id="aboutMe"
                         name="aboutMe"
                         value={personal.aboutMe}
                         onChange={(event) => actions.updatePersonalField('aboutMe', event.target.value)}
                         onBlur={() => markTouched('personal.aboutMe')}
-                        rows="6"
+                        rows={2}
                         placeholder="Write a short summary that highlights your experience, strengths, and goals."
                     />
                 </div>

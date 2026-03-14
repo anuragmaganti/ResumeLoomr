@@ -1,3 +1,5 @@
+import AutoResizeTextarea from "../autoResizeTextarea";
+
 function FieldError({ message }) {
     if (!message) {
         return null;
@@ -93,12 +95,12 @@ export default function ExperienceForm({ experience, actions, getFieldError, mar
                             {entry.activities.map((activity, activityIndex) => (
                                 <div className="activityRow" key={`${entry.id}-${activityIndex}`}>
                                     <div className="activityInputWrap">
-                                        <textarea
+                                        <AutoResizeTextarea
                                             id={`activities-${entry.id}-${activityIndex}`}
                                             value={activity}
                                             onChange={(event) => actions.updateActivity(entry.id, activityIndex, event.target.value)}
                                             onBlur={() => markTouched(`experience.${entry.id}.activities.${activityIndex}`)}
-                                            rows="3"
+                                            rows={2}
                                             placeholder="Describe a measurable accomplishment or core responsibility."
                                         />
                                         <FieldError message={getFieldError(`experience.${entry.id}.activities.${activityIndex}`)} />

@@ -12,9 +12,8 @@ export default function Header({
             <div className="brand">
                 <div className="brandMark" aria-hidden="true">R</div>
                 <div className="brandCopy">
-                    <p className="kicker">Resume builder</p>
                     <h1>ResumeLoomr</h1>
-                    <p className="brandSubcopy">A production-ready editor for focused resume writing, review, and printing.</p>
+                    <p className="brandSubcopy">Write your resume, review it live, and print a polished result in one place.</p>
                 </div>
             </div>
 
