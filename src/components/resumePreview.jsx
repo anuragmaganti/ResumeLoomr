@@ -6,7 +6,7 @@ function templateClassName(template) {
     return `resumePage--${template}`;
 }
 
-export default function ResumePreview({ previewModel, template, templateOptions, panelRef }) {
+export default function ResumePreview({ previewModel, template, templateOptions, onTemplateChange, onPrint, panelRef }) {
     const resumeRef = useRef(null);
     const [estimatedPages, setEstimatedPages] = useState(1);
     const templateLabel = useMemo(
@@ -44,12 +44,38 @@ export default function ResumePreview({ previewModel, template, templateOptions,
     return (
         <section ref={panelRef} className="previewPanel panel">
             <div className="previewPanelHeader">
-                <p className="kicker">Preview</p>
-                <div className="previewMeta">
-                    <span className={`statusBadge ${estimatedPages > 1 ? 'statusBadge--warning' : 'statusBadge--success'}`}>
-                        {estimatedPages > 1 ? `Estimated ${estimatedPages} pages` : 'Estimated 1 page'}
-                    </span>
-                    <span className="statusBadge statusBadge--neutral">{templateLabel} template</span>
+                <div className="previewPanelIntro">
+                    <p className="kicker">Preview</p>
+                    <div className="previewMeta">
+                        <span className={`statusBadge ${estimatedPages > 1 ? 'statusBadge--warning' : 'statusBadge--success'}`}>
+                            {estimatedPages > 1 ? `Estimated ${estimatedPages} pages` : 'Estimated 1 page'}
+                        </span>
+                        <span className="statusBadge statusBadge--neutral">{templateLabel} template</span>
+                    </div>
+                </div>
+
+                <div className="previewToolbar">
+                    <label className="toolbarField">
+                        <span className="toolbarLabel">Template</span>
+                        <select
+                            className="toolbarSelect"
+                            value={template}
+                            onChange={(event) => onTemplateChange(event.target.value)}
+                            aria-label="Choose resume template"
+                        >
+                            {templateOptions.map((option) => (
+                                <option key={option.id} value={option.id}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <div className="toolbarActions">
+                        <button type="button" className="button buttonPrimary printButton" onClick={onPrint}>
+                            Print resume
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -61,10 +87,23 @@ export default function ResumePreview({ previewModel, template, templateOptions,
                                 <div className="personalSection">
                                     <h1>{previewModel.personal.name || "Your Name"}</h1>
 
-                                    {(previewModel.personal.phone || previewModel.personal.email) && (
+                                    {previewModel.personal.headline && (
+                                        <div className="personalHeadline">{previewModel.personal.headline}</div>
+                                    )}
+
+                                    {(previewModel.personal.location || previewModel.personal.phone || previewModel.personal.email) && (
                                         <div className="phoneEmail">
+                                            {previewModel.personal.location && <div>{previewModel.personal.location}</div>}
                                             {previewModel.personal.phone && <div>{previewModel.personal.phone}</div>}
                                             {previewModel.personal.email && <div>{previewModel.personal.email}</div>}
+                                        </div>
+                                    )}
+
+                                    {previewModel.personal.links.length > 0 && (
+                                        <div className="personalLinks">
+                                            {previewModel.personal.links.map((link) => (
+                                                <span key={link.id}>{link.text}</span>
+                                            ))}
                                         </div>
                                     )}
 

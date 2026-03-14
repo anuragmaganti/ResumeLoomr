@@ -30,7 +30,6 @@ function loadStoredDraft() {
       resume: createEmptyResume(),
       template: DEFAULT_TEMPLATE,
       savedAt: null,
-      recoveredDraft: false,
     };
   }
 
@@ -42,7 +41,6 @@ function loadStoredDraft() {
         resume: createEmptyResume(),
         template: DEFAULT_TEMPLATE,
         savedAt: null,
-        recoveredDraft: false,
       };
     }
 
@@ -53,14 +51,12 @@ function loadStoredDraft() {
       resume: normalizedDraft.resume,
       template: normalizedDraft.template,
       savedAt: parsedDraft.savedAt || null,
-      recoveredDraft: true,
     };
   } catch {
     return {
       resume: createEmptyResume(),
       template: DEFAULT_TEMPLATE,
       savedAt: null,
-      recoveredDraft: false,
     };
   }
 }
@@ -87,13 +83,9 @@ export function useResumeBuilder() {
   const [mobileView, setMobileView] = useState('editor');
   const [touched, setTouched] = useState({});
   const [showAllErrors, setShowAllErrors] = useState(false);
-  const [saveState, setSaveState] = useState(initialDraft.recoveredDraft ? 'restored' : 'idle');
+  const [saveState, setSaveState] = useState('idle');
   const [savedAt, setSavedAt] = useState(initialDraft.savedAt);
-  const [notice, setNotice] = useState(
-    initialDraft.recoveredDraft
-      ? { tone: 'info', message: 'Recovered your last autosaved draft.' }
-      : null
-  );
+  const [notice, setNotice] = useState(null);
   const hasMounted = useRef(false);
   const printViewRef = useRef(null);
   const errors = useMemo(() => validateResume(resume), [resume]);

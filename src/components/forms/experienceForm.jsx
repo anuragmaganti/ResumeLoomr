@@ -25,7 +25,7 @@ export default function ExperienceForm({ experience, actions, getFieldError, mar
                                 disabled={index === 0}
                                 aria-label={`Move experience ${index + 1} up`}
                             >
-                                Up
+                                ↑
                             </button>
                             <button
                                 className="button buttonSecondary actionButton"
@@ -34,15 +34,16 @@ export default function ExperienceForm({ experience, actions, getFieldError, mar
                                 disabled={index === experience.length - 1}
                                 aria-label={`Move experience ${index + 1} down`}
                             >
-                                Down
+                                ↓
                             </button>
                             <button
-                                className="button buttonGhost actionButton"
+                                className="button buttonDanger actionButton"
                                 type="button"
                                 onClick={() => actions.removeExperience(entry.id)}
                                 disabled={experience.length === 1}
+                                aria-label={`Remove experience ${index + 1}`}
                             >
-                                Remove
+                                x
                             </button>
                         </div>
                     </div>
@@ -114,7 +115,7 @@ export default function ExperienceForm({ experience, actions, getFieldError, mar
                                             disabled={activityIndex === 0}
                                             aria-label={`Move highlight ${activityIndex + 1} up`}
                                         >
-                                            Up
+                                            ↑
                                         </button>
                                         <button
                                             className="button buttonSecondary iconButton"
@@ -123,14 +124,15 @@ export default function ExperienceForm({ experience, actions, getFieldError, mar
                                             disabled={activityIndex === entry.activities.length - 1}
                                             aria-label={`Move highlight ${activityIndex + 1} down`}
                                         >
-                                            Down
+                                            ↓
                                         </button>
                                         <button
-                                            className="button buttonGhost iconButton"
+                                            className="button buttonDanger iconButton"
                                             type="button"
                                             onClick={() => actions.removeActivity(entry.id, activityIndex)}
+                                            aria-label={`Remove highlight ${activityIndex + 1}`}
                                         >
-                                            Remove
+                                            x
                                         </button>
                                     </div>
                                 </div>

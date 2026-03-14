@@ -72,10 +72,6 @@ function App() {
     <div className="app">
       <div className="appShell">
         <Header
-          template={template}
-          templateOptions={templateOptions}
-          onTemplateChange={setTemplate}
-          onPrint={printResume}
           saveState={saveState}
           saveLabel={saveLabel}
           issueCount={issueCount}
@@ -128,6 +124,8 @@ function App() {
               previewModel={previewModel}
               template={template}
               templateOptions={templateOptions}
+              onTemplateChange={setTemplate}
+              onPrint={printResume}
               panelRef={previewPanelRef}
             />
           </div>

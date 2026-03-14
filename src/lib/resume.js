@@ -29,6 +29,40 @@ export function formatPhoneForPreview(value) {
   return rawValue;
 }
 
+export function normalizeUrl(value) {
+  const rawValue = trimText(value);
+
+  if (!rawValue) {
+    return '';
+  }
+
+  const prefixedValue = /^[a-z][a-z\d+\-.]*:\/\//i.test(rawValue) ? rawValue : `https://${rawValue}`;
+
+  try {
+    const url = new URL(prefixedValue);
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return '';
+    }
+
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+export function formatUrlForDisplay(value) {
+  const normalizedUrl = normalizeUrl(value);
+
+  if (!normalizedUrl) {
+    return trimText(value);
+  }
+
+  const url = new URL(normalizedUrl);
+  const path = url.pathname === '/' ? '' : url.pathname.replace(/\/$/, '');
+  return `${url.hostname.replace(/^www\./, '')}${path}`;
+}
+
 export function normalizeBulletText(value) {
   return trimText(value).replace(/^[\s\-*•]+/, '');
 }
@@ -58,8 +92,14 @@ export function createEmptyResume() {
   return {
     personal: {
       name: '',
+      headline: '',
+      location: '',
       phone: '',
       email: '',
+      linkedinUrl: '',
+      portfolioUrl: '',
+      githubUrl: '',
+      customField: '',
       aboutMe: ''
     },
     education: [createEducationEntry()],
@@ -72,12 +112,25 @@ export function normalizeResume(candidate) {
   const personal = resume.personal && typeof resume.personal === 'object' ? resume.personal : {};
   const education = Array.isArray(resume.education) ? resume.education : [];
   const experience = Array.isArray(resume.experience) ? resume.experience : [];
+  const legacyCustomLinkLabel = trimText(personal.customLinkLabel);
+  const legacyCustomLinkUrl = trimText(personal.customLinkUrl);
+  const customField = asText(personal.customField) || (
+    legacyCustomLinkLabel && legacyCustomLinkUrl
+      ? `${legacyCustomLinkLabel}: ${legacyCustomLinkUrl}`
+      : legacyCustomLinkUrl || legacyCustomLinkLabel
+  );
 
   return {
     personal: {
       name: asText(personal.name),
+      headline: asText(personal.headline),
+      location: asText(personal.location),
       phone: asText(personal.phone),
       email: asText(personal.email),
+      linkedinUrl: asText(personal.linkedinUrl),
+      portfolioUrl: asText(personal.portfolioUrl),
+      githubUrl: asText(personal.githubUrl),
+      customField,
       aboutMe: asText(personal.aboutMe)
     },
     education: education.length > 0 ? education.map(createEducationEntry) : [createEducationEntry()],
@@ -263,7 +316,18 @@ export function removeActivity(resume, entryId, activityIndex) {
 }
 
 export function personalHasContent(personal) {
-  return [personal.name, personal.phone, personal.email, personal.aboutMe].some((value) => trimText(value) !== '');
+  return [
+    personal.name,
+    personal.headline,
+    personal.location,
+    personal.phone,
+    personal.email,
+    personal.linkedinUrl,
+    personal.portfolioUrl,
+    personal.githubUrl,
+    personal.customField,
+    personal.aboutMe
+  ].some((value) => trimText(value) !== '');
 }
 
 export function educationEntryHasContent(entry) {
@@ -278,10 +342,42 @@ export function experienceEntryHasContent(entry) {
 export function getPreviewModel(resume) {
   const personal = {
     name: trimText(resume.personal.name),
+    headline: trimText(resume.personal.headline),
+    location: trimText(resume.personal.location),
     phone: formatPhoneForPreview(resume.personal.phone),
     email: trimText(resume.personal.email),
+    linkedinUrl: trimText(resume.personal.linkedinUrl),
+    portfolioUrl: trimText(resume.personal.portfolioUrl),
+    githubUrl: trimText(resume.personal.githubUrl),
+    customField: trimText(resume.personal.customField),
     aboutMe: trimText(resume.personal.aboutMe)
   };
+  const personalLinks = [
+    personal.linkedinUrl
+      ? {
+          id: 'linkedin',
+          text: formatUrlForDisplay(personal.linkedinUrl)
+        }
+      : null,
+    personal.portfolioUrl
+      ? {
+          id: 'portfolio',
+          text: formatUrlForDisplay(personal.portfolioUrl)
+        }
+      : null,
+    personal.githubUrl
+      ? {
+          id: 'github',
+          text: formatUrlForDisplay(personal.githubUrl)
+        }
+      : null,
+    personal.customField
+      ? {
+          id: 'custom',
+          text: personal.customField
+        }
+      : null
+  ].filter(Boolean);
 
   const educationEntries = resume.education
     .filter(educationEntryHasContent)
@@ -308,7 +404,10 @@ export function getPreviewModel(resume) {
 
   return {
     hasContent,
-    personal,
+    personal: {
+      ...personal,
+      links: personalLinks
+    },
     educationEntries,
     experienceEntries,
     showPersonal: personalHasContent(personal),
@@ -322,6 +421,9 @@ export function validateResume(resume) {
   const email = trimText(resume.personal.email);
   const phone = trimText(resume.personal.phone);
   const name = trimText(resume.personal.name);
+  const linkedinUrl = trimText(resume.personal.linkedinUrl);
+  const portfolioUrl = trimText(resume.personal.portfolioUrl);
+  const githubUrl = trimText(resume.personal.githubUrl);
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const phoneRegex = /^[+\d\s().-]{7,}$/;
 
@@ -340,6 +442,18 @@ export function validateResume(resume) {
 
   if (phone && !phoneRegex.test(phone)) {
     errors['personal.phone'] = 'Enter a valid phone number.';
+  }
+
+  if (linkedinUrl && !normalizeUrl(linkedinUrl)) {
+    errors['personal.linkedinUrl'] = 'Enter a valid LinkedIn URL.';
+  }
+
+  if (portfolioUrl && !normalizeUrl(portfolioUrl)) {
+    errors['personal.portfolioUrl'] = 'Enter a valid portfolio URL.';
+  }
+
+  if (githubUrl && !normalizeUrl(githubUrl)) {
+    errors['personal.githubUrl'] = 'Enter a valid GitHub URL.';
   }
 
   resume.education.forEach((entry) => {

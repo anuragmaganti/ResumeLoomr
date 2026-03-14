@@ -165,12 +165,6 @@
   border-radius: var(--radius-lg);
 }
 
-.noticeBanner--info {
-  border-color: #d7e4ff;
-  background: var(--color-info-soft);
-  color: var(--color-info);
-}
-
 .noticeBanner--success {
   border-color: #cfe8da;
   background: var(--color-success-soft);
@@ -328,7 +322,18 @@
 }
 
 .previewPanelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
   margin-bottom: var(--space-6);
+  padding-inline: 0;
+  text-align: left;
+}
+
+.previewPanelIntro {
+  display: grid;
+  gap: var(--space-2);
 }
 
 .editorPanelHeader h2,
@@ -338,6 +343,10 @@
   font-size: 1.5rem;
   line-height: 1.1;
   letter-spacing: -0.04em;
+}
+
+.editorPanelHeader h3 {
+  font-size: 1.4rem;
 }
 
 .panelDescription {
@@ -356,12 +365,25 @@
   gap: var(--space-2);
 }
 
+.previewMeta {
+  justify-content: flex-start;
+}
+
+.previewToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
 .tabs {
+  --tabs-inset: 4px;
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-2);
   overflow: hidden;
-  padding: 4px;
+  padding: var(--tabs-inset);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface-muted);
@@ -417,8 +439,6 @@
   }
 
   .topbarSide,
-  .toolbar,
-  .toolbarActions,
   .topbarMeta {
     justify-items: stretch;
     justify-content: flex-start;
@@ -470,6 +490,23 @@
     justify-content: center;
   }
 
+  .previewPanelHeader {
+    align-items: center;
+    flex-direction: column;
+    padding-inline: var(--space-2);
+    text-align: center;
+  }
+
+  .previewPanelIntro {
+    justify-items: center;
+  }
+
+  .previewMeta,
+  .previewToolbar,
+  .previewToolbar .toolbarActions {
+    justify-content: center;
+  }
+
   .tabs {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -489,7 +526,8 @@
     padding: var(--space-4);
   }
 
-  .toolbar {
+  .toolbar,
+  .previewToolbar {
     width: 100%;
   }
 
@@ -514,6 +552,9 @@
 }
 
 @media print {
+  html,
+  body,
+  #root,
   .app {
     background: #ffffff;
   }
@@ -548,8 +589,12 @@
     padding: 0;
     border: 0;
     border-radius: 0;
-    background: transparent;
-    box-shadow: none;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    filter: none !important;
+    transform: none !important;
+    transition: none !important;
+    overflow: visible !important;
   }
 }
 

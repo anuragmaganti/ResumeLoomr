@@ -57,6 +57,10 @@ form {
   line-height: 1.2;
 }
 
+.editorStage .entryHeader h3 {
+  font-size: 0.98rem;
+}
+
 .entryDescription {
   margin: 0;
   color: var(--color-text-muted);
@@ -93,6 +97,10 @@ form {
   font-weight: 600;
 }
 
+.editorStage .field label {
+  font-size: 0.8125rem;
+}
+
 .field input,
 .field textarea {
   width: 100%;
@@ -106,6 +114,11 @@ form {
     border-color var(--transition-base),
     box-shadow var(--transition-base),
     background-color var(--transition-base);
+}
+
+.editorStage .field input,
+.editorStage .field textarea {
+  font-size: 0.9375rem;
 }
 
 .field input::placeholder,
@@ -143,6 +156,14 @@ form {
   line-height: 1.45;
 }
 
+.editorStage .fieldError {
+  font-size: 0.75rem;
+}
+
+.editorStage .button {
+  font-size: 0.875rem;
+}
+
 .activityRow {
   display: grid;
   grid-template-columns: 1fr;
@@ -163,6 +184,27 @@ form {
 }
 
 @media (min-width: 721px) {
+  .activityRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-3);
+    align-items: center;
+  }
+
+  .activityActions {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    align-self: center;
+    justify-content: center;
+  }
+
+  .activityActions .iconButton {
+    min-height: 28px;
+    min-width: 0;
+    padding-inline: 6px;
+    font-size: 0.6875rem;
+  }
+
   .actionButton,
   .iconButton {
     min-height: 32px;

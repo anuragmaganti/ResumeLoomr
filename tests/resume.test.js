@@ -48,18 +48,24 @@ test('moveActivity reorders highlight bullets', () => {
 test('validateResume flags missing core fields and partial entries', () => {
   const resume = createEmptyResume();
   const populated = updatePersonalField(resume, 'email', 'invalid-email');
+  populated.personal.customField = 'Portfolio available on request';
   populated.education[0].school = 'Example University';
 
   const errors = validateResume(populated);
 
   assert.equal(errors['personal.name'], 'Add your full name.');
   assert.equal(errors['personal.email'], 'Enter a valid email address.');
+  assert.equal(errors['personal.customField'], undefined);
   assert.equal(errors[`education.${populated.education[0].id}.degree`], 'Add the degree or program.');
 });
 
-test('getPreviewModel hides empty sections and trims bullet markers', () => {
+test('getPreviewModel hides empty sections, formats personal links, and trims bullet markers', () => {
   const resume = createEmptyResume();
   resume.personal.name = 'Jordan Lee';
+  resume.personal.headline = 'Frontend Engineer';
+  resume.personal.location = 'Brooklyn, NY';
+  resume.personal.githubUrl = 'github.com/jordanlee';
+  resume.personal.customField = 'Behance: behance.net/jordanlee';
   resume.experience[0].company = 'Acme';
   resume.experience[0].role = 'Designer';
   resume.experience[0].activities = ['• Led redesign', '  - Improved conversion'];
@@ -68,6 +74,12 @@ test('getPreviewModel hides empty sections and trims bullet markers', () => {
 
   assert.equal(previewModel.showEducation, false);
   assert.equal(previewModel.showExperience, true);
+  assert.equal(previewModel.personal.headline, 'Frontend Engineer');
+  assert.equal(previewModel.personal.location, 'Brooklyn, NY');
+  assert.deepEqual(
+    previewModel.personal.links.map((link) => link.text),
+    ['github.com/jordanlee', 'Behance: behance.net/jordanlee']
+  );
   assert.deepEqual(previewModel.experienceEntries[0].activities, ['Led redesign', 'Improved conversion']);
 });
 
@@ -83,8 +95,25 @@ test('normalizeDraftPayload accepts bare resume objects and valid templates', ()
 
   assert.equal(normalized.template, 'compact');
   assert.equal(normalized.resume.personal.name, 'Jordan');
+  assert.equal(normalized.resume.personal.linkedinUrl, '');
   assert.equal(normalized.resume.education.length, 1);
   assert.equal(normalized.resume.experience.length, 1);
+});
+
+test('normalizeDraftPayload migrates legacy custom link fields into customField', () => {
+  const normalized = normalizeDraftPayload({
+    resume: {
+      personal: {
+        name: 'Jordan',
+        customLinkLabel: 'Behance',
+        customLinkUrl: 'behance.net/jordanlee'
+      },
+      education: [],
+      experience: []
+    }
+  });
+
+  assert.equal(normalized.resume.personal.customField, 'Behance: behance.net/jordanlee');
 });
 
 test('normalizeBulletText removes manual bullet prefixes', () => {

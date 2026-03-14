@@ -23,7 +23,7 @@ export default function EducationForm({ education, actions, getFieldError, markT
                                 disabled={index === 0}
                                 aria-label={`Move education ${index + 1} up`}
                             >
-                                Up
+                                ↑
                             </button>
                             <button
                                 className="button buttonSecondary actionButton"
@@ -32,15 +32,16 @@ export default function EducationForm({ education, actions, getFieldError, markT
                                 disabled={index === education.length - 1}
                                 aria-label={`Move education ${index + 1} down`}
                             >
-                                Down
+                                ↓
                             </button>
                             <button
-                                className="button buttonGhost actionButton"
+                                className="button buttonDanger actionButton"
                                 type="button"
                                 onClick={() => actions.removeEducation(entry.id)}
                                 disabled={education.length === 1}
+                                aria-label={`Remove education ${index + 1}`}
                             >
-                                Remove
+                                x
                             </button>
                         </div>
                     </div>

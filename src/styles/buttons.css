@@ -82,12 +82,26 @@
   color: var(--color-text);
 }
 
+.buttonDanger {
+  border-color: #f1c7c3;
+  background: #fff1f0;
+  color: #b42318;
+  box-shadow: none;
+}
+
+.buttonDanger:not(:disabled):hover {
+  border-color: #d92d20;
+  background: #fdd7d2;
+  color: #8e1c13;
+}
+
 .tabButton {
   justify-content: flex-start;
   width: 100%;
   min-width: 0;
   min-height: 72px;
   padding: 14px 16px;
+  border-radius: calc(var(--radius-lg) - var(--tabs-inset, 4px));
   background: transparent;
   color: var(--color-text-subtle);
   text-align: left;
@@ -134,16 +148,15 @@
 
 @media (min-width: 721px) {
   .tabs {
+    --tabs-inset: 2px;
     gap: 4px;
     min-width: 0;
-    padding: 2px;
   }
 
   .tabButton {
     min-height: 34px;
     padding: 7px 8px;
     gap: 0;
-    border-radius: 10px;
   }
 
   .tabIndex {
@@ -203,8 +216,7 @@
 }
 
 .statusBadge--saving,
-.statusBadge--info,
-.statusBadge--restored {
+.statusBadge--info {
   border-color: #d7e4ff;
   background: var(--color-info-soft);
   color: var(--color-info);
