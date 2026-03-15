@@ -8,9 +8,23 @@ import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/editorPanel';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 
+const THEME_STORAGE_KEY = 'resumeloomr:theme';
+
 function App() {
   const previewPanelRef = useRef(null);
   const [editorStageMaxHeight, setEditorStageMaxHeight] = useState(null);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') {
+      return 'light';
+    }
+
+    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      return savedTheme;
+    }
+
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
   const {
     resume,
     template,
@@ -32,6 +46,17 @@ function App() {
     saveLabel,
     templateOptions,
   } = useResumeBuilder();
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) {
+      themeColor.setAttribute('content', theme === 'dark' ? '#0f1726' : '#3158d5');
+    }
+  }, [theme]);
 
   useEffect(() => {
     function syncEditorHeight() {
@@ -73,6 +98,8 @@ function App() {
         <Header
           saveState={saveState}
           saveLabel={saveLabel}
+          theme={theme}
+          onToggleTheme={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
         />
 
         {notice && (

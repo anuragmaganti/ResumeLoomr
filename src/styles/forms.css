@@ -19,7 +19,7 @@ form {
   padding: var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  background: linear-gradient(180deg, var(--color-form-section-top) 0%, var(--color-form-section-bottom) 100%);
   box-shadow: var(--shadow-xs);
   transition:
     transform var(--transition-fast),
@@ -41,7 +41,7 @@ form {
 
 .entryCard {
   position: relative;
-  border-color: #d6dfeb;
+  border-color: var(--color-entry-border);
   overflow: visible;
 }
 
@@ -209,7 +209,7 @@ form {
   width: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: #ffffff;
+  background: var(--color-input-bg);
   color: var(--color-text);
   padding: 13px 14px;
   line-height: 1.5;
@@ -232,7 +232,7 @@ form {
 
 .field input::placeholder,
 .field textarea::placeholder {
-  color: #94a3b8;
+  color: var(--color-input-placeholder);
 }
 
 .field input:hover,
@@ -288,9 +288,9 @@ form {
 
 .nestedEntryCard {
   padding: var(--space-3);
-  border: 1px solid #dbe3ee;
+  border: 1px solid var(--color-nested-border);
   border-radius: calc(var(--radius-md) + 2px);
-  background: #f8fafc;
+  background: var(--color-nested-bg);
 }
 
 .editorStage .nestedEntryCard {

@@ -3,6 +3,8 @@ import BrandMark from "./brandMark";
 export default function Header({
     saveState,
     saveLabel,
+    theme,
+    onToggleTheme,
 }) {
     return (
         <header className="topbar panel">
@@ -21,6 +23,16 @@ export default function Header({
                     <span className={`statusBadge statusBadge--${saveState}`}>
                         {saveLabel}
                     </span>
+                    <button
+                        type="button"
+                        className="button buttonSecondary themeToggle"
+                        onClick={onToggleTheme}
+                        aria-pressed={theme === 'dark'}
+                        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                    >
+                        <span className={`themeToggleKnob themeToggleKnob--${theme}`} aria-hidden="true" />
+                        <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+                    </button>
                 </div>
             </div>
         </header>
