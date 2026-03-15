@@ -1,22 +1,9 @@
 import AutoResizeTextarea from "../autoResizeTextarea";
-
-function FieldError({ message }) {
-    if (!message) {
-        return null;
-    }
-
-    return <p className="fieldError">{message}</p>;
-}
+import FormFieldError from "./formFieldError";
 
 export default function PersonalForm({ personal, actions, getFieldError, markTouched }) {
     return (
-        <fieldset className="formSection formSectionSingle">
-            <div className="entryHeader">
-                <div>
-                    <h3>Core information</h3>
-                </div>
-            </div>
-
+        <fieldset className="formSection">
             <form onSubmit={(event) => event.preventDefault()}>
                 <div className="field">
                     <label htmlFor="name">Full name</label>
@@ -29,7 +16,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                         onBlur={() => markTouched('personal.name')}
                         placeholder="Jordan Lee"
                     />
-                    <FieldError message={getFieldError('personal.name')} />
+                    <FormFieldError message={getFieldError('personal.name')} />
                 </div>
 
                 <div className="fieldGrid fieldGridTwo">
@@ -72,7 +59,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             onBlur={() => markTouched('personal.phone')}
                             placeholder="(555) 123-4567"
                         />
-                        <FieldError message={getFieldError('personal.phone')} />
+                        <FormFieldError message={getFieldError('personal.phone')} />
                     </div>
 
                     <div className="field">
@@ -86,7 +73,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             onBlur={() => markTouched('personal.email')}
                             placeholder="jordan@example.com"
                         />
-                        <FieldError message={getFieldError('personal.email')} />
+                        <FormFieldError message={getFieldError('personal.email')} />
                     </div>
                 </div>
 
@@ -102,7 +89,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             onBlur={() => markTouched('personal.linkedinUrl')}
                             placeholder="linkedin.com/in/jordanlee"
                         />
-                        <FieldError message={getFieldError('personal.linkedinUrl')} />
+                        <FormFieldError message={getFieldError('personal.linkedinUrl')} />
                     </div>
 
                     <div className="field">
@@ -116,7 +103,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             onBlur={() => markTouched('personal.githubUrl')}
                             placeholder="github.com/jordanlee"
                         />
-                        <FieldError message={getFieldError('personal.githubUrl')} />
+                        <FormFieldError message={getFieldError('personal.githubUrl')} />
                     </div>
                 </div>
 
@@ -132,7 +119,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             onBlur={() => markTouched('personal.portfolioUrl')}
                             placeholder="jordanlee.com"
                         />
-                        <FieldError message={getFieldError('personal.portfolioUrl')} />
+                        <FormFieldError message={getFieldError('personal.portfolioUrl')} />
                     </div>
 
                     <div className="field">

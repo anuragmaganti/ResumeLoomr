@@ -1,0 +1,74 @@
+import { useState } from "react";
+import EntryActionMenu from "./entryActionMenu";
+
+export function buildEntrySummary(parts, fallback) {
+  const summary = parts
+    .map((part) => (typeof part === "string" ? part.trim() : ""))
+    .filter(Boolean)
+    .join(" • ");
+
+  return summary || fallback;
+}
+
+export default function CollapsibleEntryCard({
+  summary,
+  fallbackSummary,
+  expandLabel,
+  menuLabel,
+  moveUpLabel,
+  moveDownLabel,
+  removeLabel,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
+  disableUp = false,
+  disableDown = false,
+  disableRemove = false,
+  children,
+}) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const summaryText = summary || fallbackSummary;
+
+  return (
+    <fieldset className={`formSection entryCard${isCollapsed ? " isCollapsed" : ""}`}>
+      <div className="entryHeader entryHeaderActionsOnly">
+        <div className="entryActions">
+          <EntryActionMenu
+            menuLabel={menuLabel}
+            moveUpLabel={moveUpLabel}
+            moveDownLabel={moveDownLabel}
+            removeLabel={removeLabel}
+            onMoveUp={onMoveUp}
+            onMoveDown={onMoveDown}
+            onRemove={onRemove}
+            disableUp={disableUp}
+            disableDown={disableDown}
+            disableRemove={disableRemove}
+            extraItems={[
+              {
+                key: "toggle-collapse",
+                label: isCollapsed ? "Expand" : "Collapse",
+                ariaLabel: `${isCollapsed ? "Expand" : "Collapse"} ${expandLabel}`,
+                onSelect: () => setIsCollapsed((collapsed) => !collapsed),
+              },
+            ]}
+          />
+        </div>
+      </div>
+
+      {isCollapsed ? (
+        <button
+          type="button"
+          className="entrySummaryButton"
+          onClick={() => setIsCollapsed(false)}
+          aria-label={`Expand ${expandLabel}`}
+        >
+          <span className="entrySummaryText">{summaryText}</span>
+          <span className="entrySummaryHint">Expand</span>
+        </button>
+      ) : (
+        children
+      )}
+    </fieldset>
+  );
+}

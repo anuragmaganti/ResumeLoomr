@@ -149,13 +149,13 @@
 @media (min-width: 721px) {
   .tabs {
     --tabs-inset: 2px;
-    gap: 4px;
+    gap: 3px;
     min-width: 0;
   }
 
   .tabButton {
-    min-height: 34px;
-    padding: 7px 8px;
+    min-height: 30px;
+    padding: 5px 6px;
     gap: 0;
   }
 
@@ -164,7 +164,7 @@
   }
 
   .tabLabel {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     line-height: 1;
   }
 
@@ -182,15 +182,91 @@
   justify-content: flex-start;
 }
 
-.actionButton,
-.iconButton {
-  min-height: 36px;
-  padding-inline: 12px;
-  font-size: 0.875rem;
+.entryMenu {
+  position: relative;
+}
+
+.entryMenuButton {
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0 5px;
+  border-radius: 999px;
+  box-shadow: none;
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+.entryMenuButton:not(:disabled):hover {
+  transform: none;
+}
+
+.entryMenuPopover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 4px;
+  min-width: 138px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: var(--shadow-md);
+}
+
+.entryMenuItem {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-base),
+    color var(--transition-base),
+    border-color var(--transition-base),
+    opacity var(--transition-base);
+}
+
+.entryMenuItem:hover:not(:disabled),
+.entryMenuItem:focus-visible {
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+  outline: none;
+}
+
+.entryMenuItem:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.entryMenuItemDanger {
+  color: #b42318;
+}
+
+.entryMenuItemDanger:hover:not(:disabled),
+.entryMenuItemDanger:focus-visible {
+  border-color: #f1c7c3;
+  background: #fff1f0;
+  color: #8e1c13;
 }
 
 .printButton {
   white-space: nowrap;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.8125rem;
+  border-radius: 10px;
+  box-shadow: 0 8px 18px rgba(49, 88, 213, 0.16);
 }
 
 .statusBadge {
@@ -220,18 +296,6 @@
   border-color: #d7e4ff;
   background: var(--color-info-soft);
   color: var(--color-info);
-}
-
-.statusBadge--success {
-  border-color: #cfe8da;
-  background: var(--color-success-soft);
-  color: var(--color-success);
-}
-
-.statusBadge--warning {
-  border-color: #f0ddb8;
-  background: var(--color-warning-soft);
-  color: var(--color-warning);
 }
 
 .statusBadge--error {

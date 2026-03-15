@@ -1,53 +1,35 @@
 import AutoResizeTextarea from "../autoResizeTextarea";
-
-function FieldError({ message }) {
-    if (!message) {
-        return null;
-    }
-
-    return <p className="fieldError">{message}</p>;
-}
+import { ensureEducationCustomSections } from "../../lib/resume";
+import CollapsibleEntryCard, { buildEntrySummary } from "./collapsibleEntryCard";
+import EntryActionMenu from "./entryActionMenu";
+import FormFieldError from "./formFieldError";
 
 export default function EducationForm({ education, actions, getFieldError, markTouched }) {
     return (
         <div className="formStack">
-            {education.map((entry, index) => (
-                <fieldset key={entry.id} className="formSection entryCard">
-                    <div className="entryHeader">
-                        <div>
-                            <h3>Education {index + 1}</h3>
-                        </div>
-                        <div className="entryActions">
-                            <button
-                                className="button buttonSecondary actionButton"
-                                type="button"
-                                onClick={() => actions.moveEducation(entry.id, -1)}
-                                disabled={index === 0}
-                                aria-label={`Move education ${index + 1} up`}
-                            >
-                                ↑
-                            </button>
-                            <button
-                                className="button buttonSecondary actionButton"
-                                type="button"
-                                onClick={() => actions.moveEducation(entry.id, 1)}
-                                disabled={index === education.length - 1}
-                                aria-label={`Move education ${index + 1} down`}
-                            >
-                                ↓
-                            </button>
-                            <button
-                                className="button buttonDanger actionButton"
-                                type="button"
-                                onClick={() => actions.removeEducation(entry.id)}
-                                disabled={education.length === 1}
-                                aria-label={`Remove education ${index + 1}`}
-                            >
-                                x
-                            </button>
-                        </div>
-                    </div>
+            {education.map((entry, index) => {
+                const customSections = ensureEducationCustomSections(entry.customSections);
 
+                return (
+                <CollapsibleEntryCard
+                    key={entry.id}
+                    summary={buildEntrySummary(
+                        [entry.school, entry.degree, entry.yearsEdu],
+                        "Add institution, degree, and dates"
+                    )}
+                    fallbackSummary="Add institution, degree, and dates"
+                    expandLabel={`education entry ${index + 1}`}
+                    menuLabel={`Education ${index + 1} actions`}
+                    moveUpLabel={`Move education ${index + 1} up`}
+                    moveDownLabel={`Move education ${index + 1} down`}
+                    removeLabel={`Remove education ${index + 1}`}
+                    onMoveUp={() => actions.moveEducation(entry.id, -1)}
+                    onMoveDown={() => actions.moveEducation(entry.id, 1)}
+                    onRemove={() => actions.removeEducation(entry.id)}
+                    disableUp={index === 0}
+                    disableDown={index === education.length - 1}
+                    disableRemove={education.length === 1}
+                >
                     <form onSubmit={(event) => event.preventDefault()}>
                         <div className="field">
                             <label htmlFor={`school-${entry.id}`}>Institution</label>
@@ -59,7 +41,7 @@ export default function EducationForm({ education, actions, getFieldError, markT
                                 onBlur={() => markTouched(`education.${entry.id}.school`)}
                                 placeholder="University or school name"
                             />
-                            <FieldError message={getFieldError(`education.${entry.id}.school`)} />
+                            <FormFieldError message={getFieldError(`education.${entry.id}.school`)} />
                         </div>
 
                         <div className="fieldGrid fieldGridTwo">
@@ -73,7 +55,7 @@ export default function EducationForm({ education, actions, getFieldError, markT
                                     onBlur={() => markTouched(`education.${entry.id}.degree`)}
                                     placeholder="B.S. Computer Science"
                                 />
-                                <FieldError message={getFieldError(`education.${entry.id}.degree`)} />
+                                <FormFieldError message={getFieldError(`education.${entry.id}.degree`)} />
                             </div>
 
                             <div className="field">
@@ -86,7 +68,7 @@ export default function EducationForm({ education, actions, getFieldError, markT
                                     onBlur={() => markTouched(`education.${entry.id}.yearsEdu`)}
                                     placeholder="2020 - 2024"
                                 />
-                                <FieldError message={getFieldError(`education.${entry.id}.yearsEdu`)} />
+                                <FormFieldError message={getFieldError(`education.${entry.id}.yearsEdu`)} />
                             </div>
                         </div>
 
@@ -156,7 +138,7 @@ export default function EducationForm({ education, actions, getFieldError, markT
                             <label>Custom sections</label>
 
                             <div className="nestedEntryStack">
-                                {entry.customSections.map((section, sectionIndex) => (
+                                {customSections.map((section, sectionIndex) => (
                                     <div className="nestedEntryCard" key={section.id}>
                                         <div className="nestedEntryRow">
                                             <div className="nestedEntryContent">
@@ -186,32 +168,17 @@ export default function EducationForm({ education, actions, getFieldError, markT
                                             </div>
 
                                             <div className="activityActions nestedEntryActions">
-                                                <button
-                                                    className="button buttonSecondary iconButton"
-                                                    type="button"
-                                                    onClick={() => actions.moveEducationCustomSection(entry.id, sectionIndex, -1)}
-                                                    disabled={sectionIndex === 0}
-                                                    aria-label={`Move custom section ${sectionIndex + 1} up`}
-                                                >
-                                                    ↑
-                                                </button>
-                                                <button
-                                                    className="button buttonSecondary iconButton"
-                                                    type="button"
-                                                    onClick={() => actions.moveEducationCustomSection(entry.id, sectionIndex, 1)}
-                                                    disabled={sectionIndex === entry.customSections.length - 1}
-                                                    aria-label={`Move custom section ${sectionIndex + 1} down`}
-                                                >
-                                                    ↓
-                                                </button>
-                                                <button
-                                                    className="button buttonDanger iconButton"
-                                                    type="button"
-                                                    onClick={() => actions.removeEducationCustomSection(entry.id, sectionIndex)}
-                                                    aria-label={`Remove custom section ${sectionIndex + 1}`}
-                                                >
-                                                    x
-                                                </button>
+                                                <EntryActionMenu
+                                                    menuLabel={`Custom section ${sectionIndex + 1} actions`}
+                                                    moveUpLabel={`Move custom section ${sectionIndex + 1} up`}
+                                                    moveDownLabel={`Move custom section ${sectionIndex + 1} down`}
+                                                    removeLabel={`Remove custom section ${sectionIndex + 1}`}
+                                                    onMoveUp={() => actions.moveEducationCustomSection(entry.id, sectionIndex, -1)}
+                                                    onMoveDown={() => actions.moveEducationCustomSection(entry.id, sectionIndex, 1)}
+                                                    onRemove={() => actions.removeEducationCustomSection(entry.id, sectionIndex)}
+                                                    disableUp={sectionIndex === 0}
+                                                    disableDown={sectionIndex === customSections.length - 1}
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -223,8 +190,8 @@ export default function EducationForm({ education, actions, getFieldError, markT
                             Add custom section
                         </button>
                     </form>
-                </fieldset>
-            ))}
+                </CollapsibleEntryCard>
+            )})}
 
             <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addEducation()}>
                 Add education

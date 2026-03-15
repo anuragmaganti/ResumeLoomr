@@ -22,7 +22,6 @@ function App() {
     mobileView,
     setMobileView,
     previewModel,
-    errors,
     getFieldError,
     markTouched,
     actions,
@@ -33,8 +32,6 @@ function App() {
     saveLabel,
     templateOptions,
   } = useResumeBuilder();
-
-  const issueCount = Object.keys(errors).length;
 
   useEffect(() => {
     function syncEditorHeight() {
@@ -76,7 +73,6 @@ function App() {
         <Header
           saveState={saveState}
           saveLabel={saveLabel}
-          issueCount={issueCount}
         />
 
         {notice && (
@@ -118,7 +114,6 @@ function App() {
               actions={actions}
               getFieldError={getFieldError}
               markTouched={markTouched}
-              issueCount={issueCount}
               maxHeight={editorStageMaxHeight}
             />
           </div>

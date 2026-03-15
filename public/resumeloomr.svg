@@ -1,5 +1,32 @@
 <svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="128" height="128" rx="28" fill="#3158D5"/>
-  <path d="M35 29H74C89.464 29 102 41.536 102 57C102 72.464 89.464 85 74 85H54V99H35V29Z" fill="white"/>
-  <path d="M54 47V67H73.5C79.299 67 84 62.299 84 56.5C84 50.701 79.299 46 73.5 46H54V47Z" fill="#3158D5"/>
+  <defs>
+    <linearGradient id="bg" x1="64" y1="0" x2="64" y2="128" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F5F8FD"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="24" y1="38" x2="104" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3158D5"/>
+      <stop offset="1" stop-color="#5C7CFA"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="24" y1="64" x2="104" y2="74" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D97706"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="24" y1="88" x2="104" y2="100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DC2626"/>
+      <stop offset="1" stop-color="#F97316"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <path d="M35 24V104" stroke="#D7DFEA" stroke-width="6" stroke-linecap="round"/>
+  <path d="M49 24V104" stroke="#C8D3E4" stroke-width="6" stroke-linecap="round"/>
+  <path d="M64 24V104" stroke="#B9C7DB" stroke-width="6" stroke-linecap="round"/>
+  <path d="M79 24V104" stroke="#C8D3E4" stroke-width="6" stroke-linecap="round"/>
+  <path d="M93 24V104" stroke="#D7DFEA" stroke-width="6" stroke-linecap="round"/>
+  <path d="M24 40C31 40 34 33 41.5 33C49 33 50 47 59.5 47C69 47 70 33 77.5 33C85 33 88 40 104 40" stroke="url(#blue)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 64C31 64 34 71 41.5 71C49 71 50 57 59.5 57C69 57 70 71 77.5 71C85 71 88 64 104 64" stroke="url(#amber)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 88C31 88 34 81 41.5 81C49 81 50 95 59.5 95C69 95 70 81 77.5 81C85 81 88 88 104 88" stroke="url(#coral)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 40C31 40 34 33 41.5 33C49 33 50 47 59.5 47C69 47 70 33 77.5 33C85 33 88 40 104 40" stroke="#FFFFFF" stroke-opacity="0.36" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 64C31 64 34 71 41.5 71C49 71 50 57 59.5 57C69 57 70 71 77.5 71C85 71 88 64 104 64" stroke="#FFF7ED" stroke-opacity="0.42" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 88C31 88 34 81 41.5 81C49 81 50 95 59.5 95C69 95 70 81 77.5 81C85 81 88 88 104 88" stroke="#FFF7ED" stroke-opacity="0.28" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

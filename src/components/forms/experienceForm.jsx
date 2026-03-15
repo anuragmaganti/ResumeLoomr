@@ -1,53 +1,30 @@
-import AutoResizeTextarea from "../autoResizeTextarea";
-
-function FieldError({ message }) {
-    if (!message) {
-        return null;
-    }
-
-    return <p className="fieldError">{message}</p>;
-}
+import CollapsibleEntryCard, { buildEntrySummary } from "./collapsibleEntryCard";
+import FormFieldError from "./formFieldError";
+import ReorderableTextList from "./reorderableTextList";
 
 export default function ExperienceForm({ experience, actions, getFieldError, markTouched }) {
     return (
         <div className="formStack">
             {experience.map((entry, index) => (
-                <fieldset key={entry.id} className="formSection entryCard">
-                    <div className="entryHeader">
-                        <div>
-                            <h3>Experience {index + 1}</h3>
-                        </div>
-                        <div className="entryActions">
-                            <button
-                                className="button buttonSecondary actionButton"
-                                type="button"
-                                onClick={() => actions.moveExperience(entry.id, -1)}
-                                disabled={index === 0}
-                                aria-label={`Move experience ${index + 1} up`}
-                            >
-                                ↑
-                            </button>
-                            <button
-                                className="button buttonSecondary actionButton"
-                                type="button"
-                                onClick={() => actions.moveExperience(entry.id, 1)}
-                                disabled={index === experience.length - 1}
-                                aria-label={`Move experience ${index + 1} down`}
-                            >
-                                ↓
-                            </button>
-                            <button
-                                className="button buttonDanger actionButton"
-                                type="button"
-                                onClick={() => actions.removeExperience(entry.id)}
-                                disabled={experience.length === 1}
-                                aria-label={`Remove experience ${index + 1}`}
-                            >
-                                x
-                            </button>
-                        </div>
-                    </div>
-
+                <CollapsibleEntryCard
+                    key={entry.id}
+                    summary={buildEntrySummary(
+                        [entry.company, entry.role, entry.yearsExp],
+                        "Add company, role, and dates"
+                    )}
+                    fallbackSummary="Add company, role, and dates"
+                    expandLabel={`experience entry ${index + 1}`}
+                    menuLabel={`Experience ${index + 1} actions`}
+                    moveUpLabel={`Move experience ${index + 1} up`}
+                    moveDownLabel={`Move experience ${index + 1} down`}
+                    removeLabel={`Remove experience ${index + 1}`}
+                    onMoveUp={() => actions.moveExperience(entry.id, -1)}
+                    onMoveDown={() => actions.moveExperience(entry.id, 1)}
+                    onRemove={() => actions.removeExperience(entry.id)}
+                    disableUp={index === 0}
+                    disableDown={index === experience.length - 1}
+                    disableRemove={experience.length === 1}
+                >
                     <form onSubmit={(event) => event.preventDefault()}>
                         <div className="fieldGrid fieldGridTwo">
                             <div className="field">
@@ -60,7 +37,7 @@ export default function ExperienceForm({ experience, actions, getFieldError, mar
                                     onBlur={() => markTouched(`experience.${entry.id}.company`)}
                                     placeholder="Company name"
                                 />
-                                <FieldError message={getFieldError(`experience.${entry.id}.company`)} />
+                                <FormFieldError message={getFieldError(`experience.${entry.id}.company`)} />
                             </div>
 
                             <div className="field">
@@ -73,7 +50,7 @@ export default function ExperienceForm({ experience, actions, getFieldError, mar
                                     onBlur={() => markTouched(`experience.${entry.id}.yearsExp`)}
                                     placeholder="2022 - Present"
                                 />
-                                <FieldError message={getFieldError(`experience.${entry.id}.yearsExp`)} />
+                                <FormFieldError message={getFieldError(`experience.${entry.id}.yearsExp`)} />
                             </div>
                         </div>
 
@@ -87,63 +64,25 @@ export default function ExperienceForm({ experience, actions, getFieldError, mar
                                 onBlur={() => markTouched(`experience.${entry.id}.role`)}
                                 placeholder="Senior Product Designer"
                             />
-                            <FieldError message={getFieldError(`experience.${entry.id}.role`)} />
+                            <FormFieldError message={getFieldError(`experience.${entry.id}.role`)} />
                         </div>
 
-                        <div className="field">
-                            <label htmlFor={`activities-${entry.id}`}>Highlights</label>
-
-                            {entry.activities.map((activity, activityIndex) => (
-                                <div className="activityRow" key={`${entry.id}-${activityIndex}`}>
-                                    <div className="activityInputWrap">
-                                        <AutoResizeTextarea
-                                            id={`activities-${entry.id}-${activityIndex}`}
-                                            value={activity}
-                                            onChange={(event) => actions.updateActivity(entry.id, activityIndex, event.target.value)}
-                                            onBlur={() => markTouched(`experience.${entry.id}.activities.${activityIndex}`)}
-                                            rows={2}
-                                            placeholder="Describe a measurable accomplishment or core responsibility."
-                                        />
-                                        <FieldError message={getFieldError(`experience.${entry.id}.activities.${activityIndex}`)} />
-                                    </div>
-
-                                    <div className="activityActions">
-                                        <button
-                                            className="button buttonSecondary iconButton"
-                                            type="button"
-                                            onClick={() => actions.moveActivity(entry.id, activityIndex, -1)}
-                                            disabled={activityIndex === 0}
-                                            aria-label={`Move highlight ${activityIndex + 1} up`}
-                                        >
-                                            ↑
-                                        </button>
-                                        <button
-                                            className="button buttonSecondary iconButton"
-                                            type="button"
-                                            onClick={() => actions.moveActivity(entry.id, activityIndex, 1)}
-                                            disabled={activityIndex === entry.activities.length - 1}
-                                            aria-label={`Move highlight ${activityIndex + 1} down`}
-                                        >
-                                            ↓
-                                        </button>
-                                        <button
-                                            className="button buttonDanger iconButton"
-                                            type="button"
-                                            onClick={() => actions.removeActivity(entry.id, activityIndex)}
-                                            aria-label={`Remove highlight ${activityIndex + 1}`}
-                                        >
-                                            x
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <button className="button buttonSecondary addInlineButton" type="button" onClick={() => actions.addActivity(entry.id)}>
-                            Add highlight
-                        </button>
+                        <ReorderableTextList
+                            label="Highlights"
+                            items={entry.activities}
+                            idPrefix={`activities-${entry.id}`}
+                            pathPrefix={`experience.${entry.id}.activities`}
+                            placeholder="Describe a measurable accomplishment or core responsibility."
+                            addLabel="Add highlight"
+                            getFieldError={getFieldError}
+                            markTouched={markTouched}
+                            onChangeItem={(activityIndex, value) => actions.updateActivity(entry.id, activityIndex, value)}
+                            onMoveItem={(activityIndex, direction) => actions.moveActivity(entry.id, activityIndex, direction)}
+                            onRemoveItem={(activityIndex) => actions.removeActivity(entry.id, activityIndex)}
+                            onAddItem={() => actions.addActivity(entry.id)}
+                        />
                     </form>
-                </fieldset>
+                </CollapsibleEntryCard>
             ))}
 
             <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addExperience()}>

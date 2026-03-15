@@ -5,7 +5,19 @@ export const TEMPLATE_OPTIONS = [
   { id: 'executive', label: 'Executive' },
   { id: 'compact', label: 'Compact' }
 ];
-export const SECTION_IDS = ['personal', 'education', 'experience'];
+export const SECTION_IDS = [
+  'personal',
+  'education',
+  'experience',
+  'skills',
+  'projects',
+  'certifications',
+  'volunteering',
+  'leadership',
+  'languages',
+  'awards',
+  'publications'
+];
 
 function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2, 10)}`;
@@ -13,6 +25,81 @@ function createId() {
 
 function asText(value) {
   return typeof value === 'string' ? value : '';
+}
+
+function normalizeStringList(list) {
+  const nextList = Array.isArray(list) ? list.map(asText) : [''];
+  return nextList.length > 0 ? nextList : [''];
+}
+
+function listHasContent(list) {
+  return list.some((value) => trimText(value) !== '');
+}
+
+function entryHasTextContent(entry, fields) {
+  return fields.some((field) => trimText(entry[field]) !== '');
+}
+
+function updateEntryField(sectionEntries, entryId, field, value) {
+  return sectionEntries.map((entry) => (
+    entry.id === entryId ? { ...entry, [field]: value } : entry
+  ));
+}
+
+function addEntry(sectionEntries, createEntry) {
+  return [...sectionEntries, createEntry()];
+}
+
+function removeEntry(sectionEntries, entryId) {
+  if (sectionEntries.length <= 1) {
+    return sectionEntries;
+  }
+
+  return sectionEntries.filter((entry) => entry.id !== entryId);
+}
+
+function updateEntryStringList(entries, entryId, field, itemIndex, value) {
+  return entries.map((entry) => (
+    entry.id === entryId
+      ? {
+          ...entry,
+          [field]: entry[field].map((item, index) => (index === itemIndex ? value : item))
+        }
+      : entry
+  ));
+}
+
+function addEntryStringListItem(entries, entryId, field) {
+  return entries.map((entry) => (
+    entry.id === entryId
+      ? { ...entry, [field]: [...entry[field], ''] }
+      : entry
+  ));
+}
+
+function moveEntryStringListItem(entries, entryId, field, itemIndex, direction) {
+  return entries.map((entry) => (
+    entry.id === entryId
+      ? { ...entry, [field]: reorderList(entry[field], itemIndex, itemIndex + direction) }
+      : entry
+  ));
+}
+
+function removeEntryStringListItem(entries, entryId, field, itemIndex) {
+  return entries.map((entry) => {
+    if (entry.id !== entryId) {
+      return entry;
+    }
+
+    if (entry[field].length <= 1) {
+      return { ...entry, [field]: [''] };
+    }
+
+    return {
+      ...entry,
+      [field]: entry[field].filter((_, index) => index !== itemIndex)
+    };
+  });
 }
 
 export function trimText(value) {
@@ -69,17 +156,29 @@ export function normalizeBulletText(value) {
 }
 
 function createEducationCustomSection(overrides = {}) {
+  const source = overrides && typeof overrides === 'object' ? overrides : {};
+
   return {
-    id: overrides.id || createId(),
-    label: asText(overrides.label),
-    content: asText(overrides.content)
+    id: source.id || createId(),
+    label: asText(source.label),
+    content: asText(source.content)
   };
 }
 
-function normalizeEducationCustomSections(overrides = {}) {
-  const explicitSections = Array.isArray(overrides.customSections)
-    ? overrides.customSections.map((section) => createEducationCustomSection(section))
+export function ensureEducationCustomSections(customSections, { allowEmpty = false } = {}) {
+  const nextSections = Array.isArray(customSections)
+    ? customSections.map((section) => createEducationCustomSection(section))
     : [];
+
+  if (nextSections.length > 0) {
+    return nextSections;
+  }
+
+  return allowEmpty ? [] : [createEducationCustomSection()];
+}
+
+function normalizeEducationCustomSections(overrides = {}) {
+  const explicitSections = ensureEducationCustomSections(overrides.customSections, { allowEmpty: true });
   const legacyDescription = asText(overrides.description);
   const legacyContent = asText(overrides.customSection) || legacyDescription;
   const legacyLabel = asText(overrides.customSectionLabel);
@@ -122,16 +221,102 @@ export function createEducationEntry(overrides = {}) {
 }
 
 export function createExperienceEntry(overrides = {}) {
-  const activities = Array.isArray(overrides.activities) ? overrides.activities.map(asText) : [''];
-
   return {
     id: overrides.id || createId(),
     company: asText(overrides.company),
     role: asText(overrides.role),
-    activities: activities.length > 0 ? activities : [''],
+    activities: normalizeStringList(overrides.activities),
     yearsExp: asText(overrides.yearsExp)
   };
 }
+
+export function createSkillsEntry(overrides = {}) {
+  return {
+    id: overrides.id || createId(),
+    category: asText(overrides.category),
+    items: asText(overrides.items)
+  };
+}
+
+export function createProjectEntry(overrides = {}) {
+  return {
+    id: overrides.id || createId(),
+    name: asText(overrides.name),
+    subtitle: asText(overrides.subtitle),
+    years: asText(overrides.years),
+    summary: asText(overrides.summary),
+    highlights: normalizeStringList(overrides.highlights)
+  };
+}
+
+export function createCertificationEntry(overrides = {}) {
+  return {
+    id: overrides.id || createId(),
+    name: asText(overrides.name),
+    issuer: asText(overrides.issuer),
+    years: asText(overrides.years),
+    details: asText(overrides.details)
+  };
+}
+
+export function createVolunteeringEntry(overrides = {}) {
+  return {
+    id: overrides.id || createId(),
+    organization: asText(overrides.organization),
+    role: asText(overrides.role),
+    years: asText(overrides.years),
+    highlights: normalizeStringList(overrides.highlights)
+  };
+}
+
+export function createLeadershipEntry(overrides = {}) {
+  return {
+    id: overrides.id || createId(),
+    organization: asText(overrides.organization),
+    role: asText(overrides.role),
+    years: asText(overrides.years),
+    highlights: normalizeStringList(overrides.highlights)
+  };
+}
+
+export function createLanguageEntry(overrides = {}) {
+  return {
+    id: overrides.id || createId(),
+    language: asText(overrides.language),
+    proficiency: asText(overrides.proficiency)
+  };
+}
+
+export function createAwardEntry(overrides = {}) {
+  return {
+    id: overrides.id || createId(),
+    title: asText(overrides.title),
+    issuer: asText(overrides.issuer),
+    years: asText(overrides.years),
+    details: asText(overrides.details)
+  };
+}
+
+export function createPublicationEntry(overrides = {}) {
+  return {
+    id: overrides.id || createId(),
+    title: asText(overrides.title),
+    publisher: asText(overrides.publisher),
+    years: asText(overrides.years),
+    details: asText(overrides.details)
+  };
+}
+
+const SECTION_ENTRY_CREATORS = {
+  skills: createSkillsEntry,
+  projects: createProjectEntry,
+  certifications: createCertificationEntry,
+  volunteering: createVolunteeringEntry,
+  leadership: createLeadershipEntry,
+  languages: createLanguageEntry,
+  awards: createAwardEntry,
+  publications: createPublicationEntry
+};
 
 export function createEmptyResume() {
   return {
@@ -148,7 +333,15 @@ export function createEmptyResume() {
       aboutMe: ''
     },
     education: [createEducationEntry()],
-    experience: [createExperienceEntry()]
+    experience: [createExperienceEntry()],
+    skills: [createSkillsEntry()],
+    projects: [createProjectEntry()],
+    certifications: [createCertificationEntry()],
+    volunteering: [createVolunteeringEntry()],
+    leadership: [createLeadershipEntry()],
+    languages: [createLanguageEntry()],
+    awards: [createAwardEntry()],
+    publications: [createPublicationEntry()]
   };
 }
 
@@ -157,6 +350,14 @@ export function normalizeResume(candidate) {
   const personal = resume.personal && typeof resume.personal === 'object' ? resume.personal : {};
   const education = Array.isArray(resume.education) ? resume.education : [];
   const experience = Array.isArray(resume.experience) ? resume.experience : [];
+  const skills = Array.isArray(resume.skills) ? resume.skills : [];
+  const projects = Array.isArray(resume.projects) ? resume.projects : [];
+  const certifications = Array.isArray(resume.certifications) ? resume.certifications : [];
+  const volunteering = Array.isArray(resume.volunteering) ? resume.volunteering : [];
+  const leadership = Array.isArray(resume.leadership) ? resume.leadership : [];
+  const languages = Array.isArray(resume.languages) ? resume.languages : [];
+  const awards = Array.isArray(resume.awards) ? resume.awards : [];
+  const publications = Array.isArray(resume.publications) ? resume.publications : [];
   const legacyCustomLinkLabel = trimText(personal.customLinkLabel);
   const legacyCustomLinkUrl = trimText(personal.customLinkUrl);
   const customField = asText(personal.customField) || (
@@ -179,7 +380,15 @@ export function normalizeResume(candidate) {
       aboutMe: asText(personal.aboutMe)
     },
     education: education.length > 0 ? education.map(createEducationEntry) : [createEducationEntry()],
-    experience: experience.length > 0 ? experience.map(createExperienceEntry) : [createExperienceEntry()]
+    experience: experience.length > 0 ? experience.map(createExperienceEntry) : [createExperienceEntry()],
+    skills: skills.length > 0 ? skills.map(createSkillsEntry) : [createSkillsEntry()],
+    projects: projects.length > 0 ? projects.map(createProjectEntry) : [createProjectEntry()],
+    certifications: certifications.length > 0 ? certifications.map(createCertificationEntry) : [createCertificationEntry()],
+    volunteering: volunteering.length > 0 ? volunteering.map(createVolunteeringEntry) : [createVolunteeringEntry()],
+    leadership: leadership.length > 0 ? leadership.map(createLeadershipEntry) : [createLeadershipEntry()],
+    languages: languages.length > 0 ? languages.map(createLanguageEntry) : [createLanguageEntry()],
+    awards: awards.length > 0 ? awards.map(createAwardEntry) : [createAwardEntry()],
+    publications: publications.length > 0 ? publications.map(createPublicationEntry) : [createPublicationEntry()]
   };
 }
 
@@ -252,16 +461,14 @@ export function updatePersonalField(resume, field, value) {
 export function updateEducationField(resume, entryId, field, value) {
   return {
     ...resume,
-    education: resume.education.map((entry) => (
-      entry.id === entryId ? { ...entry, [field]: value } : entry
-    ))
+    education: updateEntryField(resume.education, entryId, field, value)
   };
 }
 
 export function addEducation(resume) {
   return {
     ...resume,
-    education: [...resume.education, createEducationEntry()]
+    education: addEntry(resume.education, createEducationEntry)
   };
 }
 
@@ -273,13 +480,15 @@ export function moveEducation(resume, entryId, direction) {
 }
 
 export function removeEducation(resume, entryId) {
-  if (resume.education.length <= 1) {
+  const nextEducation = removeEntry(resume.education, entryId);
+
+  if (nextEducation === resume.education) {
     return resume;
   }
 
   return {
     ...resume,
-    education: resume.education.filter((entry) => entry.id !== entryId)
+    education: nextEducation
   };
 }
 
@@ -290,7 +499,7 @@ export function updateEducationCustomSection(resume, entryId, sectionIndex, fiel
       entry.id === entryId
         ? {
             ...entry,
-            customSections: entry.customSections.map((section, index) => (
+            customSections: ensureEducationCustomSections(entry.customSections).map((section, index) => (
               index === sectionIndex ? { ...section, [field]: value } : section
             ))
           }
@@ -304,7 +513,7 @@ export function addEducationCustomSection(resume, entryId) {
     ...resume,
     education: resume.education.map((entry) => (
       entry.id === entryId
-        ? { ...entry, customSections: [...entry.customSections, createEducationCustomSection()] }
+        ? { ...entry, customSections: [...ensureEducationCustomSections(entry.customSections), createEducationCustomSection()] }
         : entry
     ))
   };
@@ -317,7 +526,7 @@ export function moveEducationCustomSection(resume, entryId, sectionIndex, direct
       entry.id === entryId
         ? {
             ...entry,
-            customSections: reorderList(entry.customSections, sectionIndex, sectionIndex + direction)
+            customSections: reorderList(ensureEducationCustomSections(entry.customSections), sectionIndex, sectionIndex + direction)
           }
         : entry
     ))
@@ -332,13 +541,15 @@ export function removeEducationCustomSection(resume, entryId, sectionIndex) {
         return entry;
       }
 
-      if (entry.customSections.length <= 1) {
+      const currentSections = ensureEducationCustomSections(entry.customSections);
+
+      if (currentSections.length <= 1) {
         return { ...entry, customSections: [createEducationCustomSection()] };
       }
 
       return {
         ...entry,
-        customSections: entry.customSections.filter((_, index) => index !== sectionIndex)
+        customSections: currentSections.filter((_, index) => index !== sectionIndex)
       };
     })
   };
@@ -347,16 +558,14 @@ export function removeEducationCustomSection(resume, entryId, sectionIndex) {
 export function updateExperienceField(resume, entryId, field, value) {
   return {
     ...resume,
-    experience: resume.experience.map((entry) => (
-      entry.id === entryId ? { ...entry, [field]: value } : entry
-    ))
+    experience: updateEntryField(resume.experience, entryId, field, value)
   };
 }
 
 export function addExperience(resume) {
   return {
     ...resume,
-    experience: [...resume.experience, createExperienceEntry()]
+    experience: addEntry(resume.experience, createExperienceEntry)
   };
 }
 
@@ -368,74 +577,105 @@ export function moveExperience(resume, entryId, direction) {
 }
 
 export function removeExperience(resume, entryId) {
-  if (resume.experience.length <= 1) {
+  const nextExperience = removeEntry(resume.experience, entryId);
+
+  if (nextExperience === resume.experience) {
     return resume;
   }
 
   return {
     ...resume,
-    experience: resume.experience.filter((entry) => entry.id !== entryId)
+    experience: nextExperience
   };
 }
 
 export function updateActivity(resume, entryId, activityIndex, value) {
   return {
     ...resume,
-    experience: resume.experience.map((entry) => (
-      entry.id === entryId
-        ? {
-            ...entry,
-            activities: entry.activities.map((activity, index) => (
-              index === activityIndex ? value : activity
-            ))
-          }
-        : entry
-    ))
+    experience: updateEntryStringList(resume.experience, entryId, 'activities', activityIndex, value)
   };
 }
 
 export function addActivity(resume, entryId) {
   return {
     ...resume,
-    experience: resume.experience.map((entry) => (
-      entry.id === entryId
-        ? { ...entry, activities: [...entry.activities, ''] }
-        : entry
-    ))
+    experience: addEntryStringListItem(resume.experience, entryId, 'activities')
   };
 }
 
 export function moveActivity(resume, entryId, activityIndex, direction) {
   return {
     ...resume,
-    experience: resume.experience.map((entry) => (
-      entry.id === entryId
-        ? {
-            ...entry,
-            activities: reorderList(entry.activities, activityIndex, activityIndex + direction)
-          }
-        : entry
-    ))
+    experience: moveEntryStringListItem(resume.experience, entryId, 'activities', activityIndex, direction)
   };
 }
 
 export function removeActivity(resume, entryId, activityIndex) {
   return {
     ...resume,
-    experience: resume.experience.map((entry) => {
-      if (entry.id !== entryId) {
-        return entry;
-      }
+    experience: removeEntryStringListItem(resume.experience, entryId, 'activities', activityIndex)
+  };
+}
 
-      if (entry.activities.length <= 1) {
-        return { ...entry, activities: [''] };
-      }
+export function updateCollectionEntry(resume, sectionKey, entryId, field, value) {
+  return {
+    ...resume,
+    [sectionKey]: updateEntryField(resume[sectionKey], entryId, field, value)
+  };
+}
 
-      return {
-        ...entry,
-        activities: entry.activities.filter((_, index) => index !== activityIndex)
-      };
-    })
+export function addCollectionEntry(resume, sectionKey) {
+  return {
+    ...resume,
+    [sectionKey]: addEntry(resume[sectionKey], SECTION_ENTRY_CREATORS[sectionKey])
+  };
+}
+
+export function moveCollectionEntry(resume, sectionKey, entryId, direction) {
+  return {
+    ...resume,
+    [sectionKey]: moveItemById(resume[sectionKey], entryId, direction)
+  };
+}
+
+export function removeCollectionEntry(resume, sectionKey, entryId) {
+  const nextEntries = removeEntry(resume[sectionKey], entryId);
+
+  if (nextEntries === resume[sectionKey]) {
+    return resume;
+  }
+
+  return {
+    ...resume,
+    [sectionKey]: nextEntries
+  };
+}
+
+export function updateCollectionTextList(resume, sectionKey, entryId, field, itemIndex, value) {
+  return {
+    ...resume,
+    [sectionKey]: updateEntryStringList(resume[sectionKey], entryId, field, itemIndex, value)
+  };
+}
+
+export function addCollectionTextListItem(resume, sectionKey, entryId, field) {
+  return {
+    ...resume,
+    [sectionKey]: addEntryStringListItem(resume[sectionKey], entryId, field)
+  };
+}
+
+export function moveCollectionTextListItem(resume, sectionKey, entryId, field, itemIndex, direction) {
+  return {
+    ...resume,
+    [sectionKey]: moveEntryStringListItem(resume[sectionKey], entryId, field, itemIndex, direction)
+  };
+}
+
+export function removeCollectionTextListItem(resume, sectionKey, entryId, field, itemIndex) {
+  return {
+    ...resume,
+    [sectionKey]: removeEntryStringListItem(resume[sectionKey], entryId, field, itemIndex)
   };
 }
 
@@ -455,25 +695,56 @@ export function personalHasContent(personal) {
 }
 
 export function educationEntryHasContent(entry) {
-  const hasCustomSectionContent = entry.customSections.some((section) => (
+  const hasCustomSectionContent = ensureEducationCustomSections(entry.customSections, { allowEmpty: true }).some((section) => (
     trimText(section.label) !== '' || trimText(section.content) !== ''
   ));
 
-  return [
-    entry.school,
-    entry.degree,
-    entry.yearsEdu,
-    entry.location,
-    entry.gpa,
-    entry.honors,
-    entry.coursework,
-    entry.awards
-  ].some((value) => trimText(value) !== '') || hasCustomSectionContent;
+  return entryHasTextContent(entry, [
+    'school',
+    'degree',
+    'yearsEdu',
+    'location',
+    'gpa',
+    'honors',
+    'coursework',
+    'awards'
+  ]) || hasCustomSectionContent;
 }
 
 export function experienceEntryHasContent(entry) {
-  return [entry.company, entry.role, entry.yearsExp].some((value) => trimText(value) !== '') ||
-    entry.activities.some((activity) => trimText(activity) !== '');
+  return entryHasTextContent(entry, ['company', 'role', 'yearsExp']) || listHasContent(entry.activities);
+}
+
+export function skillsEntryHasContent(entry) {
+  return entryHasTextContent(entry, ['category', 'items']);
+}
+
+export function projectEntryHasContent(entry) {
+  return entryHasTextContent(entry, ['name', 'subtitle', 'years', 'summary']) || listHasContent(entry.highlights);
+}
+
+export function certificationEntryHasContent(entry) {
+  return entryHasTextContent(entry, ['name', 'issuer', 'years', 'details']);
+}
+
+export function volunteeringEntryHasContent(entry) {
+  return entryHasTextContent(entry, ['organization', 'role', 'years']) || listHasContent(entry.highlights);
+}
+
+export function leadershipEntryHasContent(entry) {
+  return entryHasTextContent(entry, ['organization', 'role', 'years']) || listHasContent(entry.highlights);
+}
+
+export function languageEntryHasContent(entry) {
+  return entryHasTextContent(entry, ['language', 'proficiency']);
+}
+
+export function awardEntryHasContent(entry) {
+  return entryHasTextContent(entry, ['title', 'issuer', 'years', 'details']);
+}
+
+export function publicationEntryHasContent(entry) {
+  return entryHasTextContent(entry, ['title', 'publisher', 'years', 'details']);
 }
 
 export function getPreviewModel(resume) {
@@ -490,30 +761,10 @@ export function getPreviewModel(resume) {
     aboutMe: trimText(resume.personal.aboutMe)
   };
   const personalLinks = [
-    personal.linkedinUrl
-      ? {
-          id: 'linkedin',
-          text: formatUrlForDisplay(personal.linkedinUrl)
-        }
-      : null,
-    personal.portfolioUrl
-      ? {
-          id: 'portfolio',
-          text: formatUrlForDisplay(personal.portfolioUrl)
-        }
-      : null,
-    personal.githubUrl
-      ? {
-          id: 'github',
-          text: formatUrlForDisplay(personal.githubUrl)
-        }
-      : null,
-    personal.customField
-      ? {
-          id: 'custom',
-          text: personal.customField
-        }
-      : null
+    personal.linkedinUrl ? { id: 'linkedin', text: formatUrlForDisplay(personal.linkedinUrl) } : null,
+    personal.portfolioUrl ? { id: 'portfolio', text: formatUrlForDisplay(personal.portfolioUrl) } : null,
+    personal.githubUrl ? { id: 'github', text: formatUrlForDisplay(personal.githubUrl) } : null,
+    personal.customField ? { id: 'custom', text: personal.customField } : null
   ].filter(Boolean);
 
   const educationEntries = resume.education
@@ -528,7 +779,7 @@ export function getPreviewModel(resume) {
       honors: trimText(entry.honors),
       coursework: trimText(entry.coursework),
       awards: trimText(entry.awards),
-      customSections: entry.customSections
+      customSections: ensureEducationCustomSections(entry.customSections, { allowEmpty: true })
         .map((section) => ({
           id: section.id,
           label: trimText(section.label),
@@ -544,12 +795,98 @@ export function getPreviewModel(resume) {
       company: trimText(entry.company),
       role: trimText(entry.role),
       yearsExp: trimText(entry.yearsExp),
-      activities: entry.activities
-        .map(normalizeBulletText)
-        .filter((activity) => activity !== '')
+      activities: entry.activities.map(normalizeBulletText).filter((item) => item !== '')
     }));
 
-  const hasContent = personalHasContent(personal) || educationEntries.length > 0 || experienceEntries.length > 0;
+  const skillsEntries = resume.skills
+    .filter(skillsEntryHasContent)
+    .map((entry) => ({
+      id: entry.id,
+      category: trimText(entry.category),
+      items: trimText(entry.items)
+    }));
+
+  const projectEntries = resume.projects
+    .filter(projectEntryHasContent)
+    .map((entry) => ({
+      id: entry.id,
+      name: trimText(entry.name),
+      subtitle: trimText(entry.subtitle),
+      years: trimText(entry.years),
+      summary: trimText(entry.summary),
+      highlights: entry.highlights.map(normalizeBulletText).filter((item) => item !== '')
+    }));
+
+  const certificationEntries = resume.certifications
+    .filter(certificationEntryHasContent)
+    .map((entry) => ({
+      id: entry.id,
+      name: trimText(entry.name),
+      issuer: trimText(entry.issuer),
+      years: trimText(entry.years),
+      details: trimText(entry.details)
+    }));
+
+  const volunteeringEntries = resume.volunteering
+    .filter(volunteeringEntryHasContent)
+    .map((entry) => ({
+      id: entry.id,
+      organization: trimText(entry.organization),
+      role: trimText(entry.role),
+      years: trimText(entry.years),
+      highlights: entry.highlights.map(normalizeBulletText).filter((item) => item !== '')
+    }));
+
+  const leadershipEntries = resume.leadership
+    .filter(leadershipEntryHasContent)
+    .map((entry) => ({
+      id: entry.id,
+      organization: trimText(entry.organization),
+      role: trimText(entry.role),
+      years: trimText(entry.years),
+      highlights: entry.highlights.map(normalizeBulletText).filter((item) => item !== '')
+    }));
+
+  const languageEntries = resume.languages
+    .filter(languageEntryHasContent)
+    .map((entry) => ({
+      id: entry.id,
+      language: trimText(entry.language),
+      proficiency: trimText(entry.proficiency)
+    }));
+
+  const awardEntries = resume.awards
+    .filter(awardEntryHasContent)
+    .map((entry) => ({
+      id: entry.id,
+      title: trimText(entry.title),
+      issuer: trimText(entry.issuer),
+      years: trimText(entry.years),
+      details: trimText(entry.details)
+    }));
+
+  const publicationEntries = resume.publications
+    .filter(publicationEntryHasContent)
+    .map((entry) => ({
+      id: entry.id,
+      title: trimText(entry.title),
+      publisher: trimText(entry.publisher),
+      years: trimText(entry.years),
+      details: trimText(entry.details)
+    }));
+
+  const hasContent = personalHasContent(personal) || [
+    educationEntries,
+    experienceEntries,
+    skillsEntries,
+    projectEntries,
+    certificationEntries,
+    volunteeringEntries,
+    leadershipEntries,
+    languageEntries,
+    awardEntries,
+    publicationEntries
+  ].some((entries) => entries.length > 0);
 
   return {
     hasContent,
@@ -559,9 +896,25 @@ export function getPreviewModel(resume) {
     },
     educationEntries,
     experienceEntries,
+    skillsEntries,
+    projectEntries,
+    certificationEntries,
+    volunteeringEntries,
+    leadershipEntries,
+    languageEntries,
+    awardEntries,
+    publicationEntries,
     showPersonal: personalHasContent(personal),
     showEducation: educationEntries.length > 0,
-    showExperience: experienceEntries.length > 0
+    showExperience: experienceEntries.length > 0,
+    showSkills: skillsEntries.length > 0,
+    showProjects: projectEntries.length > 0,
+    showCertifications: certificationEntries.length > 0,
+    showVolunteering: volunteeringEntries.length > 0,
+    showLeadership: leadershipEntries.length > 0,
+    showLanguages: languageEntries.length > 0,
+    showAwards: awardEntries.length > 0,
+    showPublications: publicationEntries.length > 0
   };
 }
 
@@ -642,6 +995,94 @@ export function validateResume(resume) {
 
     if (entry.activities.every((activity) => trimText(activity) === '')) {
       errors[`experience.${entry.id}.activities.0`] = 'Add at least one highlight.';
+    }
+  });
+
+  resume.skills.forEach((entry) => {
+    if (!skillsEntryHasContent(entry)) {
+      return;
+    }
+
+    if (!trimText(entry.items)) {
+      errors[`skills.${entry.id}.items`] = 'Add at least one skill.';
+    }
+  });
+
+  resume.projects.forEach((entry) => {
+    if (!projectEntryHasContent(entry)) {
+      return;
+    }
+
+    if (!trimText(entry.name)) {
+      errors[`projects.${entry.id}.name`] = 'Add the project name.';
+    }
+  });
+
+  resume.certifications.forEach((entry) => {
+    if (!certificationEntryHasContent(entry)) {
+      return;
+    }
+
+    if (!trimText(entry.name)) {
+      errors[`certifications.${entry.id}.name`] = 'Add the certification name.';
+    }
+  });
+
+  resume.volunteering.forEach((entry) => {
+    if (!volunteeringEntryHasContent(entry)) {
+      return;
+    }
+
+    if (!trimText(entry.organization)) {
+      errors[`volunteering.${entry.id}.organization`] = 'Add the organization.';
+    }
+
+    if (!trimText(entry.role)) {
+      errors[`volunteering.${entry.id}.role`] = 'Add the role.';
+    }
+  });
+
+  resume.leadership.forEach((entry) => {
+    if (!leadershipEntryHasContent(entry)) {
+      return;
+    }
+
+    if (!trimText(entry.organization)) {
+      errors[`leadership.${entry.id}.organization`] = 'Add the organization.';
+    }
+
+    if (!trimText(entry.role)) {
+      errors[`leadership.${entry.id}.role`] = 'Add the role.';
+    }
+  });
+
+  resume.languages.forEach((entry) => {
+    if (!languageEntryHasContent(entry)) {
+      return;
+    }
+
+    if (!trimText(entry.language)) {
+      errors[`languages.${entry.id}.language`] = 'Add the language.';
+    }
+  });
+
+  resume.awards.forEach((entry) => {
+    if (!awardEntryHasContent(entry)) {
+      return;
+    }
+
+    if (!trimText(entry.title)) {
+      errors[`awards.${entry.id}.title`] = 'Add the award title.';
+    }
+  });
+
+  resume.publications.forEach((entry) => {
+    if (!publicationEntryHasContent(entry)) {
+      return;
+    }
+
+    if (!trimText(entry.title)) {
+      errors[`publications.${entry.id}.title`] = 'Add the publication title.';
     }
   });
 

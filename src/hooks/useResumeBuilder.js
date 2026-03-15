@@ -3,7 +3,10 @@ import { flushSync } from 'react-dom';
 import {
   DRAFT_STORAGE_KEY,
   DEFAULT_TEMPLATE,
+  SECTION_IDS,
   TEMPLATE_OPTIONS,
+  addCollectionEntry,
+  addCollectionTextListItem,
   addActivity,
   addEducationCustomSection,
   addEducation,
@@ -11,16 +14,23 @@ import {
   createDraftPayload,
   createEmptyResume,
   getPreviewModel,
+  moveCollectionEntry,
+  moveCollectionTextListItem,
   moveActivity,
   moveEducationCustomSection,
   moveEducation,
   moveExperience,
   moveSectionOrder,
   normalizeDraftPayload,
+  normalizeResume,
+  removeCollectionEntry,
+  removeCollectionTextListItem,
   removeActivity,
   removeEducationCustomSection,
   removeEducation,
   removeExperience,
+  updateCollectionEntry,
+  updateCollectionTextList,
   updateActivity,
   updateEducationCustomSection,
   updateEducationField,
@@ -34,6 +44,7 @@ function loadStoredDraft() {
     return {
       resume: createEmptyResume(),
       template: DEFAULT_TEMPLATE,
+      sectionOrder: SECTION_IDS,
       savedAt: null,
     };
   }
@@ -45,7 +56,7 @@ function loadStoredDraft() {
       return {
         resume: createEmptyResume(),
         template: DEFAULT_TEMPLATE,
-        sectionOrder: ['personal', 'education', 'experience'],
+        sectionOrder: SECTION_IDS,
         savedAt: null,
       };
     }
@@ -63,7 +74,7 @@ function loadStoredDraft() {
     return {
       resume: createEmptyResume(),
       template: DEFAULT_TEMPLATE,
-      sectionOrder: ['personal', 'education', 'experience'],
+      sectionOrder: SECTION_IDS,
       savedAt: null,
     };
   }
@@ -99,6 +110,10 @@ export function useResumeBuilder() {
   const printViewRef = useRef(null);
   const errors = useMemo(() => validateResume(resume), [resume]);
   const previewModel = useMemo(() => getPreviewModel(resume), [resume]);
+
+  useEffect(() => {
+    setResume((currentResume) => normalizeResume(currentResume));
+  }, []);
 
   useEffect(() => {
     if (!hasMounted.current) {
@@ -241,6 +256,30 @@ export function useResumeBuilder() {
     },
     removeActivity(entryId, activityIndex) {
       updateResume((currentResume) => removeActivity(currentResume, entryId, activityIndex));
+    },
+    updateCollectionEntry(sectionKey, entryId, field, value) {
+      updateResume((currentResume) => updateCollectionEntry(currentResume, sectionKey, entryId, field, value));
+    },
+    addCollectionEntry(sectionKey) {
+      updateResume((currentResume) => addCollectionEntry(currentResume, sectionKey));
+    },
+    moveCollectionEntry(sectionKey, entryId, direction) {
+      updateResume((currentResume) => moveCollectionEntry(currentResume, sectionKey, entryId, direction));
+    },
+    removeCollectionEntry(sectionKey, entryId) {
+      updateResume((currentResume) => removeCollectionEntry(currentResume, sectionKey, entryId));
+    },
+    updateCollectionTextList(sectionKey, entryId, field, itemIndex, value) {
+      updateResume((currentResume) => updateCollectionTextList(currentResume, sectionKey, entryId, field, itemIndex, value));
+    },
+    addCollectionTextListItem(sectionKey, entryId, field) {
+      updateResume((currentResume) => addCollectionTextListItem(currentResume, sectionKey, entryId, field));
+    },
+    moveCollectionTextListItem(sectionKey, entryId, field, itemIndex, direction) {
+      updateResume((currentResume) => moveCollectionTextListItem(currentResume, sectionKey, entryId, field, itemIndex, direction));
+    },
+    removeCollectionTextListItem(sectionKey, entryId, field, itemIndex) {
+      updateResume((currentResume) => removeCollectionTextListItem(currentResume, sectionKey, entryId, field, itemIndex));
     },
   };
 

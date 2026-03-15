@@ -51,13 +51,18 @@
   place-items: center;
   width: 52px;
   height: 52px;
+  padding: 7px;
   border: 1px solid var(--color-border-strong);
   border-radius: 16px;
   background: linear-gradient(180deg, #ffffff, #f5f8fd);
-  color: var(--color-accent);
-  font-size: 1.125rem;
-  font-weight: 700;
   box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+
+.brandMark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .brandCopy {
@@ -68,7 +73,7 @@
 
 .brandCopy h1 {
   margin: 0;
-  font-size: clamp(1.5rem, 2vw, 1.85rem);
+  font-size: 1.75rem;
   line-height: 1.05;
   letter-spacing: -0.04em;
 }
@@ -121,19 +126,21 @@
 
 .toolbarLabel {
   color: var(--color-text-muted);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
 .toolbarSelect {
-  min-width: 148px;
-  min-height: 44px;
-  padding: 0 40px 0 14px;
+  min-width: 128px;
+  min-height: 36px;
+  padding: 0 34px 0 11px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background:
     linear-gradient(180deg, #ffffff, #f8fafc);
   color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
   box-shadow: var(--shadow-xs);
   transition:
     border-color var(--transition-base),
@@ -216,8 +223,8 @@
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(460px, 620px) minmax(0, 1fr);
-  gap: var(--space-6);
+  grid-template-columns: clamp(430px, 44vw, 560px) minmax(0, 1fr);
+  gap: var(--space-5);
   align-items: start;
 }
 
@@ -231,8 +238,8 @@
 
 .editorWorkspace {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: var(--space-6);
+  grid-template-columns: clamp(104px, 10.5vw, 122px) minmax(0, 1fr);
+  gap: var(--space-4);
   align-items: start;
 }
 
@@ -244,20 +251,20 @@
   align-self: start;
   min-width: 0;
   overflow: hidden;
-  padding: var(--space-5);
+  padding: 12px;
 }
 
 .editorRailHeader {
   display: grid;
-  gap: var(--space-2);
+  gap: 0;
 }
 
 .editorRailHeader h2,
 .editorPanelHeader h3 {
   margin: 0;
-  font-size: 1.35rem;
-  line-height: 1.1;
-  letter-spacing: -0.035em;
+  font-size: 1rem;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
 }
 
 .editorRailDescription {
@@ -277,28 +284,24 @@
 }
 
 @media (min-width: 721px) {
-  .editorWorkspace {
-    grid-template-columns: 168px minmax(0, 1fr);
-    gap: var(--space-4);
-  }
-
   .editorRail {
     gap: var(--space-3);
-    padding: 16px;
+    padding: 10px;
   }
 
   .editorRailHeader {
-    gap: 6px;
+    gap: 0;
   }
 
-  .editorRailHeader h2 {
-    font-size: 1rem;
+  .editorRailHeader h2,
+  .editorPanelHeader h3 {
+    font-size: 0.875rem;
     letter-spacing: -0.02em;
   }
 
   .tabs {
-    --tabs-inset: 6px;
-    gap: 6px;
+    --tabs-inset: 3px;
+    gap: 3px;
   }
 }
 
@@ -316,19 +319,18 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
   padding-inline: 0;
   text-align: left;
 }
 
 .editorPanelHeading {
   display: grid;
-  gap: var(--space-2);
+  gap: 0;
   flex-shrink: 0;
   min-width: 0;
 }
 
-.editorPanelHeading .kicker,
 .editorPanelHeading h3 {
   white-space: nowrap;
 }
@@ -349,16 +351,11 @@
 }
 
 .editorPanelHeader h2,
-.editorPanelHeader h3,
 .previewPanelHeader h2 {
   margin: 0;
   font-size: 1.5rem;
   line-height: 1.1;
   letter-spacing: -0.04em;
-}
-
-.editorPanelHeader h3 {
-  font-size: 1.4rem;
 }
 
 .panelDescription {
@@ -396,19 +393,13 @@
   line-height: 1;
 }
 
-.sectionOrderActions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.sectionOrderActions .iconButton {
-  min-height: 20px;
-  min-width: 20px;
-  padding-inline: 0;
+.sectionOrderControl .entryMenuButton {
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0 5px;
   border-radius: 999px;
-  font-size: 0.6875rem;
   box-shadow: none;
+  font-size: 0.625rem;
 }
 
 .previewMeta {
@@ -420,7 +411,7 @@
   flex-wrap: wrap;
   align-items: end;
   justify-content: flex-end;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .tabs {
@@ -470,10 +461,6 @@
 }
 
 @media (max-width: 1240px) {
-  .workspace {
-    grid-template-columns: minmax(380px, 500px) minmax(0, 1fr);
-  }
-
   .appShell {
     width: min(100vw - 24px, 1520px);
   }

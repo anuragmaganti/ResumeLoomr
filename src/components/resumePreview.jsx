@@ -1,6 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-
-const ESTIMATED_SINGLE_PAGE_HEIGHT = 1040;
+import { useMemo, useRef } from 'react';
 
 function templateClassName(template) {
     return `resumePage--${template}`;
@@ -8,7 +6,6 @@ function templateClassName(template) {
 
 export default function ResumePreview({ previewModel, sectionOrder, template, templateOptions, onTemplateChange, onPrint, panelRef }) {
     const resumeRef = useRef(null);
-    const [estimatedPages, setEstimatedPages] = useState(1);
     const templateLabel = useMemo(
         () => templateOptions.find((option) => option.id === template)?.label ?? 'Modern',
         [template, templateOptions]
@@ -22,32 +19,45 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
         ].filter(Boolean)
     ), [previewModel.personal]);
 
-    useEffect(() => {
-        const resumeElement = resumeRef.current;
-
-        if (!resumeElement) {
-            return undefined;
+    function renderBulletEntries(items, keyPrefix) {
+        if (items.length === 0) {
+            return null;
         }
 
-        function measurePages() {
-            const nextPageCount = Math.max(1, Math.ceil(resumeElement.scrollHeight / ESTIMATED_SINGLE_PAGE_HEIGHT));
-            setEstimatedPages(nextPageCount);
+        return (
+            <ul className="previewEntryList">
+                {items.map((item, index) => (
+                    <li key={`${keyPrefix}-${index}`}>{item}</li>
+                ))}
+            </ul>
+        );
+    }
+
+    function renderSimpleMetaSection({ title, entries, sectionClassName, detailLabel, detailKey, secondaryKey, dateKey = 'years' }) {
+        if (entries.length === 0) {
+            return null;
         }
 
-        measurePages();
-
-        if (typeof ResizeObserver === 'undefined') {
-            return undefined;
-        }
-
-        const observer = new ResizeObserver(() => {
-            measurePages();
-        });
-
-        observer.observe(resumeElement);
-
-        return () => observer.disconnect();
-    }, [previewModel, template]);
+        return (
+            <div className={`resumeSection ${sectionClassName}`} key={sectionClassName}>
+                <h2>{title}</h2>
+                {entries.map((entry) => (
+                    <div className="previewEntry" key={entry.id}>
+                        <div className="previewEntryHeader">
+                            <div className="previewEntryTitle">{entry.title || entry.name}</div>
+                            {entry[dateKey] && <div className="previewEntryMeta">{entry[dateKey]}</div>}
+                        </div>
+                        {entry[secondaryKey] && <div className="previewEntrySubtitle">{entry[secondaryKey]}</div>}
+                        {entry[detailKey] && (
+                            <div className="previewEntryDetail">
+                                {detailLabel ? <span className="educationDetailLabel">{detailLabel}:</span> : null} {entry[detailKey]}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        );
+    }
 
     const orderedSections = sectionOrder.map((sectionId) => {
         if (sectionId === "personal" && previewModel.showPersonal) {
@@ -138,17 +148,126 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
                                 </div>
                             )}
                             {job.role && <div className="role">{job.role}</div>}
-                            {job.activities.length > 0 && (
-                                <ul>
-                                    {job.activities.map((activity, index) => (
-                                        <li key={`${job.id}-${index}`}>{activity}</li>
-                                    ))}
-                                </ul>
-                            )}
+                            {renderBulletEntries(job.activities, job.id)}
                         </div>
                     ))}
                 </div>
             );
+        }
+
+        if (sectionId === "skills" && previewModel.showSkills) {
+            return (
+                <div className="resumeSection skillsDiv" key="skills">
+                    <h2>Skills</h2>
+                    {previewModel.skillsEntries.map((entry) => (
+                        <div className="skillGroup" key={entry.id}>
+                            {entry.category && <div className="skillGroupTitle">{entry.category}</div>}
+                            <div className="skillGroupItems">{entry.items}</div>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        if (sectionId === "projects" && previewModel.showProjects) {
+            return (
+                <div className="resumeSection projectsDiv" key="projects">
+                    <h2>Projects</h2>
+                    {previewModel.projectEntries.map((entry) => (
+                        <div className="previewEntry" key={entry.id}>
+                            <div className="previewEntryHeader">
+                                <div className="previewEntryTitle">{entry.name}</div>
+                                {entry.years && <div className="previewEntryMeta">{entry.years}</div>}
+                            </div>
+                            {entry.subtitle && <div className="previewEntrySubtitle">{entry.subtitle}</div>}
+                            {entry.summary && <div className="previewEntryDetail">{entry.summary}</div>}
+                            {renderBulletEntries(entry.highlights, entry.id)}
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        if (sectionId === "certifications" && previewModel.showCertifications) {
+            return renderSimpleMetaSection({
+                title: 'Certifications',
+                entries: previewModel.certificationEntries,
+                sectionClassName: 'certificationsDiv',
+                detailKey: 'details',
+                secondaryKey: 'issuer'
+            });
+        }
+
+        if (sectionId === "volunteering" && previewModel.showVolunteering) {
+            return (
+                <div className="resumeSection volunteeringDiv" key="volunteering">
+                    <h2>Volunteering</h2>
+                    {previewModel.volunteeringEntries.map((entry) => (
+                        <div className="previewEntry" key={entry.id}>
+                            <div className="previewEntryHeader">
+                                <div className="previewEntryTitle">{entry.organization}</div>
+                                {entry.years && <div className="previewEntryMeta">{entry.years}</div>}
+                            </div>
+                            {entry.role && <div className="previewEntrySubtitle">{entry.role}</div>}
+                            {renderBulletEntries(entry.highlights, entry.id)}
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        if (sectionId === "leadership" && previewModel.showLeadership) {
+            return (
+                <div className="resumeSection leadershipDiv" key="leadership">
+                    <h2>Leadership</h2>
+                    {previewModel.leadershipEntries.map((entry) => (
+                        <div className="previewEntry" key={entry.id}>
+                            <div className="previewEntryHeader">
+                                <div className="previewEntryTitle">{entry.organization}</div>
+                                {entry.years && <div className="previewEntryMeta">{entry.years}</div>}
+                            </div>
+                            {entry.role && <div className="previewEntrySubtitle">{entry.role}</div>}
+                            {renderBulletEntries(entry.highlights, entry.id)}
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        if (sectionId === "languages" && previewModel.showLanguages) {
+            return (
+                <div className="resumeSection languagesDiv" key="languages">
+                    <h2>Languages</h2>
+                    {previewModel.languageEntries.map((entry) => (
+                        <div className="previewEntry previewEntry--tight" key={entry.id}>
+                            <div className="previewInlineHeader">
+                                <div className="previewEntryTitle">{entry.language}</div>
+                                {entry.proficiency && <div className="previewEntryMeta">{entry.proficiency}</div>}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        if (sectionId === "awards" && previewModel.showAwards) {
+            return renderSimpleMetaSection({
+                title: 'Awards',
+                entries: previewModel.awardEntries,
+                sectionClassName: 'awardsDiv',
+                detailKey: 'details',
+                secondaryKey: 'issuer'
+            });
+        }
+
+        if (sectionId === "publications" && previewModel.showPublications) {
+            return renderSimpleMetaSection({
+                title: 'Publications',
+                entries: previewModel.publicationEntries,
+                sectionClassName: 'publicationsDiv',
+                detailKey: 'details',
+                secondaryKey: 'publisher'
+            });
         }
 
         return null;
@@ -160,9 +279,6 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
                 <div className="previewPanelIntro">
                     <p className="kicker">Preview</p>
                     <div className="previewMeta">
-                        <span className={`statusBadge ${estimatedPages > 1 ? 'statusBadge--warning' : 'statusBadge--success'}`}>
-                            {estimatedPages > 1 ? `Estimated ${estimatedPages} pages` : 'Estimated 1 page'}
-                        </span>
                         <span className="statusBadge statusBadge--neutral">{templateLabel} template</span>
                     </div>
                 </div>
