@@ -284,10 +284,10 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
                 </div>
 
                 <div className="previewToolbar">
-                    <label className="toolbarField">
+                    <label className="toolbarField previewToolbarField">
                         <span className="toolbarLabel">Template</span>
                         <select
-                            className="toolbarSelect"
+                            className="toolbarSelect previewToolbarSelect"
                             value={template}
                             onChange={(event) => onTemplateChange(event.target.value)}
                             aria-label="Choose resume template"

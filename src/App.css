@@ -1,9 +1,28 @@
 .app {
   --workspace-sticky-top: 24px;
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
   background:
+    radial-gradient(circle at 14% 10%, var(--color-app-wash-left), transparent 34%),
+    radial-gradient(circle at 84% 14%, var(--color-app-wash-right), transparent 30%),
+    radial-gradient(circle at 16% 90%, var(--color-app-wash-bottom-left-warm), transparent 32%),
+    radial-gradient(circle at 10% 92%, var(--color-app-wash-bottom-left), transparent 28%),
+    radial-gradient(circle at 50% 100%, var(--color-app-wash-bottom), transparent 42%),
     radial-gradient(circle at top left, var(--color-app-glow), transparent 32%),
     linear-gradient(180deg, var(--color-app-top) 0%, var(--color-bg) 100%);
+}
+
+.app::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, var(--color-app-veil), transparent 24%),
+    radial-gradient(circle at 22% 18%, var(--color-app-highlight-left), transparent 18%),
+    radial-gradient(circle at 78% 10%, var(--color-app-highlight-right), transparent 16%);
 }
 
 .appShell {
@@ -175,9 +194,9 @@
 }
 
 .toolbarSelect {
-  min-width: 128px;
+  min-width: 96px;
   min-height: 36px;
-  padding: 0 34px 0 11px;
+  padding: 0 28px 0 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-muted));
@@ -371,7 +390,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--space-4);
-  padding-inline: 0;
+  padding: 0 10px 0 6px;
   text-align: left;
 }
 
@@ -380,7 +399,7 @@
   gap: 0;
   flex-shrink: 0;
   min-width: 0;
-  padding: 2px 0 0 4px;
+  padding: 2px 0 0;
 }
 
 .editorPanelHeading h3 {
@@ -469,6 +488,35 @@
   gap: var(--space-2);
 }
 
+.previewToolbarField {
+  width: 112px;
+}
+
+.previewToolbarSelect {
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+  padding: 0 18px 0 8px;
+  font-size: 0.75rem;
+  letter-spacing: -0.01em;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
+    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%),
+    linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-muted));
+  background-position:
+    calc(100% - 11px) calc(50% - 1px),
+    calc(100% - 7px) calc(50% - 1px),
+    0 0;
+  background-size:
+    4px 4px,
+    4px 4px,
+    100% 100%;
+  background-repeat: no-repeat;
+}
+
 .tabs {
   --tabs-inset: 4px;
   display: grid;
@@ -485,7 +533,7 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding-right: 4px;
+  padding: 2px 4px 0 0;
 }
 
 .formContainer::-webkit-scrollbar {

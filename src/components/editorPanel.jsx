@@ -112,10 +112,6 @@ export default function EditorPanel({
         <section className="editorPanel">
             <div className="editorWorkspace" style={editorWorkspaceStyle}>
                 <aside className="editorRail panel">
-                    <div className="editorRailHeader">
-                        <h2>Sections</h2>
-                    </div>
-
                     <SectionTabs
                         activeTab={activeTab}
                         setActiveTab={setActiveTab}
