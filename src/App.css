@@ -370,8 +370,8 @@
   }
 
   .tabs {
-    --tabs-inset: 3px;
-    gap: 3px;
+    --tabs-inset: 5px;
+    gap: 4px;
   }
 }
 

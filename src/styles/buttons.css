@@ -148,8 +148,8 @@
 
 @media (min-width: 721px) {
   .tabs {
-    --tabs-inset: 2px;
-    gap: 3px;
+    --tabs-inset: 5px;
+    gap: 4px;
     min-width: 0;
   }
 
