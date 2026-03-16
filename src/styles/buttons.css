@@ -186,6 +186,10 @@
   position: relative;
 }
 
+.entryMenu.isOpen {
+  z-index: 50;
+}
+
 .entryMenuButton {
   min-width: 22px;
   min-height: 22px;

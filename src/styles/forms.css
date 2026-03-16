@@ -41,8 +41,13 @@ form {
 
 .entryCard {
   position: relative;
+  z-index: 0;
   border-color: var(--color-entry-border);
   overflow: visible;
+}
+
+.entryCard:has(.entryMenu.isOpen) {
+  z-index: 40;
 }
 
 .entryCard.isCollapsed {
@@ -124,6 +129,10 @@ form {
   opacity: 0.86;
 }
 
+.entrySummaryButton:hover .entrySummaryHint {
+  color: var(--color-text);
+}
+
 .entrySummaryButton:focus-visible {
   outline: 3px solid var(--color-accent-soft);
   outline-offset: 4px;
@@ -169,6 +178,36 @@ form {
   justify-content: flex-end;
   gap: var(--space-2);
   flex-shrink: 0;
+}
+
+.button.entryCollapseButton {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.editorStage .button.entryCollapseButton {
+  font-size: 0.6875rem;
+}
+
+.button.entryCollapseButton:not(:disabled):hover {
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  transform: none;
+}
+
+.button.entryCollapseButton:focus-visible {
+  outline: 3px solid var(--color-accent-soft);
+  outline-offset: 4px;
+  border-radius: 8px;
 }
 
 .fieldGrid {

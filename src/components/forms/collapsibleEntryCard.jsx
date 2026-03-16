@@ -33,6 +33,16 @@ export default function CollapsibleEntryCard({
     <fieldset className={`formSection entryCard${isCollapsed ? " isCollapsed" : ""}`}>
       <div className="entryHeader entryHeaderActionsOnly">
         <div className="entryActions">
+          {!isCollapsed ? (
+            <button
+              type="button"
+              className="button buttonGhost entryCollapseButton"
+              onClick={() => setIsCollapsed(true)}
+              aria-label={`Collapse ${expandLabel}`}
+            >
+              Collapse
+            </button>
+          ) : null}
           <EntryActionMenu
             menuLabel={menuLabel}
             moveUpLabel={moveUpLabel}
@@ -44,14 +54,6 @@ export default function CollapsibleEntryCard({
             disableUp={disableUp}
             disableDown={disableDown}
             disableRemove={disableRemove}
-            extraItems={[
-              {
-                key: "toggle-collapse",
-                label: isCollapsed ? "Expand" : "Collapse",
-                ariaLabel: `${isCollapsed ? "Expand" : "Collapse"} ${expandLabel}`,
-                onSelect: () => setIsCollapsed((collapsed) => !collapsed),
-              },
-            ]}
           />
         </div>
       </div>
