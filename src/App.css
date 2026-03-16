@@ -414,7 +414,8 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
-  margin-bottom: var(--space-6);
+  width: min(100%, 820px);
+  margin: 0 auto var(--space-6);
   padding-inline: 0;
   text-align: left;
 }
