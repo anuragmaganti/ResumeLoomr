@@ -4,11 +4,31 @@
   isolation: isolate;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 14% 10%, var(--color-app-wash-left), transparent 34%),
-    radial-gradient(circle at 84% 14%, var(--color-app-wash-right), transparent 30%),
-    radial-gradient(circle at 16% 90%, var(--color-app-wash-bottom-left-warm), transparent 32%),
-    radial-gradient(circle at 10% 92%, var(--color-app-wash-bottom-left), transparent 28%),
-    radial-gradient(circle at 50% 100%, var(--color-app-wash-bottom), transparent 42%),
+    radial-gradient(
+      circle at 14% 10%,
+      var(--color-app-wash-left),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 84% 14%,
+      var(--color-app-wash-right),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 16% 90%,
+      var(--color-app-wash-bottom-left-warm),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 10% 92%,
+      var(--color-app-wash-bottom-left),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 50% 100%,
+      var(--color-app-wash-bottom),
+      transparent 42%
+    ),
     radial-gradient(circle at top left, var(--color-app-glow), transparent 32%),
     linear-gradient(180deg, var(--color-app-top) 0%, var(--color-bg) 100%);
 }
@@ -21,12 +41,20 @@
   pointer-events: none;
   background:
     linear-gradient(180deg, var(--color-app-veil), transparent 24%),
-    radial-gradient(circle at 22% 18%, var(--color-app-highlight-left), transparent 18%),
-    radial-gradient(circle at 78% 10%, var(--color-app-highlight-right), transparent 16%);
+    radial-gradient(
+      circle at 22% 18%,
+      var(--color-app-highlight-left),
+      transparent 18%
+    ),
+    radial-gradient(
+      circle at 78% 10%,
+      var(--color-app-highlight-right),
+      transparent 16%
+    );
 }
 
 .appShell {
-  width: min(1520px, calc(100vw - 32px));
+  width: min(1680px, calc(100vw - 32px));
   margin: 0 auto;
   padding: var(--space-8) 0 var(--space-10);
 }
@@ -73,7 +101,11 @@
   padding: 7px;
   border: 1px solid var(--color-border-strong);
   border-radius: 16px;
-  background: linear-gradient(180deg, var(--color-brand-surface-top), var(--color-brand-surface-bottom));
+  background: linear-gradient(
+    180deg,
+    var(--color-brand-surface-top),
+    var(--color-brand-surface-bottom)
+  );
   box-shadow: var(--shadow-xs);
   overflow: hidden;
 }
@@ -128,6 +160,36 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+.topbarTemplateSelect {
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+  min-height: 32px;
+  padding: 0 18px 0 8px;
+  font-size: 0.75rem;
+  letter-spacing: -0.01em;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
+    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%),
+    linear-gradient(
+      180deg,
+      var(--color-surface-elevated),
+      var(--color-surface-muted)
+    );
+  background-position:
+    calc(100% - 11px) calc(50% - 1px),
+    calc(100% - 7px) calc(50% - 1px),
+    0 0;
+  background-size:
+    4px 4px,
+    4px 4px,
+    100% 100%;
+  background-repeat: no-repeat;
 }
 
 .button.themeToggle {
@@ -199,7 +261,11 @@
   padding: 0 28px 0 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-muted));
+  background: linear-gradient(
+    180deg,
+    var(--color-surface-elevated),
+    var(--color-surface-muted)
+  );
   color: var(--color-text);
   font-size: 0.8125rem;
   font-weight: 600;
@@ -285,7 +351,7 @@
 
 .workspace {
   display: grid;
-  grid-template-columns: clamp(430px, 44vw, 560px) minmax(0, 1fr);
+  grid-template-columns: clamp(430px, 44vw, 680px) minmax(0, 1fr);
   gap: var(--space-5);
   align-items: start;
 }
@@ -300,7 +366,7 @@
 
 .editorWorkspace {
   display: grid;
-  grid-template-columns: clamp(104px, 10.5vw, 122px) minmax(0, 1fr);
+  grid-template-columns: clamp(104px, 10.5vw, 140px) minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
 }
@@ -343,15 +409,19 @@
   flex-direction: column;
   align-self: start;
   min-width: 0;
-  max-height: min(var(--editor-stage-max-height, 999rem), calc(100dvh - var(--workspace-sticky-top) - 24px));
+  max-height: min(
+    var(--editor-stage-max-height, 999rem),
+    calc(100dvh - var(--workspace-sticky-top) - 24px)
+  );
   overflow: hidden;
+
   padding: var(--space-6);
 }
 
 @media (min-width: 721px) {
   .editorRail {
     gap: var(--space-3);
-    padding: 10px;
+    padding: 16px;
   }
 
   .editorRailHeader {
@@ -372,11 +442,11 @@
   .tabs {
     --tabs-inset: 5px;
     gap: 4px;
+    min-height: 40px;
   }
 }
 
-.editorPanelHeader,
-.previewPanelHeader {
+.editorPanelHeader {
   display: grid;
   justify-items: center;
   gap: var(--space-2);
@@ -409,40 +479,15 @@
   letter-spacing: -0.025em;
 }
 
-.previewPanelHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  width: min(100%, 820px);
-  margin: 0 auto var(--space-6);
-  padding-inline: 0;
-  text-align: left;
-}
-
-.previewPanelIntro {
-  display: grid;
-  gap: var(--space-2);
-}
-
 .editorPanelHeader h2,
-.previewPanelHeader h2 {
+.editorPanelHeader h2 {
   margin: 0;
   font-size: 1.5rem;
   line-height: 1.1;
   letter-spacing: -0.04em;
 }
 
-.panelDescription {
-  max-width: 34rem;
-  margin: 0;
-  color: var(--color-text-subtle);
-  font-size: 0.95rem;
-  line-height: 1.55;
-}
-
-.editorPanelMeta,
-.previewMeta {
+.editorPanelMeta {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -475,47 +520,6 @@
   border-radius: 999px;
   box-shadow: none;
   font-size: 0.625rem;
-}
-
-.previewMeta {
-  justify-content: flex-start;
-}
-
-.previewToolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-
-.previewToolbarField {
-  width: 112px;
-}
-
-.previewToolbarSelect {
-  width: 112px;
-  min-width: 112px;
-  max-width: 112px;
-  padding: 0 18px 0 8px;
-  font-size: 0.75rem;
-  letter-spacing: -0.01em;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
-    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%),
-    linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-muted));
-  background-position:
-    calc(100% - 11px) calc(50% - 1px),
-    calc(100% - 7px) calc(50% - 1px),
-    0 0;
-  background-size:
-    4px 4px,
-    4px 4px,
-    100% 100%;
-  background-repeat: no-repeat;
 }
 
 .tabs {
@@ -566,7 +570,7 @@
 
 @media (max-width: 1240px) {
   .appShell {
-    width: min(100vw - 24px, 1520px);
+    width: min(100vw - 24px, 1680px);
   }
 }
 
@@ -631,23 +635,6 @@
     justify-content: center;
   }
 
-  .previewPanelHeader {
-    align-items: center;
-    flex-direction: column;
-    padding-inline: var(--space-2);
-    text-align: center;
-  }
-
-  .previewPanelIntro {
-    justify-items: center;
-  }
-
-  .previewMeta,
-  .previewToolbar,
-  .previewToolbar .toolbarActions {
-    justify-content: center;
-  }
-
   .tabs {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -655,7 +642,7 @@
 
 @media (max-width: 720px) {
   .appShell {
-    width: min(100vw - 16px, 1520px);
+    width: min(100vw - 16px, 1680px);
     padding-top: var(--space-5);
     padding-bottom: var(--space-8);
   }
@@ -667,18 +654,12 @@
     padding: var(--space-4);
   }
 
-  .toolbar,
-  .previewToolbar {
-    width: 100%;
+  .topbarMeta {
+    justify-content: stretch;
   }
 
-  .toolbarField,
-  .toolbarSelect,
-  .toolbarActions {
-    width: 100%;
-  }
-
-  .toolbarActions .button {
+  .topbarMeta > .toolbarSelect,
+  .topbarMeta > .button {
     flex: 1 1 calc(50% - 8px);
   }
 

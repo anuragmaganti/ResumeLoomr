@@ -427,10 +427,6 @@
     background: #ffffff;
   }
 
-  .previewPanelHeader {
-    display: none;
-  }
-
   .resumePage {
     --resume-page-bg: #ffffff;
     --resume-page-border: transparent;

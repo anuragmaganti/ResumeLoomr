@@ -5,6 +5,10 @@ export default function Header({
     saveLabel,
     theme,
     onToggleTheme,
+    template,
+    templateOptions,
+    onTemplateChange,
+    onPrint,
 }) {
     return (
         <header className="topbar panel">
@@ -32,6 +36,25 @@ export default function Header({
                     >
                         <span className={`themeToggleKnob themeToggleKnob--${theme}`} aria-hidden="true" />
                         <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+                    </button>
+                    <label className="visuallyHidden" htmlFor="header-template-select">
+                        Template
+                    </label>
+                    <select
+                        id="header-template-select"
+                        className="toolbarSelect topbarTemplateSelect"
+                        value={template}
+                        onChange={(event) => onTemplateChange(event.target.value)}
+                        aria-label="Choose resume template"
+                    >
+                        {templateOptions.map((option) => (
+                            <option key={option.id} value={option.id}>
+                                {option.label}
+                            </option>
+                        ))}
+                    </select>
+                    <button type="button" className="button buttonPrimary printButton" onClick={onPrint}>
+                        Print resume
                     </button>
                 </div>
             </div>

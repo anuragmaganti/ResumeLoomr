@@ -100,6 +100,10 @@ function App() {
           saveLabel={saveLabel}
           theme={theme}
           onToggleTheme={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
+          template={template}
+          templateOptions={templateOptions}
+          onTemplateChange={setTemplate}
+          onPrint={printResume}
         />
 
         {notice && (
@@ -150,9 +154,6 @@ function App() {
               previewModel={previewModel}
               sectionOrder={sectionOrder}
               template={template}
-              templateOptions={templateOptions}
-              onTemplateChange={setTemplate}
-              onPrint={printResume}
               panelRef={previewPanelRef}
             />
           </div>

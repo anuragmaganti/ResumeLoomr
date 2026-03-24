@@ -4,12 +4,8 @@ function templateClassName(template) {
     return `resumePage--${template}`;
 }
 
-export default function ResumePreview({ previewModel, sectionOrder, template, templateOptions, onTemplateChange, onPrint, panelRef }) {
+export default function ResumePreview({ previewModel, sectionOrder, template, panelRef }) {
     const resumeRef = useRef(null);
-    const templateLabel = useMemo(
-        () => templateOptions.find((option) => option.id === template)?.label ?? 'Modern',
-        [template, templateOptions]
-    );
     const personalDetails = useMemo(() => (
         [
             previewModel.personal.location,
@@ -275,39 +271,6 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
 
     return (
         <section ref={panelRef} className="previewPanel panel">
-            <div className="previewPanelHeader">
-                <div className="previewPanelIntro">
-                    <p className="kicker">Preview</p>
-                    <div className="previewMeta">
-                        <span className="statusBadge statusBadge--neutral">{templateLabel} template</span>
-                    </div>
-                </div>
-
-                <div className="previewToolbar">
-                    <label className="toolbarField previewToolbarField">
-                        <span className="toolbarLabel">Template</span>
-                        <select
-                            className="toolbarSelect previewToolbarSelect"
-                            value={template}
-                            onChange={(event) => onTemplateChange(event.target.value)}
-                            aria-label="Choose resume template"
-                        >
-                            {templateOptions.map((option) => (
-                                <option key={option.id} value={option.id}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-
-                    <div className="toolbarActions">
-                        <button type="button" className="button buttonPrimary printButton" onClick={onPrint}>
-                            Print resume
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             <div className="previewFrame">
                 <div ref={resumeRef} className={`resumePage ${templateClassName(template)}`}>
                     {previewModel.hasContent ? (
