@@ -18,6 +18,18 @@ export const SECTION_IDS = [
   'awards',
   'publications'
 ];
+export const SECTION_TITLE_DEFAULTS = {
+  education: 'Education',
+  experience: 'Experience',
+  skills: 'Skills',
+  projects: 'Projects',
+  certifications: 'Certifications',
+  volunteering: 'Volunteering',
+  leadership: 'Leadership',
+  languages: 'Languages',
+  awards: 'Awards',
+  publications: 'Publications'
+};
 
 function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2, 10)}`;
@@ -48,6 +60,18 @@ function updateEntryField(sectionEntries, entryId, field, value) {
 
 function addEntry(sectionEntries, createEntry) {
   return [...sectionEntries, createEntry()];
+}
+
+export function resolveSectionTitle(sectionTitles, sectionId) {
+  const defaultTitle = SECTION_TITLE_DEFAULTS[sectionId] || '';
+  const customTitle = trimText(sectionTitles?.[sectionId]);
+  return customTitle || defaultTitle;
+}
+
+function normalizeSectionTitles(sectionTitles) {
+  return Object.fromEntries(
+    Object.keys(SECTION_TITLE_DEFAULTS).map((sectionId) => [sectionId, resolveSectionTitle(sectionTitles, sectionId)])
+  );
 }
 
 function removeEntry(sectionEntries, entryId) {
@@ -332,6 +356,7 @@ export function createEmptyResume() {
       customField: '',
       aboutMe: ''
     },
+    sectionTitles: normalizeSectionTitles(),
     education: [createEducationEntry()],
     experience: [createExperienceEntry()],
     skills: [createSkillsEntry()],
@@ -348,6 +373,7 @@ export function createEmptyResume() {
 export function normalizeResume(candidate) {
   const resume = candidate && typeof candidate === 'object' ? candidate : {};
   const personal = resume.personal && typeof resume.personal === 'object' ? resume.personal : {};
+  const sectionTitles = resume.sectionTitles && typeof resume.sectionTitles === 'object' ? resume.sectionTitles : {};
   const education = Array.isArray(resume.education) ? resume.education : [];
   const experience = Array.isArray(resume.experience) ? resume.experience : [];
   const skills = Array.isArray(resume.skills) ? resume.skills : [];
@@ -379,6 +405,7 @@ export function normalizeResume(candidate) {
       customField,
       aboutMe: asText(personal.aboutMe)
     },
+    sectionTitles: normalizeSectionTitles(sectionTitles),
     education: education.length > 0 ? education.map(createEducationEntry) : [createEducationEntry()],
     experience: experience.length > 0 ? experience.map(createExperienceEntry) : [createExperienceEntry()],
     skills: skills.length > 0 ? skills.map(createSkillsEntry) : [createSkillsEntry()],
@@ -454,6 +481,20 @@ export function updatePersonalField(resume, field, value) {
     personal: {
       ...resume.personal,
       [field]: value
+    }
+  };
+}
+
+export function updateSectionTitle(resume, sectionId, value) {
+  if (!Object.hasOwn(SECTION_TITLE_DEFAULTS, sectionId)) {
+    return resume;
+  }
+
+  return {
+    ...resume,
+    sectionTitles: {
+      ...normalizeSectionTitles(resume.sectionTitles),
+      [sectionId]: trimText(value) || SECTION_TITLE_DEFAULTS[sectionId]
     }
   };
 }
@@ -748,6 +789,7 @@ export function publicationEntryHasContent(entry) {
 }
 
 export function getPreviewModel(resume) {
+  const sectionTitles = normalizeSectionTitles(resume.sectionTitles);
   const personal = {
     name: trimText(resume.personal.name),
     headline: trimText(resume.personal.headline),
@@ -890,6 +932,7 @@ export function getPreviewModel(resume) {
 
   return {
     hasContent,
+    sectionTitles,
     personal: {
       ...personal,
       links: personalLinks

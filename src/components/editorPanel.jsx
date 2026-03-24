@@ -11,6 +11,7 @@ import LanguagesForm from "./forms/languagesForm";
 import AwardsForm from "./forms/awardsForm";
 import PublicationsForm from "./forms/publicationsForm";
 import EntryActionMenu from "./forms/entryActionMenu";
+import { resolveSectionTitle } from "../lib/resume";
 
 const sectionMeta = {
     personal: {
@@ -93,9 +94,12 @@ export default function EditorPanel({
     maxHeight
 }) {
     const currentSection = sectionMeta[activeTab];
+    const currentSectionLabel = activeTab === "personal"
+        ? currentSection.label
+        : resolveSectionTitle(resume.sectionTitles, activeTab);
     const sections = sectionOrder.map((id) => ({
         id,
-        navLabel: sectionMeta[id].navLabel,
+        navLabel: id === "personal" ? sectionMeta[id].navLabel : resolveSectionTitle(resume.sectionTitles, id),
         navHint: sectionMeta[id].navHint
     }));
     const activeSectionIndex = sectionOrder.indexOf(activeTab);
@@ -122,16 +126,16 @@ export default function EditorPanel({
                 <div className="editorStage panel">
                     <div className="editorPanelHeader">
                         <div className="editorPanelHeading">
-                            <h3>{currentSection.label}</h3>
+                            <h3>{currentSectionLabel}</h3>
                         </div>
 
                         <div className="editorPanelMeta">
                             <div className="sectionOrderControl">
                                 <span className="sectionOrderLabel">Section order</span>
                                 <EntryActionMenu
-                                    menuLabel={`${currentSection.label} section order actions`}
-                                    moveUpLabel={`Move ${currentSection.label} up in the resume order`}
-                                    moveDownLabel={`Move ${currentSection.label} down in the resume order`}
+                                    menuLabel={`${currentSectionLabel} section order actions`}
+                                    moveUpLabel={`Move ${currentSectionLabel} up in the resume order`}
+                                    moveDownLabel={`Move ${currentSectionLabel} down in the resume order`}
                                     onMoveUp={() => onMoveSection(activeTab, -1)}
                                     onMoveDown={() => onMoveSection(activeTab, 1)}
                                     disableUp={!canMoveSectionUp}
@@ -142,6 +146,17 @@ export default function EditorPanel({
                     </div>
 
                     <div className="formContainer">
+                        {activeTab !== "personal" ? (
+                            <div className="field editorSectionTitleField">
+                                <label htmlFor={`section-title-${activeTab}`}>Section name</label>
+                                <input
+                                    id={`section-title-${activeTab}`}
+                                    value={resolveSectionTitle(resume.sectionTitles, activeTab)}
+                                    onChange={(event) => actions.updateSectionTitle(activeTab, event.target.value)}
+                                />
+                            </div>
+                        ) : null}
+
                         {activeTab === "personal" && (
                             <PersonalForm
                                 personal={resume.personal}

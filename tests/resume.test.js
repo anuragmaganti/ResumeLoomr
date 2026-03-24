@@ -16,6 +16,7 @@ import {
   removeEducation,
   removeExperience,
   updatePersonalField,
+  updateSectionTitle,
   validateResume,
 } from '../src/lib/resume.js';
 
@@ -108,6 +109,10 @@ test('validateResume flags missing core fields and partial entries', () => {
 
 test('getPreviewModel shapes the expanded resume sections and trims bullet markers', () => {
   const resume = createEmptyResume();
+  const renamedResume = updateSectionTitle(resume, 'projects', 'Recent projects');
+  assert.equal(renamedResume.sectionTitles.projects, 'Recent projects');
+  assert.equal(getPreviewModel(renamedResume).sectionTitles.projects, 'Recent projects');
+
   resume.personal.name = 'Jordan Lee';
   resume.personal.headline = 'Frontend Engineer';
   resume.personal.location = 'Brooklyn, NY';

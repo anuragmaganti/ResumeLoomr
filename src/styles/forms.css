@@ -32,11 +32,7 @@ form {
 }
 
 .editorStage .formStack {
-  gap: var(--space-3);
-}
-
-.editorStage .formSection {
-  padding: var(--space-4);
+  gap: var(--space-2);
 }
 
 .entryCard {
@@ -101,12 +97,11 @@ form {
 }
 
 .editorStage .entryCard {
-  padding-top: 12px;
+  padding: 10px 14px 12px;
 }
 
 .editorStage .entryCard.isCollapsed {
-  padding-top: 10px;
-  padding-bottom: 10px;
+  padding: 8px 14px;
 }
 
 .entrySummaryButton {
@@ -231,6 +226,10 @@ form {
 
 .editorStage .field {
   gap: 6px;
+}
+
+.editorSectionTitleField {
+  margin-bottom: var(--space-3);
 }
 
 .field label {

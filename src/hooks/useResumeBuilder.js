@@ -36,6 +36,7 @@ import {
   updateEducationField,
   updateExperienceField,
   updatePersonalField,
+  updateSectionTitle,
   validateResume,
 } from '../lib/resume.js';
 
@@ -208,6 +209,9 @@ export function useResumeBuilder() {
   const actions = {
     updatePersonalField(field, value) {
       updateResume((currentResume) => updatePersonalField(currentResume, field, value));
+    },
+    updateSectionTitle(sectionId, value) {
+      updateResume((currentResume) => updateSectionTitle(currentResume, sectionId, value));
     },
     updateEducationField(entryId, field, value) {
       updateResume((currentResume) => updateEducationField(currentResume, entryId, field, value));

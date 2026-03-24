@@ -87,7 +87,7 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
         if (sectionId === "education" && previewModel.showEducation) {
             return (
                 <div className="resumeSection educationDiv" key="education">
-                    <h2>Education</h2>
+                    <h2>{previewModel.sectionTitles.education}</h2>
                     {previewModel.educationEntries.map((institution) => (
                         <div className="educationSection" key={institution.id}>
                             {(institution.school || institution.location || institution.yearsEdu) && (
@@ -138,7 +138,7 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
         if (sectionId === "experience" && previewModel.showExperience) {
             return (
                 <div className="resumeSection experienceDiv" key="experience">
-                    <h2>Experience</h2>
+                    <h2>{previewModel.sectionTitles.experience}</h2>
                     {previewModel.experienceEntries.map((job) => (
                         <div className="experienceSection" key={job.id}>
                             {(job.company || job.yearsExp) && (
@@ -158,7 +158,7 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
         if (sectionId === "skills" && previewModel.showSkills) {
             return (
                 <div className="resumeSection skillsDiv" key="skills">
-                    <h2>Skills</h2>
+                    <h2>{previewModel.sectionTitles.skills}</h2>
                     {previewModel.skillsEntries.map((entry) => (
                         <div className="skillGroup" key={entry.id}>
                             {entry.category && <div className="skillGroupTitle">{entry.category}</div>}
@@ -172,7 +172,7 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
         if (sectionId === "projects" && previewModel.showProjects) {
             return (
                 <div className="resumeSection projectsDiv" key="projects">
-                    <h2>Projects</h2>
+                    <h2>{previewModel.sectionTitles.projects}</h2>
                     {previewModel.projectEntries.map((entry) => (
                         <div className="previewEntry" key={entry.id}>
                             <div className="previewEntryHeader">
@@ -190,7 +190,7 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
 
         if (sectionId === "certifications" && previewModel.showCertifications) {
             return renderSimpleMetaSection({
-                title: 'Certifications',
+                title: previewModel.sectionTitles.certifications,
                 entries: previewModel.certificationEntries,
                 sectionClassName: 'certificationsDiv',
                 detailKey: 'details',
@@ -201,7 +201,7 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
         if (sectionId === "volunteering" && previewModel.showVolunteering) {
             return (
                 <div className="resumeSection volunteeringDiv" key="volunteering">
-                    <h2>Volunteering</h2>
+                    <h2>{previewModel.sectionTitles.volunteering}</h2>
                     {previewModel.volunteeringEntries.map((entry) => (
                         <div className="previewEntry" key={entry.id}>
                             <div className="previewEntryHeader">
@@ -219,7 +219,7 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
         if (sectionId === "leadership" && previewModel.showLeadership) {
             return (
                 <div className="resumeSection leadershipDiv" key="leadership">
-                    <h2>Leadership</h2>
+                    <h2>{previewModel.sectionTitles.leadership}</h2>
                     {previewModel.leadershipEntries.map((entry) => (
                         <div className="previewEntry" key={entry.id}>
                             <div className="previewEntryHeader">
@@ -237,7 +237,7 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
         if (sectionId === "languages" && previewModel.showLanguages) {
             return (
                 <div className="resumeSection languagesDiv" key="languages">
-                    <h2>Languages</h2>
+                    <h2>{previewModel.sectionTitles.languages}</h2>
                     {previewModel.languageEntries.map((entry) => (
                         <div className="previewEntry previewEntry--tight" key={entry.id}>
                             <div className="previewInlineHeader">
@@ -252,7 +252,7 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
 
         if (sectionId === "awards" && previewModel.showAwards) {
             return renderSimpleMetaSection({
-                title: 'Awards',
+                title: previewModel.sectionTitles.awards,
                 entries: previewModel.awardEntries,
                 sectionClassName: 'awardsDiv',
                 detailKey: 'details',
@@ -262,7 +262,7 @@ export default function ResumePreview({ previewModel, sectionOrder, template, te
 
         if (sectionId === "publications" && previewModel.showPublications) {
             return renderSimpleMetaSection({
-                title: 'Publications',
+                title: previewModel.sectionTitles.publications,
                 entries: previewModel.publicationEntries,
                 sectionClassName: 'publicationsDiv',
                 detailKey: 'details',
