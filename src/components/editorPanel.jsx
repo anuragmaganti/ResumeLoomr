@@ -118,7 +118,10 @@ export default function EditorPanel({
             <div className="editorWorkspace" style={editorWorkspaceStyle}>
                 <div className="editorSidebar">
                     <aside className="settingsRail panel">
-                        <EditorSettingsRail />
+                        <EditorSettingsRail
+                            settings={resume.settings}
+                            onAdjustSetting={actions.updateResumeSetting}
+                        />
                     </aside>
 
                     <aside className="editorRail panel">

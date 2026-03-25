@@ -1,4 +1,5 @@
-import CollapsibleEntryCard, { buildEntrySummary } from "./collapsibleEntryCard";
+import CollapsibleEntryCard from "./collapsibleEntryCard";
+import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 
 export default function LanguagesForm({ languages, actions, getFieldError, markTouched }) {

@@ -22,7 +22,6 @@ import {
   moveExperience,
   moveSectionOrder,
   normalizeDraftPayload,
-  normalizeResume,
   removeCollectionEntry,
   removeCollectionTextListItem,
   removeActivity,
@@ -36,6 +35,7 @@ import {
   updateEducationField,
   updateExperienceField,
   updatePersonalField,
+  updateResumeSetting as updateResumeSettingValue,
   updateSectionTitle,
   validateResume,
 } from '../lib/resume.js';
@@ -111,10 +111,6 @@ export function useResumeBuilder() {
   const printViewRef = useRef(null);
   const errors = useMemo(() => validateResume(resume), [resume]);
   const previewModel = useMemo(() => getPreviewModel(resume), [resume]);
-
-  useEffect(() => {
-    setResume((currentResume) => normalizeResume(currentResume));
-  }, []);
 
   useEffect(() => {
     if (!hasMounted.current) {
@@ -212,6 +208,9 @@ export function useResumeBuilder() {
     },
     updateSectionTitle(sectionId, value) {
       updateResume((currentResume) => updateSectionTitle(currentResume, sectionId, value));
+    },
+    updateResumeSetting(settingId, delta) {
+      updateResume((currentResume) => updateResumeSettingValue(currentResume, settingId, delta));
     },
     updateEducationField(entryId, field, value) {
       updateResume((currentResume) => updateEducationField(currentResume, entryId, field, value));

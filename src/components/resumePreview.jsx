@@ -1,11 +1,14 @@
 import { useMemo, useRef } from 'react';
+import { getResumePresentationVars, getResumePrintPageRule } from '../lib/resume.js';
 
 function templateClassName(template) {
     return `resumePage--${template}`;
 }
 
-export default function ResumePreview({ previewModel, sectionOrder, template, panelRef }) {
+export default function ResumePreview({ previewModel, sectionOrder, template, settings, panelRef }) {
     const resumeRef = useRef(null);
+    const presentationVars = useMemo(() => getResumePresentationVars(settings, template), [settings, template]);
+    const printPageRule = useMemo(() => getResumePrintPageRule(settings, template), [settings, template]);
     const personalDetails = useMemo(() => (
         [
             previewModel.personal.location,
@@ -270,20 +273,27 @@ export default function ResumePreview({ previewModel, sectionOrder, template, pa
     }).filter(Boolean);
 
     return (
-        <section ref={panelRef} className="previewPanel panel">
-            <div className="previewFrame">
-                <div ref={resumeRef} className={`resumePage ${templateClassName(template)}`}>
-                    {previewModel.hasContent ? (
-                        orderedSections
-                    ) : (
-                        <div className="resumeEmptyState">
-                            <p className="resumeEmptyEyebrow">Live preview</p>
-                            <h3>Your resume will appear here</h3>
-                            <p>Start with your personal details, then add education and experience. Empty sections stay out of the final document until you add real content.</p>
-                        </div>
-                    )}
+        <>
+            <style media="print">{printPageRule}</style>
+            <section ref={panelRef} className="previewPanel panel">
+                <div className="previewFrame">
+                    <div
+                        ref={resumeRef}
+                        className={`resumePage ${templateClassName(template)}`}
+                        style={presentationVars}
+                    >
+                        {previewModel.hasContent ? (
+                            orderedSections
+                        ) : (
+                            <div className="resumeEmptyState">
+                                <p className="resumeEmptyEyebrow">Live preview</p>
+                                <h3>Your resume will appear here</h3>
+                                <p>Start with your personal details, then add education and experience. Empty sections stay out of the final document until you add real content.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
-        </section>
+            </section>
+        </>
     )
 }

@@ -22,25 +22,8 @@ function formatSettingValue(value) {
   return value > 0 ? `+${value}` : String(value);
 }
 
-export default function EditorSettingsRail() {
-  const [settings, setSettings] = useState({
-    textSize: 0,
-    horizontalMargins: 0,
-    verticalMargins: 0,
-    lineSpacing: 0,
-    sectionSpacing: 0,
-    entrySpacing: 0,
-    headingSize: 0,
-    nameSize: 0
-  });
+export default function EditorSettingsRail({ settings, onAdjustSetting }) {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-
-  function updateSetting(settingId, nextValue) {
-    setSettings((current) => ({
-      ...current,
-      [settingId]: Math.max(-5, Math.min(5, nextValue))
-    }));
-  }
 
   function renderSettingControl(setting) {
     const value = settings[setting.id];
@@ -53,7 +36,7 @@ export default function EditorSettingsRail() {
           <button
             type="button"
             className="button buttonSecondary settingsAdjustButton settingsAdjustButton--decrease"
-            onClick={() => updateSetting(setting.id, value - 1)}
+            onClick={() => onAdjustSetting(setting.id, -1)}
             disabled={value <= -5}
             aria-label={`Decrease ${setting.label}`}
           >
@@ -65,7 +48,7 @@ export default function EditorSettingsRail() {
           <button
             type="button"
             className="button buttonSecondary settingsAdjustButton settingsAdjustButton--increase"
-            onClick={() => updateSetting(setting.id, value + 1)}
+            onClick={() => onAdjustSetting(setting.id, 1)}
             disabled={value >= 5}
             aria-label={`Increase ${setting.label}`}
           >

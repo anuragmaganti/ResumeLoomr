@@ -1,8 +1,31 @@
 .resumePage {
+  --resume-page-min-height: 940px;
+  --resume-page-margin-inline: 0.5in;
+  --resume-page-margin-top: 0.5in;
+  --resume-page-margin-bottom: 0.5in;
+  --resume-name-size: 1.5rem;
+  --resume-heading-size: 0.625rem;
+  --resume-body-size: 0.75rem;
+  --resume-detail-size: 0.6875rem;
+  --resume-meta-size: 0.6875rem;
+  --resume-headline-size: 0.8125rem;
+  --resume-body-line-height: 1.3;
+  --resume-detail-line-height: 1.45;
+  --resume-list-line-height: 1.4;
+  --resume-section-gap: 12px;
+  --resume-section-heading-gap: 8px;
+  --resume-entry-gap: 6px;
+  --resume-repeated-entry-gap: 8px;
+  --resume-detail-gap: 4px;
+  --resume-list-gap: 4px;
+  --resume-print-min-height: 10in;
   width: min(100%, 820px);
-  min-height: 940px;
+  min-height: var(--resume-page-min-height);
   margin: 0 auto;
-  padding: clamp(38px, 4.3vw, 48px) clamp(38px, 4.3vw, 48px) clamp(42px, 4vw, 50px);
+  padding:
+    var(--resume-page-margin-top)
+    var(--resume-page-margin-inline)
+    var(--resume-page-margin-bottom);
   border: 1px solid var(--resume-page-border);
   border-radius: 22px;
   background: var(--resume-page-bg);
@@ -21,7 +44,7 @@
 }
 
 .resumePage h1 {
-  font-size: 1.5rem;
+  font-size: var(--resume-name-size);
   font-weight: 700;
   line-height: 1.06;
   letter-spacing: -0.045em;
@@ -29,9 +52,9 @@
 }
 
 .resumePage h2 {
-  margin-bottom: 8px;
+  margin-bottom: var(--resume-section-heading-gap);
   color: var(--resume-page-heading);
-  font-size: 0.625rem;
+  font-size: var(--resume-heading-size);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -57,8 +80,8 @@
 }
 
 .resumeSection {
-  margin-bottom: 12px;
-  padding-bottom: 12px;
+  margin-bottom: var(--resume-section-gap);
+  padding-bottom: var(--resume-section-gap);
   border-bottom: 1px solid var(--resume-page-divider);
 }
 
@@ -73,9 +96,9 @@
   justify-content: center;
   gap: 14px;
   flex-wrap: nowrap;
-  margin-top: 8px;
+  margin-top: var(--resume-detail-gap);
   color: var(--resume-page-muted);
-  font-size: 0.6875rem;
+  font-size: var(--resume-meta-size);
 }
 
 .personalDetails span {
@@ -85,36 +108,33 @@
 
 .personalDetails--wrap {
   flex-wrap: wrap;
-  row-gap: 4px;
+  row-gap: var(--resume-detail-gap);
 }
 
 .personalHeadline {
-  margin-top: 6px;
+  margin-top: var(--resume-detail-gap);
   color: var(--resume-page-heading);
-  font-size: 0.8125rem;
+  font-size: var(--resume-headline-size);
   font-weight: 600;
-  line-height: 1.4;
+  line-height: var(--resume-body-line-height);
   text-align: center;
 }
 
 .aboutMe {
   width: min(100%, 660px);
-  margin: 8px auto 0;
+  margin: var(--resume-detail-gap) auto 0;
   color: var(--resume-page-heading);
-  font-size: 0.75rem;
-  line-height: 1.55;
+  font-size: var(--resume-body-size);
+  line-height: var(--resume-detail-line-height);
   text-align: justify;
   text-align-last: left;
 }
 
 .educationSection,
-.experienceSection {
-  margin-top: 6px;
-}
-
+.experienceSection,
 .previewEntry,
 .skillGroup {
-  margin-top: 6px;
+  margin-top: var(--resume-entry-gap);
 }
 
 .educationDiv > .educationSection + .educationSection,
@@ -127,7 +147,7 @@
 .languagesDiv > .previewEntry + .previewEntry,
 .awardsDiv > .previewEntry + .previewEntry,
 .publicationsDiv > .previewEntry + .previewEntry {
-  margin-top: 8px;
+  margin-top: var(--resume-repeated-entry-gap);
 }
 
 .degreeYearsEduFlex,
@@ -146,23 +166,38 @@
   min-width: 0;
 }
 
-.company {
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.3;
+.company,
+.degree,
+.school,
+.role,
+.previewEntryTitle,
+.skillGroupTitle,
+.previewEntrySubtitle {
+  font-size: var(--resume-body-size);
+  line-height: var(--resume-body-line-height);
 }
 
-.degree {
+.company,
+.school,
+.role,
+.previewEntryTitle,
+.skillGroupTitle {
+  color: var(--resume-page-text);
+  font-weight: 700;
+}
+
+.degree,
+.previewEntrySubtitle {
   color: var(--resume-page-muted);
-  font-size: 0.75rem;
   font-weight: 600;
-  line-height: 1.3;
 }
 
 .yearsEdu,
-.yearsExp {
+.yearsExp,
+.previewEntryMeta {
   color: var(--resume-page-subtle);
-  font-size: 0.6875rem;
+  font-size: var(--resume-meta-size);
+  line-height: var(--resume-detail-line-height);
   white-space: nowrap;
 }
 
@@ -171,27 +206,16 @@
   justify-content: space-between;
   gap: 16px;
   align-items: baseline;
-  margin-top: 4px;
+  margin-top: var(--resume-detail-gap);
 }
 
 .educationGpa {
-  line-height: 1.3;
+  line-height: var(--resume-detail-line-height);
 }
 
-.school {
-  color: var(--resume-page-text);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.3;
-  margin-top: 0;
-}
-
-.role {
-  margin-top: 2px;
-  color: var(--resume-page-text);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.3;
+.role,
+.previewEntrySubtitle {
+  margin-top: max(0px, calc(var(--resume-detail-gap) - 2px));
 }
 
 .schoolLocation {
@@ -204,10 +228,12 @@
 .eduLocation,
 .educationMeta,
 .educationDetail,
-.educationDescription {
+.educationDescription,
+.previewEntryDetail,
+.skillGroupItems {
   color: var(--resume-page-muted);
-  font-size: 0.6875rem;
-  line-height: 1.45;
+  font-size: var(--resume-detail-size);
+  line-height: var(--resume-detail-line-height);
 }
 
 .eduLocation {
@@ -218,7 +244,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: var(--resume-detail-gap);
 }
 
 .educationDegreeRow .educationMeta {
@@ -226,28 +252,33 @@
 }
 
 .educationDetail,
-.educationDescription {
-  margin-top: 4px;
+.educationDescription,
+.previewEntryDetail,
+.skillGroupItems {
+  margin-top: var(--resume-detail-gap);
 }
 
 .educationDetailLabel {
   font-weight: 600;
 }
 
-.experienceSection ul {
-  margin: 4px 0 0;
+.experienceSection ul,
+.previewEntryList {
+  margin: var(--resume-list-gap) 0 0;
   padding-left: 16px;
 }
 
-.experienceSection li {
+.experienceSection li,
+.previewEntryList li {
   margin-top: 0;
   color: var(--resume-page-body);
-  font-size: 0.75rem;
-  line-height: 1.4;
+  font-size: var(--resume-body-size);
+  line-height: var(--resume-list-line-height);
 }
 
-.experienceSection li + li {
-  margin-top: 2px;
+.experienceSection li + li,
+.previewEntryList li + li {
+  margin-top: max(0px, calc(var(--resume-list-gap) - 2px));
 }
 
 .previewEntryHeader {
@@ -264,54 +295,8 @@
   gap: 8px;
 }
 
-.previewEntryTitle,
-.skillGroupTitle {
-  color: var(--resume-page-text);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.previewEntrySubtitle {
-  margin-top: 2px;
-  color: var(--resume-page-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.previewEntryMeta {
-  color: var(--resume-page-subtle);
-  font-size: 0.6875rem;
-  white-space: nowrap;
-}
-
-.previewEntryDetail,
-.skillGroupItems {
-  margin-top: 4px;
-  color: var(--resume-page-muted);
-  font-size: 0.6875rem;
-  line-height: 1.45;
-}
-
-.previewEntryList {
-  margin: 4px 0 0;
-  padding-left: 16px;
-}
-
-.previewEntryList li {
-  margin-top: 0;
-  color: var(--resume-page-body);
-  font-size: 0.75rem;
-  line-height: 1.4;
-}
-
-.previewEntryList li + li {
-  margin-top: 2px;
-}
-
 .previewEntry--tight {
-  margin-top: 8px;
+  margin-top: var(--resume-repeated-entry-gap);
 }
 
 .resumeEmptyState {
@@ -369,35 +354,19 @@
 }
 
 .resumePage--compact {
-  min-height: 880px;
-  padding: 42px 42px 42px;
-}
-
-.resumePage--compact h1 {
-  font-size: 1.3125rem;
-}
-
-.resumePage--compact .resumeSection {
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-}
-
-.resumePage--compact .resumeSection:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-.resumePage--compact .aboutMe,
-.resumePage--compact .school,
-.resumePage--compact .role,
-.resumePage--compact .experienceSection li,
-.resumePage--compact .previewEntryList li {
-  line-height: 1.4;
+  --resume-page-min-height: 880px;
+  --resume-page-margin-inline: 0.4375in;
+  --resume-page-margin-top: 0.4375in;
+  --resume-page-margin-bottom: 0.4375in;
+  --resume-name-size: 1.3125rem;
+  --resume-body-line-height: 1.4;
+  --resume-detail-line-height: 1.4;
+  --resume-list-line-height: 1.4;
+  --resume-section-gap: 10px;
 }
 
 @media (max-width: 720px) {
   .resumePage {
-    padding: 24px 24px 32px;
     border-radius: 18px;
   }
 
@@ -440,7 +409,7 @@
     --resume-page-divider: #e2e8f0;
     --resume-page-body: #1f2937;
     width: 100%;
-    min-height: calc(11in - 1in);
+    min-height: var(--resume-print-min-height);
     margin: 0;
     padding: 0;
     border: none;

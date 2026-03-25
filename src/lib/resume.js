@@ -30,6 +30,91 @@ export const SECTION_TITLE_DEFAULTS = {
   awards: 'Awards',
   publications: 'Publications'
 };
+export const RESUME_SETTINGS_DEFAULTS = {
+  textSize: 0,
+  horizontalMargins: 0,
+  verticalMargins: 0,
+  lineSpacing: 0,
+  sectionSpacing: 0,
+  entrySpacing: 0,
+  headingSize: 0,
+  nameSize: 0
+};
+
+const RESUME_SETTINGS_MIN = -5;
+const RESUME_SETTINGS_MAX = 5;
+const TEXT_SIZE_STEP = 0.03;
+const HEADING_SIZE_STEP = 0.05;
+const NAME_SIZE_STEP = 0.05;
+const MARGIN_STEP_IN = 0.04;
+const LINE_SPACING_STEP = 0.04;
+const SECTION_SPACING_STEP = 4;
+const ENTRY_SPACING_STEP = 3;
+const RESUME_PRESENTATION_BASES = {
+  modern: {
+    pageMinHeightPx: 940,
+    pageMarginInlineIn: 0.5,
+    pageMarginTopIn: 0.5,
+    pageMarginBottomIn: 0.5,
+    nameSizeRem: 1.5,
+    headingSizeRem: 0.625,
+    bodySizeRem: 0.75,
+    detailSizeRem: 0.6875,
+    metaSizeRem: 0.6875,
+    headlineSizeRem: 0.8125,
+    bodyLineHeight: 1.3,
+    detailLineHeight: 1.45,
+    listLineHeight: 1.4,
+    sectionGapPx: 12,
+    sectionHeadingGapPx: 8,
+    entryGapPx: 6,
+    repeatedEntryGapPx: 8,
+    detailGapPx: 4,
+    listGapPx: 4
+  },
+  executive: {
+    pageMinHeightPx: 940,
+    pageMarginInlineIn: 0.5,
+    pageMarginTopIn: 0.5,
+    pageMarginBottomIn: 0.5,
+    nameSizeRem: 1.5,
+    headingSizeRem: 0.625,
+    bodySizeRem: 0.75,
+    detailSizeRem: 0.6875,
+    metaSizeRem: 0.6875,
+    headlineSizeRem: 0.8125,
+    bodyLineHeight: 1.3,
+    detailLineHeight: 1.45,
+    listLineHeight: 1.4,
+    sectionGapPx: 12,
+    sectionHeadingGapPx: 8,
+    entryGapPx: 6,
+    repeatedEntryGapPx: 8,
+    detailGapPx: 4,
+    listGapPx: 4
+  },
+  compact: {
+    pageMinHeightPx: 880,
+    pageMarginInlineIn: 0.4375,
+    pageMarginTopIn: 0.4375,
+    pageMarginBottomIn: 0.4375,
+    nameSizeRem: 1.3125,
+    headingSizeRem: 0.625,
+    bodySizeRem: 0.75,
+    detailSizeRem: 0.6875,
+    metaSizeRem: 0.6875,
+    headlineSizeRem: 0.8125,
+    bodyLineHeight: 1.4,
+    detailLineHeight: 1.4,
+    listLineHeight: 1.4,
+    sectionGapPx: 10,
+    sectionHeadingGapPx: 8,
+    entryGapPx: 6,
+    repeatedEntryGapPx: 8,
+    detailGapPx: 4,
+    listGapPx: 4
+  }
+};
 
 function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2, 10)}`;
@@ -37,6 +122,40 @@ function createId() {
 
 function asText(value) {
   return typeof value === 'string' ? value : '';
+}
+
+function clampResumeSettingValue(value) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return Math.max(RESUME_SETTINGS_MIN, Math.min(RESUME_SETTINGS_MAX, Math.round(numericValue)));
+}
+
+function clampNumber(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function formatRem(value) {
+  return `${Number(value.toFixed(4))}rem`;
+}
+
+function formatPx(value) {
+  return `${Number(value.toFixed(2))}px`;
+}
+
+function formatInches(value) {
+  return `${Number(value.toFixed(3))}in`;
+}
+
+function formatUnitless(value) {
+  return Number(value.toFixed(3)).toString();
+}
+
+function resolvePresentationBase(template) {
+  return RESUME_PRESENTATION_BASES[template] || RESUME_PRESENTATION_BASES[DEFAULT_TEMPLATE];
 }
 
 function normalizeStringList(list) {
@@ -66,6 +185,17 @@ export function resolveSectionTitle(sectionTitles, sectionId) {
   const defaultTitle = SECTION_TITLE_DEFAULTS[sectionId] || '';
   const customTitle = trimText(sectionTitles?.[sectionId]);
   return customTitle || defaultTitle;
+}
+
+export function normalizeResumeSettings(candidate) {
+  const settings = candidate && typeof candidate === 'object' ? candidate : {};
+
+  return Object.fromEntries(
+    Object.entries(RESUME_SETTINGS_DEFAULTS).map(([settingId, defaultValue]) => [
+      settingId,
+      clampResumeSettingValue(settings[settingId] ?? defaultValue)
+    ])
+  );
 }
 
 function normalizeSectionTitles(sectionTitles) {
@@ -356,6 +486,7 @@ export function createEmptyResume() {
       customField: '',
       aboutMe: ''
     },
+    settings: normalizeResumeSettings(),
     sectionTitles: normalizeSectionTitles(),
     education: [createEducationEntry()],
     experience: [createExperienceEntry()],
@@ -405,6 +536,7 @@ export function normalizeResume(candidate) {
       customField,
       aboutMe: asText(personal.aboutMe)
     },
+    settings: normalizeResumeSettings(resume.settings),
     sectionTitles: normalizeSectionTitles(sectionTitles),
     education: education.length > 0 ? education.map(createEducationEntry) : [createEducationEntry()],
     experience: experience.length > 0 ? experience.map(createExperienceEntry) : [createExperienceEntry()],
@@ -495,6 +627,27 @@ export function updateSectionTitle(resume, sectionId, value) {
     sectionTitles: {
       ...normalizeSectionTitles(resume.sectionTitles),
       [sectionId]: trimText(value) || SECTION_TITLE_DEFAULTS[sectionId]
+    }
+  };
+}
+
+export function updateResumeSetting(resume, settingId, delta) {
+  if (!Object.hasOwn(RESUME_SETTINGS_DEFAULTS, settingId)) {
+    return resume;
+  }
+
+  const settings = normalizeResumeSettings(resume.settings);
+  const nextValue = clampResumeSettingValue(settings[settingId] + delta);
+
+  if (nextValue === settings[settingId]) {
+    return resume;
+  }
+
+  return {
+    ...resume,
+    settings: {
+      ...settings,
+      [settingId]: nextValue
     }
   };
 }
@@ -959,6 +1112,59 @@ export function getPreviewModel(resume) {
     showAwards: awardEntries.length > 0,
     showPublications: publicationEntries.length > 0
   };
+}
+
+export function getResumePresentationVars(settings, template) {
+  const normalizedSettings = normalizeResumeSettings(settings);
+  const base = resolvePresentationBase(template);
+  const textScale = 1 + (normalizedSettings.textSize * TEXT_SIZE_STEP);
+  const headingScale = 1 + (normalizedSettings.headingSize * HEADING_SIZE_STEP);
+  const nameScale = 1 + (normalizedSettings.nameSize * NAME_SIZE_STEP);
+  const bodyLineHeight = clampNumber(base.bodyLineHeight + (normalizedSettings.lineSpacing * LINE_SPACING_STEP), 1, 2.2);
+  const detailLineHeight = clampNumber(base.detailLineHeight + (normalizedSettings.lineSpacing * LINE_SPACING_STEP), 1, 2.3);
+  const listLineHeight = clampNumber(base.listLineHeight + (normalizedSettings.lineSpacing * LINE_SPACING_STEP), 1, 2.3);
+  const sectionGap = Math.max(0, base.sectionGapPx + (normalizedSettings.sectionSpacing * SECTION_SPACING_STEP));
+  const sectionHeadingGap = Math.max(0, base.sectionHeadingGapPx + (normalizedSettings.sectionSpacing * SECTION_SPACING_STEP));
+  const entryGap = Math.max(0, base.entryGapPx + (normalizedSettings.entrySpacing * ENTRY_SPACING_STEP));
+  const repeatedEntryGap = Math.max(0, base.repeatedEntryGapPx + (normalizedSettings.entrySpacing * ENTRY_SPACING_STEP));
+  const detailGap = Math.max(0, base.detailGapPx + (normalizedSettings.entrySpacing * ENTRY_SPACING_STEP));
+  const listGap = Math.max(0, base.listGapPx + (normalizedSettings.entrySpacing * ENTRY_SPACING_STEP));
+  const pageMarginInline = Math.max(0.2, base.pageMarginInlineIn + (normalizedSettings.horizontalMargins * MARGIN_STEP_IN));
+  const pageMarginTop = Math.max(0.2, base.pageMarginTopIn + (normalizedSettings.verticalMargins * MARGIN_STEP_IN));
+  const pageMarginBottom = Math.max(0.2, base.pageMarginBottomIn + (normalizedSettings.verticalMargins * MARGIN_STEP_IN));
+  const printMinHeight = Math.max(0, 11 - pageMarginTop - pageMarginBottom);
+
+  return {
+    '--resume-page-min-height': `${base.pageMinHeightPx}px`,
+    '--resume-page-margin-inline': formatInches(pageMarginInline),
+    '--resume-page-margin-top': formatInches(pageMarginTop),
+    '--resume-page-margin-bottom': formatInches(pageMarginBottom),
+    '--resume-name-size': formatRem(base.nameSizeRem * nameScale),
+    '--resume-heading-size': formatRem(base.headingSizeRem * headingScale),
+    '--resume-body-size': formatRem(base.bodySizeRem * textScale),
+    '--resume-detail-size': formatRem(base.detailSizeRem * textScale),
+    '--resume-meta-size': formatRem(base.metaSizeRem * textScale),
+    '--resume-headline-size': formatRem(base.headlineSizeRem * textScale),
+    '--resume-body-line-height': formatUnitless(bodyLineHeight),
+    '--resume-detail-line-height': formatUnitless(detailLineHeight),
+    '--resume-list-line-height': formatUnitless(listLineHeight),
+    '--resume-section-gap': formatPx(sectionGap),
+    '--resume-section-heading-gap': formatPx(sectionHeadingGap),
+    '--resume-entry-gap': formatPx(entryGap),
+    '--resume-repeated-entry-gap': formatPx(repeatedEntryGap),
+    '--resume-detail-gap': formatPx(detailGap),
+    '--resume-list-gap': formatPx(listGap),
+    '--resume-print-min-height': formatInches(printMinHeight)
+  };
+}
+
+export function getResumePrintPageRule(settings, template) {
+  const normalizedSettings = normalizeResumeSettings(settings);
+  const base = resolvePresentationBase(template);
+  const horizontalMargin = Math.max(0.2, base.pageMarginInlineIn + (normalizedSettings.horizontalMargins * MARGIN_STEP_IN));
+  const verticalMargin = Math.max(0.2, base.pageMarginTopIn + (normalizedSettings.verticalMargins * MARGIN_STEP_IN));
+
+  return `@page { margin: ${formatInches(verticalMargin)} ${formatInches(horizontalMargin)} ${formatInches(verticalMargin)} ${formatInches(horizontalMargin)}; }`;
 }
 
 export function validateResume(resume) {

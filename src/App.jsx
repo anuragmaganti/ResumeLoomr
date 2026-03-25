@@ -154,6 +154,7 @@ function App() {
               previewModel={previewModel}
               sectionOrder={sectionOrder}
               template={template}
+              settings={resume.settings}
               panelRef={previewPanelRef}
             />
           </div>

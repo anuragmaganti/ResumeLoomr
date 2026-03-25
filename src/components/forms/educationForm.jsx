@@ -1,6 +1,7 @@
 import AutoResizeTextarea from "../autoResizeTextarea";
 import { ensureEducationCustomSections } from "../../lib/resume";
-import CollapsibleEntryCard, { buildEntrySummary } from "./collapsibleEntryCard";
+import CollapsibleEntryCard from "./collapsibleEntryCard";
+import { buildEntrySummary } from "./buildEntrySummary";
 import EntryActionMenu from "./entryActionMenu";
 import FormFieldError from "./formFieldError";
 

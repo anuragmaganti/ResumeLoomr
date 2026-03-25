@@ -6,16 +6,20 @@ import {
   addEducationCustomSection,
   addEducation,
   createEmptyResume,
+  getResumePresentationVars,
+  getResumePrintPageRule,
   getPreviewModel,
   moveActivity,
   moveEducationCustomSection,
   moveSectionOrder,
   normalizeDraftPayload,
   normalizeBulletText,
+  normalizeResumeSettings,
   removeEducationCustomSection,
   removeEducation,
   removeExperience,
   updatePersonalField,
+  updateResumeSetting,
   updateSectionTitle,
   validateResume,
 } from '../src/lib/resume.js';
@@ -23,6 +27,16 @@ import {
 test('createEmptyResume returns editable starter entries', () => {
   const resume = createEmptyResume();
 
+  assert.deepEqual(resume.settings, {
+    textSize: 0,
+    horizontalMargins: 0,
+    verticalMargins: 0,
+    lineSpacing: 0,
+    sectionSpacing: 0,
+    entrySpacing: 0,
+    headingSize: 0,
+    nameSize: 0
+  });
   assert.equal(resume.education.length, 1);
   assert.equal(resume.experience.length, 1);
   assert.equal(resume.skills.length, 1);
@@ -35,6 +49,28 @@ test('createEmptyResume returns editable starter entries', () => {
   assert.equal(resume.publications.length, 1);
   assert.deepEqual(resume.experience[0].activities, ['']);
   assert.deepEqual(resume.projects[0].highlights, ['']);
+});
+
+test('normalizeResumeSettings clamps invalid values into the supported range', () => {
+  assert.deepEqual(
+    normalizeResumeSettings({
+      textSize: 9,
+      horizontalMargins: -12,
+      verticalMargins: '2',
+      lineSpacing: 'bad',
+      sectionSpacing: 1.6
+    }),
+    {
+      textSize: 5,
+      horizontalMargins: -5,
+      verticalMargins: 2,
+      lineSpacing: 0,
+      sectionSpacing: 2,
+      entrySpacing: 0,
+      headingSize: 0,
+      nameSize: 0
+    }
+  );
 });
 
 test('removeEducation and removeExperience preserve at least one editable entry', () => {
@@ -91,6 +127,17 @@ test('moveSectionOrder keeps personal first and reorders the remaining sections'
     moveSectionOrder(SECTION_IDS, 'personal', 1),
     SECTION_IDS
   );
+});
+
+test('updateResumeSetting clamps stepper values to the supported range', () => {
+  let resume = createEmptyResume();
+
+  resume = updateResumeSetting(resume, 'textSize', 3);
+  resume = updateResumeSetting(resume, 'textSize', 4);
+  resume = updateResumeSetting(resume, 'horizontalMargins', -7);
+
+  assert.equal(resume.settings.textSize, 5);
+  assert.equal(resume.settings.horizontalMargins, -5);
 });
 
 test('validateResume flags missing core fields and partial entries', () => {
@@ -210,6 +257,7 @@ test('normalizeDraftPayload accepts bare resume objects and valid templates', ()
   assert.deepEqual(normalized.sectionOrder.slice(0, 4), ['personal', 'experience', 'education', 'skills']);
   assert.equal(normalized.resume.personal.name, 'Jordan');
   assert.equal(normalized.resume.personal.linkedinUrl, '');
+  assert.equal(normalized.resume.settings.textSize, 0);
   assert.equal(normalized.resume.education[0].location, '');
   assert.equal(normalized.resume.education[0].customSections.length, 1);
   assert.equal(normalized.resume.education[0].customSections[0].label, '');
@@ -286,4 +334,31 @@ test('normalizeDraftPayload migrates legacy custom link fields into customField'
 
 test('normalizeBulletText removes manual bullet prefixes', () => {
   assert.equal(normalizeBulletText(' • Hello world '), 'Hello world');
+});
+
+test('presentation helpers map settings into preview vars and print margins', () => {
+  const styles = getResumePresentationVars({
+    textSize: 2,
+    horizontalMargins: 1,
+    verticalMargins: -1,
+    lineSpacing: 1,
+    sectionSpacing: -1,
+    entrySpacing: 2,
+    headingSize: 1,
+    nameSize: -1
+  }, 'modern');
+
+  assert.equal(styles['--resume-page-margin-inline'], '0.54in');
+  assert.equal(styles['--resume-page-margin-top'], '0.46in');
+  assert.equal(styles['--resume-name-size'], '1.425rem');
+  assert.equal(styles['--resume-heading-size'], '0.6563rem');
+  assert.equal(styles['--resume-body-size'], '0.795rem');
+  assert.equal(styles['--resume-section-gap'], '8px');
+  assert.equal(styles['--resume-entry-gap'], '12px');
+  assert.equal(styles['--resume-print-min-height'], '10.08in');
+
+  assert.equal(
+    getResumePrintPageRule({ horizontalMargins: 1, verticalMargins: -1 }, 'modern'),
+    '@page { margin: 0.46in 0.54in 0.46in 0.54in; }'
+  );
 });
