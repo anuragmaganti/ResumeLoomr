@@ -11,6 +11,7 @@ import LanguagesForm from "./forms/languagesForm";
 import AwardsForm from "./forms/awardsForm";
 import PublicationsForm from "./forms/publicationsForm";
 import EntryActionMenu from "./forms/entryActionMenu";
+import EditorSettingsRail from "./editorSettingsRail";
 import { resolveSectionTitle } from "../lib/resume";
 
 const sectionMeta = {
@@ -115,13 +116,19 @@ export default function EditorPanel({
     return (
         <section className="editorPanel">
             <div className="editorWorkspace" style={editorWorkspaceStyle}>
-                <aside className="editorRail panel">
-                    <SectionTabs
-                        activeTab={activeTab}
-                        setActiveTab={setActiveTab}
-                        sections={sections}
-                    />
-                </aside>
+                <div className="editorSidebar">
+                    <aside className="settingsRail panel">
+                        <EditorSettingsRail />
+                    </aside>
+
+                    <aside className="editorRail panel">
+                        <SectionTabs
+                            activeTab={activeTab}
+                            setActiveTab={setActiveTab}
+                            sections={sections}
+                        />
+                    </aside>
+                </div>
 
                 <div className="editorStage panel">
                     <div className="editorPanelHeader">

@@ -371,31 +371,312 @@
   align-items: start;
 }
 
-.editorRail {
+.editorSidebar {
   position: sticky;
   top: var(--workspace-sticky-top);
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-3);
+  align-self: start;
+  min-width: 0;
+  max-height: calc(100dvh - var(--workspace-sticky-top) - 24px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.editorSidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.editorSidebar::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #d2dbe8 padding-box;
+}
+
+.settingsRail,
+.editorRail {
+  display: grid;
   align-self: start;
   min-width: 0;
   overflow: hidden;
   padding: 12px;
 }
 
+.settingsRail {
+  container-type: inline-size;
+  --settings-inset: 5px;
+}
+
+.settingsRailInner {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.settingsRailHeader,
 .editorRailHeader {
   display: grid;
   gap: 0;
   justify-items: center;
-  padding: 2px 0 4px;
+  padding: 2px 0 2px;
   text-align: center;
 }
 
+.settingsRailHeader h2,
 .editorRailHeader h2,
 .editorPanelHeader h3 {
   margin: 0;
   font-size: 1rem;
   line-height: 1.15;
   letter-spacing: -0.02em;
+}
+
+.settingsRailList {
+  display: grid;
+  gap: 6px;
+}
+
+.settingsAdvancedGroup {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--transition-base),
+    opacity var(--transition-base);
+}
+
+.settingsAdvancedGroup.isExpanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.settingsAdvancedContent {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settingsControl {
+  container-type: inline-size;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius-lg) - var(--settings-inset));
+  background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-soft));
+  text-align: center;
+}
+
+.settingsControlToggle {
+  width: 100%;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    transform var(--transition-fast);
+}
+
+.settingsControlToggle:not(:disabled):hover {
+  border-color: var(--color-border-strong);
+  background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-muted));
+  transform: translateY(-1px);
+}
+
+.settingsControlToggle:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.settingsControlLabel {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  color: var(--color-text-subtle);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: normal;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+
+.settingsStepper {
+  display: inline-grid;
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  justify-self: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.settingsControlValue,
+.button.settingsAdjustButton {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: none;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.settingsControlValue {
+  border-color: transparent;
+  background: transparent;
+}
+
+.button.settingsAdjustButton:not(:disabled):hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  transform: none;
+}
+
+.button.settingsAdjustButton:not(:disabled):active {
+  transform: none;
+}
+
+.button.settingsAdjustButton--increase:not(:disabled):hover {
+  border-color: var(--color-success-border);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.button.settingsAdjustButton--increase:not(:disabled):active {
+  border-color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 18%, var(--color-surface));
+  color: var(--color-success);
+}
+
+.button.settingsAdjustButton--decrease:not(:disabled):hover {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-bg);
+  color: var(--color-error);
+}
+
+.button.settingsAdjustButton--decrease:not(:disabled):active {
+  border-color: var(--color-danger-hover-border);
+  background: var(--color-danger-hover-bg);
+  color: var(--color-danger-hover-text);
+}
+
+@container (max-width: 170px) {
+  .settingsRailInner {
+    gap: 6px;
+  }
+
+  .settingsRailHeader {
+    padding-bottom: 0;
+  }
+
+  .settingsRailHeader h2 {
+    font-size: 0.8125rem;
+  }
+
+  .settingsRailList {
+    gap: 5px;
+  }
+
+  .settingsAdvancedContent {
+    gap: 5px;
+  }
+
+  .settingsControl {
+    gap: 5px;
+    padding: 7px 5px;
+  }
+
+  .settingsControlLabel {
+    font-size: 0.625rem;
+    line-height: 1.15;
+  }
+
+  .settingsStepper {
+    gap: 3px;
+  }
+
+  .settingsControlValue,
+  .button.settingsAdjustButton {
+    min-width: 22px;
+    height: 18px;
+    min-height: 18px;
+    font-size: 0.78125rem;
+  }
+}
+
+@container (max-width: 148px) {
+  .settingsRailInner {
+    gap: 5px;
+  }
+
+  .settingsRailHeader h2 {
+    font-size: 0.75rem;
+  }
+
+  .settingsControl {
+    gap: 4px;
+    padding: 6px 4px;
+  }
+
+  .settingsControlLabel {
+    font-size: 0.59375rem;
+    line-height: 1.1;
+  }
+
+  .settingsStepper {
+    gap: 2px;
+  }
+
+  .settingsAdvancedContent {
+    gap: 4px;
+  }
+
+  .settingsControlValue,
+  .button.settingsAdjustButton {
+    min-width: 20px;
+    height: 17px;
+    min-height: 17px;
+    font-size: 0.75rem;
+  }
+}
+
+@container (max-width: 122px) {
+  .settingsControl {
+    gap: 3px;
+    padding: 5px 3px;
+  }
+
+  .settingsControlLabel {
+    font-size: 0.53125rem;
+    line-height: 1.05;
+  }
+
+  .settingsStepper {
+    gap: 1px;
+  }
+
+  .settingsAdvancedContent {
+    gap: 3px;
+  }
+
+  .settingsControlValue,
+  .button.settingsAdjustButton {
+    min-width: 17px;
+    height: 15px;
+    min-height: 15px;
+    font-size: 0.6875rem;
+  }
 }
 
 .editorRailDescription {
@@ -419,16 +700,23 @@
 }
 
 @media (min-width: 721px) {
-  .editorRail {
+  .editorSidebar {
     gap: var(--space-3);
+    padding-right: 2px;
+  }
+
+  .settingsRail,
+  .editorRail {
     padding: 16px;
   }
 
+  .settingsRailHeader,
   .editorRailHeader {
     gap: 0;
-    padding: 2px 0 4px;
+    padding: 2px 0 2px;
   }
 
+  .settingsRailHeader h2,
   .editorRailHeader h2,
   .editorPanelHeader h3 {
     font-size: 0.875rem;
@@ -594,6 +882,13 @@
     gap: var(--space-5);
   }
 
+  .editorSidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
   .editorRail {
     position: static;
   }
@@ -648,6 +943,7 @@
   }
 
   .topbar,
+  .settingsRail,
   .editorRail,
   .editorStage,
   .previewPanel {
