@@ -45,6 +45,15 @@ function App() {
     saveState,
     saveLabel,
     templateOptions,
+    resumeList,
+    activeResumeId,
+    activeResumeName,
+    canDeleteActiveResume,
+    setActiveResume,
+    createResume,
+    duplicateActiveResume,
+    renameActiveResume,
+    deleteActiveResume,
   } = useResumeBuilder();
 
   useEffect(() => {
@@ -104,6 +113,15 @@ function App() {
           templateOptions={templateOptions}
           onTemplateChange={setTemplate}
           onPrint={printResume}
+          resumeList={resumeList}
+          activeResumeId={activeResumeId}
+          activeResumeName={activeResumeName}
+          canDeleteActiveResume={canDeleteActiveResume}
+          onSetActiveResume={setActiveResume}
+          onCreateResume={createResume}
+          onDuplicateResume={duplicateActiveResume}
+          onRenameResume={renameActiveResume}
+          onDeleteResume={deleteActiveResume}
         />
 
         {notice && (

@@ -1,4 +1,6 @@
 export const DRAFT_STORAGE_KEY = 'resumeloomr:draft:v2';
+export const WORKSPACE_INDEX_STORAGE_KEY = 'resumeloomr:index:v1';
+export const RESUME_STORAGE_KEY_PREFIX = 'resumeloomr:resume:';
 export const DEFAULT_TEMPLATE = 'modern';
 export const TEMPLATE_OPTIONS = [
   { id: 'modern', label: 'Modern' },
@@ -43,6 +45,7 @@ export const RESUME_SETTINGS_DEFAULTS = {
 
 const RESUME_SETTINGS_MIN = -5;
 const RESUME_SETTINGS_MAX = 5;
+const DEFAULT_RESUME_LABEL = 'Resume';
 const TEXT_SIZE_STEP = 0.03;
 const HEADING_SIZE_STEP = 0.05;
 const NAME_SIZE_STEP = 0.05;
@@ -120,8 +123,17 @@ function createId() {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+export function createWorkspaceResumeId() {
+  return createId();
+}
+
 function asText(value) {
   return typeof value === 'string' ? value : '';
+}
+
+function normalizeWorkspaceResumeName(value, fallback) {
+  const nextName = trimText(value);
+  return nextName || fallback;
 }
 
 function clampResumeSettingValue(value) {
@@ -196,6 +208,133 @@ export function normalizeResumeSettings(candidate) {
       clampResumeSettingValue(settings[settingId] ?? defaultValue)
     ])
   );
+}
+
+export function createResumeStorageKey(resumeId) {
+  return `${RESUME_STORAGE_KEY_PREFIX}${resumeId}`;
+}
+
+export function normalizeWorkspaceIndex(candidate) {
+  const index = candidate && typeof candidate === 'object' ? candidate : {};
+  const requestedResumeIds = Array.isArray(index.resumeIds)
+    ? index.resumeIds.filter((resumeId) => trimText(resumeId) !== '')
+    : [];
+  const resumeIds = Array.from(new Set(requestedResumeIds));
+  const rawMeta = index.meta && typeof index.meta === 'object' ? index.meta : {};
+  const meta = Object.fromEntries(
+    resumeIds.map((resumeId, indexPosition) => {
+      const sourceMeta = rawMeta[resumeId] && typeof rawMeta[resumeId] === 'object' ? rawMeta[resumeId] : {};
+      const fallbackName = `${DEFAULT_RESUME_LABEL} ${indexPosition + 1}`;
+
+      return [
+        resumeId,
+        {
+          name: normalizeWorkspaceResumeName(sourceMeta.name, fallbackName),
+          updatedAt: asText(sourceMeta.updatedAt)
+        }
+      ];
+    })
+  );
+
+  return {
+    activeResumeId: resumeIds.includes(index.activeResumeId) ? index.activeResumeId : (resumeIds[0] || ''),
+    resumeIds,
+    meta
+  };
+}
+
+export function createEmptyWorkspaceIndex() {
+  return {
+    activeResumeId: '',
+    resumeIds: [],
+    meta: {}
+  };
+}
+
+export function createWorkspaceResumeMeta(name, updatedAt = '') {
+  return {
+    name: trimText(name),
+    updatedAt: asText(updatedAt)
+  };
+}
+
+export function createNextResumeName(existingNames) {
+  const normalizedNames = new Set(
+    (Array.isArray(existingNames) ? existingNames : [])
+      .map((name) => trimText(name).toLowerCase())
+      .filter(Boolean)
+  );
+  let nextNumber = 1;
+
+  while (normalizedNames.has(`${DEFAULT_RESUME_LABEL.toLowerCase()} ${nextNumber}`)) {
+    nextNumber += 1;
+  }
+
+  return `${DEFAULT_RESUME_LABEL} ${nextNumber}`;
+}
+
+export function createDuplicateResumeName(sourceName, existingNames) {
+  const baseName = trimText(sourceName) || DEFAULT_RESUME_LABEL;
+  const normalizedNames = new Set(
+    (Array.isArray(existingNames) ? existingNames : [])
+      .map((name) => trimText(name).toLowerCase())
+      .filter(Boolean)
+  );
+  const firstCopyName = `${baseName} copy`;
+
+  if (!normalizedNames.has(firstCopyName.toLowerCase())) {
+    return firstCopyName;
+  }
+
+  let nextCopyNumber = 2;
+
+  while (normalizedNames.has(`${firstCopyName} ${nextCopyNumber}`.toLowerCase())) {
+    nextCopyNumber += 1;
+  }
+
+  return `${firstCopyName} ${nextCopyNumber}`;
+}
+
+export function createWorkspaceFromLegacyDraft(payload) {
+  const resumeId = createId();
+  const normalizedDraft = normalizeDraftPayload(payload);
+  const resumeName = `${DEFAULT_RESUME_LABEL} 1`;
+
+  return {
+    workspace: {
+      activeResumeId: resumeId,
+      resumeIds: [resumeId],
+      meta: {
+        [resumeId]: createWorkspaceResumeMeta(resumeName, asText(payload?.savedAt))
+      }
+    },
+    activeResumeId: resumeId,
+    draft: {
+      ...normalizedDraft,
+      savedAt: payload?.savedAt || null
+    }
+  };
+}
+
+export function createFreshWorkspaceDraft(name = `${DEFAULT_RESUME_LABEL} 1`) {
+  const resumeId = createId();
+
+  return {
+    workspace: {
+      activeResumeId: resumeId,
+      resumeIds: [resumeId],
+      meta: {
+        [resumeId]: createWorkspaceResumeMeta(name)
+      }
+    },
+    activeResumeId: resumeId,
+    draft: {
+      resume: createEmptyResume(),
+      template: DEFAULT_TEMPLATE,
+      sectionOrder: SECTION_IDS,
+      savedAt: null
+    }
+  };
 }
 
 function normalizeSectionTitles(sectionTitles) {

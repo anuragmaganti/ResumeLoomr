@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 
 export default function EntryActionMenu({
   menuLabel,
+  triggerContent = '•••',
+  buttonClassName = '',
   moveUpLabel,
   moveDownLabel,
   removeLabel,
@@ -50,14 +52,14 @@ export default function EntryActionMenu({
   return (
     <div className={`entryMenu${isOpen ? " isOpen" : ""}`} ref={menuRef}>
       <button
-        className="button buttonSecondary entryMenuButton"
+        className={`button buttonSecondary entryMenuButton ${buttonClassName}`.trim()}
         type="button"
         aria-label={menuLabel}
         aria-expanded={isOpen}
         aria-haspopup="menu"
         onClick={() => setIsOpen((open) => !open)}
       >
-        •••
+        {triggerContent}
       </button>
 
       {isOpen ? (
@@ -75,26 +77,30 @@ export default function EntryActionMenu({
               {item.label}
             </button>
           ))}
-          <button
-            className="entryMenuItem"
-            type="button"
-            role="menuitem"
-            aria-label={moveUpLabel}
-            onClick={() => runAction(onMoveUp)}
-            disabled={disableUp}
-          >
-            Move up
-          </button>
-          <button
-            className="entryMenuItem"
-            type="button"
-            role="menuitem"
-            aria-label={moveDownLabel}
-            onClick={() => runAction(onMoveDown)}
-            disabled={disableDown}
-          >
-            Move down
-          </button>
+          {onMoveUp ? (
+            <button
+              className="entryMenuItem"
+              type="button"
+              role="menuitem"
+              aria-label={moveUpLabel}
+              onClick={() => runAction(onMoveUp)}
+              disabled={disableUp}
+            >
+              Move up
+            </button>
+          ) : null}
+          {onMoveDown ? (
+            <button
+              className="entryMenuItem"
+              type="button"
+              role="menuitem"
+              aria-label={moveDownLabel}
+              onClick={() => runAction(onMoveDown)}
+              disabled={disableDown}
+            >
+              Move down
+            </button>
+          ) : null}
           {onRemove ? (
             <button
               className="entryMenuItem entryMenuItemDanger"

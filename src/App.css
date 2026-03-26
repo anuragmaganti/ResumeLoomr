@@ -78,8 +78,10 @@
 }
 
 .topbar {
+  position: relative;
+  z-index: 30;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--space-6);
   align-items: center;
   padding: var(--space-6);
@@ -135,6 +137,119 @@
   color: var(--color-text-subtle);
   font-size: 0.95rem;
   line-height: 1.5;
+}
+
+.resumeWorkspaceBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.resumePillStrip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px;
+  overflow: visible;
+  flex-wrap: nowrap;
+}
+
+.resumePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 2px 2px 2px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  box-shadow: var(--shadow-xs);
+}
+
+.resumePill.isActive {
+  border-color: var(--color-accent-border);
+  background: color-mix(in srgb, var(--color-accent-soft) 62%, var(--color-surface) 38%);
+}
+
+.resumePill.isEditing {
+  padding-right: 10px;
+}
+
+.resumePillButton {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.resumePillLabel {
+  overflow: hidden;
+  max-width: 12rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resumePillRenameForm {
+  display: flex;
+  min-width: 0;
+}
+
+.resumePillRenameInput {
+  width: clamp(104px, 14vw, 168px);
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--color-accent-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 4px var(--color-accent-soft);
+}
+
+.resumePillRenameInput:focus {
+  outline: none;
+}
+
+.resumePillMenuButton,
+.resumeOverflowButton,
+.resumeNewButton {
+  min-height: 30px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+.resumePillMenuButton {
+  min-width: 22px;
+  padding: 0 5px;
+  letter-spacing: 0.08em;
+}
+
+.resumeOverflowButton,
+.resumeNewButton {
+  padding: 0 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.resumeOverflowButton {
+  min-width: 54px;
 }
 
 .kicker {
@@ -350,6 +465,8 @@
 }
 
 .workspace {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: clamp(430px, 44vw, 680px) minmax(0, 1fr);
   gap: var(--space-5);
@@ -867,6 +984,14 @@
     grid-template-columns: 1fr;
   }
 
+  .resumeWorkspaceBar {
+    justify-content: flex-start;
+  }
+
+  .resumePillStrip {
+    flex-wrap: wrap;
+  }
+
   .topbarSide,
   .topbarMeta {
     justify-items: stretch;
@@ -957,6 +1082,20 @@
   .topbarMeta > .toolbarSelect,
   .topbarMeta > .button {
     flex: 1 1 calc(50% - 8px);
+  }
+
+  .resumePillStrip {
+    gap: 6px;
+  }
+
+  .resumePill,
+  .resumeOverflowButton,
+  .resumeNewButton {
+    min-height: 34px;
+  }
+
+  .resumePillRenameInput {
+    width: min(100%, 168px);
   }
 
   .tabs {

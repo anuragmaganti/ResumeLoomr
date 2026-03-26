@@ -3,9 +3,18 @@ import assert from 'node:assert/strict';
 
 import {
   SECTION_IDS,
+  WORKSPACE_INDEX_STORAGE_KEY,
   addEducationCustomSection,
   addEducation,
+  createDuplicateResumeName,
   createEmptyResume,
+  createFreshWorkspaceDraft,
+  createNextResumeName,
+  createResumeStorageKey,
+  createWorkspaceFromLegacyDraft,
+  createWorkspaceResumeId,
+  createWorkspaceResumeMeta,
+  createEmptyWorkspaceIndex,
   getResumePresentationVars,
   getResumePrintPageRule,
   getPreviewModel,
@@ -15,6 +24,7 @@ import {
   normalizeDraftPayload,
   normalizeBulletText,
   normalizeResumeSettings,
+  normalizeWorkspaceIndex,
   removeEducationCustomSection,
   removeEducation,
   removeExperience,
@@ -49,6 +59,50 @@ test('createEmptyResume returns editable starter entries', () => {
   assert.equal(resume.publications.length, 1);
   assert.deepEqual(resume.experience[0].activities, ['']);
   assert.deepEqual(resume.projects[0].highlights, ['']);
+});
+
+test('workspace helpers build stable storage keys and metadata', () => {
+  const resumeId = createWorkspaceResumeId();
+  const workspace = createFreshWorkspaceDraft();
+
+  assert.match(resumeId, /^id-|^[0-9a-f-]{8,}$/i);
+  assert.equal(createResumeStorageKey('abc123'), 'resumeloomr:resume:abc123');
+  assert.deepEqual(createWorkspaceResumeMeta('Resume 4', '2026-03-26T12:00:00.000Z'), {
+    name: 'Resume 4',
+    updatedAt: '2026-03-26T12:00:00.000Z'
+  });
+  assert.equal(workspace.workspace.resumeIds.length, 1);
+  assert.equal(workspace.workspace.meta[workspace.activeResumeId].name, 'Resume 1');
+  assert.deepEqual(createEmptyWorkspaceIndex(), {
+    activeResumeId: '',
+    resumeIds: [],
+    meta: {}
+  });
+});
+
+test('workspace naming helpers create sequential and duplicate-safe names', () => {
+  assert.equal(createNextResumeName(['Resume 1', 'Resume 3']), 'Resume 2');
+  assert.equal(createDuplicateResumeName('Resume no skills', ['Resume no skills']), 'Resume no skills copy');
+  assert.equal(
+    createDuplicateResumeName('Resume no skills', ['Resume no skills', 'Resume no skills copy', 'Resume no skills copy 2']),
+    'Resume no skills copy 3'
+  );
+});
+
+test('normalizeWorkspaceIndex keeps valid ids and backfills missing names', () => {
+  const normalized = normalizeWorkspaceIndex({
+    activeResumeId: 'resume-2',
+    resumeIds: ['resume-1', 'resume-2', 'resume-2'],
+    meta: {
+      'resume-1': { name: 'Resume no skills', updatedAt: '2026-03-26T12:00:00.000Z' },
+      'resume-2': { updatedAt: '2026-03-26T13:00:00.000Z' }
+    }
+  });
+
+  assert.deepEqual(normalized.resumeIds, ['resume-1', 'resume-2']);
+  assert.equal(normalized.activeResumeId, 'resume-2');
+  assert.equal(normalized.meta['resume-1'].name, 'Resume no skills');
+  assert.equal(normalized.meta['resume-2'].name, 'Resume 2');
 });
 
 test('normalizeResumeSettings clamps invalid values into the supported range', () => {
@@ -267,6 +321,26 @@ test('normalizeDraftPayload accepts bare resume objects and valid templates', ()
   assert.equal(normalized.resume.skills.length, 1);
   assert.equal(normalized.resume.projects.length, 1);
   assert.equal(normalized.resume.publications.length, 1);
+});
+
+test('legacy single-draft payload migrates into a workspace named Resume 1', () => {
+  const migrated = createWorkspaceFromLegacyDraft({
+    savedAt: '2026-03-26T14:00:00.000Z',
+    template: 'executive',
+    sectionOrder: ['experience', 'personal', 'education'],
+    resume: {
+      personal: { name: 'Jordan' },
+      education: [],
+      experience: []
+    }
+  });
+
+  assert.equal(WORKSPACE_INDEX_STORAGE_KEY, 'resumeloomr:index:v1');
+  assert.equal(migrated.workspace.resumeIds.length, 1);
+  assert.equal(migrated.workspace.activeResumeId, migrated.activeResumeId);
+  assert.equal(migrated.workspace.meta[migrated.activeResumeId].name, 'Resume 1');
+  assert.equal(migrated.draft.template, 'executive');
+  assert.equal(migrated.draft.resume.personal.name, 'Jordan');
 });
 
 test('normalizeDraftPayload migrates legacy education description into the first custom section', () => {
