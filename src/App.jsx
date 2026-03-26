@@ -48,6 +48,7 @@ function App() {
     resumeList,
     activeResumeId,
     activeResumeName,
+    canAddResume,
     canDeleteActiveResume,
     setActiveResume,
     createResume,
@@ -116,6 +117,7 @@ function App() {
           resumeList={resumeList}
           activeResumeId={activeResumeId}
           activeResumeName={activeResumeName}
+          canAddResume={canAddResume}
           canDeleteActiveResume={canDeleteActiveResume}
           onSetActiveResume={setActiveResume}
           onCreateResume={createResume}

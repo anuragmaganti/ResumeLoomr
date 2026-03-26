@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import {
   DRAFT_STORAGE_KEY,
   DEFAULT_TEMPLATE,
+  MAX_WORKSPACE_RESUMES,
   SECTION_IDS,
   TEMPLATE_OPTIONS,
   WORKSPACE_INDEX_STORAGE_KEY,
@@ -38,6 +39,7 @@ import {
   removeEducationCustomSection,
   removeEducation,
   removeExperience,
+  sanitizeWorkspaceResumeName,
   updateCollectionEntry,
   updateCollectionTextList,
   updateActivity,
@@ -235,6 +237,7 @@ export function useResumeBuilder() {
       updatedAt: workspace.meta[resumeId]?.updatedAt || '',
     }))
   ), [workspace]);
+  const canAddResume = workspace.resumeIds.length < MAX_WORKSPACE_RESUMES;
 
   useEffect(() => {
     if (!initialWorkspaceState.needsInitialCommit || !activeResumeId) {
@@ -411,6 +414,10 @@ export function useResumeBuilder() {
   }
 
   function createResume() {
+    if (!canAddResume) {
+      return;
+    }
+
     const persistedPayload = persistActiveDraftImmediately();
 
     if (!persistedPayload && activeResumeId) {
@@ -441,6 +448,10 @@ export function useResumeBuilder() {
   }
 
   function duplicateActiveResume() {
+    if (!canAddResume) {
+      return;
+    }
+
     const persistedPayload = persistActiveDraftImmediately();
 
     if (!persistedPayload && activeResumeId) {
@@ -487,7 +498,8 @@ export function useResumeBuilder() {
   }
 
   function renameActiveResume(nextName) {
-    const trimmedName = nextName.trim();
+    const currentName = workspace.meta[activeResumeId]?.name || '';
+    const trimmedName = sanitizeWorkspaceResumeName(nextName, currentName);
 
     if (!trimmedName || !activeResumeId || trimmedName === workspace.meta[activeResumeId]?.name) {
       return;
@@ -635,6 +647,7 @@ export function useResumeBuilder() {
     resumeList,
     activeResumeId,
     activeResumeName: workspace.meta[activeResumeId]?.name || '',
+    canAddResume,
     canDeleteActiveResume: workspace.resumeIds.length > 1,
     setActiveResume,
     createResume,

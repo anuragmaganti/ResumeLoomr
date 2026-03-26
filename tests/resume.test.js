@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  MAX_WORKSPACE_RESUMES,
   SECTION_IDS,
   WORKSPACE_INDEX_STORAGE_KEY,
   addEducationCustomSection,
@@ -66,6 +67,7 @@ test('workspace helpers build stable storage keys and metadata', () => {
   const workspace = createFreshWorkspaceDraft();
 
   assert.match(resumeId, /^id-|^[0-9a-f-]{8,}$/i);
+  assert.equal(MAX_WORKSPACE_RESUMES, 10);
   assert.equal(createResumeStorageKey('abc123'), 'resumeloomr:resume:abc123');
   assert.deepEqual(createWorkspaceResumeMeta('Resume 4', '2026-03-26T12:00:00.000Z'), {
     name: 'Resume 4',
@@ -87,6 +89,9 @@ test('workspace naming helpers create sequential and duplicate-safe names', () =
     createDuplicateResumeName('Resume no skills', ['Resume no skills', 'Resume no skills copy', 'Resume no skills copy 2']),
     'Resume no skills copy 3'
   );
+  assert.ok(createDuplicateResumeName('abcdefghijklmnopqrstuvwxyz', []).length <= 25);
+  assert.ok(createDuplicateResumeName('abcdefghijklmnopqrstuvwxyz', []).endsWith(' copy'));
+  assert.equal(createWorkspaceResumeMeta('abcdefghijklmnopqrstuvwxyz').name.length, 25);
 });
 
 test('normalizeWorkspaceIndex keeps valid ids and backfills missing names', () => {

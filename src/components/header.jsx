@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
+import { MAX_WORKSPACE_RESUME_NAME_LENGTH, sanitizeWorkspaceResumeName } from "../lib/resume.js";
 import BrandMark from "./brandMark";
 import EntryActionMenu from "./forms/entryActionMenu";
 
-const MAX_VISIBLE_RESUMES = 5;
+const MAX_VISIBLE_RESUMES = 4;
 
 function getVisibleResumeIds(resumeList, activeResumeId) {
   const visibleIds = new Set(resumeList.slice(0, MAX_VISIBLE_RESUMES).map((resume) => resume.id));
@@ -27,6 +28,7 @@ export default function Header({
   resumeList,
   activeResumeId,
   activeResumeName,
+  canAddResume,
   canDeleteActiveResume,
   onSetActiveResume,
   onCreateResume,
@@ -51,7 +53,18 @@ export default function Header({
 
   function startRenamingActiveResume() {
     setRenamingId(activeResumeId);
-    setRenameValue(activeResumeName);
+    setRenameValue(sanitizeWorkspaceResumeName(activeResumeName));
+  }
+
+  function startRenamingResume(resume) {
+    if (!resume?.id) {
+      return;
+    }
+
+    cancelRename();
+    onSetActiveResume(resume.id);
+    setRenamingId(resume.id);
+    setRenameValue(sanitizeWorkspaceResumeName(resume.name));
   }
 
   function cancelRename() {
@@ -87,7 +100,7 @@ export default function Header({
         </div>
         <div className="brandCopy">
           <h1>ResumeLoomr</h1>
-          <p className="brandSubcopy">Write your resume, review it live, and print a polished result in one place.</p>
+          <p className="brandSubcopy">The only resume tool you'll need for the rest of your career.</p>
         </div>
       </div>
 
@@ -115,6 +128,7 @@ export default function Header({
                       value={renameValue}
                       onChange={(event) => setRenameValue(event.target.value)}
                       onBlur={commitRename}
+                      maxLength={MAX_WORKSPACE_RESUME_NAME_LENGTH}
                       onKeyDown={(event) => {
                         if (event.key === 'Escape') {
                           event.preventDefault();
@@ -134,6 +148,9 @@ export default function Header({
                         cancelRename();
                         onSetActiveResume(resume.id);
                       }}
+                      onDoubleClick={() => {
+                        startRenamingResume(resume);
+                      }}
                       aria-pressed={isActive}
                     >
                       <span className="resumePillLabel">{resume.name}</span>
@@ -150,6 +167,7 @@ export default function Header({
                           {
                             label: 'Duplicate',
                             onSelect: onDuplicateResume,
+                            disabled: !canAddResume,
                           },
                           {
                             label: 'Delete',
@@ -186,6 +204,7 @@ export default function Header({
           <button
             type="button"
             className="button buttonSecondary resumeNewButton"
+            disabled={!canAddResume}
             onClick={() => {
               cancelRename();
               onCreateResume();

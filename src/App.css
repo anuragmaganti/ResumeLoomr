@@ -142,14 +142,16 @@
 .resumeWorkspaceBar {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   min-width: 0;
 }
 
 .resumePillStrip {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
   padding: 2px;
@@ -160,8 +162,10 @@
 .resumePill {
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
   gap: 4px;
-  min-width: 0;
+  min-width: 104px;
   min-height: 36px;
   padding: 2px 2px 2px 10px;
   border: 1px solid var(--color-border);
@@ -182,21 +186,24 @@
 .resumePillButton {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 30px;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--color-text);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
 }
 
 .resumePillLabel {
+  min-width: 0;
   overflow: hidden;
-  max-width: 12rem;
+  max-width: 15ch;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -215,7 +222,7 @@
   border-radius: 999px;
   background: var(--color-surface);
   color: var(--color-text);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 700;
   line-height: 1;
   box-shadow: 0 0 0 4px var(--color-accent-soft);
@@ -234,6 +241,7 @@
 }
 
 .resumePillMenuButton {
+  flex: 0 0 auto;
   min-width: 22px;
   padding: 0 5px;
   letter-spacing: 0.08em;
@@ -976,6 +984,41 @@
 @media (max-width: 1240px) {
   .appShell {
     width: min(100vw - 24px, 1680px);
+  }
+}
+
+@media (max-width: 1660px) and (min-width: 981px) {
+  .topbar {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: start;
+    column-gap: var(--space-4);
+    row-gap: var(--space-3);
+  }
+
+  .brand {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: start;
+  }
+
+  .topbarSide {
+    grid-column: 2;
+    grid-row: 1;
+    justify-items: end;
+  }
+
+  .resumeWorkspaceBar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    justify-content: flex-start;
+    padding-left: calc(52px + var(--space-3));
+  }
+
+  .resumePillStrip {
+    width: 100%;
+    flex-wrap: nowrap;
   }
 }
 

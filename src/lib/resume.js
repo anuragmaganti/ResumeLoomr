@@ -1,6 +1,8 @@
 export const DRAFT_STORAGE_KEY = 'resumeloomr:draft:v2';
 export const WORKSPACE_INDEX_STORAGE_KEY = 'resumeloomr:index:v1';
 export const RESUME_STORAGE_KEY_PREFIX = 'resumeloomr:resume:';
+export const MAX_WORKSPACE_RESUME_NAME_LENGTH = 25;
+export const MAX_WORKSPACE_RESUMES = 10;
 export const DEFAULT_TEMPLATE = 'modern';
 export const TEMPLATE_OPTIONS = [
   { id: 'modern', label: 'Modern' },
@@ -136,6 +138,16 @@ function normalizeWorkspaceResumeName(value, fallback) {
   return nextName || fallback;
 }
 
+export function sanitizeWorkspaceResumeName(value, fallback = '') {
+  const nextName = trimText(value).slice(0, MAX_WORKSPACE_RESUME_NAME_LENGTH).trim();
+
+  if (nextName) {
+    return nextName;
+  }
+
+  return trimText(fallback).slice(0, MAX_WORKSPACE_RESUME_NAME_LENGTH).trim();
+}
+
 function clampResumeSettingValue(value) {
   const numericValue = Number(value);
 
@@ -253,7 +265,7 @@ export function createEmptyWorkspaceIndex() {
 
 export function createWorkspaceResumeMeta(name, updatedAt = '') {
   return {
-    name: trimText(name),
+    name: sanitizeWorkspaceResumeName(name, DEFAULT_RESUME_LABEL),
     updatedAt: asText(updatedAt)
   };
 }
@@ -274,13 +286,22 @@ export function createNextResumeName(existingNames) {
 }
 
 export function createDuplicateResumeName(sourceName, existingNames) {
-  const baseName = trimText(sourceName) || DEFAULT_RESUME_LABEL;
+  const baseName = sanitizeWorkspaceResumeName(sourceName, DEFAULT_RESUME_LABEL);
   const normalizedNames = new Set(
     (Array.isArray(existingNames) ? existingNames : [])
       .map((name) => trimText(name).toLowerCase())
       .filter(Boolean)
   );
-  const firstCopyName = `${baseName} copy`;
+  const buildCopyName = (copyNumber) => {
+    const suffix = copyNumber > 1 ? ` copy ${copyNumber}` : ' copy';
+    const maxBaseLength = Math.max(1, MAX_WORKSPACE_RESUME_NAME_LENGTH - suffix.length);
+    const nextBaseName = sanitizeWorkspaceResumeName(baseName, DEFAULT_RESUME_LABEL)
+      .slice(0, maxBaseLength)
+      .trim();
+
+    return `${nextBaseName || DEFAULT_RESUME_LABEL.slice(0, maxBaseLength)}${suffix}`;
+  };
+  const firstCopyName = buildCopyName(1);
 
   if (!normalizedNames.has(firstCopyName.toLowerCase())) {
     return firstCopyName;
@@ -288,11 +309,11 @@ export function createDuplicateResumeName(sourceName, existingNames) {
 
   let nextCopyNumber = 2;
 
-  while (normalizedNames.has(`${firstCopyName} ${nextCopyNumber}`.toLowerCase())) {
+  while (normalizedNames.has(buildCopyName(nextCopyNumber).toLowerCase())) {
     nextCopyNumber += 1;
   }
 
-  return `${firstCopyName} ${nextCopyNumber}`;
+  return buildCopyName(nextCopyNumber);
 }
 
 export function createWorkspaceFromLegacyDraft(payload) {
