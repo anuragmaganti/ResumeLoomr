@@ -12,6 +12,7 @@ const THEME_STORAGE_KEY = 'resumeloomr:theme';
 
 function App() {
   const previewPanelRef = useRef(null);
+  const documentTitleRef = useRef('ResumeLoomr | Professional Resume Builder');
   const [editorStageMaxHeight, setEditorStageMaxHeight] = useState(null);
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') {
@@ -58,6 +59,12 @@ function App() {
   } = useResumeBuilder();
 
   useEffect(() => {
+    if (typeof document !== 'undefined') {
+      documentTitleRef.current = document.title || documentTitleRef.current;
+    }
+  }, []);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
@@ -102,6 +109,23 @@ function App() {
     };
   }, [template, previewModel]);
 
+  useEffect(() => {
+    function restoreDocumentTitle() {
+      document.title = documentTitleRef.current;
+    }
+
+    window.addEventListener('afterprint', restoreDocumentTitle);
+
+    return () => {
+      window.removeEventListener('afterprint', restoreDocumentTitle);
+    };
+  }, []);
+
+  function handlePrint() {
+    document.title = activeResumeName || 'Resume';
+    printResume();
+  }
+
   return (
     <div className="app">
       <div className="appShell">
@@ -113,7 +137,7 @@ function App() {
           template={template}
           templateOptions={templateOptions}
           onTemplateChange={setTemplate}
-          onPrint={printResume}
+          onPrint={handlePrint}
           resumeList={resumeList}
           activeResumeId={activeResumeId}
           activeResumeName={activeResumeName}
