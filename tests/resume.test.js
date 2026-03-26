@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   MAX_WORKSPACE_RESUMES,
@@ -34,6 +37,25 @@ import {
   updateSectionTitle,
   validateResume,
 } from '../src/lib/resume.js';
+
+const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const SRC_DIR = path.resolve(TEST_FILE_DIR, '../src');
+
+function collectSourceFiles(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const resolvedPath = path.join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      return collectSourceFiles(resolvedPath);
+    }
+
+    if (/\.(js|jsx)$/.test(entry.name)) {
+      return [resolvedPath];
+    }
+
+    return [];
+  });
+}
 
 test('createEmptyResume returns editable starter entries', () => {
   const resume = createEmptyResume();
@@ -130,6 +152,54 @@ test('normalizeResumeSettings clamps invalid values into the supported range', (
       nameSize: 0
     }
   );
+});
+
+test('preview model keeps dangerous-looking strings as plain text data', () => {
+  const resume = createEmptyResume();
+  const payload = `<script>alert("xss")</script><style>body{display:none}</style>`;
+
+  resume.personal.name = payload;
+  resume.personal.aboutMe = payload;
+  resume.education[0].school = payload;
+  resume.education[0].degree = payload;
+  resume.education[0].yearsEdu = '2020-2024';
+  resume.experience[0].company = payload;
+  resume.experience[0].role = payload;
+  resume.experience[0].yearsExp = '2024-Present';
+  resume.experience[0].activities = [payload];
+
+  const preview = getPreviewModel(resume);
+
+  assert.equal(preview.personal.name, payload);
+  assert.equal(preview.personal.aboutMe, payload);
+  assert.equal(preview.educationEntries[0].school, payload);
+  assert.equal(preview.educationEntries[0].degree, payload);
+  assert.equal(preview.experienceEntries[0].company, payload);
+  assert.equal(preview.experienceEntries[0].role, payload);
+  assert.deepEqual(preview.experienceEntries[0].activities, [payload]);
+});
+
+test('app source does not use raw HTML execution sinks in src files', () => {
+  const sourceFiles = collectSourceFiles(SRC_DIR);
+  const dangerousPatterns = [
+    { label: 'dangerouslySetInnerHTML', pattern: /dangerouslySetInnerHTML/ },
+    { label: '.innerHTML', pattern: /\.innerHTML\b/ },
+    { label: 'eval(', pattern: /\beval\s*\(/ },
+    { label: 'new Function(', pattern: /\bnew\s+Function\s*\(/ },
+    { label: 'srcdoc=', pattern: /\bsrcdoc\s*=/ },
+  ];
+
+  for (const filePath of sourceFiles) {
+    const source = fs.readFileSync(filePath, 'utf8');
+
+    for (const { label, pattern } of dangerousPatterns) {
+      assert.equal(
+        pattern.test(source),
+        false,
+        `Found ${label} in ${path.relative(TEST_FILE_DIR, filePath)}`
+      );
+    }
+  }
 });
 
 test('removeEducation and removeExperience preserve at least one editable entry', () => {
