@@ -1,0 +1,163 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - img [ref=e8]
+      - generic [ref=e15]:
+        - heading "ResumeLoomr" [level=1] [ref=e16]
+        - paragraph [ref=e17]: The only resume tool you'll need for the rest of your career.
+    - generic "Resumes" [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - button "Resume 1" [pressed] [ref=e21] [cursor=pointer]:
+            - generic [ref=e22]: Resume 1
+          - button "Resume 1 actions" [ref=e24] [cursor=pointer]: •••
+        - button "+ New" [ref=e25] [cursor=pointer]
+    - generic [ref=e27]:
+      - generic [ref=e28]: Saved 6:14 PM
+      - button "Switch to dark mode" [ref=e29] [cursor=pointer]:
+        - generic [ref=e31]: Dark
+      - generic [ref=e32]: Template
+      - combobox "Choose resume template" [ref=e33]:
+        - option "Modern" [selected]
+        - option "Executive"
+        - option "Compact"
+      - button "Print resume" [ref=e34] [cursor=pointer]
+  - main [ref=e35]:
+    - generic [ref=e38]:
+      - generic [ref=e39]:
+        - complementary [ref=e40]:
+          - generic [ref=e41]:
+            - heading "Settings" [level=2] [ref=e43]
+            - generic [ref=e44]:
+              - generic [ref=e45]:
+                - generic [ref=e46]: Text size
+                - group "Text size" [ref=e47]:
+                  - button "Decrease Text size" [ref=e48] [cursor=pointer]: "-"
+                  - generic [ref=e49]: "0"
+                  - button "Increase Text size" [ref=e50] [cursor=pointer]: +
+              - generic [ref=e51]:
+                - generic [ref=e52]: Horizontal margins
+                - group "Horizontal margins" [ref=e53]:
+                  - button "Decrease Horizontal margins" [ref=e54] [cursor=pointer]: "-"
+                  - generic [ref=e55]: "0"
+                  - button "Increase Horizontal margins" [ref=e56] [cursor=pointer]: +
+              - generic [ref=e57]:
+                - generic [ref=e58]: Vertical margins
+                - group "Vertical margins" [ref=e59]:
+                  - button "Decrease Vertical margins" [ref=e60] [cursor=pointer]: "-"
+                  - generic [ref=e61]: "0"
+                  - button "Increase Vertical margins" [ref=e62] [cursor=pointer]: +
+              - button "Advanced Settings" [ref=e63] [cursor=pointer]:
+                - generic [ref=e64]: Advanced Settings
+              - generic:
+                - generic:
+                  - generic [ref=e65]:
+                    - generic [ref=e66]: Line spacing
+                    - group "Line spacing" [ref=e67]:
+                      - button "Decrease Line spacing" [ref=e68] [cursor=pointer]: "-"
+                      - generic [ref=e69]: "0"
+                      - button "Increase Line spacing" [ref=e70] [cursor=pointer]: +
+                  - generic [ref=e71]:
+                    - generic [ref=e72]: Section spacing
+                    - group "Section spacing" [ref=e73]:
+                      - button "Decrease Section spacing" [ref=e74] [cursor=pointer]: "-"
+                      - generic [ref=e75]: "0"
+                      - button "Increase Section spacing" [ref=e76] [cursor=pointer]: +
+                  - generic [ref=e77]:
+                    - generic [ref=e78]: Entry spacing
+                    - group "Entry spacing" [ref=e79]:
+                      - button "Decrease Entry spacing" [ref=e80] [cursor=pointer]: "-"
+                      - generic [ref=e81]: "0"
+                      - button "Increase Entry spacing" [ref=e82] [cursor=pointer]: +
+                  - generic [ref=e83]:
+                    - generic [ref=e84]: Heading size
+                    - group "Heading size" [ref=e85]:
+                      - button "Decrease Heading size" [ref=e86] [cursor=pointer]: "-"
+                      - generic [ref=e87]: "0"
+                      - button "Increase Heading size" [ref=e88] [cursor=pointer]: +
+                  - generic [ref=e89]:
+                    - generic [ref=e90]: Name size
+                    - group "Name size" [ref=e91]:
+                      - button "Decrease Name size" [ref=e92] [cursor=pointer]: "-"
+                      - generic [ref=e93]: "0"
+                      - button "Increase Name size" [ref=e94] [cursor=pointer]: +
+        - complementary [ref=e95]:
+          - tablist "Resume sections" [ref=e96]:
+            - tab "Personal" [selected] [ref=e97] [cursor=pointer]:
+              - generic [ref=e99]: Personal
+            - tab "Education" [ref=e100] [cursor=pointer]:
+              - generic [ref=e102]: Education
+            - tab "Experience" [ref=e103] [cursor=pointer]:
+              - generic [ref=e105]: Experience
+            - tab "Skills" [ref=e106] [cursor=pointer]:
+              - generic [ref=e108]: Skills
+            - tab "Projects" [ref=e109] [cursor=pointer]:
+              - generic [ref=e111]: Projects
+            - tab "Certifications" [ref=e112] [cursor=pointer]:
+              - generic [ref=e114]: Certifications
+            - tab "Volunteering" [ref=e115] [cursor=pointer]:
+              - generic [ref=e117]: Volunteering
+            - tab "Leadership" [ref=e118] [cursor=pointer]:
+              - generic [ref=e120]: Leadership
+            - tab "Languages" [ref=e121] [cursor=pointer]:
+              - generic [ref=e123]: Languages
+            - tab "Awards" [ref=e124] [cursor=pointer]:
+              - generic [ref=e126]: Awards
+            - tab "Publications" [ref=e127] [cursor=pointer]:
+              - generic [ref=e129]: Publications
+      - generic [ref=e130]:
+        - generic [ref=e131]:
+          - heading "Personal details" [level=3] [ref=e133]
+          - generic [ref=e135]:
+            - generic [ref=e136]: Section order
+            - button "Personal details section order actions" [ref=e138] [cursor=pointer]: •••
+        - group [ref=e140]:
+          - generic [ref=e141]:
+            - generic [ref=e142]:
+              - generic [ref=e143]: Full name
+              - textbox "Full name" [ref=e144]:
+                - /placeholder: Jordan Lee
+            - generic [ref=e145]:
+              - generic [ref=e146]:
+                - generic [ref=e147]: Professional headline
+                - textbox "Professional headline" [ref=e148]:
+                  - /placeholder: Frontend Engineer
+              - generic [ref=e149]:
+                - generic [ref=e150]: Location
+                - textbox "Location" [ref=e151]:
+                  - /placeholder: New York, NY
+            - generic [ref=e152]:
+              - generic [ref=e153]:
+                - generic [ref=e154]: Phone number
+                - textbox "Phone number" [ref=e155]:
+                  - /placeholder: (555) 123-4567
+              - generic [ref=e156]:
+                - generic [ref=e157]: Email address
+                - textbox "Email address" [ref=e158]:
+                  - /placeholder: jordan@example.com
+            - generic [ref=e159]:
+              - generic [ref=e160]:
+                - generic [ref=e161]: LinkedIn URL
+                - textbox "LinkedIn URL" [ref=e162]:
+                  - /placeholder: linkedin.com/in/jordanlee
+              - generic [ref=e163]:
+                - generic [ref=e164]: GitHub URL
+                - textbox "GitHub URL" [ref=e165]:
+                  - /placeholder: github.com/jordanlee
+            - generic [ref=e166]:
+              - generic [ref=e167]:
+                - generic [ref=e168]: Portfolio or website
+                - textbox "Portfolio or website" [ref=e169]:
+                  - /placeholder: jordanlee.com
+              - generic [ref=e170]:
+                - generic [ref=e171]: Custom field
+                - textbox "Custom field" [ref=e172]:
+                  - /placeholder: "Behance: behance.net/jordanlee"
+            - generic [ref=e173]:
+              - generic [ref=e174]: Professional summary
+              - textbox "Professional summary" [ref=e175]:
+                - /placeholder: Write a short summary that highlights your experience, strengths, and goals.
+    - generic [ref=e180]:
+      - paragraph [ref=e181]: Live preview
+      - heading "Your resume will appear here" [level=3] [ref=e182]
+      - paragraph [ref=e183]: Start with your personal details, then add education and experience. Empty sections stay out of the final document until you add real content.

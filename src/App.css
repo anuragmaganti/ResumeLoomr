@@ -1022,6 +1022,33 @@
   }
 }
 
+@media (max-width: 1660px) and (min-width: 861px) {
+  .workspace {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
+  .workspaceColumnEditor {
+    width: fit-content;
+  }
+
+  .editorWorkspace {
+    grid-template-columns: clamp(104px, 10.5vw, 140px) minmax(0, max-content);
+    justify-content: start;
+  }
+
+  .editorStage {
+    width: fit-content;
+    max-width: 100%;
+    justify-self: start;
+  }
+
+  .workspaceColumnPreview,
+  .previewPanel,
+  .previewFrame {
+    width: 100%;
+  }
+}
+
 @media (max-width: 980px) {
   .topbar {
     grid-template-columns: 1fr;
@@ -1045,6 +1072,13 @@
     grid-template-columns: 1fr;
   }
 
+  .workspaceColumnEditor,
+  .workspaceColumnPreview,
+  .previewPanel,
+  .previewFrame {
+    width: 100%;
+  }
+
   .editorWorkspace {
     grid-template-columns: 1fr;
     gap: var(--space-5);
@@ -1063,7 +1097,10 @@
 
   .editorStage {
     position: static;
+    width: auto;
+    max-width: none;
     max-height: none;
+    justify-self: stretch;
   }
 
   .formContainer {

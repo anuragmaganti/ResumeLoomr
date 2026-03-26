@@ -397,9 +397,47 @@ form {
   }
 }
 
+@media (max-width: 1660px) and (min-width: 861px) {
+  .editorStage {
+    --editor-field-max-width: 190px;
+  }
+
+  .editorStage .field,
+  .editorStage .fieldGrid {
+    width: 100%;
+    max-width: var(--editor-field-max-width);
+  }
+
+  .editorStage .fieldGridTwo {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .editorStage .fieldGridTwo > .field {
+    max-width: none;
+  }
+}
+
 @media (max-width: 860px) {
   .fieldGridTwo {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .editorStage .field,
+  .editorStage .fieldGrid {
+    width: 100%;
+    max-width: none;
+  }
+
+  .editorStage .fieldGridTwo {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .editorStage .fieldGridTwo > .field {
+    max-width: none;
   }
 }
 
