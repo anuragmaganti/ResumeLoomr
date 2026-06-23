@@ -7,6 +7,7 @@ import {
 } from './resume.js';
 
 export const GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY = 'resumeloomr:guest-backup-before-cloud-mirror:v1';
+export const GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY = 'resumeloomr:cloud-mirror-manifest:v1';
 
 function serializeDraftState(draft) {
   return {
@@ -64,6 +65,46 @@ export function createGuestMirrorWorkspace(workspace, limit = MAX_WORKSPACE_RESU
   });
 }
 
+function writeCloudMirrorManifest({ uid, workspace, storage }) {
+  const targetStorage = getDefaultStorage(storage);
+
+  if (!targetStorage || !uid || !workspace) {
+    return null;
+  }
+
+  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+  const manifest = {
+    uid,
+    activeResumeId: normalizedWorkspace.activeResumeId,
+    resumeIds: normalizedWorkspace.resumeIds,
+    updatedAt: new Date().toISOString(),
+  };
+
+  targetStorage.setItem(GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY, JSON.stringify(manifest));
+  return manifest;
+}
+
+export function readCloudMirrorManifest(uid, storage) {
+  const targetStorage = getDefaultStorage(storage);
+
+  if (!targetStorage || !uid) {
+    return null;
+  }
+
+  const manifest = safeJsonParse(targetStorage.getItem(GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY));
+
+  if (manifest?.uid !== uid || !Array.isArray(manifest.resumeIds)) {
+    return null;
+  }
+
+  return {
+    uid: manifest.uid,
+    activeResumeId: typeof manifest.activeResumeId === 'string' ? manifest.activeResumeId : '',
+    resumeIds: manifest.resumeIds.filter((resumeId) => typeof resumeId === 'string' && resumeId.trim() !== ''),
+    updatedAt: typeof manifest.updatedAt === 'string' ? manifest.updatedAt : '',
+  };
+}
+
 export function backupGuestWorkspaceBeforeCloudMirror(storage) {
   const targetStorage = getDefaultStorage(storage);
 
@@ -89,7 +130,7 @@ export function backupGuestWorkspaceBeforeCloudMirror(storage) {
   return backup;
 }
 
-export function persistCloudWorkspaceMirror({ workspace, readDraft, storage } = {}) {
+export function persistCloudWorkspaceMirror({ uid, workspace, readDraft, storage } = {}) {
   const targetStorage = getDefaultStorage(storage);
 
   if (!targetStorage || !workspace) {
@@ -100,6 +141,7 @@ export function persistCloudWorkspaceMirror({ workspace, readDraft, storage } = 
   const mirrorWorkspace = createGuestMirrorWorkspace(workspace);
 
   targetStorage.setItem(WORKSPACE_INDEX_STORAGE_KEY, JSON.stringify(mirrorWorkspace));
+  writeCloudMirrorManifest({ uid, workspace: mirrorWorkspace, storage: targetStorage });
 
   mirrorWorkspace.resumeIds.forEach((resumeId) => {
     const draft = readDraft?.(resumeId);
@@ -114,7 +156,7 @@ export function persistCloudWorkspaceMirror({ workspace, readDraft, storage } = 
   return mirrorWorkspace;
 }
 
-export function persistCloudDraftMirror({ resumeId, workspace, draft, storage } = {}) {
+export function persistCloudDraftMirror({ uid, resumeId, workspace, draft, storage } = {}) {
   const targetStorage = getDefaultStorage(storage);
 
   if (!targetStorage || !resumeId || !workspace) {
@@ -125,6 +167,7 @@ export function persistCloudDraftMirror({ resumeId, workspace, draft, storage } 
   const mirrorWorkspace = createGuestMirrorWorkspace(workspace);
 
   targetStorage.setItem(WORKSPACE_INDEX_STORAGE_KEY, JSON.stringify(mirrorWorkspace));
+  writeCloudMirrorManifest({ uid, workspace: mirrorWorkspace, storage: targetStorage });
 
   if (draft && mirrorWorkspace.resumeIds.includes(resumeId)) {
     targetStorage.setItem(createResumeStorageKey(resumeId), JSON.stringify(serializeDraftState(draft)));

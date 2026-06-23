@@ -9,7 +9,10 @@ import {
   RESUME_STORAGE_KEY_PREFIX,
   WORKSPACE_INDEX_STORAGE_KEY,
 } from './resume.js';
-import { GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY } from './localWorkspaceMirror.js';
+import {
+  GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY,
+  GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY,
+} from './localWorkspaceMirror.js';
 
 export const CONNECTED_ACCOUNT_STORAGE_KEY = 'resumeloomr:connected-account:v1';
 
@@ -119,6 +122,7 @@ export function clearBrowserResumeConnectionData({ storage, sessionStorage } = {
       key === WORKSPACE_INDEX_STORAGE_KEY ||
       key === DRAFT_STORAGE_KEY ||
       key === GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY ||
+      key === GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY ||
       key === CONNECTED_ACCOUNT_STORAGE_KEY ||
       key === CLOUD_DEVICE_ID_KEY ||
       key === CLOUD_TRUSTED_DEVICE_KEY ||

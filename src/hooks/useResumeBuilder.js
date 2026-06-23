@@ -2,17 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
   CLOUD_WORKSPACE_RESUME_LIMIT,
-  appendWorkspaceToCloud,
   deleteCloudResume,
   getCloudDeviceId,
   getCloudSessionId,
-  hasImportedGuestWorkspace,
   importWorkspaceToCloud,
   markGuestWorkspaceImported,
   readCloudDraft,
   readCloudWorkspace,
   subscribeCloudDraft,
   subscribeCloudWorkspace,
+  syncLocalWorkspaceToCloud,
   writeCloudDraft,
   writeCloudWorkspace,
 } from '../lib/firebaseWorkspace.js';
@@ -70,6 +69,7 @@ import {
 import {
   persistCloudDraftMirror,
   persistCloudWorkspaceMirror,
+  readCloudMirrorManifest,
 } from '../lib/localWorkspaceMirror.js';
 
 function createBlankDraftState() {
@@ -410,6 +410,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       try {
         persistActiveDraftImmediately({ localOnly: true });
         const localSnapshot = readStoredWorkspaceSnapshot();
+        const localMirrorManifest = readCloudMirrorManifest(uid);
         const remoteWorkspace = await readCloudWorkspace(uid, trustedDevice, {
           cacheOnly: shouldReadFirestoreCache(trustedDevice),
         });
@@ -424,14 +425,15 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
             cloudIdentityRef.current,
           );
           markGuestWorkspaceImported(uid);
-        } else if (!hasImportedGuestWorkspace(uid)) {
-          nextWorkspace = await appendWorkspaceToCloud(
+        } else {
+          nextWorkspace = await syncLocalWorkspaceToCloud(
             uid,
             nextWorkspace,
             localSnapshot.workspace,
             localSnapshot.readDraft,
             trustedDevice,
             cloudIdentityRef.current,
+            { mirroredResumeIds: localMirrorManifest?.resumeIds || [] },
           );
           markGuestWorkspaceImported(uid);
         }
@@ -835,6 +837,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
   function mirrorCloudWorkspaceLocally(nextWorkspace, readDraft) {
     persistCloudWorkspaceMirror({
+      uid: userRef.current?.uid,
       workspace: nextWorkspace,
       readDraft,
     });
@@ -842,6 +845,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
   function mirrorCloudDraftLocally(resumeId, nextWorkspace, draft) {
     persistCloudDraftMirror({
+      uid: userRef.current?.uid,
       resumeId,
       workspace: nextWorkspace,
       draft,

@@ -100,6 +100,11 @@ function getSerializedByteSize(value) {
   return serialized.length;
 }
 
+function getTimestamp(value) {
+  const timestamp = Date.parse(value || '');
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 export function validateCloudDraftPayload(draftDoc) {
   const resume = draftDoc?.resume && typeof draftDoc.resume === 'object' ? draftDoc.resume : {};
   const oversizedCollection = RESUME_COLLECTION_KEYS.find((key) => (
@@ -451,6 +456,113 @@ export async function appendWorkspaceToCloud(uid, cloudWorkspace, localWorkspace
 
   await batch.commit();
   return nextWorkspace;
+}
+
+export async function syncLocalWorkspaceToCloud(
+  uid,
+  cloudWorkspace,
+  localWorkspace,
+  readDraft,
+  trustedDevice,
+  identity,
+  { mirroredResumeIds = [] } = {},
+) {
+  const workspaceRef = getWorkspaceDocRef(uid, trustedDevice);
+
+  if (!workspaceRef) {
+    return null;
+  }
+
+  const normalizedCloudWorkspace = normalizeWorkspaceIndex(cloudWorkspace);
+  const normalizedLocalWorkspace = normalizeWorkspaceIndex(localWorkspace);
+  const cloudIdentity = normalizeCloudIdentity(identity);
+  const localResumeIds = new Set(normalizedLocalWorkspace.resumeIds);
+  const safeDeletedIds = mirroredResumeIds.filter((resumeId) => (
+    normalizedCloudWorkspace.resumeIds.includes(resumeId) && !localResumeIds.has(resumeId)
+  ));
+  const batch = writeBatch(workspaceRef.firestore);
+  const nextWorkspace = {
+    ...normalizedCloudWorkspace,
+    resumeIds: normalizedCloudWorkspace.resumeIds.filter((resumeId) => !safeDeletedIds.includes(resumeId)),
+    meta: { ...normalizedCloudWorkspace.meta },
+  };
+  let hasChanges = false;
+
+  safeDeletedIds.forEach((resumeId) => {
+    delete nextWorkspace.meta[resumeId];
+    batch.delete(doc(collection(workspaceRef.firestore, 'users', uid, 'resumes'), resumeId));
+    hasChanges = true;
+  });
+
+  const existingNames = nextWorkspace.resumeIds.map((resumeId) => nextWorkspace.meta[resumeId]?.name || '');
+
+  for (const resumeId of normalizedLocalWorkspace.resumeIds) {
+    const draft = readDraft(resumeId);
+
+    if (!draft) {
+      continue;
+    }
+
+    const localName = normalizedLocalWorkspace.meta[resumeId]?.name || 'Resume';
+    const localUpdatedAt = Math.max(
+      getTimestamp(draft.savedAt),
+      getTimestamp(normalizedLocalWorkspace.meta[resumeId]?.updatedAt),
+    );
+    const cloudUpdatedAt = getTimestamp(normalizedCloudWorkspace.meta[resumeId]?.updatedAt);
+
+    if (nextWorkspace.resumeIds.includes(resumeId)) {
+      if (localUpdatedAt <= cloudUpdatedAt) {
+        continue;
+      }
+
+      const draftDoc = createCloudDraftDoc({ resumeId, name: localName, draft, identity: cloudIdentity });
+      validateCloudDraftPayload(draftDoc);
+      batch.set(
+        doc(collection(workspaceRef.firestore, 'users', uid, 'resumes'), resumeId),
+        draftDoc,
+        { merge: true },
+      );
+      nextWorkspace.meta[resumeId] = createWorkspaceResumeMeta(localName, draftDoc.updatedAt);
+      hasChanges = true;
+      continue;
+    }
+
+    if (nextWorkspace.resumeIds.length >= CLOUD_WORKSPACE_RESUME_LIMIT) {
+      continue;
+    }
+
+    const nextName = existingNames.includes(localName)
+      ? createDuplicateResumeName(localName, existingNames)
+      : localName;
+    const draftDoc = createCloudDraftDoc({ resumeId, name: nextName, draft, identity: cloudIdentity });
+
+    validateCloudDraftPayload(draftDoc);
+    existingNames.push(nextName);
+    nextWorkspace.resumeIds.push(resumeId);
+    nextWorkspace.meta[resumeId] = createWorkspaceResumeMeta(nextName, draftDoc.updatedAt);
+    batch.set(
+      doc(collection(workspaceRef.firestore, 'users', uid, 'resumes'), resumeId),
+      draftDoc,
+      { merge: true },
+    );
+    hasChanges = true;
+  }
+
+  nextWorkspace.activeResumeId = nextWorkspace.resumeIds.includes(normalizedLocalWorkspace.activeResumeId)
+    ? normalizedLocalWorkspace.activeResumeId
+    : nextWorkspace.resumeIds.includes(normalizedCloudWorkspace.activeResumeId)
+      ? normalizedCloudWorkspace.activeResumeId
+      : nextWorkspace.resumeIds[0] || '';
+
+  const normalizedNextWorkspace = normalizeWorkspaceIndex(nextWorkspace);
+
+  if (!hasChanges && normalizedNextWorkspace.activeResumeId === normalizedCloudWorkspace.activeResumeId) {
+    return normalizedCloudWorkspace;
+  }
+
+  batch.set(workspaceRef, createCloudWorkspaceDoc(normalizedNextWorkspace, cloudIdentity));
+  await batch.commit();
+  return normalizedNextWorkspace;
 }
 
 export function subscribeCloudWorkspace(uid, trustedDevice, onNext, onError) {

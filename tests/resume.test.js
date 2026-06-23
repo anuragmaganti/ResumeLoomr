@@ -49,9 +49,11 @@ import {
 } from '../src/lib/firebaseWorkspace.js';
 import {
   GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY,
+  GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY,
   createGuestMirrorWorkspace,
   persistCloudDraftMirror,
   persistCloudWorkspaceMirror,
+  readCloudMirrorManifest,
 } from '../src/lib/localWorkspaceMirror.js';
 import {
   CONNECTED_ACCOUNT_STORAGE_KEY,
@@ -238,6 +240,7 @@ test('cloud guest mirror backs up existing guest workspace once and preserves un
   };
 
   persistCloudWorkspaceMirror({
+    uid: 'user-1',
     workspace: cloudWorkspace,
     readDraft: (resumeId) => (resumeId === 'cloud-1' ? cloudDraft : null),
     storage,
@@ -251,12 +254,16 @@ test('cloud guest mirror backs up existing guest workspace once and preserves un
   const backup = JSON.parse(storage.getItem(GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY));
   const mirroredWorkspace = JSON.parse(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY));
   const mirroredDraft = JSON.parse(storage.getItem(createResumeStorageKey('cloud-1')));
+  const manifest = JSON.parse(storage.getItem(GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY));
 
   assert.equal(JSON.parse(backup.workspaceRaw).meta['guest-1'].name, 'Guest Resume');
   assert.equal(JSON.parse(backup.drafts['guest-1']).savedAt, 'guest');
   assert.equal(storage.getItem(createResumeStorageKey('unrelated')), JSON.stringify({ savedAt: 'keep-me' }));
   assert.deepEqual(mirroredWorkspace.resumeIds, ['cloud-1']);
   assert.equal(mirroredDraft.savedAt, '2026-01-02T00:00:00.000Z');
+  assert.deepEqual(manifest.resumeIds, ['cloud-1']);
+  assert.equal(readCloudMirrorManifest('user-1', storage).activeResumeId, 'cloud-1');
+  assert.equal(readCloudMirrorManifest('other-user', storage), null);
 });
 
 test('cloud draft mirror writes only mirrored resume drafts', () => {
@@ -278,6 +285,7 @@ test('cloud draft mirror writes only mirrored resume drafts', () => {
   };
 
   persistCloudDraftMirror({
+    uid: 'user-1',
     resumeId: 'resume-11',
     workspace,
     draft,
@@ -288,6 +296,7 @@ test('cloud draft mirror writes only mirrored resume drafts', () => {
   assert.deepEqual(JSON.parse(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY)).resumeIds, resumeIds.slice(0, 10));
 
   persistCloudDraftMirror({
+    uid: 'user-1',
     resumeId: 'resume-1',
     workspace,
     draft,
@@ -318,6 +327,7 @@ test('clearing browser connection data removes resume and account keys only', ()
     [DRAFT_STORAGE_KEY, '{}'],
     [createResumeStorageKey('resume-1'), '{}'],
     [GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY, '{}'],
+    [GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY, '{}'],
     [CONNECTED_ACCOUNT_STORAGE_KEY, '{}'],
     [`${CLOUD_IMPORT_PREFIX}user-1`, 'true'],
     [CLOUD_DEVICE_ID_KEY, 'device-1'],
@@ -334,6 +344,7 @@ test('clearing browser connection data removes resume and account keys only', ()
   assert.equal(storage.getItem(DRAFT_STORAGE_KEY), null);
   assert.equal(storage.getItem(createResumeStorageKey('resume-1')), null);
   assert.equal(storage.getItem(CONNECTED_ACCOUNT_STORAGE_KEY), null);
+  assert.equal(storage.getItem(GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY), null);
   assert.equal(storage.getItem(CLOUD_DEVICE_ID_KEY), null);
   assert.equal(storage.getItem(CLOUD_TRUSTED_DEVICE_KEY), null);
   assert.equal(sessionStorage.getItem(CLOUD_SESSION_ID_KEY), null);
@@ -492,6 +503,18 @@ test('builder source uses a per-resume cloud save queue instead of one global sa
 
   assert.match(source, /cloudSaveQueueRef\s*=\s*useRef\(new Map\(\)\)/);
   assert.equal(/cloudSaveTimeoutRef|cloudForceSaveRef/.test(source), false);
+});
+
+test('builder reconciles signed-out local workspace changes on every sign-in', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const bootstrapStart = source.indexOf('async function bootstrapCloudWorkspace()');
+  const bootstrapEnd = source.indexOf('if (cancelled || !nextWorkspace)', bootstrapStart);
+  const bootstrapSource = source.slice(bootstrapStart, bootstrapEnd);
+
+  assert.ok(bootstrapStart > -1);
+  assert.match(bootstrapSource, /readCloudMirrorManifest\(uid\)/);
+  assert.match(bootstrapSource, /syncLocalWorkspaceToCloud\(/);
+  assert.doesNotMatch(bootstrapSource, /hasImportedGuestWorkspace/);
 });
 
 test('builder delete waits for online cloud delete before local removal', () => {
