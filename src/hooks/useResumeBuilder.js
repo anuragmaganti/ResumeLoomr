@@ -814,11 +814,21 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         .catch((error) => {
           logCloudError(error);
           setSyncState(isOnline() ? 'error' : 'offline');
+          setSaveState('error');
+          setNotice({
+            tone: 'error',
+            message: getCloudSyncErrorMessage(error),
+          });
           return false;
         });
     } catch (error) {
       logCloudError(error);
       setSyncState(isOnline() ? 'error' : 'offline');
+      setSaveState('error');
+      setNotice({
+        tone: 'error',
+        message: getCloudSyncErrorMessage(error),
+      });
       return Promise.resolve(false);
     }
   }
@@ -1267,24 +1277,21 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       activeResumeId: nextResumeId,
     };
 
-    window.localStorage.removeItem(createResumeStorageKey(deletedResumeId));
-    commitWorkspace(nextWorkspace);
-
     if (isCloudMode && user?.uid) {
-      mirrorCloudWorkspaceLocally(nextWorkspace);
       const cloudDeleteSucceeded = await runCloudMutation(() => (
         deleteCloudResume(user.uid, deletedResumeId, nextWorkspace, trustedDevice, cloudIdentityRef.current)
       ));
 
       if (!cloudDeleteSucceeded && isOnline()) {
-        setSaveState('error');
-        setNotice({
-          tone: 'error',
-          message: trustedDevice
-            ? 'Cloud sync failed. Firestore will keep trying from this trusted device.'
-            : 'Cloud sync failed. Your latest changes are still in this browser session.',
-        });
+        return;
       }
+    }
+
+    window.localStorage.removeItem(createResumeStorageKey(deletedResumeId));
+    commitWorkspace(nextWorkspace);
+
+    if (isCloudMode && user?.uid) {
+      mirrorCloudWorkspaceLocally(nextWorkspace);
     }
 
     loadDraftIntoEditor(readStoredResumeDraft(nextResumeId));
@@ -1333,9 +1340,10 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       template: localDraft.template,
       sectionOrder: localDraft.sectionOrder,
     });
+    const originalResumeId = conflict.resumeId || activeResumeId;
     const nextWorkspace = {
       ...workspace,
-      activeResumeId: nextResumeId,
+      activeResumeId: originalResumeId,
       resumeIds: [...workspace.resumeIds, nextResumeId],
       meta: {
         ...workspace.meta,
@@ -1353,7 +1361,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         savedAt: duplicatePayload.savedAt,
       });
 
-      await runCloudMutation(() => (
+      const copySaved = await runCloudMutation(() => (
         writeCloudDraft(
           user.uid,
           nextResumeId,
@@ -1368,6 +1376,10 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
           cloudIdentityRef.current,
         )
       ));
+
+      if (!copySaved && isOnline()) {
+        return;
+      }
     }
 
     skipNextAutosaveRef.current = true;

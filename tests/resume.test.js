@@ -494,6 +494,29 @@ test('builder source uses a per-resume cloud save queue instead of one global sa
   assert.equal(/cloudSaveTimeoutRef|cloudForceSaveRef/.test(source), false);
 });
 
+test('builder delete waits for online cloud delete before local removal', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const deleteStart = source.indexOf('async function deleteActiveResume()');
+  const deleteEnd = source.indexOf('function useCloudConflictVersion()', deleteStart);
+  const deleteSource = source.slice(deleteStart, deleteEnd);
+
+  assert.ok(deleteStart > -1);
+  assert.ok(deleteSource.indexOf('deleteCloudResume(') < deleteSource.indexOf('window.localStorage.removeItem'));
+  assert.ok(deleteSource.includes('if (!cloudDeleteSucceeded && isOnline())'));
+});
+
+test('conflict copy keeps the conflicted resume active instead of activating the copy', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const conflictCopyStart = source.indexOf('async function saveConflictAsCopy()');
+  const conflictCopyEnd = source.indexOf('const actions = {', conflictCopyStart);
+  const conflictCopySource = source.slice(conflictCopyStart, conflictCopyEnd);
+
+  assert.ok(conflictCopyStart > -1);
+  assert.match(conflictCopySource, /const originalResumeId = conflict\.resumeId \|\| activeResumeId;/);
+  assert.match(conflictCopySource, /activeResumeId: originalResumeId,/);
+  assert.doesNotMatch(conflictCopySource, /activeResumeId: nextResumeId,/);
+});
+
 test('removeEducation and removeExperience preserve at least one editable entry', () => {
   const resume = createEmptyResume();
   const nextResume = removeEducation(resume, resume.education[0].id);
