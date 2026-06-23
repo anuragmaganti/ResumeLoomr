@@ -22,7 +22,13 @@ function formatSettingValue(value) {
   return value > 0 ? `+${value}` : String(value);
 }
 
-export default function EditorSettingsRail({ settings, onAdjustSetting }) {
+export default function EditorSettingsRail({
+  settings,
+  onAdjustSetting,
+  template,
+  templateOptions,
+  onTemplateChange
+}) {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
   function renderSettingControl(setting) {
@@ -66,6 +72,23 @@ export default function EditorSettingsRail({ settings, onAdjustSetting }) {
       </div>
 
       <div className="settingsRailList">
+        <label className="settingsTemplateControl settingsControl" htmlFor="settings-template-select">
+          <span className="settingsControlLabel">Template</span>
+          <select
+            id="settings-template-select"
+            className="toolbarSelect settingsTemplateSelect"
+            value={template}
+            onChange={(event) => onTemplateChange(event.target.value)}
+            aria-label="Choose resume template"
+          >
+            {templateOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
         {settingOptions.map(renderSettingControl)}
 
         <button

@@ -147,9 +147,6 @@ function App() {
           saveLabel={saveLabel}
           theme={theme}
           onToggleTheme={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
-          template={template}
-          templateOptions={templateOptions}
-          onTemplateChange={setTemplate}
           onPrint={handlePrint}
           resumeList={resumeList}
           activeResumeId={activeResumeId}
@@ -238,6 +235,9 @@ function App() {
               setActiveTab={setActiveTab}
               sectionOrder={sectionOrder}
               onMoveSection={moveSection}
+              template={template}
+              templateOptions={templateOptions}
+              onTemplateChange={setTemplate}
               resume={resume}
               actions={actions}
               getFieldError={getFieldError}

@@ -88,6 +88,9 @@ export default function EditorPanel({
     setActiveTab,
     sectionOrder,
     onMoveSection,
+    template,
+    templateOptions,
+    onTemplateChange,
     resume,
     actions,
     getFieldError,
@@ -121,6 +124,9 @@ export default function EditorPanel({
                         <EditorSettingsRail
                             settings={resume.settings}
                             onAdjustSetting={actions.updateResumeSetting}
+                            template={template}
+                            templateOptions={templateOptions}
+                            onTemplateChange={onTemplateChange}
                         />
                     </aside>
 
