@@ -471,6 +471,22 @@ test('cloud draft payload guard rejects oversized documents before Firestore wri
   );
 });
 
+test('cloud workspace writes replace the index document instead of merging stale meta keys', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'lib/firebaseWorkspace.js'), 'utf8');
+  const workspaceWriteLines = source
+    .split('\n')
+    .filter((line) => /(?:setDoc|batch\.set)\(\s*workspaceRef/.test(line));
+
+  assert.ok(workspaceWriteLines.length > 0);
+  workspaceWriteLines.forEach((line) => {
+    assert.equal(
+      /\{\s*merge:\s*true\s*\}/.test(line),
+      false,
+      'workspace/main writes must not use merge:true because stale meta keys break deletes',
+    );
+  });
+});
+
 test('builder source uses a per-resume cloud save queue instead of one global save timer', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
 

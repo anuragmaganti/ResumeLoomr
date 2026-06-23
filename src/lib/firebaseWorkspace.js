@@ -186,6 +186,35 @@ function normalizeCloudWorkspace(data) {
   });
 }
 
+function createCloudWorkspaceDoc(workspace, identity, updatedAt = new Date().toISOString(), version = Date.now()) {
+  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+  const cloudIdentity = normalizeCloudIdentity(identity);
+  const defaultResumeIds = normalizedWorkspace.resumeIds.slice(0, CLOUD_WORKSPACE_RESUME_LIMIT);
+  const resumeIds = normalizedWorkspace.activeResumeId && !defaultResumeIds.includes(normalizedWorkspace.activeResumeId)
+    ? [
+        normalizedWorkspace.activeResumeId,
+        ...defaultResumeIds
+          .filter((resumeId) => resumeId !== normalizedWorkspace.activeResumeId)
+          .slice(0, CLOUD_WORKSPACE_RESUME_LIMIT - 1),
+      ]
+    : defaultResumeIds;
+
+  return {
+    schemaVersion: CLOUD_WORKSPACE_SCHEMA_VERSION,
+    activeResumeId: resumeIds.includes(normalizedWorkspace.activeResumeId)
+      ? normalizedWorkspace.activeResumeId
+      : resumeIds[0] || '',
+    resumeIds,
+    meta: Object.fromEntries(
+      resumeIds.map((resumeId) => [resumeId, normalizedWorkspace.meta[resumeId]]),
+    ),
+    updatedAt,
+    version,
+    deviceId: cloudIdentity.deviceId,
+    sessionId: cloudIdentity.sessionId,
+  };
+}
+
 export function createCloudDraftDoc({ resumeId, name, draft, identity, deviceId, deletedAt = null }) {
   const cloudIdentity = normalizeCloudIdentity(identity || deviceId);
   const payload = createDraftPayload({
@@ -269,19 +298,9 @@ export async function writeCloudWorkspace(uid, workspace, trustedDevice, identit
   }
 
   const now = new Date().toISOString();
-  const cloudIdentity = normalizeCloudIdentity(identity);
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
 
-  await setDoc(workspaceRef, {
-    schemaVersion: CLOUD_WORKSPACE_SCHEMA_VERSION,
-    activeResumeId: normalizedWorkspace.activeResumeId,
-    resumeIds: normalizedWorkspace.resumeIds.slice(0, CLOUD_WORKSPACE_RESUME_LIMIT),
-    meta: normalizedWorkspace.meta,
-    updatedAt: now,
-    version: Date.now(),
-    deviceId: cloudIdentity.deviceId,
-    sessionId: cloudIdentity.sessionId,
-  }, { merge: true });
+  await setDoc(workspaceRef, createCloudWorkspaceDoc(normalizedWorkspace, identity, now));
 
   return {
     ...normalizedWorkspace,
@@ -306,19 +325,16 @@ export async function writeCloudDraft(uid, resumeId, workspace, draft, trustedDe
 
   const batch = writeBatch(workspaceRef.firestore);
   batch.set(draftRef, draftDoc, { merge: true });
-  batch.set(workspaceRef, {
-    schemaVersion: CLOUD_WORKSPACE_SCHEMA_VERSION,
-    activeResumeId: normalizedWorkspace.activeResumeId,
-    resumeIds: normalizedWorkspace.resumeIds.slice(0, CLOUD_WORKSPACE_RESUME_LIMIT),
-    meta: {
-      ...normalizedWorkspace.meta,
-      [resumeId]: createWorkspaceResumeMeta(name, draftDoc.updatedAt),
-    },
-    updatedAt: draftDoc.updatedAt,
-    version: draftDoc.version,
-    deviceId: cloudIdentity.deviceId,
-    sessionId: cloudIdentity.sessionId,
-  }, { merge: true });
+  batch.set(
+    workspaceRef,
+    createCloudWorkspaceDoc({
+      ...normalizedWorkspace,
+      meta: {
+        ...normalizedWorkspace.meta,
+        [resumeId]: createWorkspaceResumeMeta(name, draftDoc.updatedAt),
+      },
+    }, cloudIdentity, draftDoc.updatedAt, draftDoc.version),
+  );
 
   await batch.commit();
   return draftDoc;
@@ -333,21 +349,11 @@ export async function deleteCloudResume(uid, resumeId, workspace, trustedDevice,
   }
 
   const now = new Date().toISOString();
-  const cloudIdentity = normalizeCloudIdentity(identity);
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const batch = writeBatch(workspaceRef.firestore);
 
   batch.delete(draftRef);
-  batch.set(workspaceRef, {
-    schemaVersion: CLOUD_WORKSPACE_SCHEMA_VERSION,
-    activeResumeId: normalizedWorkspace.activeResumeId,
-    resumeIds: normalizedWorkspace.resumeIds,
-    meta: normalizedWorkspace.meta,
-    updatedAt: now,
-    version: Date.now(),
-    deviceId: cloudIdentity.deviceId,
-    sessionId: cloudIdentity.sessionId,
-  }, { merge: true });
+  batch.set(workspaceRef, createCloudWorkspaceDoc(normalizedWorkspace, identity, now));
 
   await batch.commit();
   return now;
@@ -390,14 +396,7 @@ export async function importWorkspaceToCloud(uid, workspace, readDraft, trustedD
     meta: nextMeta,
   };
 
-  batch.set(workspaceRef, {
-    schemaVersion: CLOUD_WORKSPACE_SCHEMA_VERSION,
-    ...nextWorkspace,
-    updatedAt: now,
-    version: Date.now(),
-    deviceId: cloudIdentity.deviceId,
-    sessionId: cloudIdentity.sessionId,
-  }, { merge: true });
+  batch.set(workspaceRef, createCloudWorkspaceDoc(nextWorkspace, cloudIdentity, now));
 
   await batch.commit();
   return nextWorkspace;
@@ -448,14 +447,7 @@ export async function appendWorkspaceToCloud(uid, cloudWorkspace, localWorkspace
     );
   }
 
-  batch.set(workspaceRef, {
-    schemaVersion: CLOUD_WORKSPACE_SCHEMA_VERSION,
-    ...nextWorkspace,
-    updatedAt: new Date().toISOString(),
-    version: Date.now(),
-    deviceId: cloudIdentity.deviceId,
-    sessionId: cloudIdentity.sessionId,
-  }, { merge: true });
+  batch.set(workspaceRef, createCloudWorkspaceDoc(nextWorkspace, cloudIdentity));
 
   await batch.commit();
   return nextWorkspace;
