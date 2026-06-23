@@ -4,9 +4,11 @@ import './styles/buttons.css'
 import './styles/forms.css'
 import './styles/preview.css'
 import Header from './components/header';
+import AuthModal from './components/authModal';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/editorPanel';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
+import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
 
 const THEME_STORAGE_KEY = 'resumeloomr:theme';
 
@@ -14,6 +16,7 @@ function App() {
   const previewPanelRef = useRef(null);
   const documentTitleRef = useRef('ResumeLoomr | Professional Resume Builder');
   const [editorStageMaxHeight, setEditorStageMaxHeight] = useState(null);
+  const auth = useFirebaseAuth();
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') {
       return 'light';
@@ -45,6 +48,12 @@ function App() {
     dismissNotice,
     saveState,
     saveLabel,
+    syncState,
+    isCloudMode,
+    conflict,
+    resolveConflictWithCloud,
+    resolveConflictWithLocal,
+    saveConflictAsCopy,
     templateOptions,
     resumeList,
     activeResumeId,
@@ -56,7 +65,11 @@ function App() {
     duplicateActiveResume,
     renameActiveResume,
     deleteActiveResume,
-  } = useResumeBuilder();
+  } = useResumeBuilder({
+    user: auth.user,
+    authReady: auth.authReady,
+    trustedDevice: auth.trustedDevice,
+  });
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -148,6 +161,26 @@ function App() {
           onDuplicateResume={duplicateActiveResume}
           onRenameResume={renameActiveResume}
           onDeleteResume={deleteActiveResume}
+          authUser={auth.user}
+          authReady={auth.authReady}
+          firebaseEnabled={auth.firebaseEnabled}
+          trustedDevice={auth.trustedDevice}
+          isCloudMode={isCloudMode}
+          syncState={syncState}
+          onOpenAuth={auth.openAuthModal}
+          onSignOut={auth.signOut}
+        />
+
+        <AuthModal
+          isOpen={auth.isAuthModalOpen}
+          busy={auth.authBusy}
+          error={auth.authError}
+          trustedDevice={auth.trustedDevice}
+          onTrustedDeviceChange={auth.setTrustedDevice}
+          onClose={auth.closeAuthModal}
+          onGoogleSignIn={auth.signInWithGoogle}
+          onEmailSignIn={auth.signInWithEmail}
+          onEmailSignUp={auth.signUpWithEmail}
         />
 
         {notice && (
@@ -156,6 +189,26 @@ function App() {
             <button type="button" className="noticeDismiss" onClick={dismissNotice} aria-label="Dismiss message">
               Dismiss
             </button>
+          </div>
+        )}
+
+        {conflict && (
+          <div className="conflictBanner" role="alert">
+            <div>
+              <strong>This resume changed on another device.</strong>
+              <span>Choose which version to keep before continuing sync.</span>
+            </div>
+            <div className="conflictActions">
+              <button type="button" className="button buttonSecondary" onClick={resolveConflictWithCloud}>
+                Use cloud version
+              </button>
+              <button type="button" className="button buttonSecondary" onClick={resolveConflictWithLocal}>
+                Keep this device
+              </button>
+              <button type="button" className="button buttonPrimary" onClick={saveConflictAsCopy}>
+                Save as copy
+              </button>
+            </div>
           </div>
         )}
 

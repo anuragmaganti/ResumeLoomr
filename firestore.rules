@@ -1,0 +1,161 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isString(value) {
+      return value is string;
+    }
+
+    function isNullableString(value) {
+      return value == null || value is string;
+    }
+
+    function isValidTemplate(value) {
+      return value in ['modern', 'executive', 'compact'];
+    }
+
+    function isValidSectionId(value) {
+      return value in [
+        'personal',
+        'education',
+        'experience',
+        'skills',
+        'projects',
+        'certifications',
+        'volunteering',
+        'leadership',
+        'languages',
+        'awards',
+        'publications'
+      ];
+    }
+
+    function isValidSectionOrder(sectionOrder) {
+      return sectionOrder is list &&
+        sectionOrder.size() >= 1 &&
+        sectionOrder.size() <= 11 &&
+        sectionOrder.hasOnly([
+          'personal',
+          'education',
+          'experience',
+          'skills',
+          'projects',
+          'certifications',
+          'volunteering',
+          'leadership',
+          'languages',
+          'awards',
+          'publications'
+        ]);
+    }
+
+    function isValidSetting(value) {
+      return value is int && value >= -5 && value <= 5;
+    }
+
+    function isValidSettings(settings) {
+      return settings is map &&
+        settings.keys().hasOnly([
+          'textSize',
+          'horizontalMargins',
+          'verticalMargins',
+          'lineSpacing',
+          'sectionSpacing',
+          'entrySpacing',
+          'headingSize',
+          'nameSize'
+        ]) &&
+        isValidSetting(settings.textSize) &&
+        isValidSetting(settings.horizontalMargins) &&
+        isValidSetting(settings.verticalMargins) &&
+        isValidSetting(settings.lineSpacing) &&
+        isValidSetting(settings.sectionSpacing) &&
+        isValidSetting(settings.entrySpacing) &&
+        isValidSetting(settings.headingSize) &&
+        isValidSetting(settings.nameSize);
+    }
+
+    function isValidMeta(meta, resumeIds) {
+      return meta is map &&
+        meta.keys().hasAll(resumeIds) &&
+        meta.keys().hasOnly(resumeIds);
+    }
+
+    function isValidWorkspace(data) {
+      return data.keys().hasOnly([
+        'schemaVersion',
+        'activeResumeId',
+        'resumeIds',
+        'meta',
+        'updatedAt',
+        'version',
+        'deviceId'
+      ]) &&
+      data.schemaVersion == 1 &&
+      isString(data.activeResumeId) &&
+      data.resumeIds is list &&
+      data.resumeIds.size() > 0 &&
+      data.resumeIds.size() <= 25 &&
+      data.activeResumeId in data.resumeIds &&
+      isValidMeta(data.meta, data.resumeIds) &&
+      isString(data.updatedAt) &&
+      data.version is int &&
+      isString(data.deviceId);
+    }
+
+    function isValidResumeDoc(data, resumeId) {
+      return data.keys().hasOnly([
+        'schemaVersion',
+        'resumeId',
+        'name',
+        'template',
+        'sectionOrder',
+        'resume',
+        'savedAt',
+        'updatedAt',
+        'version',
+        'deviceId',
+        'deletedAt'
+      ]) &&
+      data.schemaVersion == 1 &&
+      data.resumeId == resumeId &&
+      isString(data.name) &&
+      data.name.size() > 0 &&
+      data.name.size() <= 25 &&
+      isValidTemplate(data.template) &&
+      isValidSectionOrder(data.sectionOrder) &&
+      data.resume is map &&
+      data.resume.settings is map &&
+      isValidSettings(data.resume.settings) &&
+      isString(data.savedAt) &&
+      isString(data.updatedAt) &&
+      data.version is int &&
+      isString(data.deviceId) &&
+      isNullableString(data.deletedAt);
+    }
+
+    match /users/{uid}/workspace/main {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isValidWorkspace(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /users/{uid}/resumes/{resumeId} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isValidResumeDoc(request.resource.data, resumeId);
+      allow delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

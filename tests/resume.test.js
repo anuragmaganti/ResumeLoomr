@@ -202,6 +202,20 @@ test('app source does not use raw HTML execution sinks in src files', () => {
   }
 });
 
+test('signed-in resume storage relies on Firebase cache instead of an app-owned IndexedDB cache', () => {
+  const libFiles = collectSourceFiles(path.resolve(SRC_DIR, 'lib'));
+
+  for (const filePath of libFiles) {
+    const source = fs.readFileSync(filePath, 'utf8');
+
+    assert.equal(
+      /window\.indexedDB|indexedDB\.open/.test(source),
+      false,
+      `Found app-owned IndexedDB usage in ${path.relative(TEST_FILE_DIR, filePath)}`
+    );
+  }
+});
+
 test('removeEducation and removeExperience preserve at least one editable entry', () => {
   const resume = createEmptyResume();
   const nextResume = removeEducation(resume, resume.education[0].id);

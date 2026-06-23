@@ -35,6 +35,14 @@ export default function Header({
   onDuplicateResume,
   onRenameResume,
   onDeleteResume,
+  authUser,
+  authReady,
+  firebaseEnabled,
+  trustedDevice,
+  isCloudMode,
+  syncState,
+  onOpenAuth,
+  onSignOut,
 }) {
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
@@ -220,6 +228,26 @@ export default function Header({
           <span className={`statusBadge statusBadge--${saveState}`}>
             {saveLabel}
           </span>
+          {isCloudMode ? (
+            <span className={`statusBadge statusBadge--${syncState === 'error' ? 'error' : 'info'}`}>
+              {trustedDevice ? 'Trusted device' : 'Cloud'}
+            </span>
+          ) : null}
+          {authUser ? (
+            <button type="button" className="button buttonSecondary accountButton" onClick={onSignOut}>
+              Sign out
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="button buttonSecondary accountButton"
+              onClick={onOpenAuth}
+              disabled={!authReady || !firebaseEnabled}
+              title={firebaseEnabled ? 'Sign in to sync resumes' : 'Firebase is not configured yet'}
+            >
+              Sign in
+            </button>
+          )}
           <button
             type="button"
             className="button buttonSecondary themeToggle"
