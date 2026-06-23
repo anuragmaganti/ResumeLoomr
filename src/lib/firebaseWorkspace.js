@@ -233,12 +233,7 @@ export async function deleteCloudResume(uid, resumeId, workspace, trustedDevice,
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const batch = writeBatch(workspaceRef.firestore);
 
-  batch.set(draftRef, {
-    deletedAt: now,
-    updatedAt: now,
-    version: Date.now(),
-    deviceId,
-  }, { merge: true });
+  batch.delete(draftRef);
   batch.set(workspaceRef, {
     schemaVersion: CLOUD_WORKSPACE_SCHEMA_VERSION,
     activeResumeId: normalizedWorkspace.activeResumeId,

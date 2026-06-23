@@ -132,6 +132,21 @@ test('normalizeWorkspaceIndex keeps valid ids and backfills missing names', () =
   assert.equal(normalized.meta['resume-2'].name, 'Resume 2');
 });
 
+test('normalizeWorkspaceIndex truncates imported resume names to the supported length', () => {
+  const normalized = normalizeWorkspaceIndex({
+    activeResumeId: 'resume-1',
+    resumeIds: ['resume-1'],
+    meta: {
+      'resume-1': {
+        name: 'abcdefghijklmnopqrstuvwxyz imported resume',
+      },
+    },
+  });
+
+  assert.equal(normalized.meta['resume-1'].name.length, 25);
+  assert.equal(normalized.meta['resume-1'].name, 'abcdefghijklmnopqrstuvwxy');
+});
+
 test('normalizeResumeSettings clamps invalid values into the supported range', () => {
   assert.deepEqual(
     normalizeResumeSettings({

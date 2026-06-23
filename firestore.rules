@@ -151,7 +151,7 @@ service cloud.firestore {
     match /users/{uid}/resumes/{resumeId} {
       allow read: if isOwner(uid);
       allow create, update: if isOwner(uid) && isValidResumeDoc(request.resource.data, resumeId);
-      allow delete: if false;
+      allow delete: if isOwner(uid);
     }
 
     match /{document=**} {
