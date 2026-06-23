@@ -42,9 +42,32 @@ import {
   getCloudSessionId,
   validateCloudDraftPayload,
 } from '../src/lib/firebaseWorkspace.js';
+import {
+  GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY,
+  createGuestMirrorWorkspace,
+  persistCloudDraftMirror,
+  persistCloudWorkspaceMirror,
+} from '../src/lib/localWorkspaceMirror.js';
 
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = path.resolve(TEST_FILE_DIR, '../src');
+
+function createMemoryStorage(initialEntries = []) {
+  const values = new Map(initialEntries);
+
+  return {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      values.set(key, String(value));
+    },
+    removeItem(key) {
+      values.delete(key);
+    },
+    values,
+  };
+}
 
 function collectSourceFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -150,6 +173,111 @@ test('normalizeWorkspaceIndex truncates imported resume names to the supported l
 
   assert.equal(normalized.meta['resume-1'].name.length, 25);
   assert.equal(normalized.meta['resume-1'].name, 'abcdefghijklmnopqrstuvwxy');
+});
+
+test('cloud guest mirror caps signed-in resumes to the guest workspace limit', () => {
+  const resumeIds = Array.from({ length: MAX_WORKSPACE_RESUMES + 2 }, (_, index) => `resume-${index + 1}`);
+  const workspace = normalizeWorkspaceIndex({
+    activeResumeId: 'resume-12',
+    resumeIds,
+    meta: Object.fromEntries(resumeIds.map((resumeId, index) => [
+      resumeId,
+      { name: `Resume ${index + 1}`, updatedAt: '' },
+    ])),
+  });
+  const mirror = createGuestMirrorWorkspace(workspace);
+
+  assert.equal(mirror.resumeIds.length, MAX_WORKSPACE_RESUMES);
+  assert.deepEqual(mirror.resumeIds, ['resume-12', ...resumeIds.slice(0, MAX_WORKSPACE_RESUMES - 1)]);
+  assert.equal(mirror.activeResumeId, 'resume-12');
+  assert.equal(mirror.meta['resume-10'], undefined);
+});
+
+test('cloud guest mirror backs up existing guest workspace once and preserves unrelated draft keys', () => {
+  const existingWorkspace = normalizeWorkspaceIndex({
+    activeResumeId: 'guest-1',
+    resumeIds: ['guest-1'],
+    meta: {
+      'guest-1': { name: 'Guest Resume', updatedAt: '2026-01-01T00:00:00.000Z' },
+    },
+  });
+  const storage = createMemoryStorage([
+    [WORKSPACE_INDEX_STORAGE_KEY, JSON.stringify(existingWorkspace)],
+    [createResumeStorageKey('guest-1'), JSON.stringify({ savedAt: 'guest' })],
+    [createResumeStorageKey('unrelated'), JSON.stringify({ savedAt: 'keep-me' })],
+  ]);
+  const cloudWorkspace = normalizeWorkspaceIndex({
+    activeResumeId: 'cloud-1',
+    resumeIds: ['cloud-1'],
+    meta: {
+      'cloud-1': { name: 'Cloud Resume', updatedAt: '2026-01-02T00:00:00.000Z' },
+    },
+  });
+  const cloudDraft = {
+    resume: createEmptyResume(),
+    template: 'modern',
+    sectionOrder: SECTION_IDS,
+    savedAt: '2026-01-02T00:00:00.000Z',
+  };
+
+  persistCloudWorkspaceMirror({
+    workspace: cloudWorkspace,
+    readDraft: (resumeId) => (resumeId === 'cloud-1' ? cloudDraft : null),
+    storage,
+  });
+  persistCloudWorkspaceMirror({
+    workspace: cloudWorkspace,
+    readDraft: () => null,
+    storage,
+  });
+
+  const backup = JSON.parse(storage.getItem(GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY));
+  const mirroredWorkspace = JSON.parse(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY));
+  const mirroredDraft = JSON.parse(storage.getItem(createResumeStorageKey('cloud-1')));
+
+  assert.equal(JSON.parse(backup.workspaceRaw).meta['guest-1'].name, 'Guest Resume');
+  assert.equal(JSON.parse(backup.drafts['guest-1']).savedAt, 'guest');
+  assert.equal(storage.getItem(createResumeStorageKey('unrelated')), JSON.stringify({ savedAt: 'keep-me' }));
+  assert.deepEqual(mirroredWorkspace.resumeIds, ['cloud-1']);
+  assert.equal(mirroredDraft.savedAt, '2026-01-02T00:00:00.000Z');
+});
+
+test('cloud draft mirror writes only mirrored resume drafts', () => {
+  const storage = createMemoryStorage();
+  const resumeIds = Array.from({ length: MAX_WORKSPACE_RESUMES + 1 }, (_, index) => `resume-${index + 1}`);
+  const workspace = normalizeWorkspaceIndex({
+    activeResumeId: 'resume-1',
+    resumeIds,
+    meta: Object.fromEntries(resumeIds.map((resumeId, index) => [
+      resumeId,
+      { name: `Resume ${index + 1}`, updatedAt: '' },
+    ])),
+  });
+  const draft = {
+    resume: createEmptyResume(),
+    template: 'compact',
+    sectionOrder: SECTION_IDS,
+    savedAt: '2026-01-03T00:00:00.000Z',
+  };
+
+  persistCloudDraftMirror({
+    resumeId: 'resume-11',
+    workspace,
+    draft,
+    storage,
+  });
+
+  assert.equal(storage.getItem(createResumeStorageKey('resume-11')), null);
+  assert.deepEqual(JSON.parse(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY)).resumeIds, resumeIds.slice(0, 10));
+
+  persistCloudDraftMirror({
+    resumeId: 'resume-1',
+    workspace,
+    draft,
+    storage,
+  });
+
+  assert.equal(JSON.parse(storage.getItem(createResumeStorageKey('resume-1'))).template, 'compact');
 });
 
 test('normalizeResumeSettings clamps invalid values into the supported range', () => {
