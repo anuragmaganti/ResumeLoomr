@@ -8,18 +8,21 @@ import {
   persistentMultipleTabManager,
 } from 'firebase/firestore';
 
+const env = import.meta.env || {};
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  apiKey: env.VITE_FIREBASE_API_KEY,
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: env.VITE_FIREBASE_PROJECT_ID,
+  appId: env.VITE_FIREBASE_APP_ID,
+  measurementId: env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 let appInstance = null;
 let authInstance = null;
 let dbInstance = null;
 let dbCacheMode = null;
+let dbCacheFallbackReason = '';
 let appCheckInitialized = false;
 
 export function hasFirebaseConfig() {
@@ -59,7 +62,7 @@ export function getFirebaseAuth() {
 
 export function initializeFirebaseAppCheck() {
   const app = getFirebaseApp();
-  const siteKey = import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY;
+  const siteKey = env.VITE_FIREBASE_APPCHECK_SITE_KEY;
 
   if (!app || !siteKey || appCheckInitialized || typeof window === 'undefined') {
     return;
@@ -85,16 +88,36 @@ export function getFirebaseDb({ trustedDevice = false } = {}) {
     return dbInstance;
   }
 
-  dbInstance = initializeFirestore(app, {
-    localCache: trustedDevice
-      ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-      : memoryLocalCache(),
-  });
-  dbCacheMode = requestedMode;
+  try {
+    dbInstance = initializeFirestore(app, {
+      localCache: trustedDevice
+        ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+        : memoryLocalCache(),
+    });
+    dbCacheMode = requestedMode;
+  } catch (error) {
+    if (!trustedDevice) {
+      throw error;
+    }
+
+    dbInstance = initializeFirestore(app, {
+      localCache: memoryLocalCache(),
+    });
+    dbCacheMode = 'memory';
+    dbCacheFallbackReason = error?.message || 'Persistent cache unavailable.';
+  }
 
   return dbInstance;
 }
 
 export function getFirebaseDbCacheMode() {
   return dbCacheMode;
+}
+
+export function isFirebaseDbInitialized() {
+  return Boolean(dbInstance);
+}
+
+export function getFirebaseDbCacheFallbackReason() {
+  return dbCacheFallbackReason;
 }

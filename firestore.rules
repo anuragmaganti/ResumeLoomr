@@ -22,22 +22,6 @@ service cloud.firestore {
       return value in ['modern', 'executive', 'compact'];
     }
 
-    function isValidSectionId(value) {
-      return value in [
-        'personal',
-        'education',
-        'experience',
-        'skills',
-        'projects',
-        'certifications',
-        'volunteering',
-        'leadership',
-        'languages',
-        'awards',
-        'publications'
-      ];
-    }
-
     function isValidSectionOrder(sectionOrder) {
       return sectionOrder is list &&
         sectionOrder.size() >= 1 &&
@@ -86,7 +70,65 @@ service cloud.firestore {
     function isValidMeta(meta, resumeIds) {
       return meta is map &&
         meta.keys().hasAll(resumeIds) &&
-        meta.keys().hasOnly(resumeIds);
+        meta.keys().hasOnly(resumeIds) &&
+        isValidMetaEntries(meta, resumeIds);
+    }
+
+    function isValidMetaEntry(entry) {
+      return entry is map &&
+        entry.keys().hasOnly(['name', 'updatedAt']) &&
+        isString(entry.name) &&
+        entry.name.size() > 0 &&
+        entry.name.size() <= 25 &&
+        isString(entry.updatedAt);
+    }
+
+    function isValidMetaEntries(meta, resumeIds) {
+      return (resumeIds.size() <= 0 || isValidMetaEntry(meta[resumeIds[0]])) &&
+        (resumeIds.size() <= 1 || isValidMetaEntry(meta[resumeIds[1]])) &&
+        (resumeIds.size() <= 2 || isValidMetaEntry(meta[resumeIds[2]])) &&
+        (resumeIds.size() <= 3 || isValidMetaEntry(meta[resumeIds[3]])) &&
+        (resumeIds.size() <= 4 || isValidMetaEntry(meta[resumeIds[4]])) &&
+        (resumeIds.size() <= 5 || isValidMetaEntry(meta[resumeIds[5]])) &&
+        (resumeIds.size() <= 6 || isValidMetaEntry(meta[resumeIds[6]])) &&
+        (resumeIds.size() <= 7 || isValidMetaEntry(meta[resumeIds[7]])) &&
+        (resumeIds.size() <= 8 || isValidMetaEntry(meta[resumeIds[8]])) &&
+        (resumeIds.size() <= 9 || isValidMetaEntry(meta[resumeIds[9]])) &&
+        (resumeIds.size() <= 10 || isValidMetaEntry(meta[resumeIds[10]])) &&
+        (resumeIds.size() <= 11 || isValidMetaEntry(meta[resumeIds[11]])) &&
+        (resumeIds.size() <= 12 || isValidMetaEntry(meta[resumeIds[12]])) &&
+        (resumeIds.size() <= 13 || isValidMetaEntry(meta[resumeIds[13]])) &&
+        (resumeIds.size() <= 14 || isValidMetaEntry(meta[resumeIds[14]])) &&
+        (resumeIds.size() <= 15 || isValidMetaEntry(meta[resumeIds[15]])) &&
+        (resumeIds.size() <= 16 || isValidMetaEntry(meta[resumeIds[16]])) &&
+        (resumeIds.size() <= 17 || isValidMetaEntry(meta[resumeIds[17]])) &&
+        (resumeIds.size() <= 18 || isValidMetaEntry(meta[resumeIds[18]])) &&
+        (resumeIds.size() <= 19 || isValidMetaEntry(meta[resumeIds[19]])) &&
+        (resumeIds.size() <= 20 || isValidMetaEntry(meta[resumeIds[20]])) &&
+        (resumeIds.size() <= 21 || isValidMetaEntry(meta[resumeIds[21]])) &&
+        (resumeIds.size() <= 22 || isValidMetaEntry(meta[resumeIds[22]])) &&
+        (resumeIds.size() <= 23 || isValidMetaEntry(meta[resumeIds[23]])) &&
+        (resumeIds.size() <= 24 || isValidMetaEntry(meta[resumeIds[24]]));
+    }
+
+    function isValidResumeCollection(value) {
+      return value is list && value.size() <= 100;
+    }
+
+    function isValidResumeShape(resume) {
+      return resume is map &&
+        resume.settings is map &&
+        isValidSettings(resume.settings) &&
+        isValidResumeCollection(resume.education) &&
+        isValidResumeCollection(resume.experience) &&
+        isValidResumeCollection(resume.skills) &&
+        isValidResumeCollection(resume.projects) &&
+        isValidResumeCollection(resume.certifications) &&
+        isValidResumeCollection(resume.volunteering) &&
+        isValidResumeCollection(resume.leadership) &&
+        isValidResumeCollection(resume.languages) &&
+        isValidResumeCollection(resume.awards) &&
+        isValidResumeCollection(resume.publications);
     }
 
     function isValidWorkspace(data) {
@@ -97,7 +139,8 @@ service cloud.firestore {
         'meta',
         'updatedAt',
         'version',
-        'deviceId'
+        'deviceId',
+        'sessionId'
       ]) &&
       data.schemaVersion == 1 &&
       isString(data.activeResumeId) &&
@@ -108,7 +151,8 @@ service cloud.firestore {
       isValidMeta(data.meta, data.resumeIds) &&
       isString(data.updatedAt) &&
       data.version is int &&
-      isString(data.deviceId);
+      isString(data.deviceId) &&
+      isNullableString(data.sessionId);
     }
 
     function isValidResumeDoc(data, resumeId) {
@@ -123,6 +167,7 @@ service cloud.firestore {
         'updatedAt',
         'version',
         'deviceId',
+        'sessionId',
         'deletedAt'
       ]) &&
       data.schemaVersion == 1 &&
@@ -132,13 +177,12 @@ service cloud.firestore {
       data.name.size() <= 25 &&
       isValidTemplate(data.template) &&
       isValidSectionOrder(data.sectionOrder) &&
-      data.resume is map &&
-      data.resume.settings is map &&
-      isValidSettings(data.resume.settings) &&
+      isValidResumeShape(data.resume) &&
       isString(data.savedAt) &&
       isString(data.updatedAt) &&
       data.version is int &&
       isString(data.deviceId) &&
+      isNullableString(data.sessionId) &&
       isNullableString(data.deletedAt);
     }
 

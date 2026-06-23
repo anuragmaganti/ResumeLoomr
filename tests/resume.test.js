@@ -37,6 +37,11 @@ import {
   updateSectionTitle,
   validateResume,
 } from '../src/lib/resume.js';
+import {
+  CLOUD_DRAFT_MAX_BYTES,
+  getCloudSessionId,
+  validateCloudDraftPayload,
+} from '../src/lib/firebaseWorkspace.js';
 
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = path.resolve(TEST_FILE_DIR, '../src');
@@ -229,6 +234,60 @@ test('signed-in resume storage relies on Firebase cache instead of an app-owned 
       `Found app-owned IndexedDB usage in ${path.relative(TEST_FILE_DIR, filePath)}`
     );
   }
+});
+
+test('cloud session id is stored in sessionStorage, not shared localStorage', () => {
+  const previousWindow = globalThis.window;
+  const sessionValues = new Map();
+  const localValues = new Map();
+
+  globalThis.window = {
+    sessionStorage: {
+      getItem(key) {
+        return sessionValues.get(key) || null;
+      },
+      setItem(key, value) {
+        sessionValues.set(key, value);
+      },
+    },
+    localStorage: {
+      getItem(key) {
+        return localValues.get(key) || null;
+      },
+      setItem(key, value) {
+        localValues.set(key, value);
+      },
+    },
+  };
+
+  try {
+    const sessionId = getCloudSessionId();
+
+    assert.equal(getCloudSessionId(), sessionId);
+    assert.equal(localValues.size, 0);
+    assert.equal(sessionValues.size, 1);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test('cloud draft payload guard rejects oversized documents before Firestore writes', () => {
+  assert.throws(
+    () => validateCloudDraftPayload({
+      resume: {
+        settings: {},
+        projects: [{ summary: 'x'.repeat(CLOUD_DRAFT_MAX_BYTES) }],
+      },
+    }),
+    /too large/i,
+  );
+});
+
+test('builder source uses a per-resume cloud save queue instead of one global save timer', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+
+  assert.match(source, /cloudSaveQueueRef\s*=\s*useRef\(new Map\(\)\)/);
+  assert.equal(/cloudSaveTimeoutRef|cloudForceSaveRef/.test(source), false);
 });
 
 test('removeEducation and removeExperience preserve at least one editable entry', () => {

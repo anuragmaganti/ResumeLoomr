@@ -32,6 +32,7 @@ function createWorkspaceDoc(overrides = {}) {
     updatedAt: '2026-06-23T12:00:00.000Z',
     version: 1,
     deviceId: 'device-1',
+    sessionId: 'session-1',
   };
 }
 
@@ -58,11 +59,22 @@ function createResumeDoc(overrides = {}) {
       personal: {
         name: 'Ada Lovelace',
       },
+      education: [],
+      experience: [],
+      skills: [],
+      projects: [],
+      certifications: [],
+      volunteering: [],
+      leadership: [],
+      languages: [],
+      awards: [],
+      publications: [],
     },
     savedAt: '2026-06-23T12:00:00.000Z',
     updatedAt: '2026-06-23T12:00:00.000Z',
     version: 1,
     deviceId: 'device-1',
+    sessionId: 'session-1',
     deletedAt: null,
     ...overrides,
   };
@@ -101,6 +113,20 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
     await assertFails(ownerDb.doc('users/user-a/workspace/main').set(createWorkspaceDoc({
       activeResumeId: 'resume-1',
       resumeIds: ['resume-2'],
+    })));
+    await assertFails(ownerDb.doc('users/user-a/workspace/main').set(createWorkspaceDoc({
+      meta: {
+        'resume-1': {
+          name: 'abcdefghijklmnopqrstuvwxyz',
+          updatedAt: '2026-06-23T12:00:00.000Z',
+        },
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        projects: Array.from({ length: 101 }, () => ({})),
+      },
     })));
   } finally {
     await testEnv.cleanup();

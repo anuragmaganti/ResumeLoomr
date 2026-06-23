@@ -5,6 +5,7 @@ export default function AuthModal({
   busy,
   error,
   trustedDevice,
+  trustedDeviceLocked,
   onTrustedDeviceChange,
   onClose,
   onGoogleSignIn,
@@ -103,10 +104,13 @@ export default function AuthModal({
             <input
               type="checkbox"
               checked={trustedDevice}
+              disabled={trustedDeviceLocked}
               onChange={(event) => onTrustedDeviceChange(event.target.checked)}
             />
             <span>
-              Trust this device for offline access. Resume data can stay cached in this browser.
+              {trustedDeviceLocked
+                ? 'Sign out and back in to change offline cache.'
+                : 'Trust this device for offline access. Resume data can stay cached in this browser.'}
             </span>
           </label>
 

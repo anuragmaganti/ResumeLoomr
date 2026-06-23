@@ -22,6 +22,27 @@ export const CLOUD_WORKSPACE_SCHEMA_VERSION = 1;
 export const CLOUD_IMPORT_PREFIX = 'resumeloomr:firebase-imported:';
 export const CLOUD_TRUSTED_DEVICE_KEY = 'resumeloomr:firebase-trusted-device';
 export const CLOUD_DEVICE_ID_KEY = 'resumeloomr:firebase-device-id';
+export const CLOUD_SESSION_ID_KEY = 'resumeloomr:firebase-session-id';
+export const CLOUD_DRAFT_MAX_BYTES = 850_000;
+export const CLOUD_COLLECTION_ENTRY_LIMIT = 100;
+export const CLOUD_TEXT_LIST_LIMIT = 150;
+
+const RESUME_COLLECTION_KEYS = [
+  'education',
+  'experience',
+  'skills',
+  'projects',
+  'certifications',
+  'volunteering',
+  'leadership',
+  'languages',
+  'awards',
+  'publications',
+];
+
+function createCloudId(prefix) {
+  return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Math.random().toString(36).slice(2)}`;
+}
 
 export function getCloudDeviceId() {
   if (typeof window === 'undefined') {
@@ -34,9 +55,83 @@ export function getCloudDeviceId() {
     return existingDeviceId;
   }
 
-  const nextDeviceId = globalThis.crypto?.randomUUID?.() ?? `device-${Math.random().toString(36).slice(2)}`;
+  const nextDeviceId = createCloudId('device');
   window.localStorage.setItem(CLOUD_DEVICE_ID_KEY, nextDeviceId);
   return nextDeviceId;
+}
+
+export function getCloudSessionId() {
+  if (typeof window === 'undefined') {
+    return 'server';
+  }
+
+  const existingSessionId = window.sessionStorage.getItem(CLOUD_SESSION_ID_KEY);
+
+  if (existingSessionId) {
+    return existingSessionId;
+  }
+
+  const nextSessionId = createCloudId('session');
+  window.sessionStorage.setItem(CLOUD_SESSION_ID_KEY, nextSessionId);
+  return nextSessionId;
+}
+
+function normalizeCloudIdentity(identity) {
+  if (typeof identity === 'string') {
+    return {
+      deviceId: identity,
+      sessionId: 'legacy-session',
+    };
+  }
+
+  return {
+    deviceId: identity?.deviceId || 'unknown-device',
+    sessionId: identity?.sessionId || 'unknown-session',
+  };
+}
+
+function getSerializedByteSize(value) {
+  const serialized = JSON.stringify(value);
+
+  if (typeof TextEncoder !== 'undefined') {
+    return new TextEncoder().encode(serialized).length;
+  }
+
+  return serialized.length;
+}
+
+export function validateCloudDraftPayload(draftDoc) {
+  const resume = draftDoc?.resume && typeof draftDoc.resume === 'object' ? draftDoc.resume : {};
+  const oversizedCollection = RESUME_COLLECTION_KEYS.find((key) => (
+    Array.isArray(resume[key]) && resume[key].length > CLOUD_COLLECTION_ENTRY_LIMIT
+  ));
+
+  if (oversizedCollection) {
+    throw Object.assign(new Error(`Too many entries in ${oversizedCollection}.`), {
+      code: 'resume/too-many-entries',
+    });
+  }
+
+  if (Array.isArray(resume.experience)) {
+    const oversizedHighlights = resume.experience.some((entry) => (
+      Array.isArray(entry?.activities) && entry.activities.length > CLOUD_TEXT_LIST_LIMIT
+    ));
+
+    if (oversizedHighlights) {
+      throw Object.assign(new Error('Too many experience highlights.'), {
+        code: 'resume/too-many-highlights',
+      });
+    }
+  }
+
+  const payloadSize = getSerializedByteSize(draftDoc);
+
+  if (payloadSize > CLOUD_DRAFT_MAX_BYTES) {
+    throw Object.assign(new Error('Resume is too large to sync.'), {
+      code: 'resume/payload-too-large',
+      payloadSize,
+    });
+  }
 }
 
 export function getTrustedDevicePreference() {
@@ -91,7 +186,8 @@ function normalizeCloudWorkspace(data) {
   });
 }
 
-export function createCloudDraftDoc({ resumeId, name, draft, deviceId, deletedAt = null }) {
+export function createCloudDraftDoc({ resumeId, name, draft, identity, deviceId, deletedAt = null }) {
+  const cloudIdentity = normalizeCloudIdentity(identity || deviceId);
   const payload = createDraftPayload({
     resume: draft.resume,
     template: draft.template,
@@ -108,7 +204,8 @@ export function createCloudDraftDoc({ resumeId, name, draft, deviceId, deletedAt
     savedAt: payload.savedAt,
     updatedAt: payload.savedAt,
     version: Date.now(),
-    deviceId,
+    deviceId: cloudIdentity.deviceId,
+    sessionId: cloudIdentity.sessionId,
     deletedAt,
   };
 }
@@ -164,7 +261,7 @@ export async function readCloudDraft(uid, resumeId, trustedDevice, options = {})
   return cloudDocToDraft(snapshot.data());
 }
 
-export async function writeCloudWorkspace(uid, workspace, trustedDevice, deviceId) {
+export async function writeCloudWorkspace(uid, workspace, trustedDevice, identity) {
   const workspaceRef = getWorkspaceDocRef(uid, trustedDevice);
 
   if (!workspaceRef) {
@@ -172,6 +269,7 @@ export async function writeCloudWorkspace(uid, workspace, trustedDevice, deviceI
   }
 
   const now = new Date().toISOString();
+  const cloudIdentity = normalizeCloudIdentity(identity);
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
 
   await setDoc(workspaceRef, {
@@ -181,7 +279,8 @@ export async function writeCloudWorkspace(uid, workspace, trustedDevice, deviceI
     meta: normalizedWorkspace.meta,
     updatedAt: now,
     version: Date.now(),
-    deviceId,
+    deviceId: cloudIdentity.deviceId,
+    sessionId: cloudIdentity.sessionId,
   }, { merge: true });
 
   return {
@@ -190,7 +289,7 @@ export async function writeCloudWorkspace(uid, workspace, trustedDevice, deviceI
   };
 }
 
-export async function writeCloudDraft(uid, resumeId, workspace, draft, trustedDevice, deviceId) {
+export async function writeCloudDraft(uid, resumeId, workspace, draft, trustedDevice, identity) {
   const workspaceRef = getWorkspaceDocRef(uid, trustedDevice);
   const draftRef = getResumeDocRef(uid, resumeId, trustedDevice);
 
@@ -200,7 +299,10 @@ export async function writeCloudDraft(uid, resumeId, workspace, draft, trustedDe
 
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const name = normalizedWorkspace.meta[resumeId]?.name || 'Resume';
-  const draftDoc = createCloudDraftDoc({ resumeId, name, draft, deviceId });
+  const cloudIdentity = normalizeCloudIdentity(identity);
+  const draftDoc = createCloudDraftDoc({ resumeId, name, draft, identity: cloudIdentity });
+
+  validateCloudDraftPayload(draftDoc);
 
   const batch = writeBatch(workspaceRef.firestore);
   batch.set(draftRef, draftDoc, { merge: true });
@@ -214,14 +316,15 @@ export async function writeCloudDraft(uid, resumeId, workspace, draft, trustedDe
     },
     updatedAt: draftDoc.updatedAt,
     version: draftDoc.version,
-    deviceId,
+    deviceId: cloudIdentity.deviceId,
+    sessionId: cloudIdentity.sessionId,
   }, { merge: true });
 
   await batch.commit();
   return draftDoc;
 }
 
-export async function deleteCloudResume(uid, resumeId, workspace, trustedDevice, deviceId) {
+export async function deleteCloudResume(uid, resumeId, workspace, trustedDevice, identity) {
   const workspaceRef = getWorkspaceDocRef(uid, trustedDevice);
   const draftRef = getResumeDocRef(uid, resumeId, trustedDevice);
 
@@ -230,6 +333,7 @@ export async function deleteCloudResume(uid, resumeId, workspace, trustedDevice,
   }
 
   const now = new Date().toISOString();
+  const cloudIdentity = normalizeCloudIdentity(identity);
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const batch = writeBatch(workspaceRef.firestore);
 
@@ -241,14 +345,15 @@ export async function deleteCloudResume(uid, resumeId, workspace, trustedDevice,
     meta: normalizedWorkspace.meta,
     updatedAt: now,
     version: Date.now(),
-    deviceId,
+    deviceId: cloudIdentity.deviceId,
+    sessionId: cloudIdentity.sessionId,
   }, { merge: true });
 
   await batch.commit();
   return now;
 }
 
-export async function importWorkspaceToCloud(uid, workspace, readDraft, trustedDevice, deviceId) {
+export async function importWorkspaceToCloud(uid, workspace, readDraft, trustedDevice, identity) {
   const workspaceRef = getWorkspaceDocRef(uid, trustedDevice);
 
   if (!workspaceRef) {
@@ -256,6 +361,7 @@ export async function importWorkspaceToCloud(uid, workspace, readDraft, trustedD
   }
 
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+  const cloudIdentity = normalizeCloudIdentity(identity);
   const cappedResumeIds = normalizedWorkspace.resumeIds.slice(0, CLOUD_WORKSPACE_RESUME_LIMIT);
   const now = new Date().toISOString();
   const batch = writeBatch(workspaceRef.firestore);
@@ -268,9 +374,10 @@ export async function importWorkspaceToCloud(uid, workspace, readDraft, trustedD
       resumeId,
       name,
       draft,
-      deviceId,
+      identity: cloudIdentity,
     });
 
+    validateCloudDraftPayload(draftDoc);
     nextMeta[resumeId] = createWorkspaceResumeMeta(name, draftDoc.updatedAt);
     batch.set(doc(collection(workspaceRef.firestore, 'users', uid, 'resumes'), resumeId), draftDoc, { merge: true });
   }
@@ -288,14 +395,15 @@ export async function importWorkspaceToCloud(uid, workspace, readDraft, trustedD
     ...nextWorkspace,
     updatedAt: now,
     version: Date.now(),
-    deviceId,
+    deviceId: cloudIdentity.deviceId,
+    sessionId: cloudIdentity.sessionId,
   }, { merge: true });
 
   await batch.commit();
   return nextWorkspace;
 }
 
-export async function appendWorkspaceToCloud(uid, cloudWorkspace, localWorkspace, readDraft, trustedDevice, deviceId) {
+export async function appendWorkspaceToCloud(uid, cloudWorkspace, localWorkspace, readDraft, trustedDevice, identity) {
   const workspaceRef = getWorkspaceDocRef(uid, trustedDevice);
 
   if (!workspaceRef) {
@@ -304,6 +412,7 @@ export async function appendWorkspaceToCloud(uid, cloudWorkspace, localWorkspace
 
   const normalizedCloudWorkspace = normalizeWorkspaceIndex(cloudWorkspace);
   const normalizedLocalWorkspace = normalizeWorkspaceIndex(localWorkspace);
+  const cloudIdentity = normalizeCloudIdentity(identity);
   const remainingSlots = CLOUD_WORKSPACE_RESUME_LIMIT - normalizedCloudWorkspace.resumeIds.length;
 
   if (remainingSlots <= 0) {
@@ -329,9 +438,12 @@ export async function appendWorkspaceToCloud(uid, cloudWorkspace, localWorkspace
     existingNames.push(nextName);
     nextWorkspace.resumeIds.push(resumeId);
     nextWorkspace.meta[resumeId] = createWorkspaceResumeMeta(nextName, new Date().toISOString());
+    const draftDoc = createCloudDraftDoc({ resumeId, name: nextName, draft, identity: cloudIdentity });
+
+    validateCloudDraftPayload(draftDoc);
     batch.set(
       doc(collection(workspaceRef.firestore, 'users', uid, 'resumes'), resumeId),
-      createCloudDraftDoc({ resumeId, name: nextName, draft, deviceId }),
+      draftDoc,
       { merge: true },
     );
   }
@@ -341,7 +453,8 @@ export async function appendWorkspaceToCloud(uid, cloudWorkspace, localWorkspace
     ...nextWorkspace,
     updatedAt: new Date().toISOString(),
     version: Date.now(),
-    deviceId,
+    deviceId: cloudIdentity.deviceId,
+    sessionId: cloudIdentity.sessionId,
   }, { merge: true });
 
   await batch.commit();

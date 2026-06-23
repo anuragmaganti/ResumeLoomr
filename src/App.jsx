@@ -54,6 +54,8 @@ function App() {
     resolveConflictWithCloud,
     resolveConflictWithLocal,
     saveConflictAsCopy,
+    retryCloudSync,
+    flushActiveCloudDraft,
     templateOptions,
     resumeList,
     activeResumeId,
@@ -139,6 +141,11 @@ function App() {
     printResume();
   }
 
+  async function handleSignOut() {
+    await flushActiveCloudDraft({ reason: 'signout' });
+    await auth.signOut();
+  }
+
   return (
     <div className="app">
       <div className="appShell">
@@ -165,7 +172,7 @@ function App() {
           isCloudMode={isCloudMode}
           syncState={syncState}
           onOpenAuth={auth.openAuthModal}
-          onSignOut={auth.signOut}
+          onSignOut={handleSignOut}
         />
 
         <AuthModal
@@ -173,6 +180,7 @@ function App() {
           busy={auth.authBusy}
           error={auth.authError}
           trustedDevice={auth.trustedDevice}
+          trustedDeviceLocked={auth.trustedDeviceLocked}
           onTrustedDeviceChange={auth.setTrustedDevice}
           onClose={auth.closeAuthModal}
           onGoogleSignIn={auth.signInWithGoogle}
@@ -183,9 +191,16 @@ function App() {
         {notice && (
           <div className={`noticeBanner noticeBanner--${notice.tone}`} role="status">
             <span>{notice.message}</span>
-            <button type="button" className="noticeDismiss" onClick={dismissNotice} aria-label="Dismiss message">
-              Dismiss
-            </button>
+            <div className="noticeActions">
+              {syncState === 'error' ? (
+                <button type="button" className="noticeDismiss" onClick={retryCloudSync}>
+                  Retry sync
+                </button>
+              ) : null}
+              <button type="button" className="noticeDismiss" onClick={dismissNotice} aria-label="Dismiss message">
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
 

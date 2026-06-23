@@ -7,7 +7,13 @@ import {
   signInWithPopup,
   signOut,
 } from 'firebase/auth';
-import { getFirebaseAuth, hasFirebaseConfig, initializeFirebaseAppCheck } from '../lib/firebaseClient.js';
+import {
+  getFirebaseAuth,
+  getFirebaseDbCacheMode,
+  hasFirebaseConfig,
+  initializeFirebaseAppCheck,
+  isFirebaseDbInitialized,
+} from '../lib/firebaseClient.js';
 import {
   getTrustedDevicePreference,
   setTrustedDevicePreference,
@@ -40,6 +46,7 @@ export function useFirebaseAuth() {
   const [authBusy, setAuthBusy] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [trustedDevice, setTrustedDevice] = useState(() => getTrustedDevicePreference());
+  const trustedDeviceLocked = Boolean(user) || isFirebaseDbInitialized();
 
   useEffect(() => {
     if (!firebaseEnabled) {
@@ -61,6 +68,11 @@ export function useFirebaseAuth() {
   }, [firebaseEnabled]);
 
   function updateTrustedDevice(nextValue) {
+    if (trustedDeviceLocked) {
+      setAuthError('Sign out and back in to change offline cache.');
+      return;
+    }
+
     setTrustedDevice(nextValue);
     setTrustedDevicePreference(nextValue);
   }
@@ -100,6 +112,8 @@ export function useFirebaseAuth() {
     firebaseEnabled,
     isAuthModalOpen,
     trustedDevice,
+    trustedDeviceLocked,
+    dbCacheMode: getFirebaseDbCacheMode(),
     openAuthModal() {
       setAuthError('');
       setIsAuthModalOpen(true);
