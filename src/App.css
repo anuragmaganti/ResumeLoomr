@@ -524,6 +524,257 @@
   background: var(--color-surface);
 }
 
+.settingsLauncher {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 80;
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-muted));
+  color: var(--color-text-subtle);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    background-color var(--transition-base);
+}
+
+.settingsLauncher:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+
+.settingsLauncher svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.accountSettingsOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  pointer-events: none;
+}
+
+.accountSettingsBackdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(3px);
+  pointer-events: auto;
+  cursor: default;
+}
+
+.accountSettingsPanel {
+  position: absolute;
+  left: 18px;
+  bottom: 72px;
+  z-index: 1;
+  display: grid;
+  gap: var(--space-4);
+  width: min(420px, calc(100vw - 36px));
+  padding: var(--space-5);
+  background: var(--color-surface);
+  pointer-events: auto;
+  animation: settingsPanelIn 180ms ease both;
+}
+
+.accountSettingsHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.accountSettingsEyebrow {
+  margin: 0 0 5px;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.accountSettingsHeader h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.connectionSummary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 0 0, var(--color-accent-soft), transparent 42%),
+    var(--color-surface-muted);
+}
+
+.connectionOrb {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-text-muted);
+  box-shadow: inset 0 0 0 6px var(--color-surface);
+}
+
+.connectionOrb.isCloud {
+  border-color: var(--color-success-border);
+  background: var(--color-success);
+}
+
+.connectionOrb.isRemembered {
+  border-color: var(--color-info-border);
+  background: var(--color-info);
+}
+
+.connectionMode {
+  margin: 0 0 4px;
+  color: var(--color-text-subtle);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.connectionAccount {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connectionDetails {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.connectionDetails div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface-soft);
+}
+
+.connectionDetails dt {
+  margin: 0 0 4px;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.connectionDetails dd {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.accountSettingsNote {
+  padding: var(--space-3);
+  border: 1px solid var(--color-info-border);
+  border-radius: 16px;
+  background: var(--color-info-soft);
+  color: var(--color-text);
+}
+
+.accountSettingsNote strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+}
+
+.accountSettingsNote p {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.accountSettingsPrimary {
+  width: 100%;
+  min-height: 38px;
+}
+
+.disconnectBox {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-danger-bg);
+}
+
+.disconnectBox h3 {
+  margin: 0 0 5px;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.disconnectBox p {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.accountSettingsDanger {
+  width: 100%;
+  min-height: 38px;
+}
+
+.disconnectActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.disconnectActions .button {
+  min-height: 36px;
+  padding-inline: 12px;
+  font-size: 0.78rem;
+}
+
+@keyframes settingsPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .authDialogHeader {
   display: flex;
   align-items: flex-start;
@@ -1456,6 +1707,27 @@
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .settingsLauncher {
+    left: 12px;
+    bottom: 12px;
+    width: 38px;
+    height: 38px;
+  }
+
+  .accountSettingsPanel {
+    left: 8px;
+    right: 8px;
+    bottom: 58px;
+    width: auto;
+    max-height: calc(100dvh - 76px);
+    overflow: auto;
+    padding: var(--space-4);
+  }
+
+  .connectionDetails {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media print {
@@ -1474,6 +1746,8 @@
   .noticeBanner,
   .conflictBanner,
   .authOverlay,
+  .settingsLauncher,
+  .accountSettingsOverlay,
   .mobileWorkspaceToggle,
   .workspaceColumnEditor,
   .editorPanel {

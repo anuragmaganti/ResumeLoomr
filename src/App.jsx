@@ -5,10 +5,12 @@ import './styles/forms.css'
 import './styles/preview.css'
 import Header from './components/header';
 import AuthModal from './components/authModal';
+import AccountSettings from './components/accountSettings';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/editorPanel';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
+import { clearBrowserResumeConnectionData } from './lib/browserConnection.js';
 
 const THEME_STORAGE_KEY = 'resumeloomr:theme';
 
@@ -17,6 +19,7 @@ function App() {
   const documentTitleRef = useRef('ResumeLoomr | Professional Resume Builder');
   const [editorStageMaxHeight, setEditorStageMaxHeight] = useState(null);
   const auth = useFirebaseAuth();
+  const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') {
       return 'light';
@@ -146,6 +149,21 @@ function App() {
     await auth.signOut();
   }
 
+  function handleOpenAuthFromSettings() {
+    setIsAccountSettingsOpen(false);
+    auth.openAuthModal();
+  }
+
+  async function handleDisconnectBrowser() {
+    if (auth.user) {
+      await flushActiveCloudDraft({ reason: 'disconnect-browser' });
+    }
+
+    await auth.clearBrowserConnection();
+    clearBrowserResumeConnectionData();
+    window.location.reload();
+  }
+
   return (
     <div className="app">
       <div className="appShell">
@@ -186,6 +204,20 @@ function App() {
           onGoogleSignIn={auth.signInWithGoogle}
           onEmailSignIn={auth.signInWithEmail}
           onEmailSignUp={auth.signUpWithEmail}
+        />
+
+        <AccountSettings
+          isOpen={isAccountSettingsOpen}
+          authUser={auth.user}
+          connectedAccount={auth.connectedAccount}
+          firebaseEnabled={auth.firebaseEnabled}
+          trustedDevice={auth.trustedDevice}
+          syncState={syncState}
+          busy={auth.authBusy}
+          onOpen={() => setIsAccountSettingsOpen(true)}
+          onClose={() => setIsAccountSettingsOpen(false)}
+          onOpenAuth={handleOpenAuthFromSettings}
+          onDisconnectBrowser={handleDisconnectBrowser}
         />
 
         {notice && (

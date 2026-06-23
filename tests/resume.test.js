@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  DRAFT_STORAGE_KEY,
   MAX_WORKSPACE_RESUMES,
   SECTION_IDS,
   WORKSPACE_INDEX_STORAGE_KEY,
@@ -38,7 +39,11 @@ import {
   validateResume,
 } from '../src/lib/resume.js';
 import {
+  CLOUD_DEVICE_ID_KEY,
   CLOUD_DRAFT_MAX_BYTES,
+  CLOUD_IMPORT_PREFIX,
+  CLOUD_SESSION_ID_KEY,
+  CLOUD_TRUSTED_DEVICE_KEY,
   getCloudSessionId,
   validateCloudDraftPayload,
 } from '../src/lib/firebaseWorkspace.js';
@@ -48,6 +53,12 @@ import {
   persistCloudDraftMirror,
   persistCloudWorkspaceMirror,
 } from '../src/lib/localWorkspaceMirror.js';
+import {
+  CONNECTED_ACCOUNT_STORAGE_KEY,
+  clearBrowserResumeConnectionData,
+  readConnectedAccount,
+  writeConnectedAccount,
+} from '../src/lib/browserConnection.js';
 
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = path.resolve(TEST_FILE_DIR, '../src');
@@ -64,6 +75,12 @@ function createMemoryStorage(initialEntries = []) {
     },
     removeItem(key) {
       values.delete(key);
+    },
+    key(index) {
+      return Array.from(values.keys())[index] || null;
+    },
+    get length() {
+      return values.size;
     },
     values,
   };
@@ -278,6 +295,49 @@ test('cloud draft mirror writes only mirrored resume drafts', () => {
   });
 
   assert.equal(JSON.parse(storage.getItem(createResumeStorageKey('resume-1'))).template, 'compact');
+});
+
+test('connected account helpers persist user-facing account context', () => {
+  const storage = createMemoryStorage();
+  const account = writeConnectedAccount({
+    uid: 'user-1',
+    email: 'person@example.com',
+    displayName: 'Person Example',
+  }, {
+    trustedDevice: true,
+    cacheMode: 'persistent',
+  }, storage);
+
+  assert.equal(account.email, 'person@example.com');
+  assert.deepEqual(readConnectedAccount(storage), account);
+});
+
+test('clearing browser connection data removes resume and account keys only', () => {
+  const storage = createMemoryStorage([
+    [WORKSPACE_INDEX_STORAGE_KEY, '{}'],
+    [DRAFT_STORAGE_KEY, '{}'],
+    [createResumeStorageKey('resume-1'), '{}'],
+    [GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY, '{}'],
+    [CONNECTED_ACCOUNT_STORAGE_KEY, '{}'],
+    [`${CLOUD_IMPORT_PREFIX}user-1`, 'true'],
+    [CLOUD_DEVICE_ID_KEY, 'device-1'],
+    [CLOUD_TRUSTED_DEVICE_KEY, 'true'],
+    ['resumeloomr:theme', 'dark'],
+  ]);
+  const sessionStorage = createMemoryStorage([
+    [CLOUD_SESSION_ID_KEY, 'session-1'],
+  ]);
+
+  clearBrowserResumeConnectionData({ storage, sessionStorage });
+
+  assert.equal(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY), null);
+  assert.equal(storage.getItem(DRAFT_STORAGE_KEY), null);
+  assert.equal(storage.getItem(createResumeStorageKey('resume-1')), null);
+  assert.equal(storage.getItem(CONNECTED_ACCOUNT_STORAGE_KEY), null);
+  assert.equal(storage.getItem(CLOUD_DEVICE_ID_KEY), null);
+  assert.equal(storage.getItem(CLOUD_TRUSTED_DEVICE_KEY), null);
+  assert.equal(sessionStorage.getItem(CLOUD_SESSION_ID_KEY), null);
+  assert.equal(storage.getItem('resumeloomr:theme'), 'dark');
 });
 
 test('normalizeResumeSettings clamps invalid values into the supported range', () => {

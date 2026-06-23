@@ -2,10 +2,13 @@ import { initializeApp } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { getAuth } from 'firebase/auth';
 import {
+  clearIndexedDbPersistence,
+  getFirestore,
   initializeFirestore,
   memoryLocalCache,
   persistentLocalCache,
   persistentMultipleTabManager,
+  terminate,
 } from 'firebase/firestore';
 
 const env = import.meta.env || {};
@@ -120,4 +123,30 @@ export function isFirebaseDbInitialized() {
 
 export function getFirebaseDbCacheFallbackReason() {
   return dbCacheFallbackReason;
+}
+
+export async function clearFirebaseBrowserCache() {
+  const app = getFirebaseApp();
+  const db = dbInstance || (app ? getFirestore(app) : null);
+
+  if (!db) {
+    dbCacheMode = null;
+    dbCacheFallbackReason = '';
+    return;
+  }
+
+  const shouldTerminate = Boolean(dbInstance);
+  dbInstance = null;
+  dbCacheMode = null;
+
+  try {
+    if (shouldTerminate) {
+      await terminate(db);
+    }
+
+    await clearIndexedDbPersistence(db);
+    dbCacheFallbackReason = '';
+  } catch (error) {
+    dbCacheFallbackReason = error?.message || 'Could not clear Firebase browser cache.';
+  }
 }

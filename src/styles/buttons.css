@@ -41,7 +41,9 @@
 .tabButton:focus-visible,
 .toolbarSelect:focus-visible,
 .mobileWorkspaceButton:focus-visible,
-.noticeDismiss:focus-visible {
+.noticeDismiss:focus-visible,
+.settingsLauncher:focus-visible,
+.accountSettingsBackdrop:focus-visible {
   outline: 3px solid var(--color-accent-soft);
   outline-offset: 0;
 }

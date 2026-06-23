@@ -8,12 +8,18 @@ import {
   signOut,
 } from 'firebase/auth';
 import {
+  clearFirebaseBrowserCache,
   getFirebaseAuth,
   getFirebaseDbCacheMode,
   hasFirebaseConfig,
   initializeFirebaseAppCheck,
   isFirebaseDbInitialized,
 } from '../lib/firebaseClient.js';
+import {
+  clearConnectedAccount,
+  readConnectedAccount,
+  writeConnectedAccount,
+} from '../lib/browserConnection.js';
 import {
   getTrustedDevicePreference,
   setTrustedDevicePreference,
@@ -46,6 +52,7 @@ export function useFirebaseAuth() {
   const [authBusy, setAuthBusy] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [trustedDevice, setTrustedDevice] = useState(() => getTrustedDevicePreference());
+  const [connectedAccount, setConnectedAccount] = useState(() => readConnectedAccount());
   const trustedDeviceLocked = Boolean(user) || isFirebaseDbInitialized();
 
   useEffect(() => {
@@ -62,10 +69,20 @@ export function useFirebaseAuth() {
     }
 
     return onAuthStateChanged(auth, (nextUser) => {
+      if (nextUser) {
+        const account = writeConnectedAccount(nextUser, {
+          trustedDevice,
+          cacheMode: getFirebaseDbCacheMode(),
+        });
+        setConnectedAccount(account);
+      } else {
+        setConnectedAccount(readConnectedAccount());
+      }
+
       setUser(nextUser);
       setAuthReady(true);
     });
-  }, [firebaseEnabled]);
+  }, [firebaseEnabled, trustedDevice]);
 
   function updateTrustedDevice(nextValue) {
     if (trustedDeviceLocked) {
@@ -106,6 +123,7 @@ export function useFirebaseAuth() {
 
   return {
     user,
+    connectedAccount,
     authReady,
     authBusy,
     authError,
@@ -144,6 +162,28 @@ export function useFirebaseAuth() {
 
       try {
         await signOut(auth);
+      } catch (error) {
+        setAuthError(getFriendlyAuthError(error));
+      } finally {
+        setAuthBusy(false);
+      }
+    },
+    async clearBrowserConnection() {
+      setAuthError('');
+      const auth = getFirebaseAuth();
+
+      setAuthBusy(true);
+
+      try {
+        if (auth?.currentUser) {
+          await signOut(auth);
+        }
+
+        await clearFirebaseBrowserCache();
+        clearConnectedAccount();
+        setTrustedDevice(false);
+        setTrustedDevicePreference(false);
+        setConnectedAccount(null);
       } catch (error) {
         setAuthError(getFriendlyAuthError(error));
       } finally {
