@@ -9,6 +9,7 @@ import { z } from 'zod';
 import {
   DEFAULT_TEMPLATE,
   SECTION_IDS,
+  getPreviewModel,
   normalizeDraftPayload,
   sanitizeWorkspaceResumeName,
   trimText,
@@ -726,6 +727,11 @@ export function validateImportedDraftCoverage(draft, sourceCoverage) {
   };
 }
 
+export function hasUsableImportedDraft(draft) {
+  const normalized = normalizeDraftPayload(draft);
+  return getPreviewModel(normalized.resume).hasContent;
+}
+
 async function runWithTimeout(promise, ms) {
   let timeoutId;
   const timeoutPromise = new Promise((_, reject) => {
@@ -1412,8 +1418,8 @@ export async function parseResumeWithGemini(file) {
   const repairedImport = applySourceAwareImportCleanup(rawRepairedImport, sourceCoverage);
   const repairedCoverageValidation = validateImportedDraftCoverage(repairedImport.draft, sourceCoverage);
 
-  if (!repairedCoverageValidation.ok) {
-    throw new ImportResumeError('Resume import missed too much information. Try again with another file.', {
+  if (!repairedCoverageValidation.ok && !hasUsableImportedDraft(repairedImport.draft)) {
+    throw new ImportResumeError('Resume import could not extract usable information. Try again with another file.', {
       statusCode: 502,
       code: 'import/incomplete-ai-response',
     });
@@ -1425,7 +1431,9 @@ export async function parseResumeWithGemini(file) {
       ...repairedImport.draft,
       importWarnings: [
         ...importWarnings,
-        'Some sections may need review because the first extraction pass needed repair.',
+        repairedCoverageValidation.ok
+          ? 'Some sections may need review because the first extraction pass needed repair.'
+          : 'Some sections may need review because the import could not verify every source detail.',
       ],
     },
   };

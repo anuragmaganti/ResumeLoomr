@@ -82,6 +82,7 @@ import {
   applySourceAwareImportCleanup,
   assessExtractedResumeText,
   getGeminiErrorDetails,
+  hasUsableImportedDraft,
   normalizeImportFilePayload,
   normalizeImportedResumeDraft,
   validateImportedDraftCoverage,
@@ -419,6 +420,37 @@ test('full import coverage rejects drafts that drop source highlights and awards
   assert.match(validation.issues.join(' '), /awards/);
   assert.match(validation.issues.join(' '), /GPA/);
   assert.match(validation.issues.join(' '), /coursework/i);
+});
+
+test('incomplete but usable imports can be applied with a warning instead of being blocked', () => {
+  const sourceCoverage = analyzeResumeSourceCoverage(`
+    EXPERIENCE
+    Acme, Analyst 2024
+    • First source bullet
+    • Second source bullet
+    • Third source bullet
+    • Fourth source bullet
+    • Fifth source bullet
+    • Sixth source bullet
+  `);
+  const imported = normalizeImportedResumeDraft({
+    resume: {
+      experience: [
+        {
+          company: 'Acme',
+          role: 'Analyst',
+          yearsExp: '2024',
+          activities: ['First source bullet', 'Second source bullet'],
+        },
+      ],
+    },
+  });
+  const emptyImport = normalizeImportedResumeDraft({ resume: {} });
+  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage);
+
+  assert.equal(validation.ok, false);
+  assert.equal(hasUsableImportedDraft(imported.draft), true);
+  assert.equal(hasUsableImportedDraft(emptyImport.draft), false);
 });
 
 test('full import coverage accepts drafts that preserve source details', () => {
