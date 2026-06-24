@@ -20,6 +20,7 @@ import {
   DRAFT_STORAGE_KEY,
   DEFAULT_TEMPLATE,
   MAX_WORKSPACE_RESUMES,
+  RESUME_STORAGE_KEY_PREFIX,
   SECTION_IDS,
   TEMPLATE_OPTIONS,
   WORKSPACE_INDEX_STORAGE_KEY,
@@ -68,6 +69,7 @@ import {
   validateResume,
 } from '../lib/resume.js';
 import {
+  createGuestMirrorWorkspace,
   persistCloudDraftMirror,
   persistCloudWorkspaceMirror,
   readCloudMirrorManifest,
@@ -106,6 +108,29 @@ function persistExistingDraftState(resumeId, draft) {
   }
 
   window.localStorage.setItem(createResumeStorageKey(resumeId), JSON.stringify(serializeDraftState(draft)));
+}
+
+function pruneStoredResumeDraftsToWorkspace(workspace) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const resumeIds = new Set(workspace.resumeIds);
+  const keysToRemove = [];
+
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+
+    if (key?.startsWith(RESUME_STORAGE_KEY_PREFIX)) {
+      const resumeId = key.slice(RESUME_STORAGE_KEY_PREFIX.length);
+
+      if (!resumeIds.has(resumeId)) {
+        keysToRemove.push(key);
+      }
+    }
+  }
+
+  keysToRemove.forEach((key) => window.localStorage.removeItem(key));
 }
 
 function readStoredResumeDraft(resumeId) {
@@ -169,13 +194,21 @@ function loadStoredWorkspace() {
         };
       }
 
-      const activeResumeId = normalizedWorkspace.activeResumeId || normalizedWorkspace.resumeIds[0];
+      const localWorkspace = createGuestMirrorWorkspace(normalizedWorkspace);
+      const activeResumeId = localWorkspace.activeResumeId || localWorkspace.resumeIds[0];
+
+      if (
+        localWorkspace.resumeIds.length !== normalizedWorkspace.resumeIds.length ||
+        localWorkspace.activeResumeId !== normalizedWorkspace.activeResumeId ||
+        localWorkspace.resumeIds.some((resumeId, index) => resumeId !== normalizedWorkspace.resumeIds[index])
+      ) {
+        persistWorkspaceIndex(localWorkspace);
+      }
+
+      pruneStoredResumeDraftsToWorkspace(localWorkspace);
 
       return {
-        workspace: {
-          ...normalizedWorkspace,
-          activeResumeId,
-        },
+        workspace: localWorkspace,
         activeResumeId,
         draft: readStoredResumeDraft(activeResumeId),
         needsInitialCommit: false,

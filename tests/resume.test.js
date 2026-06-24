@@ -650,6 +650,21 @@ test('builder reloads the local recent workspace when signing out of cloud mode'
   assert.match(signOutBranchSource, /wasCloudModeRef\.current = false/);
 });
 
+test('builder normalizes stale local workspaces to the recent ten on refresh', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const loadStart = source.indexOf('function loadStoredWorkspace()');
+  const loadEnd = source.indexOf('function formatSavedAt(', loadStart);
+  const loadSource = source.slice(loadStart, loadEnd);
+
+  assert.ok(loadStart > -1);
+  assert.match(source, /createGuestMirrorWorkspace,/);
+  assert.match(source, /function pruneStoredResumeDraftsToWorkspace\(workspace\)/);
+  assert.match(loadSource, /const localWorkspace = createGuestMirrorWorkspace\(normalizedWorkspace\)/);
+  assert.match(loadSource, /persistWorkspaceIndex\(localWorkspace\)/);
+  assert.match(loadSource, /pruneStoredResumeDraftsToWorkspace\(localWorkspace\)/);
+  assert.match(loadSource, /workspace: localWorkspace,/);
+});
+
 test('builder reconciles signed-out local workspace changes on every sign-in', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const bootstrapStart = source.indexOf('async function bootstrapCloudWorkspace()');
