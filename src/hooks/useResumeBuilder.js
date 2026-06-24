@@ -61,6 +61,10 @@ import {
   removeResumeSectionBlock,
   removeRoleBlockActivity,
   removeRoleBlockEntry,
+  removeSectionBlockEducationCustomSection,
+  removeSectionBlockEducationProgram,
+  removeSectionBlockEntry,
+  removeSectionBlockTextListItem,
   reorderSectionOrder,
   reorderResumeSectionBlock,
   sanitizeWorkspaceResumeName,
@@ -74,9 +78,21 @@ import {
   updateResumeSetting as updateResumeSettingValue,
   updateRoleBlockActivity,
   updateRoleBlockEntry,
+  updateSectionBlockEducationCustomSection,
+  updateSectionBlockEducationProgram,
+  updateSectionBlockEntry,
+  updateSectionBlockTextList,
   updateSectionTitle,
   addRoleBlockActivity,
   addRoleBlockEntry,
+  addSectionBlockEducationCustomSection,
+  addSectionBlockEducationProgram,
+  addSectionBlockEntry,
+  addSectionBlockTextListItem,
+  moveSectionBlockEducationCustomSection,
+  moveSectionBlockEducationProgram,
+  moveSectionBlockEntry,
+  moveSectionBlockTextListItem,
   validateResume,
 } from '../lib/resume.js';
 import {
@@ -1753,6 +1769,54 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     },
     removeRoleBlockActivity(sectionId, entryId, activityIndex) {
       updateResume((currentResume) => removeRoleBlockActivity(currentResume, sectionId, entryId, activityIndex));
+    },
+    updateSectionBlockEntry(sectionId, entryId, field, value) {
+      updateResume((currentResume) => updateSectionBlockEntry(currentResume, sectionId, entryId, field, value));
+    },
+    addSectionBlockEntry(sectionId) {
+      updateResume((currentResume) => addSectionBlockEntry(currentResume, sectionId));
+    },
+    moveSectionBlockEntry(sectionId, entryId, direction) {
+      updateResume((currentResume) => moveSectionBlockEntry(currentResume, sectionId, entryId, direction));
+    },
+    removeSectionBlockEntry(sectionId, entryId) {
+      updateResume((currentResume) => removeSectionBlockEntry(currentResume, sectionId, entryId));
+    },
+    updateSectionBlockTextList(sectionId, entryId, field, itemIndex, value) {
+      updateResume((currentResume) => updateSectionBlockTextList(currentResume, sectionId, entryId, field, itemIndex, value));
+    },
+    addSectionBlockTextListItem(sectionId, entryId, field) {
+      updateResume((currentResume) => addSectionBlockTextListItem(currentResume, sectionId, entryId, field));
+    },
+    moveSectionBlockTextListItem(sectionId, entryId, field, itemIndex, direction) {
+      updateResume((currentResume) => moveSectionBlockTextListItem(currentResume, sectionId, entryId, field, itemIndex, direction));
+    },
+    removeSectionBlockTextListItem(sectionId, entryId, field, itemIndex) {
+      updateResume((currentResume) => removeSectionBlockTextListItem(currentResume, sectionId, entryId, field, itemIndex));
+    },
+    updateSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, field, value) {
+      updateResume((currentResume) => updateSectionBlockEducationCustomSection(currentResume, sectionId, entryId, sectionIndex, field, value));
+    },
+    addSectionBlockEducationCustomSection(sectionId, entryId) {
+      updateResume((currentResume) => addSectionBlockEducationCustomSection(currentResume, sectionId, entryId));
+    },
+    moveSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, direction) {
+      updateResume((currentResume) => moveSectionBlockEducationCustomSection(currentResume, sectionId, entryId, sectionIndex, direction));
+    },
+    removeSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex) {
+      updateResume((currentResume) => removeSectionBlockEducationCustomSection(currentResume, sectionId, entryId, sectionIndex));
+    },
+    updateSectionBlockEducationProgram(sectionId, entryId, programIndex, field, value) {
+      updateResume((currentResume) => updateSectionBlockEducationProgram(currentResume, sectionId, entryId, programIndex, field, value));
+    },
+    addSectionBlockEducationProgram(sectionId, entryId) {
+      updateResume((currentResume) => addSectionBlockEducationProgram(currentResume, sectionId, entryId));
+    },
+    moveSectionBlockEducationProgram(sectionId, entryId, programIndex, direction) {
+      updateResume((currentResume) => moveSectionBlockEducationProgram(currentResume, sectionId, entryId, programIndex, direction));
+    },
+    removeSectionBlockEducationProgram(sectionId, entryId, programIndex) {
+      updateResume((currentResume) => removeSectionBlockEducationProgram(currentResume, sectionId, entryId, programIndex));
     },
     updateCollectionEntry(sectionKey, entryId, field, value) {
       updateResume((currentResume) => updateCollectionEntry(currentResume, sectionKey, entryId, field, value));

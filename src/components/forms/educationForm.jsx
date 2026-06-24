@@ -5,11 +5,55 @@ import { buildEntrySummary } from "./buildEntrySummary";
 import EntryActionMenu from "./entryActionMenu";
 import FormFieldError from "./formFieldError";
 
-export default function EducationForm({ education, actions, getFieldError, markTouched }) {
+export default function EducationForm({ education = [], section, actions, getFieldError, markTouched }) {
+    const entries = section?.entries || education;
+    const sectionId = section?.id || '';
+    const isBlockEditor = Boolean(sectionId);
+
+    const pathFor = (entryId, field) => (
+        isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `education.${entryId}.${field}`
+    );
+    const updateField = (entryId, field, value) => (
+        isBlockEditor
+            ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
+            : actions.updateEducationField(entryId, field, value)
+    );
+    const addEntry = () => (
+        isBlockEditor ? actions.addSectionBlockEntry(sectionId) : actions.addEducation()
+    );
+    const moveEntry = (entryId, direction) => (
+        isBlockEditor ? actions.moveSectionBlockEntry(sectionId, entryId, direction) : actions.moveEducation(entryId, direction)
+    );
+    const removeEntry = (entryId) => (
+        isBlockEditor ? actions.removeSectionBlockEntry(sectionId, entryId) : actions.removeEducation(entryId)
+    );
+    const updateCustomSection = (entryId, sectionIndex, field, value) => (
+        isBlockEditor
+            ? actions.updateSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, field, value)
+            : actions.updateEducationCustomSection(entryId, sectionIndex, field, value)
+    );
+    const addCustomSection = (entryId) => (
+        isBlockEditor
+            ? actions.addSectionBlockEducationCustomSection(sectionId, entryId)
+            : actions.addEducationCustomSection(entryId)
+    );
+    const moveCustomSection = (entryId, sectionIndex, direction) => (
+        isBlockEditor
+            ? actions.moveSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, direction)
+            : actions.moveEducationCustomSection(entryId, sectionIndex, direction)
+    );
+    const removeCustomSection = (entryId, sectionIndex) => (
+        isBlockEditor
+            ? actions.removeSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex)
+            : actions.removeEducationCustomSection(entryId, sectionIndex)
+    );
+
     return (
         <div className="formStack">
-            {education.map((entry, index) => {
+            {entries.map((entry, index) => {
                 const customSections = ensureEducationCustomSections(entry.customSections);
+                const programs = Array.isArray(entry.programs) ? entry.programs : [];
+                const usesPrograms = isBlockEditor && programs.length > 0;
 
                 return (
                 <CollapsibleEntryCard
@@ -24,12 +68,12 @@ export default function EducationForm({ education, actions, getFieldError, markT
                     moveUpLabel={`Move education ${index + 1} up`}
                     moveDownLabel={`Move education ${index + 1} down`}
                     removeLabel={`Remove education ${index + 1}`}
-                    onMoveUp={() => actions.moveEducation(entry.id, -1)}
-                    onMoveDown={() => actions.moveEducation(entry.id, 1)}
-                    onRemove={() => actions.removeEducation(entry.id)}
+                    onMoveUp={() => moveEntry(entry.id, -1)}
+                    onMoveDown={() => moveEntry(entry.id, 1)}
+                    onRemove={() => removeEntry(entry.id)}
                     disableUp={index === 0}
-                    disableDown={index === education.length - 1}
-                    disableRemove={education.length === 1}
+                    disableDown={index === entries.length - 1}
+                    disableRemove={entries.length === 1}
                 >
                     <form onSubmit={(event) => event.preventDefault()}>
                         <div className="field">
@@ -38,39 +82,11 @@ export default function EducationForm({ education, actions, getFieldError, markT
                                 type="text"
                                 id={`school-${entry.id}`}
                                 value={entry.school}
-                                onChange={(event) => actions.updateEducationField(entry.id, 'school', event.target.value)}
-                                onBlur={() => markTouched(`education.${entry.id}.school`)}
+                                onChange={(event) => updateField(entry.id, 'school', event.target.value)}
+                                onBlur={() => markTouched(pathFor(entry.id, 'school'))}
                                 placeholder="University or school name"
                             />
-                            <FormFieldError message={getFieldError(`education.${entry.id}.school`)} />
-                        </div>
-
-                        <div className="fieldGrid fieldGridTwo">
-                            <div className="field">
-                                <label htmlFor={`degree-${entry.id}`}>Degree or program</label>
-                                <input
-                                    type="text"
-                                    id={`degree-${entry.id}`}
-                                    value={entry.degree}
-                                    onChange={(event) => actions.updateEducationField(entry.id, 'degree', event.target.value)}
-                                    onBlur={() => markTouched(`education.${entry.id}.degree`)}
-                                    placeholder="B.S. Computer Science"
-                                />
-                                <FormFieldError message={getFieldError(`education.${entry.id}.degree`)} />
-                            </div>
-
-                            <div className="field">
-                                <label htmlFor={`yearsEdu-${entry.id}`}>Dates</label>
-                                <input
-                                    type="text"
-                                    id={`yearsEdu-${entry.id}`}
-                                    value={entry.yearsEdu}
-                                    onChange={(event) => actions.updateEducationField(entry.id, 'yearsEdu', event.target.value)}
-                                    onBlur={() => markTouched(`education.${entry.id}.yearsEdu`)}
-                                    placeholder="2020 - 2024"
-                                />
-                                <FormFieldError message={getFieldError(`education.${entry.id}.yearsEdu`)} />
-                            </div>
+                            <FormFieldError message={getFieldError(pathFor(entry.id, 'school'))} />
                         </div>
 
                         <div className="fieldGrid fieldGridTwo">
@@ -80,44 +96,160 @@ export default function EducationForm({ education, actions, getFieldError, markT
                                     type="text"
                                     id={`location-${entry.id}`}
                                     value={entry.location}
-                                    onChange={(event) => actions.updateEducationField(entry.id, 'location', event.target.value)}
-                                    onBlur={() => markTouched(`education.${entry.id}.location`)}
+                                    onChange={(event) => updateField(entry.id, 'location', event.target.value)}
+                                    onBlur={() => markTouched(pathFor(entry.id, 'location'))}
                                     placeholder="Cambridge, MA"
                                 />
                             </div>
 
                             <div className="field">
-                                <label htmlFor={`gpa-${entry.id}`}>GPA</label>
+                                <label htmlFor={`yearsEdu-${entry.id}`}>{usesPrograms ? 'Institution dates' : 'Dates'}</label>
                                 <input
                                     type="text"
-                                    id={`gpa-${entry.id}`}
-                                    value={entry.gpa}
-                                    onChange={(event) => actions.updateEducationField(entry.id, 'gpa', event.target.value)}
-                                    onBlur={() => markTouched(`education.${entry.id}.gpa`)}
-                                    placeholder="3.9 / 4.0"
+                                    id={`yearsEdu-${entry.id}`}
+                                    value={entry.yearsEdu}
+                                    onChange={(event) => updateField(entry.id, 'yearsEdu', event.target.value)}
+                                    onBlur={() => markTouched(pathFor(entry.id, 'yearsEdu'))}
+                                    placeholder="2020 - 2024"
                                 />
+                                <FormFieldError message={getFieldError(pathFor(entry.id, 'yearsEdu'))} />
                             </div>
                         </div>
 
-                        <div className="field">
-                            <label htmlFor={`honors-${entry.id}`}>Honors</label>
-                            <input
-                                type="text"
-                                id={`honors-${entry.id}`}
-                                value={entry.honors}
-                                onChange={(event) => actions.updateEducationField(entry.id, 'honors', event.target.value)}
-                                onBlur={() => markTouched(`education.${entry.id}.honors`)}
-                                placeholder="Magna Cum Laude, Dean's List"
-                            />
-                        </div>
+                        {usesPrograms ? (
+                            <div className="field">
+                                <label>Programs</label>
+                                <div className="nestedEntryStack">
+                                    {programs.map((program, programIndex) => (
+                                        <div className="nestedEntryCard" key={program.id}>
+                                            <div className="nestedEntryRow">
+                                                <div className="nestedEntryContent">
+                                                    <div className="fieldGrid fieldGridTwo">
+                                                        <div className="field">
+                                                            <label htmlFor={`education-program-degree-${entry.id}-${program.id}`}>Degree or program</label>
+                                                            <input
+                                                                type="text"
+                                                                id={`education-program-degree-${entry.id}-${program.id}`}
+                                                                value={program.degree}
+                                                                onChange={(event) => actions.updateSectionBlockEducationProgram(sectionId, entry.id, programIndex, 'degree', event.target.value)}
+                                                                onBlur={() => markTouched(pathFor(entry.id, `programs.${programIndex}.degree`))}
+                                                                placeholder="B.S. Computer Science"
+                                                            />
+                                                        </div>
+
+                                                        <div className="field">
+                                                            <label htmlFor={`education-program-years-${entry.id}-${program.id}`}>Dates</label>
+                                                            <input
+                                                                type="text"
+                                                                id={`education-program-years-${entry.id}-${program.id}`}
+                                                                value={program.yearsEdu}
+                                                                onChange={(event) => actions.updateSectionBlockEducationProgram(sectionId, entry.id, programIndex, 'yearsEdu', event.target.value)}
+                                                                onBlur={() => markTouched(pathFor(entry.id, `programs.${programIndex}.yearsEdu`))}
+                                                                placeholder="2020 - 2024"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="fieldGrid fieldGridTwo">
+                                                        <div className="field">
+                                                            <label htmlFor={`education-program-gpa-${entry.id}-${program.id}`}>GPA</label>
+                                                            <input
+                                                                type="text"
+                                                                id={`education-program-gpa-${entry.id}-${program.id}`}
+                                                                value={program.gpa}
+                                                                onChange={(event) => actions.updateSectionBlockEducationProgram(sectionId, entry.id, programIndex, 'gpa', event.target.value)}
+                                                                onBlur={() => markTouched(pathFor(entry.id, `programs.${programIndex}.gpa`))}
+                                                                placeholder="3.9 / 4.0"
+                                                            />
+                                                        </div>
+
+                                                        <div className="field">
+                                                            <label htmlFor={`education-program-honors-${entry.id}-${program.id}`}>Honors</label>
+                                                            <input
+                                                                type="text"
+                                                                id={`education-program-honors-${entry.id}-${program.id}`}
+                                                                value={program.honors}
+                                                                onChange={(event) => actions.updateSectionBlockEducationProgram(sectionId, entry.id, programIndex, 'honors', event.target.value)}
+                                                                onBlur={() => markTouched(pathFor(entry.id, `programs.${programIndex}.honors`))}
+                                                                placeholder="Magna Cum Laude"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="activityActions nestedEntryActions">
+                                                    <EntryActionMenu
+                                                        menuLabel={`Program ${programIndex + 1} actions`}
+                                                        moveUpLabel={`Move program ${programIndex + 1} up`}
+                                                        moveDownLabel={`Move program ${programIndex + 1} down`}
+                                                        removeLabel={`Remove program ${programIndex + 1}`}
+                                                        onMoveUp={() => actions.moveSectionBlockEducationProgram(sectionId, entry.id, programIndex, -1)}
+                                                        onMoveDown={() => actions.moveSectionBlockEducationProgram(sectionId, entry.id, programIndex, 1)}
+                                                        onRemove={() => actions.removeSectionBlockEducationProgram(sectionId, entry.id, programIndex)}
+                                                        disableUp={programIndex === 0}
+                                                        disableDown={programIndex === programs.length - 1}
+                                                        disableRemove={programs.length === 1}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <button className="button buttonSecondary addInlineButton" type="button" onClick={() => actions.addSectionBlockEducationProgram(sectionId, entry.id)}>
+                                    Add program
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="fieldGrid fieldGridTwo">
+                                    <div className="field">
+                                        <label htmlFor={`degree-${entry.id}`}>Degree or program</label>
+                                        <input
+                                            type="text"
+                                            id={`degree-${entry.id}`}
+                                            value={entry.degree}
+                                            onChange={(event) => updateField(entry.id, 'degree', event.target.value)}
+                                            onBlur={() => markTouched(pathFor(entry.id, 'degree'))}
+                                            placeholder="B.S. Computer Science"
+                                        />
+                                        <FormFieldError message={getFieldError(pathFor(entry.id, 'degree'))} />
+                                    </div>
+
+                                    <div className="field">
+                                        <label htmlFor={`gpa-${entry.id}`}>GPA</label>
+                                        <input
+                                            type="text"
+                                            id={`gpa-${entry.id}`}
+                                            value={entry.gpa}
+                                            onChange={(event) => updateField(entry.id, 'gpa', event.target.value)}
+                                            onBlur={() => markTouched(pathFor(entry.id, 'gpa'))}
+                                            placeholder="3.9 / 4.0"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="field">
+                                    <label htmlFor={`honors-${entry.id}`}>Honors</label>
+                                    <input
+                                        type="text"
+                                        id={`honors-${entry.id}`}
+                                        value={entry.honors}
+                                        onChange={(event) => updateField(entry.id, 'honors', event.target.value)}
+                                        onBlur={() => markTouched(pathFor(entry.id, 'honors'))}
+                                        placeholder="Magna Cum Laude, Dean's List"
+                                    />
+                                </div>
+                            </>
+                        )}
 
                         <div className="field">
                             <label htmlFor={`coursework-${entry.id}`}>Relevant coursework</label>
                             <AutoResizeTextarea
                                 id={`coursework-${entry.id}`}
                                 value={entry.coursework}
-                                onChange={(event) => actions.updateEducationField(entry.id, 'coursework', event.target.value)}
-                                onBlur={() => markTouched(`education.${entry.id}.coursework`)}
+                                onChange={(event) => updateField(entry.id, 'coursework', event.target.value)}
+                                onBlur={() => markTouched(pathFor(entry.id, 'coursework'))}
                                 rows={2}
                                 placeholder="Human-Computer Interaction, Algorithms, Product Strategy"
                             />
@@ -128,8 +260,8 @@ export default function EducationForm({ education, actions, getFieldError, markT
                             <AutoResizeTextarea
                                 id={`awards-${entry.id}`}
                                 value={entry.awards}
-                                onChange={(event) => actions.updateEducationField(entry.id, 'awards', event.target.value)}
-                                onBlur={() => markTouched(`education.${entry.id}.awards`)}
+                                onChange={(event) => updateField(entry.id, 'awards', event.target.value)}
+                                onBlur={() => markTouched(pathFor(entry.id, 'awards'))}
                                 rows={2}
                                 placeholder="Scholarships, distinctions, academic awards"
                             />
@@ -149,8 +281,8 @@ export default function EducationForm({ education, actions, getFieldError, markT
                                                         type="text"
                                                         id={`customSectionLabel-${entry.id}-${section.id}`}
                                                         value={section.label}
-                                                        onChange={(event) => actions.updateEducationCustomSection(entry.id, sectionIndex, 'label', event.target.value)}
-                                                        onBlur={() => markTouched(`education.${entry.id}.customSections.${sectionIndex}.label`)}
+                                                        onChange={(event) => updateCustomSection(entry.id, sectionIndex, 'label', event.target.value)}
+                                                        onBlur={() => markTouched(pathFor(entry.id, `customSections.${sectionIndex}.label`))}
                                                         placeholder="Capstone project"
                                                     />
                                                 </div>
@@ -160,8 +292,8 @@ export default function EducationForm({ education, actions, getFieldError, markT
                                                     <AutoResizeTextarea
                                                         id={`customSection-${entry.id}-${section.id}`}
                                                         value={section.content}
-                                                        onChange={(event) => actions.updateEducationCustomSection(entry.id, sectionIndex, 'content', event.target.value)}
-                                                        onBlur={() => markTouched(`education.${entry.id}.customSections.${sectionIndex}.content`)}
+                                                        onChange={(event) => updateCustomSection(entry.id, sectionIndex, 'content', event.target.value)}
+                                                        onBlur={() => markTouched(pathFor(entry.id, `customSections.${sectionIndex}.content`))}
                                                         rows={2}
                                                         placeholder="Add the details you want to show under this custom section."
                                                     />
@@ -174,9 +306,9 @@ export default function EducationForm({ education, actions, getFieldError, markT
                                                     moveUpLabel={`Move custom section ${sectionIndex + 1} up`}
                                                     moveDownLabel={`Move custom section ${sectionIndex + 1} down`}
                                                     removeLabel={`Remove custom section ${sectionIndex + 1}`}
-                                                    onMoveUp={() => actions.moveEducationCustomSection(entry.id, sectionIndex, -1)}
-                                                    onMoveDown={() => actions.moveEducationCustomSection(entry.id, sectionIndex, 1)}
-                                                    onRemove={() => actions.removeEducationCustomSection(entry.id, sectionIndex)}
+                                                    onMoveUp={() => moveCustomSection(entry.id, sectionIndex, -1)}
+                                                    onMoveDown={() => moveCustomSection(entry.id, sectionIndex, 1)}
+                                                    onRemove={() => removeCustomSection(entry.id, sectionIndex)}
                                                     disableUp={sectionIndex === 0}
                                                     disableDown={sectionIndex === customSections.length - 1}
                                                 />
@@ -187,14 +319,14 @@ export default function EducationForm({ education, actions, getFieldError, markT
                             </div>
                         </div>
 
-                        <button className="button buttonSecondary addInlineButton" type="button" onClick={() => actions.addEducationCustomSection(entry.id)}>
+                        <button className="button buttonSecondary addInlineButton" type="button" onClick={() => addCustomSection(entry.id)}>
                             Add custom section
                         </button>
                     </form>
                 </CollapsibleEntryCard>
             )})}
 
-            <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addEducation()}>
+            <button className="button buttonSecondary addEntryButton" type="button" onClick={addEntry}>
                 Add education
             </button>
         </div>

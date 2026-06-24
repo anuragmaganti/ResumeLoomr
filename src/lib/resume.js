@@ -735,6 +735,42 @@ function normalizeSectionBlockEntries(kind, entries) {
   return Array.isArray(entries) ? entries.map(createEntry) : [];
 }
 
+function getLegacySectionBlockEntries(section, kind, legacyResume) {
+  const legacySectionId = section.legacySectionId;
+
+  if (!legacySectionId || !legacyResume || typeof legacyResume !== 'object') {
+    return null;
+  }
+
+  if (legacySectionId === 'experience') {
+    return Array.isArray(legacyResume.experience)
+      ? legacyResume.experience.map((entry) => createRoleEntry({
+          ...entry,
+          groupLabel: trimText(entry.groupLabel) || section.title
+        }))
+      : null;
+  }
+
+  if (ROLE_LEGACY_SECTION_IDS.has(legacySectionId)) {
+    return Array.isArray(legacyResume[legacySectionId])
+      ? legacyResume[legacySectionId].map((entry) => createRoleEntry({
+          id: entry.id,
+          company: entry.organization,
+          role: entry.role,
+          yearsExp: entry.years,
+          activities: entry.highlights,
+          groupLabel: section.title
+        }))
+      : null;
+  }
+
+  if (LEGACY_SECTION_KIND_MAP[legacySectionId] === kind && Array.isArray(legacyResume[legacySectionId])) {
+    return legacyResume[legacySectionId];
+  }
+
+  return null;
+}
+
 function createRoleBlocksFromExperience(entries, title, baseId = 'experience', legacySectionId = 'experience') {
   const hasGroupLabels = entries.some((entry) => trimText(entry.groupLabel) !== '');
 
@@ -832,10 +868,11 @@ export function createSectionBlocksFromLegacyResume(resume, sectionOrder = SECTI
   return blocks;
 }
 
-export function normalizeResumeSections(candidate, legacyResume, sectionOrder = SECTION_IDS) {
+export function normalizeResumeSections(candidate, legacyResume, sectionOrder = SECTION_IDS, options = {}) {
   const candidateSections = Array.isArray(candidate) ? candidate : [];
   const normalizedBlocks = [];
   const usedIds = new Set();
+  const refreshLegacyEntries = options.refreshLegacyEntries === true;
 
   candidateSections.forEach((section, index) => {
     if (!section || typeof section !== 'object') {
@@ -855,12 +892,14 @@ export function normalizeResumeSections(candidate, legacyResume, sectionOrder = 
     }
 
     usedIds.add(id);
+    const legacyEntries = refreshLegacyEntries ? getLegacySectionBlockEntries({ ...section, title }, kind, legacyResume) : null;
+
     normalizedBlocks.push({
       id,
       kind,
       title,
       legacySectionId: Object.hasOwn(LEGACY_SECTION_KIND_MAP, section.legacySectionId) ? section.legacySectionId : '',
-      entries: normalizeSectionBlockEntries(kind, section.entries)
+      entries: normalizeSectionBlockEntries(kind, legacyEntries || section.entries)
     });
   });
 
@@ -953,7 +992,7 @@ export function normalizeResume(candidate, { sectionOrder = SECTION_IDS } = {}) 
 
   return {
     ...normalizedResume,
-    sections: normalizeResumeSections(resume.sections, normalizedResume, sectionOrder)
+    sections: normalizeResumeSections(resume.sections, normalizedResume, sectionOrder, { refreshLegacyEntries: true })
   };
 }
 
@@ -1053,39 +1092,101 @@ export function updatePersonalField(resume, field, value) {
   };
 }
 
-function syncLegacyExperienceFromRoleSections(resume) {
+function syncLegacyMirrorsFromSections(resume) {
   const sections = normalizeResumeSections(resume.sections, resume);
-  const roleEntries = sections
-    .filter((section) => section.kind === 'roles')
-    .flatMap((section) => (
-      section.entries.map((entry) => createExperienceEntry({
+  const mirrors = {
+    education: [],
+    experience: [],
+    skills: [],
+    projects: [],
+    certifications: [],
+    volunteering: [],
+    leadership: [],
+    languages: [],
+    awards: [],
+    publications: []
+  };
+
+  sections.forEach((section) => {
+    if (section.kind === 'education') {
+      mirrors.education.push(...section.entries.map(createEducationEntry));
+      return;
+    }
+
+    if (section.kind === 'roles') {
+      const roleEntries = section.entries.map((entry) => createExperienceEntry({
         ...entry,
         groupLabel: trimText(entry.groupLabel) || section.title
-      }))
-    ));
+      }));
+      mirrors.experience.push(...roleEntries);
 
-  if (roleEntries.length === 0) {
-    return resume;
-  }
+      if (section.legacySectionId === 'volunteering') {
+        mirrors.volunteering.push(...section.entries.map((entry) => createVolunteeringEntry({
+          id: entry.id,
+          organization: entry.company,
+          role: entry.role,
+          years: entry.yearsExp,
+          highlights: entry.activities
+        })));
+      }
+
+      if (section.legacySectionId === 'leadership') {
+        mirrors.leadership.push(...section.entries.map((entry) => createLeadershipEntry({
+          id: entry.id,
+          organization: entry.company,
+          role: entry.role,
+          years: entry.yearsExp,
+          highlights: entry.activities
+        })));
+      }
+
+      return;
+    }
+
+    if (section.kind === 'skills') {
+      mirrors.skills.push(...section.entries.map(createSkillsEntry));
+      return;
+    }
+
+    if (section.kind === 'projects') {
+      mirrors.projects.push(...section.entries.map(createProjectEntry));
+      return;
+    }
+
+    if (section.kind === 'certifications') {
+      mirrors.certifications.push(...section.entries.map(createCertificationEntry));
+      return;
+    }
+
+    if (section.kind === 'languages') {
+      mirrors.languages.push(...section.entries.map(createLanguageEntry));
+      return;
+    }
+
+    if (section.kind === 'awards') {
+      mirrors.awards.push(...section.entries.map(createAwardEntry));
+      return;
+    }
+
+    if (section.kind === 'publications') {
+      mirrors.publications.push(...section.entries.map(createPublicationEntry));
+    }
+  });
 
   return {
     ...resume,
     sections,
-    experience: roleEntries
+    education: mirrors.education.length > 0 ? mirrors.education : [createEducationEntry()],
+    experience: mirrors.experience.length > 0 ? mirrors.experience : [createExperienceEntry()],
+    skills: mirrors.skills.length > 0 ? mirrors.skills : [createSkillsEntry()],
+    projects: mirrors.projects.length > 0 ? mirrors.projects : [createProjectEntry()],
+    certifications: mirrors.certifications.length > 0 ? mirrors.certifications : [createCertificationEntry()],
+    volunteering: mirrors.volunteering.length > 0 ? mirrors.volunteering : [createVolunteeringEntry()],
+    leadership: mirrors.leadership.length > 0 ? mirrors.leadership : [createLeadershipEntry()],
+    languages: mirrors.languages.length > 0 ? mirrors.languages : [createLanguageEntry()],
+    awards: mirrors.awards.length > 0 ? mirrors.awards : [createAwardEntry()],
+    publications: mirrors.publications.length > 0 ? mirrors.publications : [createPublicationEntry()]
   };
-}
-
-function createEmptyLegacyEntries(sectionId) {
-  if (sectionId === 'education') {
-    return [createEducationEntry()];
-  }
-
-  if (sectionId === 'experience') {
-    return [createExperienceEntry()];
-  }
-
-  const createEntry = SECTION_ENTRY_CREATORS[sectionId];
-  return createEntry ? [createEntry()] : [];
 }
 
 export function moveResumeSectionBlock(resume, sectionId, direction) {
@@ -1148,44 +1249,10 @@ export function removeResumeSectionBlock(resume, sectionId) {
     return resume;
   }
 
-  const removedSection = sections.find((section) => section.id === sectionId);
-  const removedEntryIds = new Set(removedSection?.entries.map((entry) => entry.id) || []);
-  let nextResume = {
+  return syncLegacyMirrorsFromSections({
     ...resume,
     sections: sections.filter((section) => section.id !== sectionId)
-  };
-
-  if (!removedSection) {
-    return nextResume;
-  }
-
-  if (removedSection.kind === 'roles') {
-    if (removedSection.legacySectionId && removedSection.legacySectionId !== 'experience') {
-      return {
-        ...nextResume,
-        [removedSection.legacySectionId]: createEmptyLegacyEntries(removedSection.legacySectionId)
-      };
-    }
-
-    nextResume = {
-      ...nextResume,
-      experience: resume.experience.filter((entry) => !removedEntryIds.has(entry.id))
-    };
-
-    return {
-      ...nextResume,
-      experience: nextResume.experience.length > 0 ? nextResume.experience : [createExperienceEntry()]
-    };
-  }
-
-  if (removedSection.legacySectionId) {
-    return {
-      ...nextResume,
-      [removedSection.legacySectionId]: createEmptyLegacyEntries(removedSection.legacySectionId)
-    };
-  }
-
-  return nextResume;
+  });
 }
 
 export function updateSectionTitle(resume, sectionId, value) {
@@ -1213,10 +1280,10 @@ export function updateSectionTitle(resume, sectionId, value) {
     };
 
     if (!Object.hasOwn(SECTION_TITLE_DEFAULTS, sectionId)) {
-      return syncLegacyExperienceFromRoleSections(nextResume);
+      return syncLegacyMirrorsFromSections(nextResume);
     }
 
-    return syncLegacyExperienceFromRoleSections({
+    return syncLegacyMirrorsFromSections({
       ...nextResume,
       sectionTitles: {
         ...normalizeSectionTitles(resume.sectionTitles),
@@ -1432,7 +1499,7 @@ function updateRoleSectionEntries(resume, sectionId, transform) {
       : section
   ));
 
-  return syncLegacyExperienceFromRoleSections({
+  return syncLegacyMirrorsFromSections({
     ...resume,
     sections: nextSections
   });
@@ -1484,6 +1551,180 @@ export function moveRoleBlockActivity(resume, sectionId, entryId, activityIndex,
 export function removeRoleBlockActivity(resume, sectionId, entryId, activityIndex) {
   return updateRoleSectionEntries(resume, sectionId, (entries) => (
     removeEntryStringListItem(entries, entryId, 'activities', activityIndex)
+  ));
+}
+
+function updateSectionBlockEntries(resume, sectionId, transform) {
+  const sections = normalizeResumeSections(resume.sections, resume);
+  let didUpdate = false;
+  const nextSections = sections.map((section) => {
+    if (section.id !== sectionId) {
+      return section;
+    }
+
+    didUpdate = true;
+
+    return {
+      ...section,
+      entries: normalizeSectionBlockEntries(section.kind, transform(section.entries, section))
+    };
+  });
+
+  if (!didUpdate) {
+    return resume;
+  }
+
+  return syncLegacyMirrorsFromSections({
+    ...resume,
+    sections: nextSections
+  });
+}
+
+export function updateSectionBlockEntry(resume, sectionId, entryId, field, value) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => updateEntryField(entries, entryId, field, value));
+}
+
+export function addSectionBlockEntry(resume, sectionId) {
+  return updateSectionBlockEntries(resume, sectionId, (entries, section) => {
+    const createEntry = SECTION_BLOCK_ENTRY_CREATORS[section.kind] || createCustomBlockEntry;
+    const nextEntry = section.kind === 'roles'
+      ? createRoleEntry({ groupLabel: section.title })
+      : createEntry();
+
+    return [...entries, nextEntry];
+  });
+}
+
+export function moveSectionBlockEntry(resume, sectionId, entryId, direction) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => moveItemById(entries, entryId, direction));
+}
+
+export function removeSectionBlockEntry(resume, sectionId, entryId) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => removeEntry(entries, entryId));
+}
+
+export function updateSectionBlockTextList(resume, sectionId, entryId, field, itemIndex, value) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => updateEntryStringList(entries, entryId, field, itemIndex, value));
+}
+
+export function addSectionBlockTextListItem(resume, sectionId, entryId, field) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => addEntryStringListItem(entries, entryId, field));
+}
+
+export function moveSectionBlockTextListItem(resume, sectionId, entryId, field, itemIndex, direction) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => moveEntryStringListItem(entries, entryId, field, itemIndex, direction));
+}
+
+export function removeSectionBlockTextListItem(resume, sectionId, entryId, field, itemIndex) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => removeEntryStringListItem(entries, entryId, field, itemIndex));
+}
+
+export function updateSectionBlockEducationCustomSection(resume, sectionId, entryId, sectionIndex, field, value) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => (
+    entries.map((entry) => (
+      entry.id === entryId
+        ? {
+            ...entry,
+            customSections: ensureEducationCustomSections(entry.customSections).map((section, index) => (
+              index === sectionIndex ? { ...section, [field]: value } : section
+            ))
+          }
+        : entry
+    ))
+  ));
+}
+
+export function addSectionBlockEducationCustomSection(resume, sectionId, entryId) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => (
+    entries.map((entry) => (
+      entry.id === entryId
+        ? { ...entry, customSections: [...ensureEducationCustomSections(entry.customSections), createEducationCustomSection()] }
+        : entry
+    ))
+  ));
+}
+
+export function moveSectionBlockEducationCustomSection(resume, sectionId, entryId, sectionIndex, direction) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => (
+    entries.map((entry) => (
+      entry.id === entryId
+        ? {
+            ...entry,
+            customSections: reorderList(ensureEducationCustomSections(entry.customSections), sectionIndex, sectionIndex + direction)
+          }
+        : entry
+    ))
+  ));
+}
+
+export function removeSectionBlockEducationCustomSection(resume, sectionId, entryId, sectionIndex) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => (
+    entries.map((entry) => {
+      if (entry.id !== entryId) {
+        return entry;
+      }
+
+      const currentSections = ensureEducationCustomSections(entry.customSections);
+
+      if (currentSections.length <= 1) {
+        return { ...entry, customSections: [createEducationCustomSection()] };
+      }
+
+      return {
+        ...entry,
+        customSections: currentSections.filter((_, index) => index !== sectionIndex)
+      };
+    })
+  ));
+}
+
+export function updateSectionBlockEducationProgram(resume, sectionId, entryId, programIndex, field, value) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => (
+    entries.map((entry) => (
+      entry.id === entryId
+        ? {
+            ...entry,
+            programs: entry.programs.map((program, index) => (
+              index === programIndex ? createEducationProgram({ ...program, [field]: value }) : program
+            ))
+          }
+        : entry
+    ))
+  ));
+}
+
+export function addSectionBlockEducationProgram(resume, sectionId, entryId) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => (
+    entries.map((entry) => (
+      entry.id === entryId
+        ? { ...entry, programs: [...entry.programs, createEducationProgram()] }
+        : entry
+    ))
+  ));
+}
+
+export function moveSectionBlockEducationProgram(resume, sectionId, entryId, programIndex, direction) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => (
+    entries.map((entry) => (
+      entry.id === entryId
+        ? { ...entry, programs: reorderList(entry.programs, programIndex, programIndex + direction) }
+        : entry
+    ))
+  ));
+}
+
+export function removeSectionBlockEducationProgram(resume, sectionId, entryId, programIndex) {
+  return updateSectionBlockEntries(resume, sectionId, (entries) => (
+    entries.map((entry) => {
+      if (entry.id !== entryId || entry.programs.length <= 1) {
+        return entry;
+      }
+
+      return {
+        ...entry,
+        programs: entry.programs.filter((_, index) => index !== programIndex)
+      };
+    })
   ));
 }
 

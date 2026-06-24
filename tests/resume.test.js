@@ -40,6 +40,9 @@ import {
   updatePersonalField,
   updateRoleBlockEntry,
   updateResumeSetting,
+  updateSectionBlockEducationCustomSection,
+  updateSectionBlockEducationProgram,
+  updateSectionBlockEntry,
   updateSectionTitle,
   validateResume,
 } from '../src/lib/resume.js';
@@ -641,6 +644,97 @@ test('section block actions reorder and edit dynamic role blocks safely', () => 
     ['INTERNSHIP EXPERIENCE', 'LEADERSHIP EXPERIENCE']
   );
   assert.equal(movedBack.sections[1].entries[0].company, 'University Housing');
+});
+
+test('block-first actions edit imported education and awards blocks shown in preview', () => {
+  const draft = normalizeDraftPayload({
+    resume: {
+      sections: [
+        {
+          id: 'education-imported',
+          kind: 'education',
+          title: 'EDUCATION',
+          entries: [
+            {
+              id: 'education-entry',
+              school: 'University of Georgia',
+              location: 'Athens, GA',
+              programs: [
+                {
+                  id: 'program-1',
+                  degree: 'Bachelor of Arts, Political Science',
+                  yearsEdu: 'May 2023',
+                  gpa: '3.73/4.00',
+                },
+              ],
+              coursework: 'Leadership and Personal Development',
+              customSections: [{ id: 'custom-1', label: 'Study Abroad', content: 'Oxford University' }],
+            },
+          ],
+        },
+        {
+          id: 'awards-imported',
+          kind: 'awards',
+          title: 'HONORS & AWARDS',
+          entries: [
+            {
+              id: 'award-1',
+              title: 'HOPE Scholarship Recipient',
+              years: 'August 2019 - Present',
+            },
+          ],
+        },
+      ],
+    },
+  });
+  const editedSchool = updateSectionBlockEntry(draft.resume, 'education-imported', 'education-entry', 'school', 'University of Georgia Honors Program');
+  const editedProgram = updateSectionBlockEducationProgram(editedSchool, 'education-imported', 'education-entry', 0, 'gpa', '3.80/4.00');
+  const editedCustom = updateSectionBlockEducationCustomSection(editedProgram, 'education-imported', 'education-entry', 0, 'content', 'Oxford University tutorial program');
+  const editedAward = updateSectionBlockEntry(editedCustom, 'awards-imported', 'award-1', 'details', 'Merit scholarship');
+  const previewModel = getPreviewModel(editedAward);
+
+  assert.equal(editedAward.sections[0].entries[0].school, 'University of Georgia Honors Program');
+  assert.equal(editedAward.sections[0].entries[0].programs[0].gpa, '3.80/4.00');
+  assert.equal(editedAward.sections[0].entries[0].customSections[0].content, 'Oxford University tutorial program');
+  assert.equal(editedAward.sections[1].entries[0].details, 'Merit scholarship');
+  assert.equal(editedAward.education[0].school, 'University of Georgia Honors Program');
+  assert.equal(editedAward.awards[0].details, 'Merit scholarship');
+  assert.equal(previewModel.sectionBlocks[0].entries[0].programs[0].gpa, '3.80/4.00');
+  assert.equal(previewModel.sectionBlocks[1].entries[0].details, 'Merit scholarship');
+});
+
+test('normalization refreshes stale legacy fixed blocks into section blocks', () => {
+  const draft = normalizeDraftPayload({
+    resume: {
+      education: [
+        {
+          id: 'education-entry',
+          school: 'Fresh Legacy University',
+          degree: 'B.A. Economics',
+          yearsEdu: '2024',
+        },
+      ],
+      sections: [
+        {
+          id: 'education',
+          kind: 'education',
+          title: 'Education',
+          legacySectionId: 'education',
+          entries: [
+            {
+              id: 'education-entry',
+              school: 'Stale Block University',
+              degree: 'Old Degree',
+              yearsEdu: '2020',
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(draft.resume.sections[0].entries[0].school, 'Fresh Legacy University');
+  assert.equal(getPreviewModel(draft.resume).sectionBlocks[0].entries[0].school, 'Fresh Legacy University');
 });
 
 test('removing a section block clears matching legacy mirror content', () => {

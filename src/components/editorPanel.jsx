@@ -1,16 +1,6 @@
 import SectionTabs from "./sectionTabs";
 import PersonalForm from "./forms/personalForm";
-import EducationForm from "./forms/educationForm";
-import ExperienceForm from "./forms/experienceForm";
-import SkillsForm from "./forms/skillsForm";
-import ProjectsForm from "./forms/projectsForm";
-import CertificationsForm from "./forms/certificationsForm";
-import VolunteeringForm from "./forms/volunteeringForm";
-import LeadershipForm from "./forms/leadershipForm";
-import LanguagesForm from "./forms/languagesForm";
-import AwardsForm from "./forms/awardsForm";
-import PublicationsForm from "./forms/publicationsForm";
-import RoleBlockForm from "./forms/roleBlockForm";
+import SectionBlockForm from "./forms/sectionBlockForm";
 import EntryActionMenu from "./forms/entryActionMenu";
 import EditorSettingsRail from "./editorSettingsRail";
 import { resolveSectionTitle } from "../lib/resume";
@@ -201,89 +191,9 @@ export default function EditorPanel({
                                 markTouched={markTouched}
                             />
                         )}
-                        {activeTab === "education" && (
-                            <EducationForm
-                                education={resume.education}
-                                actions={actions}
-                                getFieldError={getFieldError}
-                                markTouched={markTouched}
-                            />
-                        )}
-                        {activeTab === "experience" && (
-                            <ExperienceForm
-                                experience={resume.experience}
-                                actions={actions}
-                                getFieldError={getFieldError}
-                                markTouched={markTouched}
-                            />
-                        )}
-                        {activeBlock?.kind === "roles" && !sectionMeta[activeTab] && (
-                            <RoleBlockForm
+                        {activeTab !== "personal" && activeBlock && (
+                            <SectionBlockForm
                                 section={activeBlock}
-                                actions={actions}
-                                getFieldError={getFieldError}
-                                markTouched={markTouched}
-                            />
-                        )}
-                        {activeTab === "skills" && (
-                            <SkillsForm
-                                skills={resume.skills}
-                                actions={actions}
-                                getFieldError={getFieldError}
-                                markTouched={markTouched}
-                            />
-                        )}
-                        {activeTab === "projects" && (
-                            <ProjectsForm
-                                projects={resume.projects}
-                                actions={actions}
-                                getFieldError={getFieldError}
-                                markTouched={markTouched}
-                            />
-                        )}
-                        {activeTab === "certifications" && (
-                            <CertificationsForm
-                                certifications={resume.certifications}
-                                actions={actions}
-                                getFieldError={getFieldError}
-                                markTouched={markTouched}
-                            />
-                        )}
-                        {activeTab === "volunteering" && (
-                            <VolunteeringForm
-                                volunteering={resume.volunteering}
-                                actions={actions}
-                                getFieldError={getFieldError}
-                                markTouched={markTouched}
-                            />
-                        )}
-                        {activeTab === "leadership" && (
-                            <LeadershipForm
-                                leadership={resume.leadership}
-                                actions={actions}
-                                getFieldError={getFieldError}
-                                markTouched={markTouched}
-                            />
-                        )}
-                        {activeTab === "languages" && (
-                            <LanguagesForm
-                                languages={resume.languages}
-                                actions={actions}
-                                getFieldError={getFieldError}
-                                markTouched={markTouched}
-                            />
-                        )}
-                        {activeTab === "awards" && (
-                            <AwardsForm
-                                awards={resume.awards}
-                                actions={actions}
-                                getFieldError={getFieldError}
-                                markTouched={markTouched}
-                            />
-                        )}
-                        {activeTab === "publications" && (
-                            <PublicationsForm
-                                publications={resume.publications}
                                 actions={actions}
                                 getFieldError={getFieldError}
                                 markTouched={markTouched}

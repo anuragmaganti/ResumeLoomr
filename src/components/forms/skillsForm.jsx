@@ -3,10 +3,31 @@ import CollapsibleEntryCard from "./collapsibleEntryCard";
 import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 
-export default function SkillsForm({ skills, actions, getFieldError, markTouched }) {
+export default function SkillsForm({ skills = [], section, actions, getFieldError, markTouched }) {
+  const entries = section?.entries || skills;
+  const sectionId = section?.id || '';
+  const isBlockEditor = Boolean(sectionId);
+  const pathFor = (entryId, field) => (
+    isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `skills.${entryId}.${field}`
+  );
+  const updateEntry = (entryId, field, value) => (
+    isBlockEditor
+      ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
+      : actions.updateCollectionEntry('skills', entryId, field, value)
+  );
+  const addEntry = () => (
+    isBlockEditor ? actions.addSectionBlockEntry(sectionId) : actions.addCollectionEntry('skills')
+  );
+  const moveEntry = (entryId, direction) => (
+    isBlockEditor ? actions.moveSectionBlockEntry(sectionId, entryId, direction) : actions.moveCollectionEntry('skills', entryId, direction)
+  );
+  const removeEntry = (entryId) => (
+    isBlockEditor ? actions.removeSectionBlockEntry(sectionId, entryId) : actions.removeCollectionEntry('skills', entryId)
+  );
+
   return (
     <div className="formStack">
-      {skills.map((entry, index) => (
+      {entries.map((entry, index) => (
         <CollapsibleEntryCard
           key={entry.id}
           summary={buildEntrySummary(
@@ -19,12 +40,12 @@ export default function SkillsForm({ skills, actions, getFieldError, markTouched
           moveUpLabel={`Move skill group ${index + 1} up`}
           moveDownLabel={`Move skill group ${index + 1} down`}
           removeLabel={`Remove skill group ${index + 1}`}
-          onMoveUp={() => actions.moveCollectionEntry('skills', entry.id, -1)}
-          onMoveDown={() => actions.moveCollectionEntry('skills', entry.id, 1)}
-          onRemove={() => actions.removeCollectionEntry('skills', entry.id)}
+          onMoveUp={() => moveEntry(entry.id, -1)}
+          onMoveDown={() => moveEntry(entry.id, 1)}
+          onRemove={() => removeEntry(entry.id)}
           disableUp={index === 0}
-          disableDown={index === skills.length - 1}
-          disableRemove={skills.length === 1}
+          disableDown={index === entries.length - 1}
+          disableRemove={entries.length === 1}
         >
           <form onSubmit={(event) => event.preventDefault()}>
             <div className="field">
@@ -33,8 +54,8 @@ export default function SkillsForm({ skills, actions, getFieldError, markTouched
                 type="text"
                 id={`skills-category-${entry.id}`}
                 value={entry.category}
-                onChange={(event) => actions.updateCollectionEntry('skills', entry.id, 'category', event.target.value)}
-                onBlur={() => markTouched(`skills.${entry.id}.category`)}
+                onChange={(event) => updateEntry(entry.id, 'category', event.target.value)}
+                onBlur={() => markTouched(pathFor(entry.id, 'category'))}
                 placeholder="Product design"
               />
             </div>
@@ -44,18 +65,18 @@ export default function SkillsForm({ skills, actions, getFieldError, markTouched
               <AutoResizeTextarea
                 id={`skills-items-${entry.id}`}
                 value={entry.items}
-                onChange={(event) => actions.updateCollectionEntry('skills', entry.id, 'items', event.target.value)}
-                onBlur={() => markTouched(`skills.${entry.id}.items`)}
+                onChange={(event) => updateEntry(entry.id, 'items', event.target.value)}
+                onBlur={() => markTouched(pathFor(entry.id, 'items'))}
                 rows={2}
                 placeholder="Design systems, prototyping, user research, Figma"
               />
-              <FormFieldError message={getFieldError(`skills.${entry.id}.items`)} />
+              <FormFieldError message={getFieldError(pathFor(entry.id, 'items'))} />
             </div>
           </form>
         </CollapsibleEntryCard>
       ))}
 
-      <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addCollectionEntry('skills')}>
+      <button className="button buttonSecondary addEntryButton" type="button" onClick={addEntry}>
         Add skill group
       </button>
     </div>
