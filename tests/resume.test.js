@@ -72,12 +72,11 @@ import {
 } from '../src/lib/browserConnection.js';
 import {
   DEFAULT_GEMINI_IMPORT_MODEL,
-  IMPORT_MODE_FULL,
-  IMPORT_MODE_ONE_PAGE,
   IMPORT_FILE_MAX_BYTES,
   ImportResumeError,
   analyzeResumeSourceCoverage,
   assessExtractedResumeText,
+  getGeminiErrorDetails,
   normalizeImportFilePayload,
   normalizeImportedResumeDraft,
   validateImportedDraftCoverage,
@@ -247,21 +246,20 @@ test('resume import file normalization rejects oversize uploads', () => {
   );
 });
 
-test('resume import file normalization defaults to full import mode and accepts one-page mode', () => {
-  const fullImport = normalizeImportFilePayload({
+test('resume import file normalization reads valid PDF and DOCX uploads', () => {
+  const pdfImport = normalizeImportFilePayload({
     fileName: 'resume.pdf',
     mimeType: 'application/pdf',
     fileDataBase64: Buffer.from('pdf data').toString('base64'),
   });
-  const onePageImport = normalizeImportFilePayload({
+  const docxImport = normalizeImportFilePayload({
     fileName: 'resume.docx',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     fileDataBase64: Buffer.from('docx data').toString('base64'),
-    importMode: IMPORT_MODE_ONE_PAGE,
   });
 
-  assert.equal(fullImport.importMode, IMPORT_MODE_FULL);
-  assert.equal(onePageImport.importMode, IMPORT_MODE_ONE_PAGE);
+  assert.equal(pdfImport.mimeType, 'application/pdf');
+  assert.equal(docxImport.mimeType, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 });
 
 test('PDF extraction assessment accepts readable resume text', () => {
@@ -403,7 +401,7 @@ test('full import coverage rejects drafts that drop source highlights and awards
       awards: [],
     },
   });
-  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage, IMPORT_MODE_FULL);
+  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage);
 
   assert.equal(validation.ok, false);
   assert.match(validation.issues.join(' '), /source bullets/);
@@ -446,47 +444,9 @@ test('full import coverage accepts drafts that preserve source details', () => {
       awards: [{ title: 'Award One' }, { title: 'Award Two' }],
     },
   });
-  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage, IMPORT_MODE_FULL);
+  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage);
 
   assert.equal(validation.ok, true);
-});
-
-test('one-page import coverage allows condensed bullets but not missing major sections', () => {
-  const sourceCoverage = analyzeResumeSourceCoverage(`
-    EDUCATION
-    University of Georgia
-    INTERNSHIP EXPERIENCE
-    Acme, Intern 2024
-    • First source bullet
-    • Second source bullet
-    • Third source bullet
-    • Fourth source bullet
-    LEADERSHIP EXPERIENCE
-    Club, President 2024
-    • Fifth source bullet
-    HONORS & AWARDS
-    Award One
-  `);
-  const condensed = normalizeImportedResumeDraft({
-    sectionOrder: ['education', 'experience', 'leadership', 'awards'],
-    resume: {
-      education: [{ school: 'University of Georgia' }],
-      experience: [{ company: 'Acme', role: 'Intern', activities: ['Strongest bullet'] }],
-      leadership: [{ organization: 'Club', role: 'President', highlights: ['Leadership bullet'] }],
-      awards: [{ title: 'Award One' }],
-    },
-  });
-  const missingLeadership = normalizeImportedResumeDraft({
-    sectionOrder: ['education', 'experience', 'awards'],
-    resume: {
-      education: [{ school: 'University of Georgia' }],
-      experience: [{ company: 'Acme', role: 'Intern', activities: ['Strongest bullet'] }],
-      awards: [{ title: 'Award One' }],
-    },
-  });
-
-  assert.equal(validateImportedDraftCoverage(condensed.draft, sourceCoverage, IMPORT_MODE_ONE_PAGE).ok, true);
-  assert.equal(validateImportedDraftCoverage(missingLeadership.draft, sourceCoverage, IMPORT_MODE_ONE_PAGE).ok, false);
 });
 
 test('server import source keeps DOCX text-only and PDF fallback paths', () => {
@@ -495,8 +455,8 @@ test('server import source keeps DOCX text-only and PDF fallback paths', () => {
   assert.match(source, /if \(isPdf\) \{/);
   assert.match(source, /extractPdfText\(file\)/);
   assert.match(source, /assessExtractedResumeText\(extractedPdfText\)/);
-  assert.match(source, /createTextGeminiContents\(file\.fileName, sourceText, \{ importMode \}\)/);
-  assert.match(source, /createPdfDocumentGeminiContents\(file, \{ importMode \}\)/);
+  assert.match(source, /createTextGeminiContents\(file\.fileName, sourceText\)/);
+  assert.match(source, /createPdfDocumentGeminiContents\(file\)/);
   assert.match(source, /sourceText = await extractDocxText\(file\)/);
 });
 
@@ -558,6 +518,21 @@ test('Gemini resume import normalization moves relevant coursework out of duplic
   assert.equal(imported.draft.resume.education[0].coursework, 'Leadership and Personal Development, Business Spanish');
   assert.equal(imported.draft.resume.skills.length, 1);
   assert.equal(imported.draft.resume.skills[0].category, 'Tools');
+});
+
+test('Gemini provider errors expose status details for typed API responses', () => {
+  const error = new Error(JSON.stringify({
+    error: {
+      code: 503,
+      message: 'This model is currently experiencing high demand. Please try again later.',
+      status: 'UNAVAILABLE',
+    },
+  }));
+  const details = getGeminiErrorDetails(error);
+
+  assert.equal(details.statusCode, 503);
+  assert.equal(details.status, 'UNAVAILABLE');
+  assert.match(details.message, /high demand/);
 });
 
 test('cloud guest mirror keeps the ten most recently updated resumes', () => {
