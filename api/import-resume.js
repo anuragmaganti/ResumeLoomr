@@ -62,6 +62,7 @@ export default async function handler(req, res) {
       mimeType: file.mimeType,
       sectionCount: parsedImport?.draft?.resume?.sections?.length || 0,
       warningCount: parsedImport?.draft?.importWarnings?.length || 0,
+      diagnostics: parsedImport?.diagnostics || undefined,
     }));
     sendJson(res, 200, createImportResponseBody(parsedImport));
   } catch (error) {

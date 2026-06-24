@@ -823,6 +823,47 @@ test('source-aware cleanup preserves block-only AI imports when legacy mirrors a
   assert.deepEqual(previewModel.sectionBlocks[0].entries[0].activities, ['Analyzed survey data', 'Presented findings']);
 });
 
+test('source-aware cleanup prefers imported section blocks over duplicate legacy mirrors', () => {
+  const imported = normalizeImportedResumeDraft({
+    suggestedName: 'Walter Resume',
+    resume: {
+      personal: { name: 'Walter Washington' },
+      sections: [
+        {
+          id: 'roles-additional-work-experience',
+          kind: 'roles',
+          title: 'Additional Work Experience',
+          entries: [
+            {
+              company: 'UGA Honors Program',
+              role: 'Student Assistant',
+              yearsExp: 'September 2019 - Present',
+              activities: ['Answered front desk questions and coordinated student office support.'],
+            },
+          ],
+        },
+      ],
+      experience: [
+        {
+          company: 'ADDITIONAL WORK EXPERIENCE',
+          role: 'UGA Honors Program, Student Assistant | Athens, GA September 2019 - Present',
+          groupLabel: 'ADDITIONAL WORK EXPERIENCE',
+          yearsExp: '',
+          activities: [],
+        },
+      ],
+    },
+  });
+  const cleaned = applySourceAwareImportCleanup(imported, analyzeResumeSourceCoverage('ADDITIONAL WORK EXPERIENCE'));
+  const previewModel = getPreviewModel(cleaned.draft.resume);
+
+  assert.equal(previewModel.sectionBlocks.length, 1);
+  assert.equal(previewModel.sectionBlocks[0].title, 'Additional Work Experience');
+  assert.equal(previewModel.sectionBlocks[0].entries.length, 1);
+  assert.equal(previewModel.sectionBlocks[0].entries[0].company, 'UGA Honors Program');
+  assert.equal(previewModel.sectionBlocks[0].entries[0].role, 'Student Assistant');
+});
+
 test('removing a section block clears matching legacy mirror content', () => {
   const resume = createEmptyResume();
   resume.awards[0].title = 'Hidden Award';

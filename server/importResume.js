@@ -806,26 +806,27 @@ function createExtractionPrompt({ fileName, isDocumentInput }) {
     'If the source resume is one page, keep the output compact and do not expand single-line source entries into repeated verbose entries.',
     'Do not omit source bullets. Do not merge multiple source bullets into one output item.',
     'Keep entries in the same order they appear in the source resume.',
-    'Return ordered resume.sections blocks that match the source resume section headings and order.',
+    'Return ordered resume.sections blocks as the source of truth. Match the source resume section headings and order.',
     'personal is not a section block; it always renders first.',
     'Use kind "roles" for role-like source sections including Internship Experience, Leadership Experience, Additional Work Experience, Research, Teaching, Military, Clinical, Campus Involvement, and Public Service.',
     'When the source has multiple role-like headings, create one roles block per heading with title exactly matching the source heading.',
-    'Map internship, professional, employment, work, and additional work entries into experience[].',
-    'When multiple source work headings exist, put that source heading in experience[].groupLabel for each matching entry.',
-    'If role-based source headings must be interleaved to preserve order, put those roles in experience[] with groupLabel instead of splitting them into separate top-level sections.',
-    'Map leadership entries into leadership[] only when doing so preserves the source section order.',
-    'Do not duplicate a source heading in both sectionTitles.experience and experience[].groupLabel. If groupLabel is used for source headings, set sectionTitles.experience to "Experience".',
+    'Each source section heading should appear once as one resume.sections block title. Do not create duplicate custom blocks or legacy entries that repeat the same heading.',
+    'Each job, internship, leadership role, or volunteer role must be its own entry. Do not combine multiple roles into one semicolon-delimited entry.',
+    'Map internship, professional, employment, work, and additional work entries into roles section blocks.',
+    'When multiple source work headings exist, use separate roles section blocks with those source headings as block titles.',
+    'If role-based source headings are interleaved, preserve that order with separate roles blocks instead of merging them into a generic Experience section.',
+    'Map leadership entries into a roles section block titled with the source leadership heading.',
     'Do not repeat the same university for fragmented lines from the same education block.',
-    'For one institution with multiple adjacent degrees, majors, certificates, or study-abroad details, use one education entry and put separate degree/program rows in education[].programs when helpful.',
+    'For one institution with multiple adjacent degrees, majors, certificates, or study-abroad details, use one education entry and put separate degree/program rows in that entry programs array when helpful.',
     'Keep separate education entries when the same school appears for clearly separate degree periods, such as undergrad and PhD.',
     'Merge same-school entries only when they share the same date range, one row is missing dates, or the row is clearly a certificate, study-abroad, honors, coursework, or detail fragment attached to the same education block.',
-    'Map each work bullet into experience[].activities as a separate string.',
-    'Map each leadership bullet into leadership[].highlights as a separate string.',
-    'Map education bullets such as certificates or study abroad details into education[].customSections.',
-    'Map GPA into education[].gpa.',
-    'Map Relevant Coursework into education[].coursework, not into skills and not into a duplicate section.',
-    'Map honors and awards into awards[] unless the item is clearly attached to a single education entry.',
-    'Also mirror the same parsed content into the legacy arrays education[], experience[], skills[], projects[], certifications[], languages[], awards[], and publications[] for compatibility.',
+    'Map each work bullet into the matching roles entry activities array as a separate string.',
+    'Map each leadership bullet into the matching roles entry activities array as a separate string.',
+    'Map education bullets such as certificates or study abroad details into the matching education entry customSections array.',
+    'Map GPA into the matching education entry gpa field.',
+    'Map Relevant Coursework into the matching education entry coursework field, not into skills and not into a duplicate section.',
+    'Map honors and awards into an awards section block unless the item is clearly attached to a single education entry.',
+    'Do not mirror the same parsed content into both resume.sections and legacy arrays. If resume.sections is populated, leave legacy arrays empty unless a field cannot be represented in section blocks.',
   ];
   return [
     'You are extracting structured resume data for ResumeLoomr.',
@@ -1385,8 +1386,32 @@ function hasLegacyImportContent(resume) {
   return hasEducation || hasExperience || hasCollections;
 }
 
+function rawImportValueHasContent(value) {
+  if (Array.isArray(value)) {
+    return value.some(rawImportValueHasContent);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value).some(([key, childValue]) => (
+      key !== 'id' && rawImportValueHasContent(childValue)
+    ));
+  }
+
+  return trimText(value) !== '';
+}
+
+function hasRawSectionBlockContent(sections) {
+  return Array.isArray(sections) && sections.some((section) => (
+    section &&
+    typeof section === 'object' &&
+    Array.isArray(section.entries) &&
+    section.entries.some(rawImportValueHasContent)
+  ));
+}
+
 export function applySourceAwareImportCleanup(parsedImport, sourceCoverage) {
   let draft = normalizeDraftPayload(parsedImport.draft);
+  const hasModelSectionBlocks = parsedImport.sourceShape?.hasSectionBlocks === true;
 
   draft = compactRepeatedEducationEntries(draft);
 
@@ -1408,7 +1433,7 @@ export function applySourceAwareImportCleanup(parsedImport, sourceCoverage) {
 
   draft = normalizeImportedExperienceTitles(draft);
 
-  if (hasLegacyImportContent(draft.resume)) {
+  if (!hasModelSectionBlocks && hasLegacyImportContent(draft.resume)) {
     draft = normalizeDraftPayload({
       ...draft,
       resume: {
@@ -1430,6 +1455,7 @@ export function applySourceAwareImportCleanup(parsedImport, sourceCoverage) {
 export function normalizeImportedResumeDraft(aiOutput, { sourceFileName = '' } = {}) {
   const output = aiOutput && typeof aiOutput === 'object' ? aiOutput : {};
   const resumeCandidate = output.resume && typeof output.resume === 'object' ? output.resume : output;
+  const hasSectionBlocks = hasRawSectionBlockContent(resumeCandidate.sections);
   const normalizedDraft = removeRelevantCourseworkSkillDuplicates(normalizeDraftPayload({
     template: DEFAULT_TEMPLATE,
     sectionOrder: output.sectionOrder,
@@ -1444,6 +1470,9 @@ export function normalizeImportedResumeDraft(aiOutput, { sourceFileName = '' } =
 
   return {
     suggestedName,
+    sourceShape: {
+      hasSectionBlocks,
+    },
     draft: {
       ...normalizedDraft,
       savedAt: null,
@@ -1571,6 +1600,11 @@ export async function parseResumeWithGemini(file) {
   if (coverageValidation.ok || !sourceCoverage.hasSourceText) {
     return {
       ...parsedImport,
+      diagnostics: {
+        ...importDiagnostics,
+        usedRepair: false,
+        coverageOk: coverageValidation.ok,
+      },
       draft: {
         ...parsedImport.draft,
         importWarnings,
@@ -1581,6 +1615,12 @@ export async function parseResumeWithGemini(file) {
   if (!shouldAttemptImportRepair(coverageValidation, parsedImport.draft)) {
     return {
       ...parsedImport,
+      diagnostics: {
+        ...importDiagnostics,
+        usedRepair: false,
+        coverageOk: false,
+        coverageIssueCount: coverageValidation.issues.length,
+      },
       draft: {
         ...parsedImport.draft,
         importWarnings: [
@@ -1621,6 +1661,12 @@ export async function parseResumeWithGemini(file) {
 
   return {
     ...bestImport.candidate,
+    diagnostics: {
+      ...importDiagnostics,
+      usedRepair: true,
+      coverageOk: bestCoverageValidation.ok,
+      coverageIssueCount: bestCoverageValidation.issues.length,
+    },
     draft: {
       ...bestImport.candidate.draft,
       importWarnings: [
