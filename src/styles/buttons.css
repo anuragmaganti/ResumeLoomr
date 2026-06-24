@@ -133,14 +133,17 @@
 }
 
 .tabButton.isDragging {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-surface-elevated) 72%, var(--color-accent-soft) 28%);
+  border-color: var(--color-accent-strong);
+  background: color-mix(in srgb, var(--color-surface-elevated) 58%, var(--color-accent-soft) 42%);
   color: var(--color-text);
   opacity: 1;
   box-shadow:
-    0 0 0 3px var(--color-accent-soft),
+    inset 0 0 0 2px var(--color-accent-strong),
+    0 0 0 4px var(--color-accent-soft),
     var(--shadow-sm);
-  transform: scale(0.98);
+  outline: 2px solid var(--color-accent);
+  outline-offset: -4px;
+  transform: scale(0.985);
 }
 
 .tabButton.isDragging .tabLabel {
