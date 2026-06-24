@@ -83,6 +83,7 @@
   display: grid;
   gap: var(--space-3);
   margin-bottom: var(--space-5);
+  min-width: 0;
 }
 
 .topbar {
@@ -147,6 +148,7 @@
 }
 
 .resumeWorkspaceBar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -157,6 +159,8 @@
 .resumeSubbar {
   position: relative;
   z-index: 35;
+  width: 100%;
+  min-width: 0;
   padding: 10px 12px;
 }
 
@@ -177,9 +181,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  flex: 0 0 auto;
+  flex: 0 0 clamp(130px, 10vw, 188px);
   gap: 4px;
-  min-width: 104px;
+  width: clamp(130px, 10vw, 188px);
+  min-width: 130px;
   min-height: 36px;
   padding: 2px 2px 2px 10px;
   border: 1px solid var(--color-border);
@@ -217,7 +222,7 @@
 .resumePillLabel {
   min-width: 0;
   overflow: hidden;
-  max-width: 15ch;
+  max-width: 19ch;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -228,7 +233,7 @@
 }
 
 .resumePillRenameInput {
-  width: clamp(104px, 14vw, 168px);
+  width: clamp(130px, 14vw, 196px);
   min-width: 0;
   min-height: 30px;
   padding: 0 8px;
@@ -272,6 +277,23 @@
 
 .resumeOverflowButton {
   min-width: 54px;
+}
+
+.resumeMeasureStrip {
+  position: fixed;
+  top: -10000px;
+  left: -10000px;
+  z-index: -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: none;
+  height: 0;
+  padding: 2px;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .kicker {
@@ -1730,10 +1752,6 @@
 
   .resumeWorkspaceBar {
     justify-content: flex-start;
-  }
-
-  .resumePillStrip {
-    flex-wrap: wrap;
   }
 
   .topbarSide,
