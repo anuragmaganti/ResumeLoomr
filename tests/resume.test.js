@@ -84,8 +84,10 @@ import {
   applySourceAwareImportCleanup,
   assessExtractedResumeText,
   chooseBestImportedDraftCandidate,
+  compileSourceDocumentToImportedDraft,
   createGeminiImportGenerationConfig,
   createResumeSourceOutline,
+  createSourceDocumentFromText,
   getGeminiErrorDetails,
   hasUsableImportedDraft,
   normalizeImportFilePayload,
@@ -453,6 +455,105 @@ test('resume source outline detects ordered source section blocks', () => {
   assert.equal(outline.hasCoursework, true);
   assert.equal(outline.requiredBlocks.find((block) => block.title === 'INTERNSHIP EXPERIENCE').roleEntryCount, 2);
   assert.equal(outline.requiredBlocks.find((block) => block.title === 'LEADERSHIP EXPERIENCE').roleEntryCount, 2);
+});
+
+test('source document segmentation handles generic section headings', () => {
+  const sourceDocument = createSourceDocumentFromText(`
+    JORDAN EXAMPLE
+    jordan@example.com | Austin, TX | github.com/jordan
+    CAREER HIGHLIGHTS
+    • Built a public-sector workflow used by 10 teams
+    • Reduced reporting time by 40%
+    TECHNICAL TOOLKIT
+    JavaScript, React, SQL, Python
+    COMMUNITY ENGAGEMENT
+    Code Club, Mentor January 2022 - Present
+    • Coached students through weekly coding labs
+  `);
+
+  assert.deepEqual(
+    sourceDocument.sections.map((section) => section.title),
+    ['CAREER HIGHLIGHTS', 'TECHNICAL TOOLKIT', 'COMMUNITY ENGAGEMENT']
+  );
+  assert.equal(sourceDocument.personalLines[0], 'JORDAN EXAMPLE');
+  assert.equal(sourceDocument.sections[0].lines.length, 2);
+});
+
+test('source-first compiler preserves ordered role bullets, education details, and awards', () => {
+  const sourceText = `
+    WALTER WASHINGTON
+    wwashington@uofga.edu ● Athens, GA 30602 ● (706) 555-1234 ● linkedin.com/in/wwashington
+    EDUCATION
+    University of Georgia, Honors Program Athens, GA
+    Bachelor of Arts, Political Science | School of Public & International Affairs May 2023
+    Bachelor of Arts, Spanish | Franklin College of Arts & Sciences GPA: 3.73/4.00
+    Certificate in Personal and Organizational Leadership August 2022 - Present
+    • Participant in highly selective year-long leadership development program
+    Study Abroad: Oxford University | Oxford, England August 2021 - December 2021
+    • Earned 6 credit hours taught by Oxford faculty
+    RELEVANT COURSEWORK
+    Leadership and Personal Development, Business Spanish
+    INTERNSHIP EXPERIENCE
+    Benton, Getchell & Grayson, LLC, Virtual Law Intern | Remote August 2021 - Present
+    • Contribute to daily operations of law firm
+    • Draft motions and participate in depositions
+    • Update correspondence of clients
+    The Population Institute, Intern | Washington, D.C. June 2020 - August 2020
+    • Created and negotiated student scholarship program
+    • Managed relations for World Population Day Symposium
+    • Wrote 4 grant proposals
+    • Advocated with Congress and NGOs
+    LEADERSHIP EXPERIENCE
+    UGA Department of University Housing, Resident Assistant | Athens, GA August 2021 - Present
+    • Design, implement, and evaluate educational programs, including an Effective
+    Leadership workshop series
+    • Utilize communication and counseling skills
+    • Quickly respond to crises
+    • Compile annual facility inventory
+    YMCA Camp Harbor, Head Counselor | Gainesville, GA May 2019 - July 2019
+    • Selected by supervisor to interview, hire, and train counselors
+    • Developed leadership training curriculum
+    • Taught leadership lessons to campers
+    • Designed comprehensive camp schedule
+    ADDITIONAL WORK EXPERIENCE
+    UGA Honors Program, Student Assistant | Athens, GA September 2019 - Present
+    Russell Hall, Desk Assistant | Athens, GA August 2020 - May 2021
+    Dillard's, Sales Associate | Alpharetta, GA May 2018 - August 2019
+    HONORS & AWARDS
+    HOPE Scholarship Recipient August 2019 - Present
+    Dean's List 5 semesters
+    Governor's Scholarship August 2019 - May 2020
+    UGA Rotary Top 12 Award Winner February 2020
+  `;
+  const sourceDocument = createSourceDocumentFromText(sourceText);
+  const imported = compileSourceDocumentToImportedDraft(sourceDocument, null, {
+    sourceFileName: 'government_leadership_resume25.pdf',
+  });
+  const previewModel = getPreviewModel(imported.draft.resume);
+  const validation = validateImportedDraftCoverage(
+    imported.draft,
+    analyzeResumeSourceCoverage(sourceText),
+    createResumeSourceOutline(sourceText)
+  );
+
+  assert.equal(imported.draft.resume.personal.name, 'WALTER WASHINGTON');
+  assert.equal(imported.draft.resume.personal.email, 'wwashington@uofga.edu');
+  assert.deepEqual(
+    previewModel.sectionBlocks.map((section) => [section.title, section.kind]),
+    [
+      ['EDUCATION', 'education'],
+      ['INTERNSHIP EXPERIENCE', 'roles'],
+      ['LEADERSHIP EXPERIENCE', 'roles'],
+      ['ADDITIONAL WORK EXPERIENCE', 'roles'],
+      ['HONORS & AWARDS', 'awards'],
+    ]
+  );
+  assert.equal(previewModel.sectionBlocks.find((section) => section.title === 'EDUCATION').entries.length, 1);
+  assert.equal(previewModel.sectionBlocks.find((section) => section.title === 'INTERNSHIP EXPERIENCE').entries.length, 2);
+  assert.equal(previewModel.sectionBlocks.find((section) => section.title === 'LEADERSHIP EXPERIENCE').entries[0].activities.length, 4);
+  assert.equal(previewModel.sectionBlocks.find((section) => section.title === 'ADDITIONAL WORK EXPERIENCE').entries.length, 3);
+  assert.equal(previewModel.sectionBlocks.find((section) => section.title === 'HONORS & AWARDS').entries.length, 4);
+  assert.equal(validation.ok, true);
 });
 
 test('Gemini import wire output rejects personal-only and legacy-array responses', () => {
@@ -1231,9 +1332,12 @@ test('server import source keeps DOCX text-only and PDF fallback paths', () => {
   assert.match(source, /if \(isPdf\) \{/);
   assert.match(source, /extractPdfText\(file\)/);
   assert.match(source, /assessExtractedResumeText\(extractedPdfText\)/);
-  assert.match(source, /createTextGeminiContents\(file\.fileName, sourceText, sourceOutline\)/);
-  assert.match(source, /createPdfDocumentGeminiContents\(file\)/);
+  assert.match(source, /sourceDocument = createSourceDocumentFromText\(sourceText\)/);
+  assert.match(source, /generateSourceDocumentFromGemini\(\{/);
+  assert.match(source, /generateSourceMappingFromGemini\(\{/);
+  assert.match(source, /compileSourceDocumentToImportedDraft\(sourceDocument, sourceMapping/);
   assert.match(source, /sourceText = await extractDocxText\(file\)/);
+  assert.doesNotMatch(source, /createTextGeminiContents\(file\.fileName, sourceText, sourceOutline\)/);
 });
 
 test('Gemini resume import output normalizes into a safe draft payload', () => {
