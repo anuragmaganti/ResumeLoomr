@@ -75,13 +75,16 @@ import {
   writeSignedOutEditingPreference,
 } from '../src/lib/browserConnection.js';
 import {
+  DEFAULT_GEMINI_MAX_OUTPUT_TOKENS,
   DEFAULT_GEMINI_IMPORT_MODEL,
+  DEFAULT_GEMINI_THINKING_LEVEL,
   IMPORT_FILE_MAX_BYTES,
   ImportResumeError,
   analyzeResumeSourceCoverage,
   applySourceAwareImportCleanup,
   assessExtractedResumeText,
   chooseBestImportedDraftCandidate,
+  createGeminiImportGenerationConfig,
   getGeminiErrorDetails,
   hasUsableImportedDraft,
   normalizeImportFilePayload,
@@ -939,7 +942,7 @@ test('Gemini resume import output normalizes into a safe draft payload', () => {
     },
   }, { sourceFileName: 'jane-example.pdf' });
 
-  assert.equal(DEFAULT_GEMINI_IMPORT_MODEL, 'gemini-2.5-flash-lite');
+  assert.equal(DEFAULT_GEMINI_IMPORT_MODEL, 'gemini-3.1-flash-lite');
   assert.equal(imported.suggestedName, 'Jane Example Resume');
   assert.equal(imported.draft.template, DEFAULT_TEMPLATE);
   assert.deepEqual(imported.draft.sectionOrder.slice(0, 3), ['personal', 'experience', 'education']);
@@ -948,6 +951,46 @@ test('Gemini resume import output normalizes into a safe draft payload', () => {
   assert.equal(imported.draft.resume.experience[0].groupLabel, 'Professional Experience');
   assert.equal(imported.draft.resume.education[0].school, 'State University');
   assert.equal(imported.draft.resume.settings.textSize, 0);
+});
+
+test('Gemini 3 import config uses thinking level without legacy temperature', () => {
+  const config = createGeminiImportGenerationConfig('gemini-3.1-flash-lite', {
+    GEMINI_THINKING_LEVEL: '',
+    GEMINI_MAX_OUTPUT_TOKENS: '',
+  });
+
+  assert.equal(config.responseMimeType, 'application/json');
+  assert.equal(config.responseSchema.type, 'OBJECT');
+  assert.equal(config.thinkingConfig.thinkingLevel, DEFAULT_GEMINI_THINKING_LEVEL);
+  assert.equal(config.maxOutputTokens, DEFAULT_GEMINI_MAX_OUTPUT_TOKENS);
+  assert.equal(Object.hasOwn(config, 'temperature'), false);
+});
+
+test('Gemini import config keeps 2.5 rollback tuning without thinking level', () => {
+  const config = createGeminiImportGenerationConfig('gemini-2.5-flash-lite', {
+    GEMINI_THINKING_LEVEL: 'high',
+    GEMINI_MAX_OUTPUT_TOKENS: '12000',
+  });
+
+  assert.equal(config.temperature, 0.1);
+  assert.equal(config.maxOutputTokens, 12000);
+  assert.equal(Object.hasOwn(config, 'thinkingConfig'), false);
+});
+
+test('Gemini import config clamps output tokens and rejects invalid thinking levels', () => {
+  const invalidConfig = createGeminiImportGenerationConfig('gemini-3.1-flash-lite', {
+    GEMINI_THINKING_LEVEL: 'unsupported',
+    GEMINI_MAX_OUTPUT_TOKENS: '999999',
+  });
+  const lowConfig = createGeminiImportGenerationConfig('gemini-3.1-flash-lite', {
+    GEMINI_THINKING_LEVEL: 'minimal',
+    GEMINI_MAX_OUTPUT_TOKENS: '12',
+  });
+
+  assert.equal(invalidConfig.thinkingConfig.thinkingLevel, DEFAULT_GEMINI_THINKING_LEVEL);
+  assert.equal(invalidConfig.maxOutputTokens, 65536);
+  assert.equal(lowConfig.thinkingConfig.thinkingLevel, 'minimal');
+  assert.equal(lowConfig.maxOutputTokens, 1024);
 });
 
 test('Gemini resume import normalization moves relevant coursework out of duplicate skills', () => {

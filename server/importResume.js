@@ -17,7 +17,9 @@ import {
 
 export const IMPORT_FILE_MAX_BYTES = 3 * 1024 * 1024;
 export const DEFAULT_AI_IMPORT_DAILY_LIMIT = 10;
-export const DEFAULT_GEMINI_IMPORT_MODEL = 'gemini-2.5-flash-lite';
+export const DEFAULT_GEMINI_IMPORT_MODEL = 'gemini-3.1-flash-lite';
+export const DEFAULT_GEMINI_THINKING_LEVEL = 'low';
+export const DEFAULT_GEMINI_MAX_OUTPUT_TOKENS = 20000;
 export const PDF_TEXT_EXTRACTION_TIMEOUT_MS = 2000;
 export const GEMINI_GENERATE_RETRY_DELAYS_MS = [750, 1500];
 
@@ -29,6 +31,9 @@ const TRUSTED_PDF_TEXT_MIN_CHARACTERS = 450;
 const TRUSTED_PDF_TEXT_MIN_WORDS = 75;
 const TRUSTED_PDF_TEXT_MIN_PRINTABLE_RATIO = 0.85;
 const TRUSTED_PDF_TEXT_MIN_RESUME_SIGNALS = 2;
+const GEMINI_THINKING_LEVELS = new Set(['minimal', 'low', 'medium', 'high']);
+const GEMINI_MIN_OUTPUT_TOKENS = 1024;
+const GEMINI_MAX_OUTPUT_TOKENS = 65536;
 const serverRequire = createRequire(import.meta.url);
 const RESUME_SIGNAL_PATTERNS = [
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
@@ -1003,6 +1008,49 @@ function wait(ms) {
   });
 }
 
+function isGemini3Model(model) {
+  return /(?:^|\/)gemini-3(?:[.-]|$)/i.test(trimText(model));
+}
+
+function getGeminiThinkingLevel(env = process.env) {
+  const thinkingLevel = trimText(env.GEMINI_THINKING_LEVEL).toLowerCase();
+
+  return GEMINI_THINKING_LEVELS.has(thinkingLevel) ? thinkingLevel : DEFAULT_GEMINI_THINKING_LEVEL;
+}
+
+function getGeminiMaxOutputTokens(env = process.env) {
+  const parsedValue = Number.parseInt(trimText(env.GEMINI_MAX_OUTPUT_TOKENS), 10);
+
+  if (!Number.isFinite(parsedValue)) {
+    return DEFAULT_GEMINI_MAX_OUTPUT_TOKENS;
+  }
+
+  return Math.min(GEMINI_MAX_OUTPUT_TOKENS, Math.max(GEMINI_MIN_OUTPUT_TOKENS, parsedValue));
+}
+
+export function createGeminiImportGenerationConfig(model, env = process.env) {
+  const maxOutputTokens = getGeminiMaxOutputTokens(env);
+  const baseConfig = {
+    responseMimeType: 'application/json',
+    responseSchema: resumeImportResponseSchema,
+    maxOutputTokens,
+  };
+
+  if (!isGemini3Model(model)) {
+    return {
+      ...baseConfig,
+      temperature: 0.1,
+    };
+  }
+
+  return {
+    ...baseConfig,
+    thinkingConfig: {
+      thinkingLevel: getGeminiThinkingLevel(env),
+    },
+  };
+}
+
 function removeRelevantCourseworkSkillDuplicates(draft) {
   const courseworkSkills = draft.resume.skills.filter((entry) => /^(?:relevant\s+)?coursework$/i.test(trimText(entry.category)));
 
@@ -1403,7 +1451,14 @@ export function normalizeImportedResumeDraft(aiOutput, { sourceFileName = '' } =
   };
 }
 
-async function generateImportedDraft({ ai, model, contents, sourceFileName, diagnostics = null }) {
+async function generateImportedDraft({
+  ai,
+  model,
+  contents,
+  sourceFileName,
+  generationConfig,
+  diagnostics = null,
+}) {
   let lastError;
 
   for (let attempt = 0; attempt <= GEMINI_GENERATE_RETRY_DELAYS_MS.length; attempt += 1) {
@@ -1411,11 +1466,7 @@ async function generateImportedDraft({ ai, model, contents, sourceFileName, diag
       const response = await ai.models.generateContent({
         model,
         contents,
-        config: {
-          temperature: 0.1,
-          responseMimeType: 'application/json',
-          responseSchema: resumeImportResponseSchema,
-        },
+        config: generationConfig,
       });
       const responseText = String(response.text || '');
 
@@ -1448,6 +1499,7 @@ export async function parseResumeWithGemini(file) {
 
   const ai = new GoogleGenAI({ apiKey });
   const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_IMPORT_MODEL;
+  const generationConfig = createGeminiImportGenerationConfig(model);
   const isPdf = file.mimeType === PDF_MIME_TYPE;
   let contents;
   let sourceText = '';
@@ -1491,6 +1543,8 @@ export async function parseResumeWithGemini(file) {
   }
   const importDiagnostics = {
     model,
+    thinkingLevel: generationConfig.thinkingConfig?.thinkingLevel,
+    maxOutputTokens: generationConfig.maxOutputTokens,
     fileName: trimText(file.fileName).slice(0, 120),
     mimeType: file.mimeType,
     fileSizeBytes: file.size || file.buffer?.length || 0,
@@ -1504,6 +1558,7 @@ export async function parseResumeWithGemini(file) {
     model,
     contents,
     sourceFileName: file.fileName,
+    generationConfig,
     diagnostics: {
       ...importDiagnostics,
       phase: 'initial',
@@ -1546,6 +1601,7 @@ export async function parseResumeWithGemini(file) {
       issues: coverageValidation.issues,
     }),
     sourceFileName: file.fileName,
+    generationConfig,
     diagnostics: {
       ...importDiagnostics,
       phase: 'repair',
