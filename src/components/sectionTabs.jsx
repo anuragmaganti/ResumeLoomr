@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const defaultSections = [
     { id: "personal", navLabel: "Personal", navHint: "Name, contact, summary" },
@@ -7,16 +7,31 @@ const defaultSections = [
 ];
 
 const SECTION_DRAG_MIME_TYPE = "application/x-resumeloomr-section";
+let transparentDragImageElement = null;
 
-function createTransparentDragImage() {
+function getTransparentDragImage() {
     if (typeof document === "undefined") {
         return null;
     }
 
-    const canvas = document.createElement("canvas");
-    canvas.width = 1;
-    canvas.height = 1;
-    return canvas;
+    if (transparentDragImageElement?.isConnected) {
+        return transparentDragImageElement;
+    }
+
+    const element = document.createElement("div");
+    element.setAttribute("aria-hidden", "true");
+    element.style.position = "fixed";
+    element.style.top = "0";
+    element.style.left = "0";
+    element.style.width = "1px";
+    element.style.height = "1px";
+    element.style.opacity = "0";
+    element.style.pointerEvents = "none";
+    element.style.zIndex = "-1";
+
+    document.body.appendChild(element);
+    transparentDragImageElement = element;
+    return transparentDragImageElement;
 }
 
 export default function SectionTabs({
@@ -26,6 +41,10 @@ export default function SectionTabs({
     onReorderSection
 }) {
     const [draggedSectionId, setDraggedSectionId] = useState(null);
+
+    useEffect(() => {
+        getTransparentDragImage();
+    }, []);
 
     function clearDragState() {
         setDraggedSectionId(null);
@@ -39,7 +58,7 @@ export default function SectionTabs({
 
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData(SECTION_DRAG_MIME_TYPE, sectionId);
-        const dragImage = createTransparentDragImage();
+        const dragImage = getTransparentDragImage();
 
         if (dragImage) {
             event.dataTransfer.setDragImage(dragImage, 0, 0);
@@ -105,6 +124,11 @@ export default function SectionTabs({
                     aria-selected={activeTab === section.id}
                     draggable={section.id !== "personal" && Boolean(onReorderSection)}
                     onClick={() => setActiveTab(section.id)}
+                    onPointerDown={() => {
+                        if (section.id !== "personal" && onReorderSection) {
+                            getTransparentDragImage();
+                        }
+                    }}
                     onDragStart={(event) => handleDragStart(event, section.id)}
                     onDragOver={(event) => handleDragOver(event, section.id)}
                     onDrop={handleDrop}
