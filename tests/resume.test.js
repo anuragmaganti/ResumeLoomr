@@ -75,6 +75,7 @@ import {
   IMPORT_FILE_MAX_BYTES,
   ImportResumeError,
   analyzeResumeSourceCoverage,
+  applySourceAwareImportCleanup,
   assessExtractedResumeText,
   getGeminiErrorDetails,
   normalizeImportFilePayload,
@@ -353,6 +354,8 @@ test('resume source coverage detects bullets, GPA, coursework, awards, and major
     • Developed leadership training curriculum
     • Taught leadership lessons to campers
     • Designed comprehensive camp schedule
+    ADDITIONAL WORK EXPERIENCE
+    UGA Honors Program, Student Assistant September 2019 - Present
     HONORS & AWARDS
     HOPE Scholarship Recipient August 2019 - Present
     Dean's List 5 semesters
@@ -371,6 +374,10 @@ test('resume source coverage detects bullets, GPA, coursework, awards, and major
     leadership: true,
     awards: true,
   });
+  assert.deepEqual(
+    coverage.roleSectionOrder.map((section) => section.label),
+    ['INTERNSHIP EXPERIENCE', 'LEADERSHIP EXPERIENCE', 'ADDITIONAL WORK EXPERIENCE']
+  );
 });
 
 test('full import coverage rejects drafts that drop source highlights and awards', () => {
@@ -447,6 +454,87 @@ test('full import coverage accepts drafts that preserve source details', () => {
   const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage);
 
   assert.equal(validation.ok, true);
+});
+
+test('source-aware import cleanup compacts repeated education and preserves interleaved role order', () => {
+  const sourceCoverage = analyzeResumeSourceCoverage(`
+    EDUCATION
+    University of Georgia
+    INTERNSHIP EXPERIENCE
+    Benton, Intern 2021
+    • Drafted motions
+    LEADERSHIP EXPERIENCE
+    UGA Housing, Resident Assistant 2021
+    • Led programs
+    ADDITIONAL WORK EXPERIENCE
+    UGA Honors Program, Student Assistant 2019
+    HONORS & AWARDS
+    HOPE Scholarship
+  `);
+  const imported = normalizeImportedResumeDraft({
+    sectionOrder: ['education', 'experience', 'leadership', 'awards'],
+    resume: {
+      sectionTitles: {
+        experience: 'INTERNSHIP EXPERIENCE',
+        leadership: 'LEADERSHIP EXPERIENCE',
+      },
+      education: [
+        {
+          school: 'University of Georgia',
+          degree: 'Bachelor of Arts, Political Science',
+          yearsEdu: 'May 2023',
+          gpa: '3.73/4.00',
+        },
+        {
+          school: 'University of Georgia',
+          degree: 'Bachelor of Arts, Spanish',
+        },
+        {
+          school: 'University of Georgia',
+          degree: 'Certificate in Personal and Organizational Leadership',
+          yearsEdu: 'August 2022 - Present',
+        },
+      ],
+      experience: [
+        {
+          company: 'Benton',
+          role: 'Intern',
+          groupLabel: 'INTERNSHIP EXPERIENCE',
+          yearsExp: '2021',
+          activities: ['Drafted motions'],
+        },
+        {
+          company: 'UGA Honors Program',
+          role: 'Student Assistant',
+          groupLabel: 'ADDITIONAL WORK EXPERIENCE',
+          yearsExp: '2019',
+          activities: [''],
+        },
+      ],
+      leadership: [
+        {
+          organization: 'UGA Housing',
+          role: 'Resident Assistant',
+          years: '2021',
+          highlights: ['Led programs'],
+        },
+      ],
+      awards: [{ title: 'HOPE Scholarship' }],
+    },
+  });
+  const cleaned = applySourceAwareImportCleanup(imported, sourceCoverage);
+
+  assert.equal(cleaned.draft.resume.education.length, 1);
+  assert.equal(cleaned.draft.resume.education[0].school, 'University of Georgia');
+  assert.match(cleaned.draft.resume.education[0].degree, /Political Science/);
+  assert.match(cleaned.draft.resume.education[0].degree, /Spanish/);
+  assert.match(cleaned.draft.resume.education[0].degree, /Certificate/);
+  assert.equal(cleaned.draft.resume.sectionTitles.experience, 'Experience');
+  assert.deepEqual(
+    cleaned.draft.resume.experience.map((entry) => entry.groupLabel),
+    ['INTERNSHIP EXPERIENCE', 'LEADERSHIP EXPERIENCE', 'ADDITIONAL WORK EXPERIENCE']
+  );
+  assert.equal(cleaned.draft.resume.leadership.every((entry) => !entry.organization && !entry.role && !entry.highlights.some(Boolean)), true);
 });
 
 test('server import source keeps DOCX text-only and PDF fallback paths', () => {

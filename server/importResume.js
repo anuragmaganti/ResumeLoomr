@@ -472,6 +472,20 @@ function isKnownSourceSectionHeader(line) {
   return /^(?:education|relevant coursework|coursework|internship experience|professional experience|work experience|additional work experience|employment experience|experience|leadership experience|volunteer experience|volunteering|projects?|skills|certifications?|languages|honors?\s*(?:&|and)?\s*awards?|awards|publications?)$/i.test(trimText(line));
 }
 
+function getRoleSectionType(line) {
+  const text = trimText(line);
+
+  if (/^leadership experience$/i.test(text)) {
+    return 'leadership';
+  }
+
+  if (/^(?:internship experience|professional experience|work experience|additional work experience|employment experience|experience)$/i.test(text)) {
+    return 'experience';
+  }
+
+  return '';
+}
+
 function getSectionLines(lines, headerPattern) {
   const startIndex = lines.findIndex((line) => headerPattern.test(line));
 
@@ -507,6 +521,9 @@ export function analyzeResumeSourceCoverage(text) {
   const awardsLines = getSectionLines(lines, /^honors?\s*(?:&|and)?\s*awards?$|^awards$/i)
     .filter((line) => !isLikelySourceBullet(line));
   const hasSection = (pattern) => lines.some((line) => pattern.test(line));
+  const roleSectionOrder = lines
+    .map((line) => ({ label: line, type: getRoleSectionType(line) }))
+    .filter((section) => section.type);
 
   return {
     hasSourceText: normalizedText.length > 0,
@@ -520,6 +537,7 @@ export function analyzeResumeSourceCoverage(text) {
       leadership: hasSection(/^leadership experience$/i),
       awards: hasSection(/^honors?\s*(?:&|and)?\s*awards?$|^awards$/i),
     },
+    roleSectionOrder,
   };
 }
 
@@ -543,6 +561,7 @@ function analyzeImportedDraftCoverage(draft) {
   const leadershipDetailCount = countDraftListItems(resume.leadership, 'highlights');
   const volunteeringDetailCount = countDraftListItems(resume.volunteering, 'highlights');
   const projectDetailCount = countDraftListItems(resume.projects, 'highlights');
+  const leadershipAsExperience = resume.experience.some((entry) => /leadership/i.test(trimText(entry.groupLabel)));
 
   return {
     bulletLikeDetailCount: educationCustomDetailCount + experienceDetailCount + leadershipDetailCount + volunteeringDetailCount + projectDetailCount,
@@ -552,7 +571,7 @@ function analyzeImportedDraftCoverage(draft) {
     sections: {
       education: resume.education.some((entry) => [entry.school, entry.degree, entry.yearsEdu, entry.gpa, entry.coursework].some((value) => trimText(value) !== '')),
       experience: resume.experience.some((entry) => [entry.company, entry.role, entry.yearsExp].some((value) => trimText(value) !== '') || entry.activities.some((value) => trimText(value) !== '')),
-      leadership: resume.leadership.some((entry) => [entry.organization, entry.role, entry.years].some((value) => trimText(value) !== '') || entry.highlights.some((value) => trimText(value) !== '')),
+      leadership: leadershipAsExperience || resume.leadership.some((entry) => [entry.organization, entry.role, entry.years].some((value) => trimText(value) !== '') || entry.highlights.some((value) => trimText(value) !== '')),
       awards: topLevelAwardCount + educationAwardCount > 0,
     },
   };
@@ -635,10 +654,16 @@ async function extractPdfText(file) {
 function createExtractionPrompt({ fileName, isDocumentInput }) {
   const fullImportInstructions = [
     'Preserve every source bullet, highlight, award, GPA, and coursework item even if the resume becomes longer than one page.',
+    'If the source resume is one page, keep the output compact and do not expand single-line source entries into repeated verbose entries.',
     'Do not omit source bullets. Do not merge multiple source bullets into one output item.',
+    'Keep entries in the same order they appear in the source resume.',
     'Map internship, professional, employment, work, and additional work entries into experience[].',
     'When multiple source work headings exist, put that source heading in experience[].groupLabel for each matching entry.',
-    'Map leadership entries into leadership[] and set sectionTitles.leadership to the source leadership heading when present.',
+    'If role-based source headings must be interleaved to preserve order, put those roles in experience[] with groupLabel instead of splitting them into separate top-level sections.',
+    'Map leadership entries into leadership[] only when doing so preserves the source section order.',
+    'Do not duplicate a source heading in both sectionTitles.experience and experience[].groupLabel. If groupLabel is used for source headings, set sectionTitles.experience to "Experience".',
+    'Use one education entry per institution. Do not repeat the same university for multiple degrees, certificates, or study-abroad lines.',
+    'Merge multiple degrees from the same school into the same education[].degree value.',
     'Map each work bullet into experience[].activities as a separate string.',
     'Map each leadership bullet into leadership[].highlights as a separate string.',
     'Map education bullets such as certificates or study abroad details into education[].customSections.',
@@ -805,6 +830,213 @@ function removeRelevantCourseworkSkillDuplicates(draft) {
   });
 }
 
+function normalizeComparisonKey(value) {
+  return trimText(value)
+    .toLowerCase()
+    .replace(/\bhonors?\s+program\b/g, '')
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function mergeUniqueText(values, separator = '; ') {
+  const seen = new Set();
+
+  return values
+    .flatMap((value) => trimText(value).split(/\n|;/g))
+    .map(trimText)
+    .filter((value) => {
+      if (!value) {
+        return false;
+      }
+
+      const key = normalizeComparisonKey(value);
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    })
+    .join(separator);
+}
+
+function mergeEducationCustomSections(sections) {
+  const seen = new Set();
+
+  return sections.filter((section) => {
+    const label = trimText(section.label);
+    const content = trimText(section.content);
+
+    if (!label && !content) {
+      return false;
+    }
+
+    const key = `${normalizeComparisonKey(label)}:${normalizeComparisonKey(content)}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function compactRepeatedEducationEntries(draft) {
+  const education = [];
+  const schoolIndexes = new Map();
+
+  for (const entry of draft.resume.education) {
+    const schoolKey = normalizeComparisonKey(entry.school);
+
+    if (!schoolKey || !schoolIndexes.has(schoolKey)) {
+      if (schoolKey) {
+        schoolIndexes.set(schoolKey, education.length);
+      }
+
+      education.push(entry);
+      continue;
+    }
+
+    const existingIndex = schoolIndexes.get(schoolKey);
+    const existing = education[existingIndex];
+
+    education[existingIndex] = {
+      ...existing,
+      degree: mergeUniqueText([existing.degree, entry.degree]),
+      yearsEdu: trimText(existing.yearsEdu) || trimText(entry.yearsEdu),
+      location: trimText(existing.location) || trimText(entry.location),
+      gpa: trimText(existing.gpa) || trimText(entry.gpa),
+      honors: mergeUniqueText([existing.honors, entry.honors]),
+      coursework: mergeUniqueText([existing.coursework, entry.coursework], ', '),
+      awards: mergeUniqueText([existing.awards, entry.awards]),
+      customSections: mergeEducationCustomSections([
+        ...existing.customSections,
+        ...entry.customSections,
+      ]),
+    };
+  }
+
+  return normalizeDraftPayload({
+    ...draft,
+    resume: {
+      ...draft.resume,
+      education,
+    },
+  });
+}
+
+function normalizeImportedExperienceTitles(draft) {
+  const groupLabelKeys = new Set(
+    draft.resume.experience
+      .map((entry) => normalizeComparisonKey(entry.groupLabel))
+      .filter(Boolean)
+  );
+  const experienceTitleKey = normalizeComparisonKey(draft.resume.sectionTitles.experience);
+  const shouldUseGenericExperienceTitle = groupLabelKeys.size > 1 || groupLabelKeys.has(experienceTitleKey);
+
+  if (!shouldUseGenericExperienceTitle) {
+    return draft;
+  }
+
+  return normalizeDraftPayload({
+    ...draft,
+    resume: {
+      ...draft.resume,
+      sectionTitles: {
+        ...draft.resume.sectionTitles,
+        experience: 'Experience',
+      },
+    },
+  });
+}
+
+function sourceHasInterleavedLeadership(roleSectionOrder) {
+  const leadershipIndex = roleSectionOrder.findIndex((section) => section.type === 'leadership');
+
+  return (
+    leadershipIndex > -1 &&
+    roleSectionOrder.some((section, index) => index < leadershipIndex && section.type === 'experience') &&
+    roleSectionOrder.some((section, index) => index > leadershipIndex && section.type === 'experience')
+  );
+}
+
+function orderExperienceEntriesBySourceSections(experienceEntries, leadershipEntries, roleSectionOrder) {
+  const usedExperienceIds = new Set();
+  const leadershipGroup = roleSectionOrder.find((section) => section.type === 'leadership')?.label || 'Leadership Experience';
+  const leadershipAsExperience = leadershipEntries
+    .filter((entry) => (
+      [entry.organization, entry.role, entry.years].some((value) => trimText(value) !== '') ||
+      entry.highlights.some((value) => trimText(value) !== '')
+    ))
+    .map((entry) => ({
+      id: entry.id,
+      company: entry.organization,
+      role: entry.role,
+      groupLabel: leadershipGroup,
+      yearsExp: entry.years,
+      activities: entry.highlights,
+    }));
+  const ordered = [];
+
+  for (const sourceSection of roleSectionOrder) {
+    if (sourceSection.type === 'leadership') {
+      ordered.push(...leadershipAsExperience);
+      continue;
+    }
+
+    const sourceKey = normalizeComparisonKey(sourceSection.label);
+    const matchingEntries = experienceEntries.filter((entry) => normalizeComparisonKey(entry.groupLabel) === sourceKey);
+
+    for (const entry of matchingEntries) {
+      usedExperienceIds.add(entry.id);
+      ordered.push(entry);
+    }
+  }
+
+  for (const entry of experienceEntries) {
+    if (!usedExperienceIds.has(entry.id)) {
+      ordered.push(entry);
+    }
+  }
+
+  return ordered;
+}
+
+export function applySourceAwareImportCleanup(parsedImport, sourceCoverage) {
+  let draft = normalizeDraftPayload(parsedImport.draft);
+
+  draft = compactRepeatedEducationEntries(draft);
+
+  if (sourceHasInterleavedLeadership(sourceCoverage?.roleSectionOrder || [])) {
+    draft = normalizeDraftPayload({
+      ...draft,
+      sectionOrder: draft.sectionOrder.filter((sectionId) => sectionId !== 'leadership'),
+      resume: {
+        ...draft.resume,
+        experience: orderExperienceEntriesBySourceSections(
+          draft.resume.experience,
+          draft.resume.leadership,
+          sourceCoverage.roleSectionOrder,
+        ),
+        leadership: [],
+      },
+    });
+  }
+
+  draft = normalizeImportedExperienceTitles(draft);
+
+  return {
+    ...parsedImport,
+    draft: {
+      ...draft,
+      savedAt: null,
+    },
+  };
+}
+
 export function normalizeImportedResumeDraft(aiOutput, { sourceFileName = '' } = {}) {
   const output = aiOutput && typeof aiOutput === 'object' ? aiOutput : {};
   const resumeCandidate = output.resume && typeof output.resume === 'object' ? output.resume : output;
@@ -900,20 +1132,21 @@ export async function parseResumeWithGemini(file) {
     contents = createTextGeminiContents(file.fileName, sourceText);
   }
 
-  const parsedImport = await generateImportedDraft({
+  const rawParsedImport = await generateImportedDraft({
     ai,
     model,
     contents,
     sourceFileName: file.fileName,
   });
   const sourceCoverage = analyzeResumeSourceCoverage(sourceText);
+  const parsedImport = applySourceAwareImportCleanup(rawParsedImport, sourceCoverage);
   const coverageValidation = validateImportedDraftCoverage(parsedImport.draft, sourceCoverage);
 
   if (coverageValidation.ok || !sourceCoverage.hasSourceText) {
     return parsedImport;
   }
 
-  const repairedImport = await generateImportedDraft({
+  const rawRepairedImport = await generateImportedDraft({
     ai,
     model,
     contents: createRepairGeminiContents({
@@ -924,6 +1157,7 @@ export async function parseResumeWithGemini(file) {
     }),
     sourceFileName: file.fileName,
   });
+  const repairedImport = applySourceAwareImportCleanup(rawRepairedImport, sourceCoverage);
   const repairedCoverageValidation = validateImportedDraftCoverage(repairedImport.draft, sourceCoverage);
 
   if (!repairedCoverageValidation.ok) {

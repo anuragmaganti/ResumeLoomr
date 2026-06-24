@@ -5,6 +5,10 @@ function templateClassName(template) {
     return `resumePage--${template}`;
 }
 
+function normalizeLabel(value) {
+    return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+}
+
 export default function ResumePreview({ previewModel, sectionOrder, template, settings, panelRef }) {
     const resumeRef = useRef(null);
     const presentationVars = useMemo(() => getResumePresentationVars(settings, template), [settings, template]);
@@ -139,7 +143,10 @@ export default function ResumePreview({ previewModel, sectionOrder, template, se
                 <div className="resumeSection experienceDiv" key="experience">
                     <h2>{previewModel.sectionTitles.experience}</h2>
                     {previewModel.experienceEntries.map((job, index, entries) => {
-                        const showGroupLabel = job.groupLabel && job.groupLabel !== entries[index - 1]?.groupLabel;
+                        const groupLabelKey = normalizeLabel(job.groupLabel);
+                        const previousGroupLabelKey = normalizeLabel(entries[index - 1]?.groupLabel);
+                        const sectionTitleKey = normalizeLabel(previewModel.sectionTitles.experience);
+                        const showGroupLabel = groupLabelKey && groupLabelKey !== previousGroupLabelKey && groupLabelKey !== sectionTitleKey;
 
                         return (
                             <Fragment key={job.id}>
