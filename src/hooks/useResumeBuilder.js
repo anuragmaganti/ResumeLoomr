@@ -55,6 +55,7 @@ import {
   removeEducationCustomSection,
   removeEducation,
   removeExperience,
+  reorderSectionOrder,
   sanitizeWorkspaceResumeName,
   updateCollectionEntry,
   updateCollectionTextList,
@@ -1053,6 +1054,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     setSectionOrder((currentOrder) => moveSectionOrder(currentOrder, sectionId, direction));
   }
 
+  function reorderSection(sectionId, targetSectionId, placement) {
+    setSaveState('saving');
+    setSectionOrder((currentOrder) => reorderSectionOrder(currentOrder, sectionId, targetSectionId, placement));
+  }
+
   function markTouched(path) {
     setTouched((currentTouched) => (
       currentTouched[path]
@@ -1562,6 +1568,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     setActiveTab,
     sectionOrder,
     moveSection,
+    reorderSection,
     mobileView,
     setMobileView,
     previewModel,

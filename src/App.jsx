@@ -49,6 +49,7 @@ function App() {
     setActiveTab,
     sectionOrder,
     moveSection,
+    reorderSection,
     mobileView,
     setMobileView,
     previewModel,
@@ -369,6 +370,7 @@ function App() {
               setActiveTab={setActiveTab}
               sectionOrder={sectionOrder}
               onMoveSection={moveSection}
+              onReorderSection={reorderSection}
               template={template}
               templateOptions={templateOptions}
               onTemplateChange={setTemplate}

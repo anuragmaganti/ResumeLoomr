@@ -766,6 +766,35 @@ export function moveSectionOrder(sectionOrder, sectionId, direction) {
   return reorderList(normalizedOrder, currentIndex, nextIndex);
 }
 
+export function reorderSectionOrder(sectionOrder, sectionId, targetSectionId, placement = 'before') {
+  const normalizedOrder = normalizeSectionOrder(sectionOrder);
+
+  if (sectionId === 'personal' || sectionId === targetSectionId) {
+    return normalizedOrder;
+  }
+
+  const currentIndex = normalizedOrder.indexOf(sectionId);
+  const targetIndex = normalizedOrder.indexOf(targetSectionId);
+
+  if (currentIndex < 1 || targetIndex < 0) {
+    return normalizedOrder;
+  }
+
+  const nextOrder = [...normalizedOrder];
+  nextOrder.splice(currentIndex, 1);
+
+  let insertIndex = targetIndex + (placement === 'after' ? 1 : 0);
+
+  if (currentIndex < insertIndex) {
+    insertIndex -= 1;
+  }
+
+  insertIndex = Math.max(1, Math.min(insertIndex, nextOrder.length));
+  nextOrder.splice(insertIndex, 0, sectionId);
+
+  return normalizeSectionOrder(nextOrder);
+}
+
 export function updatePersonalField(resume, field, value) {
   return {
     ...resume,

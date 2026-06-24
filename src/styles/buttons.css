@@ -98,6 +98,7 @@
 }
 
 .tabButton {
+  position: relative;
   justify-content: flex-start;
   width: 100%;
   min-width: 0;
@@ -107,6 +108,21 @@
   background: transparent;
   color: var(--color-text-subtle);
   text-align: left;
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    color var(--transition-base),
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.tabButton[draggable="true"] {
+  cursor: grab;
+}
+
+.tabButton[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .tabButton.isActive {
@@ -114,6 +130,15 @@
   background: var(--color-surface-elevated);
   color: var(--color-text);
   box-shadow: var(--shadow-xs);
+}
+
+.tabButton.isDragging {
+  opacity: 0.92;
+  transform: scale(0.98);
+}
+
+.tabButton.isLocked {
+  cursor: default;
 }
 
 .tabIndex {

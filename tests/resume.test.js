@@ -33,6 +33,7 @@ import {
   removeEducationCustomSection,
   removeEducation,
   removeExperience,
+  reorderSectionOrder,
   updatePersonalField,
   updateResumeSetting,
   updateSectionTitle,
@@ -796,6 +797,24 @@ test('moveSectionOrder keeps personal first and reorders the remaining sections'
     moveSectionOrder(SECTION_IDS, 'personal', 1),
     SECTION_IDS
   );
+});
+
+test('reorderSectionOrder keeps personal fixed while dragging sections into place', () => {
+  const baseOrder = ['personal', 'education', 'experience', 'skills', 'projects'];
+
+  assert.deepEqual(
+    reorderSectionOrder(baseOrder, 'projects', 'experience', 'before').slice(0, 5),
+    ['personal', 'education', 'projects', 'experience', 'skills']
+  );
+  assert.deepEqual(
+    reorderSectionOrder(baseOrder, 'education', 'projects', 'after').slice(0, 5),
+    ['personal', 'experience', 'skills', 'projects', 'education']
+  );
+  assert.deepEqual(
+    reorderSectionOrder(baseOrder, 'personal', 'projects', 'after').slice(0, 5),
+    ['personal', 'education', 'experience', 'skills', 'projects']
+  );
+  assert.equal(reorderSectionOrder(baseOrder, 'projects', 'personal', 'before')[0], 'personal');
 });
 
 test('updateResumeSetting clamps stepper values to the supported range', () => {
