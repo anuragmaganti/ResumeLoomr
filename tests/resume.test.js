@@ -85,10 +85,12 @@ import {
   assessExtractedResumeText,
   chooseBestImportedDraftCandidate,
   createGeminiImportGenerationConfig,
+  createResumeSourceOutline,
   getGeminiErrorDetails,
   hasUsableImportedDraft,
   normalizeImportFilePayload,
   normalizeImportedResumeDraft,
+  parseGeminiImportWireOutput,
   scoreImportedDraftCoverage,
   shouldRejectIncompleteImportedDraft,
   shouldAttemptImportRepair,
@@ -390,6 +392,288 @@ test('resume source coverage detects bullets, GPA, coursework, awards, and major
     coverage.roleSectionOrder.map((section) => section.label),
     ['INTERNSHIP EXPERIENCE', 'LEADERSHIP EXPERIENCE', 'ADDITIONAL WORK EXPERIENCE']
   );
+});
+
+test('resume source outline detects ordered source section blocks', () => {
+  const outline = createResumeSourceOutline(`
+    WALTER WASHINGTON
+    EDUCATION
+    University of Georgia, Honors Program Athens, GA
+    Bachelor of Arts, Political Science May 2023
+    Bachelor of Arts, Spanish GPA: 3.73/4.00
+    Certificate in Personal and Organizational Leadership August 2022 - Present
+    • Participant in selective leadership development program
+    Study Abroad: Oxford University August 2021 - December 2021
+    • Earned 6 credit hours taught by Oxford faculty
+    RELEVANT COURSEWORK
+    Leadership and Personal Development, Business Spanish
+    INTERNSHIP EXPERIENCE
+    Benton, Getchell & Grayson, LLC, Virtual Law Intern August 2021 - Present
+    • Contribute to daily operations of law firm
+    • Draft motions and participate in depositions
+    • Update correspondence of clients
+    The Population Institute, Intern June 2020 - August 2020
+    • Created and negotiated student scholarship program
+    • Managed relations for World Population Day Symposium
+    • Wrote 4 grant proposals
+    • Advocated with Congress and NGOs
+    LEADERSHIP EXPERIENCE
+    UGA Department of University Housing, Resident Assistant August 2021 - Present
+    • Design, implement, and evaluate educational programs
+    • Utilize communication and counseling skills
+    • Quickly respond to crises
+    • Compile annual facility inventory
+    YMCA Camp Harbor, Head Counselor May 2019 - July 2019
+    • Selected by supervisor to interview, hire, and train counselors
+    • Developed leadership training curriculum
+    • Taught leadership lessons to campers
+    • Designed comprehensive camp schedule
+    ADDITIONAL WORK EXPERIENCE
+    UGA Honors Program, Student Assistant September 2019 - Present
+    HONORS & AWARDS
+    HOPE Scholarship Recipient August 2019 - Present
+    Dean's List 5 semesters
+    Governor's Scholarship August 2019 - May 2020
+    UGA Rotary Top 12 Award Winner February 2020
+  `);
+
+  assert.deepEqual(
+    outline.requiredBlocks.map((block) => [block.title, block.kind]),
+    [
+      ['EDUCATION', 'education'],
+      ['INTERNSHIP EXPERIENCE', 'roles'],
+      ['LEADERSHIP EXPERIENCE', 'roles'],
+      ['ADDITIONAL WORK EXPERIENCE', 'roles'],
+      ['HONORS & AWARDS', 'awards'],
+    ]
+  );
+  assert.equal(outline.bulletCount, 17);
+  assert.equal(outline.awardCount, 4);
+  assert.equal(outline.hasGpa, true);
+  assert.equal(outline.hasCoursework, true);
+  assert.equal(outline.requiredBlocks.find((block) => block.title === 'INTERNSHIP EXPERIENCE').roleEntryCount, 2);
+  assert.equal(outline.requiredBlocks.find((block) => block.title === 'LEADERSHIP EXPERIENCE').roleEntryCount, 2);
+});
+
+test('Gemini import wire output rejects personal-only and legacy-array responses', () => {
+  assert.throws(
+    () => parseGeminiImportWireOutput(JSON.stringify({
+      resume: {
+        personal: {
+          name: 'Walter Washington',
+        },
+      },
+    })),
+    (error) => error instanceof ImportResumeError && error.code === 'import/invalid-ai-response'
+  );
+
+  assert.throws(
+    () => parseGeminiImportWireOutput(JSON.stringify({
+      resume: {
+        personal: {
+          name: 'Walter Washington',
+        },
+        sections: [
+          {
+            kind: 'education',
+            title: 'EDUCATION',
+            entries: [{ school: 'University of Georgia' }],
+          },
+        ],
+        education: [{ school: 'University of Georgia' }],
+      },
+    })),
+    (error) => error instanceof ImportResumeError && error.code === 'import/invalid-ai-response'
+  );
+});
+
+test('section-block import passes source-outline coverage when all major source details are preserved', () => {
+  const sourceText = `
+    EDUCATION
+    University of Georgia, Honors Program Athens, GA
+    Bachelor of Arts, Political Science May 2023
+    Bachelor of Arts, Spanish GPA: 3.73/4.00
+    Certificate in Personal and Organizational Leadership August 2022 - Present
+    • Participant in selective leadership development program
+    Study Abroad: Oxford University August 2021 - December 2021
+    • Earned 6 credit hours taught by Oxford faculty
+    RELEVANT COURSEWORK
+    Leadership and Personal Development, Business Spanish
+    INTERNSHIP EXPERIENCE
+    Benton, Getchell & Grayson, LLC, Virtual Law Intern August 2021 - Present
+    • Contribute to daily operations of law firm
+    • Draft motions and participate in depositions
+    • Update correspondence of clients
+    The Population Institute, Intern June 2020 - August 2020
+    • Created and negotiated student scholarship program
+    • Managed relations for World Population Day Symposium
+    • Wrote 4 grant proposals
+    • Advocated with Congress and NGOs
+    LEADERSHIP EXPERIENCE
+    UGA Department of University Housing, Resident Assistant August 2021 - Present
+    • Design, implement, and evaluate educational programs
+    • Utilize communication and counseling skills
+    • Quickly respond to crises
+    • Compile annual facility inventory
+    YMCA Camp Harbor, Head Counselor May 2019 - July 2019
+    • Selected by supervisor to interview, hire, and train counselors
+    • Developed leadership training curriculum
+    • Taught leadership lessons to campers
+    • Designed comprehensive camp schedule
+    ADDITIONAL WORK EXPERIENCE
+    UGA Honors Program, Student Assistant September 2019 - Present
+    HONORS & AWARDS
+    HOPE Scholarship Recipient August 2019 - Present
+    Dean's List 5 semesters
+    Governor's Scholarship August 2019 - May 2020
+    UGA Rotary Top 12 Award Winner February 2020
+  `;
+  const sourceCoverage = analyzeResumeSourceCoverage(sourceText);
+  const sourceOutline = createResumeSourceOutline(sourceText);
+  const imported = normalizeImportedResumeDraft(parseGeminiImportWireOutput(JSON.stringify({
+    suggestedName: 'Walter Washington',
+    resume: {
+      personal: { name: 'Walter Washington' },
+      sections: [
+        {
+          sourceSectionId: sourceOutline.requiredBlocks[0].id,
+          kind: 'education',
+          title: 'EDUCATION',
+          entries: [
+            {
+              school: 'University of Georgia, Honors Program',
+              location: 'Athens, GA',
+              degree: 'Bachelor of Arts, Political Science; Bachelor of Arts, Spanish',
+              yearsEdu: 'May 2023',
+              gpa: '3.73/4.00',
+              coursework: 'Leadership and Personal Development, Business Spanish',
+              customSections: [
+                { label: 'Certificate', content: 'Participant in selective leadership development program' },
+                { label: 'Study Abroad', content: 'Earned 6 credit hours taught by Oxford faculty' },
+              ],
+            },
+          ],
+        },
+        {
+          sourceSectionId: sourceOutline.requiredBlocks[1].id,
+          kind: 'roles',
+          title: 'INTERNSHIP EXPERIENCE',
+          entries: [
+            {
+              company: 'Benton, Getchell & Grayson, LLC',
+              role: 'Virtual Law Intern',
+              yearsExp: 'August 2021 - Present',
+              activities: ['Contribute to daily operations of law firm', 'Draft motions and participate in depositions', 'Update correspondence of clients'],
+            },
+            {
+              company: 'The Population Institute',
+              role: 'Intern',
+              yearsExp: 'June 2020 - August 2020',
+              activities: ['Created and negotiated student scholarship program', 'Managed relations for World Population Day Symposium', 'Wrote 4 grant proposals', 'Advocated with Congress and NGOs'],
+            },
+          ],
+        },
+        {
+          sourceSectionId: sourceOutline.requiredBlocks[2].id,
+          kind: 'roles',
+          title: 'LEADERSHIP EXPERIENCE',
+          entries: [
+            {
+              company: 'UGA Department of University Housing',
+              role: 'Resident Assistant',
+              yearsExp: 'August 2021 - Present',
+              activities: ['Design, implement, and evaluate educational programs', 'Utilize communication and counseling skills', 'Quickly respond to crises', 'Compile annual facility inventory'],
+            },
+            {
+              company: 'YMCA Camp Harbor',
+              role: 'Head Counselor',
+              yearsExp: 'May 2019 - July 2019',
+              activities: ['Selected by supervisor to interview, hire, and train counselors', 'Developed leadership training curriculum', 'Taught leadership lessons to campers', 'Designed comprehensive camp schedule'],
+            },
+          ],
+        },
+        {
+          sourceSectionId: sourceOutline.requiredBlocks[3].id,
+          kind: 'roles',
+          title: 'ADDITIONAL WORK EXPERIENCE',
+          entries: [
+            {
+              company: 'UGA Honors Program',
+              role: 'Student Assistant',
+              yearsExp: 'September 2019 - Present',
+              activities: [],
+            },
+          ],
+        },
+        {
+          sourceSectionId: sourceOutline.requiredBlocks[4].id,
+          kind: 'awards',
+          title: 'HONORS & AWARDS',
+          entries: [
+            { title: 'HOPE Scholarship Recipient', years: 'August 2019 - Present' },
+            { title: "Dean's List", details: '5 semesters' },
+            { title: "Governor's Scholarship", years: 'August 2019 - May 2020' },
+            { title: 'UGA Rotary Top 12 Award Winner', years: 'February 2020' },
+          ],
+        },
+      ],
+    },
+  })));
+  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage, sourceOutline);
+
+  assert.equal(validation.ok, true);
+});
+
+test('source-outline coverage rejects missing blocks, duplicate headings, and merged role entries', () => {
+  const sourceText = `
+    ADDITIONAL WORK EXPERIENCE
+    UGA Honors Program, Student Assistant September 2019 - Present
+    Russell Hall, Desk Assistant August 2020 - May 2021
+    Dillard's, Sales Associate May 2018 - August 2019
+    HONORS & AWARDS
+    Award One
+    Award Two
+  `;
+  const sourceCoverage = analyzeResumeSourceCoverage(sourceText);
+  const sourceOutline = createResumeSourceOutline(sourceText);
+  const imported = normalizeImportedResumeDraft(parseGeminiImportWireOutput(JSON.stringify({
+    resume: {
+      personal: { name: 'Walter Washington' },
+      sections: [
+        {
+          kind: 'roles',
+          title: 'ADDITIONAL WORK EXPERIENCE',
+          entries: [
+            {
+              company: 'UGA Honors Program; Russell Hall; Dillard\'s',
+              role: 'Student Assistant; Desk Assistant; Sales Associate',
+              yearsExp: 'September 2019 - Present; August 2020 - May 2021; May 2018 - August 2019',
+              activities: [],
+            },
+          ],
+        },
+        {
+          kind: 'roles',
+          title: 'ADDITIONAL WORK EXPERIENCE',
+          entries: [
+            {
+              company: 'Duplicate',
+              role: 'Duplicate',
+              yearsExp: '2020',
+              activities: [],
+            },
+          ],
+        },
+      ],
+    },
+  })));
+  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage, sourceOutline);
+
+  assert.equal(validation.ok, false);
+  assert.match(validation.issues.join(' '), /Duplicate/);
+  assert.match(validation.issues.join(' '), /source entries/);
+  assert.match(validation.issues.join(' '), /semicolon-delimited/);
+  assert.match(validation.issues.join(' '), /HONORS & AWARDS/);
 });
 
 test('full import coverage rejects drafts that drop source highlights and awards', () => {
@@ -947,7 +1231,7 @@ test('server import source keeps DOCX text-only and PDF fallback paths', () => {
   assert.match(source, /if \(isPdf\) \{/);
   assert.match(source, /extractPdfText\(file\)/);
   assert.match(source, /assessExtractedResumeText\(extractedPdfText\)/);
-  assert.match(source, /createTextGeminiContents\(file\.fileName, sourceText\)/);
+  assert.match(source, /createTextGeminiContents\(file\.fileName, sourceText, sourceOutline\)/);
   assert.match(source, /createPdfDocumentGeminiContents\(file\)/);
   assert.match(source, /sourceText = await extractDocxText\(file\)/);
 });
@@ -1002,7 +1286,8 @@ test('Gemini 3 import config uses medium thinking without legacy temperature', (
   });
 
   assert.equal(config.responseMimeType, 'application/json');
-  assert.equal(config.responseSchema.type, 'OBJECT');
+  assert.equal(config.responseJsonSchema.type, 'object');
+  assert.equal(config.responseJsonSchema.required.includes('resume'), true);
   assert.equal(config.thinkingConfig.thinkingLevel, DEFAULT_GEMINI_THINKING_LEVEL);
   assert.equal(config.maxOutputTokens, DEFAULT_GEMINI_MAX_OUTPUT_TOKENS);
   assert.equal(Object.hasOwn(config, 'temperature'), false);
