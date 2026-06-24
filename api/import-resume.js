@@ -14,18 +14,26 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
-function logImportError(error) {
+function logImportError(error, context = {}) {
   if (error instanceof ImportResumeError && error.statusCode < 500) {
     return;
   }
 
-  console.error('Resume import failed', {
+  console.error(JSON.stringify({
+    level: 'error',
+    message: 'Resume import failed',
     code: error?.code,
-    message: error?.message,
-  });
+    errorMessage: error?.message,
+    statusCode: error?.statusCode,
+    diagnostics: error?.diagnostics || undefined,
+    ...context,
+  }));
 }
 
 export default async function handler(req, res) {
+  const startedAt = Date.now();
+  const requestId = req.headers['x-vercel-id'] || req.headers['x-request-id'] || '';
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     sendJson(res, 405, {
@@ -45,9 +53,22 @@ export default async function handler(req, res) {
     await enforceDailyImportLimit(decodedToken.uid);
 
     const parsedImport = await parseResumeWithGemini(file);
+    console.info(JSON.stringify({
+      level: 'info',
+      message: 'Resume import completed',
+      requestId,
+      ms: Date.now() - startedAt,
+      fileSizeBytes: file.size,
+      mimeType: file.mimeType,
+      sectionCount: parsedImport?.draft?.resume?.sections?.length || 0,
+      warningCount: parsedImport?.draft?.importWarnings?.length || 0,
+    }));
     sendJson(res, 200, createImportResponseBody(parsedImport));
   } catch (error) {
-    logImportError(error);
+    logImportError(error, {
+      requestId,
+      ms: Date.now() - startedAt,
+    });
 
     if (error instanceof ImportResumeError) {
       sendJson(res, error.statusCode, {

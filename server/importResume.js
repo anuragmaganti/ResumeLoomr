@@ -300,11 +300,12 @@ const importRequestSchema = z.object({
 });
 
 export class ImportResumeError extends Error {
-  constructor(message, { statusCode = 400, code = 'import/failed' } = {}) {
+  constructor(message, { statusCode = 400, code = 'import/failed', diagnostics = null } = {}) {
     super(message);
     this.name = 'ImportResumeError';
     this.statusCode = statusCode;
     this.code = code;
+    this.diagnostics = diagnostics;
   }
 }
 
@@ -918,13 +919,20 @@ function isRetryableGeminiError(error) {
   );
 }
 
-function createGeminiUnavailableError(error) {
+function createGeminiUnavailableError(error, diagnostics = null) {
   const { statusCode, status, message } = getGeminiErrorDetails(error);
+  const providerDiagnostics = {
+    ...diagnostics,
+    providerStatusCode: statusCode || undefined,
+    providerStatus: status || undefined,
+    providerMessage: message ? message.slice(0, 500) : undefined,
+  };
 
   if (statusCode === 429 || status === 'RESOURCE_EXHAUSTED') {
     return new ImportResumeError('The AI import service is busy right now. Try again in a minute.', {
       statusCode: 503,
       code: 'import/ai-rate-limited',
+      diagnostics: providerDiagnostics,
     });
   }
 
@@ -932,12 +940,14 @@ function createGeminiUnavailableError(error) {
     return new ImportResumeError('The AI import service is temporarily busy. Try again in a minute.', {
       statusCode: 503,
       code: 'import/ai-unavailable',
+      diagnostics: providerDiagnostics,
     });
   }
 
   return new ImportResumeError(message || 'The AI import service could not process this resume. Try again with another file.', {
     statusCode: statusCode >= 400 && statusCode < 500 ? 502 : 503,
     code: 'import/ai-provider-failed',
+    diagnostics: providerDiagnostics,
   });
 }
 
@@ -1347,7 +1357,7 @@ export function normalizeImportedResumeDraft(aiOutput, { sourceFileName = '' } =
   };
 }
 
-async function generateImportedDraft({ ai, model, contents, sourceFileName }) {
+async function generateImportedDraft({ ai, model, contents, sourceFileName, diagnostics = null }) {
   let lastError;
 
   for (let attempt = 0; attempt <= GEMINI_GENERATE_RETRY_DELAYS_MS.length; attempt += 1) {
@@ -1361,8 +1371,9 @@ async function generateImportedDraft({ ai, model, contents, sourceFileName }) {
           responseSchema: resumeImportResponseSchema,
         },
       });
+      const responseText = String(response.text || '');
 
-      return normalizeImportedResumeDraft(parseGeminiJson(response.text), {
+      return normalizeImportedResumeDraft(parseGeminiJson(responseText), {
         sourceFileName,
       });
     } catch (error) {
@@ -1376,7 +1387,7 @@ async function generateImportedDraft({ ai, model, contents, sourceFileName }) {
     }
   }
 
-  throw createGeminiUnavailableError(lastError);
+  throw createGeminiUnavailableError(lastError, diagnostics);
 }
 
 export async function parseResumeWithGemini(file) {
@@ -1394,18 +1405,30 @@ export async function parseResumeWithGemini(file) {
   const isPdf = file.mimeType === PDF_MIME_TYPE;
   let contents;
   let sourceText = '';
+  let sourceMode = '';
+  let extractionDiagnostics = null;
   const importWarnings = [];
 
   if (isPdf) {
     const extractedPdfText = await extractPdfText(file);
     const extractedPdfAssessment = assessExtractedResumeText(extractedPdfText);
+    extractionDiagnostics = {
+      isTrustworthy: extractedPdfAssessment.isTrustworthy,
+      characters: extractedPdfAssessment.text.length,
+      nonWhitespaceCharacters: extractedPdfAssessment.nonWhitespaceCharacters,
+      wordCount: extractedPdfAssessment.wordCount,
+      printableRatio: Number(extractedPdfAssessment.printableRatio.toFixed(3)),
+      resumeSignalCount: extractedPdfAssessment.resumeSignalCount,
+    };
 
     if (extractedPdfAssessment.isTrustworthy) {
       sourceText = extractedPdfAssessment.text;
       contents = createTextGeminiContents(file.fileName, sourceText);
+      sourceMode = 'pdf-text';
     } else {
       importWarnings.push('Some sections may need review because this PDF could not be verified from selectable text.');
       contents = createPdfDocumentGeminiContents(file);
+      sourceMode = 'pdf-document';
     }
   } else {
     sourceText = await extractDocxText(file);
@@ -1418,13 +1441,27 @@ export async function parseResumeWithGemini(file) {
     }
 
     contents = createTextGeminiContents(file.fileName, sourceText);
+    sourceMode = 'docx-text';
   }
+  const importDiagnostics = {
+    model,
+    fileName: trimText(file.fileName).slice(0, 120),
+    mimeType: file.mimeType,
+    fileSizeBytes: file.size || file.buffer?.length || 0,
+    sourceMode,
+    sourceTextCharacters: sourceText.length,
+    extraction: extractionDiagnostics,
+  };
 
   const rawParsedImport = await generateImportedDraft({
     ai,
     model,
     contents,
     sourceFileName: file.fileName,
+    diagnostics: {
+      ...importDiagnostics,
+      phase: 'initial',
+    },
   });
   const sourceCoverage = analyzeResumeSourceCoverage(sourceText);
   const parsedImport = applySourceAwareImportCleanup(rawParsedImport, sourceCoverage);
@@ -1463,6 +1500,11 @@ export async function parseResumeWithGemini(file) {
       issues: coverageValidation.issues,
     }),
     sourceFileName: file.fileName,
+    diagnostics: {
+      ...importDiagnostics,
+      phase: 'repair',
+      repairIssueCount: coverageValidation.issues.length,
+    },
   });
   const repairedImport = applySourceAwareImportCleanup(rawRepairedImport, sourceCoverage);
   const bestImport = chooseBestImportedDraftCandidate([parsedImport, repairedImport], sourceCoverage);
