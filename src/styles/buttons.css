@@ -133,8 +133,18 @@
 }
 
 .tabButton.isDragging {
-  opacity: 0.92;
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-surface-elevated) 72%, var(--color-accent-soft) 28%);
+  color: var(--color-text);
+  opacity: 1;
+  box-shadow:
+    0 0 0 3px var(--color-accent-soft),
+    var(--shadow-sm);
   transform: scale(0.98);
+}
+
+.tabButton.isDragging .tabLabel {
+  color: var(--color-accent-strong);
 }
 
 .tabButton.isLocked {

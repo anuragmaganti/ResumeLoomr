@@ -6,14 +6,17 @@ const defaultSections = [
     { id: "experience", navLabel: "Experience", navHint: "Roles and highlights" }
 ];
 
+const SECTION_DRAG_MIME_TYPE = "application/x-resumeloomr-section";
+
 function createTransparentDragImage() {
-    if (typeof Image === "undefined") {
+    if (typeof document === "undefined") {
         return null;
     }
 
-    const image = new Image();
-    image.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-    return image;
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    return canvas;
 }
 
 export default function SectionTabs({
@@ -35,7 +38,7 @@ export default function SectionTabs({
         }
 
         event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", sectionId);
+        event.dataTransfer.setData(SECTION_DRAG_MIME_TYPE, sectionId);
         const dragImage = createTransparentDragImage();
 
         if (dragImage) {
