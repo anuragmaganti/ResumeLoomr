@@ -77,15 +77,22 @@
   }
 }
 
+.headerStack {
+  position: relative;
+  z-index: 40;
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
 .topbar {
   position: relative;
   z-index: 30;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--space-6);
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-5);
   align-items: center;
   padding: var(--space-6);
-  margin-bottom: var(--space-5);
 }
 
 .brand {
@@ -143,7 +150,14 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  width: 100%;
   min-width: 0;
+}
+
+.resumeSubbar {
+  position: relative;
+  z-index: 35;
+  padding: 10px 12px;
 }
 
 .resumePillStrip {
@@ -1664,31 +1678,16 @@
 
 @media (max-width: 1660px) and (min-width: 981px) {
   .topbar {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    align-items: start;
+    grid-template-columns: minmax(0, 1fr) auto;
     column-gap: var(--space-4);
-    row-gap: var(--space-3);
   }
 
   .brand {
-    grid-column: 1;
-    grid-row: 1;
     align-self: start;
   }
 
   .topbarSide {
-    grid-column: 2;
-    grid-row: 1;
     justify-items: end;
-  }
-
-  .resumeWorkspaceBar {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    width: 100%;
-    justify-content: flex-start;
-    padding-left: calc(52px + var(--space-3));
   }
 
   .resumePillStrip {
@@ -1823,6 +1822,7 @@
   }
 
   .topbar,
+  .resumeSubbar,
   .settingsRail,
   .editorRail,
   .editorStage,
@@ -1896,7 +1896,9 @@
     display: block;
   }
 
+  .headerStack,
   .topbar,
+  .resumeSubbar,
   .noticeBanner,
   .conflictBanner,
   .authOverlay,

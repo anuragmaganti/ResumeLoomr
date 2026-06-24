@@ -99,18 +99,8 @@ export default function Header({
     }
   }
 
-  return (
-    <header className="topbar panel">
-      <div className="brand">
-        <div className="brandMark" aria-hidden="true">
-          <BrandMark />
-        </div>
-        <div className="brandCopy">
-          <h1>ResumeLoomr</h1>
-          <p className="brandSubcopy">The only resume tool you'll need for the rest of your career.</p>
-        </div>
-      </div>
-
+  const resumeWorkspaceControls = (
+    <section className="resumeSubbar panel" aria-label="Resume versions">
       <div className="resumeWorkspaceBar" aria-label="Resumes">
         <div className="resumePillStrip">
           {visibleResumes.map((resume) => {
@@ -221,58 +211,76 @@ export default function Header({
           </button>
         </div>
       </div>
+    </section>
+  );
 
-      <div className="topbarSide">
-        <div className="topbarMeta">
-          <span className={`statusBadge statusBadge--${saveState}`}>
-            {saveLabel}
-          </span>
-          {isCloudMode ? (
-            <span className={`statusBadge statusBadge--${syncState === 'error' ? 'error' : 'info'}`}>
-              {trustedDevice ? 'Trusted device' : 'Cloud'}
+  return (
+    <div className="headerStack">
+      <header className="topbar panel">
+        <div className="brand">
+          <div className="brandMark" aria-hidden="true">
+            <BrandMark />
+          </div>
+          <div className="brandCopy">
+            <h1>ResumeLoomr</h1>
+            <p className="brandSubcopy">The only resume tool you'll need for the rest of your career.</p>
+          </div>
+        </div>
+
+        <div className="topbarSide">
+          <div className="topbarMeta">
+            <span className={`statusBadge statusBadge--${saveState}`}>
+              {saveLabel}
             </span>
-          ) : null}
-          <button
-            type="button"
-            className="button buttonSecondary themeToggle"
-            onClick={onToggleTheme}
-            aria-pressed={theme === 'dark'}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-          >
-            <span className={`themeToggleKnob themeToggleKnob--${theme}`} aria-hidden="true" />
-            <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
-          </button>
-          <button
-            type="button"
-            className="button buttonSecondary importResumeButton"
-            onClick={onImportResume}
-            disabled={isImportingResume}
-          >
-            {isImportingResume ? (
-              <span className="buttonSpinner" aria-hidden="true" />
+            {isCloudMode ? (
+              <span className={`statusBadge statusBadge--${syncState === 'error' ? 'error' : 'info'}`}>
+                {trustedDevice ? 'Trusted device' : 'Cloud'}
+              </span>
             ) : null}
-            {isImportingResume ? 'Processing...' : 'Import Existing Resume'}
-          </button>
-          <button type="button" className="button buttonPrimary printButton" onClick={onPrint}>
-            Print resume
-          </button>
-          {authUser ? (
-            <button type="button" className="button buttonSecondary accountButton" onClick={onSignOut}>
-              Sign out
-            </button>
-          ) : (
             <button
               type="button"
-              className="button buttonSecondary accountButton"
-              onClick={onOpenAuth}
-              disabled={!authReady || !firebaseEnabled}
-              title={firebaseEnabled ? 'Sign in to sync resumes' : 'Firebase is not configured yet'}
+              className="button buttonSecondary themeToggle"
+              onClick={onToggleTheme}
+              aria-pressed={theme === 'dark'}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
-              Sign in
+              <span className={`themeToggleKnob themeToggleKnob--${theme}`} aria-hidden="true" />
+              <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
             </button>
-          )}
+            <button
+              type="button"
+              className="button buttonSecondary importResumeButton"
+              onClick={onImportResume}
+              disabled={isImportingResume}
+            >
+              {isImportingResume ? (
+                <span className="buttonSpinner" aria-hidden="true" />
+              ) : null}
+              {isImportingResume ? 'Processing...' : 'Import Existing Resume'}
+            </button>
+            <button type="button" className="button buttonPrimary printButton" onClick={onPrint}>
+              Print resume
+            </button>
+            {authUser ? (
+              <button type="button" className="button buttonSecondary accountButton" onClick={onSignOut}>
+                Sign out
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="button buttonSecondary accountButton"
+                onClick={onOpenAuth}
+                disabled={!authReady || !firebaseEnabled}
+                title={firebaseEnabled ? 'Sign in to sync resumes' : 'Firebase is not configured yet'}
+              >
+                Sign in
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {resumeWorkspaceControls}
+    </div>
   );
 }
