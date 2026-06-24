@@ -15,6 +15,11 @@ import {
 } from './localWorkspaceMirror.js';
 
 export const CONNECTED_ACCOUNT_STORAGE_KEY = 'resumeloomr:connected-account:v1';
+export const SIGNED_OUT_EDITING_PREFERENCE_KEY = 'resumeloomr:signed-out-editing-preference:v1';
+export const DEFAULT_SIGNED_OUT_EDITING_PREFERENCE = {
+  allow: true,
+  skipPrompt: false,
+};
 
 function getStorage(storage) {
   if (storage) {
@@ -105,9 +110,45 @@ export function clearConnectedAccount(storage) {
   targetStorage.removeItem(CONNECTED_ACCOUNT_STORAGE_KEY);
 }
 
-export function clearBrowserResumeConnectionData({ storage, sessionStorage } = {}) {
+export function readSignedOutEditingPreference(storage) {
   const targetStorage = getStorage(storage);
-  const targetSessionStorage = getSessionStorage(sessionStorage);
+
+  if (!targetStorage) {
+    return DEFAULT_SIGNED_OUT_EDITING_PREFERENCE;
+  }
+
+  const preference = safeParse(targetStorage.getItem(SIGNED_OUT_EDITING_PREFERENCE_KEY));
+
+  return {
+    allow: typeof preference?.allow === 'boolean'
+      ? preference.allow
+      : DEFAULT_SIGNED_OUT_EDITING_PREFERENCE.allow,
+    skipPrompt: typeof preference?.skipPrompt === 'boolean'
+      ? preference.skipPrompt
+      : DEFAULT_SIGNED_OUT_EDITING_PREFERENCE.skipPrompt,
+  };
+}
+
+export function writeSignedOutEditingPreference(preference, storage) {
+  const targetStorage = getStorage(storage);
+  const nextPreference = {
+    allow: typeof preference?.allow === 'boolean'
+      ? preference.allow
+      : DEFAULT_SIGNED_OUT_EDITING_PREFERENCE.allow,
+    skipPrompt: typeof preference?.skipPrompt === 'boolean'
+      ? preference.skipPrompt
+      : DEFAULT_SIGNED_OUT_EDITING_PREFERENCE.skipPrompt,
+  };
+
+  if (targetStorage) {
+    targetStorage.setItem(SIGNED_OUT_EDITING_PREFERENCE_KEY, JSON.stringify(nextPreference));
+  }
+
+  return nextPreference;
+}
+
+export function clearLocalResumeWorkspaceData(storage) {
+  const targetStorage = getStorage(storage);
 
   if (!targetStorage) {
     return;
@@ -123,9 +164,6 @@ export function clearBrowserResumeConnectionData({ storage, sessionStorage } = {
       key === DRAFT_STORAGE_KEY ||
       key === GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY ||
       key === GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY ||
-      key === CONNECTED_ACCOUNT_STORAGE_KEY ||
-      key === CLOUD_DEVICE_ID_KEY ||
-      key === CLOUD_TRUSTED_DEVICE_KEY ||
       key?.startsWith(RESUME_STORAGE_KEY_PREFIX) ||
       key?.startsWith(CLOUD_IMPORT_PREFIX)
     ) {
@@ -134,5 +172,20 @@ export function clearBrowserResumeConnectionData({ storage, sessionStorage } = {
   }
 
   keysToRemove.forEach((key) => targetStorage.removeItem(key));
+}
+
+export function clearBrowserResumeConnectionData({ storage, sessionStorage } = {}) {
+  const targetStorage = getStorage(storage);
+  const targetSessionStorage = getSessionStorage(sessionStorage);
+
+  if (!targetStorage) {
+    return;
+  }
+
+  clearLocalResumeWorkspaceData(targetStorage);
+  targetStorage.removeItem(CONNECTED_ACCOUNT_STORAGE_KEY);
+  targetStorage.removeItem(CLOUD_DEVICE_ID_KEY);
+  targetStorage.removeItem(CLOUD_TRUSTED_DEVICE_KEY);
+  targetStorage.removeItem(SIGNED_OUT_EDITING_PREFERENCE_KEY);
   targetSessionStorage?.removeItem(CLOUD_SESSION_ID_KEY);
 }

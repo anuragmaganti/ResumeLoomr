@@ -25,12 +25,14 @@ export default function AccountSettings({
   connectedAccount,
   firebaseEnabled,
   trustedDevice,
+  signedOutEditingPreference,
   syncState,
   busy,
   onOpen,
   onClose,
   onOpenAuth,
   onDisconnectBrowser,
+  onSignedOutEditingPreferenceChange,
 }) {
   const [isConfirmingDisconnect, setIsConfirmingDisconnect] = useState(false);
   const activeAccount = authUser
@@ -127,6 +129,46 @@ export default function AccountSettings({
               <p>
                 Local browser data keeps the editor fast. When signed in, cloud sync backs up your resumes and makes them available on other devices.
               </p>
+            </div>
+
+            <div className="signedOutEditingSettings">
+              <div>
+                <h3>Signed-out editing</h3>
+                <p>
+                  Choose whether this browser keeps local resume copies after you sign out. Turn this off on shared computers.
+                </p>
+              </div>
+              <label className="settingsCheckboxRow">
+                <input
+                  type="checkbox"
+                  checked={signedOutEditingPreference.allow}
+                  onChange={(event) => onSignedOutEditingPreferenceChange({
+                    ...signedOutEditingPreference,
+                    allow: event.target.checked,
+                  })}
+                />
+                <span>
+                  Keep my first 10 resumes available for signed-out editing on this browser.
+                </span>
+              </label>
+              <label className="settingsCheckboxRow">
+                <input
+                  type="checkbox"
+                  checked={!signedOutEditingPreference.skipPrompt}
+                  onChange={(event) => onSignedOutEditingPreferenceChange({
+                    ...signedOutEditingPreference,
+                    skipPrompt: !event.target.checked,
+                  })}
+                />
+                <span>
+                  Ask me when I sign out. If you turn this off, this setting will be used automatically.
+                </span>
+              </label>
+              {!signedOutEditingPreference.allow ? (
+                <p className="signedOutEditingWarning">
+                  When you sign out, local resume copies will be cleared from this browser after cloud sync finishes.
+                </p>
+              ) : null}
             </div>
 
             {!isSignedIn && !hasRememberedAccount ? (

@@ -58,9 +58,14 @@ import {
 } from '../src/lib/localWorkspaceMirror.js';
 import {
   CONNECTED_ACCOUNT_STORAGE_KEY,
+  DEFAULT_SIGNED_OUT_EDITING_PREFERENCE,
+  SIGNED_OUT_EDITING_PREFERENCE_KEY,
   clearBrowserResumeConnectionData,
+  clearLocalResumeWorkspaceData,
   readConnectedAccount,
+  readSignedOutEditingPreference,
   writeConnectedAccount,
+  writeSignedOutEditingPreference,
 } from '../src/lib/browserConnection.js';
 
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -346,6 +351,52 @@ test('connected account helpers persist user-facing account context', () => {
   assert.deepEqual(readConnectedAccount(storage), account);
 });
 
+test('signed-out editing preference defaults safely and persists choices', () => {
+  const storage = createMemoryStorage();
+
+  assert.deepEqual(readSignedOutEditingPreference(storage), DEFAULT_SIGNED_OUT_EDITING_PREFERENCE);
+
+  const preference = writeSignedOutEditingPreference({
+    allow: false,
+    skipPrompt: true,
+  }, storage);
+
+  assert.deepEqual(preference, {
+    allow: false,
+    skipPrompt: true,
+  });
+  assert.deepEqual(readSignedOutEditingPreference(storage), preference);
+});
+
+test('clearing local resume workspace data preserves account and preference settings', () => {
+  const storage = createMemoryStorage([
+    [WORKSPACE_INDEX_STORAGE_KEY, '{}'],
+    [DRAFT_STORAGE_KEY, '{}'],
+    [createResumeStorageKey('resume-1'), '{}'],
+    [GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY, '{}'],
+    [GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY, '{}'],
+    [CONNECTED_ACCOUNT_STORAGE_KEY, '{"uid":"user-1"}'],
+    [SIGNED_OUT_EDITING_PREFERENCE_KEY, JSON.stringify({ allow: false, skipPrompt: true })],
+    [`${CLOUD_IMPORT_PREFIX}user-1`, 'true'],
+    [CLOUD_DEVICE_ID_KEY, 'device-1'],
+    [CLOUD_TRUSTED_DEVICE_KEY, 'true'],
+    ['resumeloomr:theme', 'dark'],
+  ]);
+
+  clearLocalResumeWorkspaceData(storage);
+
+  assert.equal(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY), null);
+  assert.equal(storage.getItem(DRAFT_STORAGE_KEY), null);
+  assert.equal(storage.getItem(createResumeStorageKey('resume-1')), null);
+  assert.equal(storage.getItem(GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY), null);
+  assert.equal(storage.getItem(`${CLOUD_IMPORT_PREFIX}user-1`), null);
+  assert.equal(storage.getItem(CONNECTED_ACCOUNT_STORAGE_KEY), '{"uid":"user-1"}');
+  assert.equal(storage.getItem(SIGNED_OUT_EDITING_PREFERENCE_KEY), JSON.stringify({ allow: false, skipPrompt: true }));
+  assert.equal(storage.getItem(CLOUD_DEVICE_ID_KEY), 'device-1');
+  assert.equal(storage.getItem(CLOUD_TRUSTED_DEVICE_KEY), 'true');
+  assert.equal(storage.getItem('resumeloomr:theme'), 'dark');
+});
+
 test('clearing browser connection data removes resume and account keys only', () => {
   const storage = createMemoryStorage([
     [WORKSPACE_INDEX_STORAGE_KEY, '{}'],
@@ -354,6 +405,7 @@ test('clearing browser connection data removes resume and account keys only', ()
     [GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY, '{}'],
     [GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY, '{}'],
     [CONNECTED_ACCOUNT_STORAGE_KEY, '{}'],
+    [SIGNED_OUT_EDITING_PREFERENCE_KEY, '{}'],
     [`${CLOUD_IMPORT_PREFIX}user-1`, 'true'],
     [CLOUD_DEVICE_ID_KEY, 'device-1'],
     [CLOUD_TRUSTED_DEVICE_KEY, 'true'],
@@ -369,6 +421,7 @@ test('clearing browser connection data removes resume and account keys only', ()
   assert.equal(storage.getItem(DRAFT_STORAGE_KEY), null);
   assert.equal(storage.getItem(createResumeStorageKey('resume-1')), null);
   assert.equal(storage.getItem(CONNECTED_ACCOUNT_STORAGE_KEY), null);
+  assert.equal(storage.getItem(SIGNED_OUT_EDITING_PREFERENCE_KEY), null);
   assert.equal(storage.getItem(GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY), null);
   assert.equal(storage.getItem(CLOUD_DEVICE_ID_KEY), null);
   assert.equal(storage.getItem(CLOUD_TRUSTED_DEVICE_KEY), null);

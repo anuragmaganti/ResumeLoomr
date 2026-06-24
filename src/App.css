@@ -717,6 +717,56 @@
   line-height: 1.4;
 }
 
+.signedOutEditingSettings {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-soft);
+}
+
+.signedOutEditingSettings h3 {
+  margin: 0 0 5px;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.signedOutEditingSettings p {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.settingsCheckboxRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--color-text-subtle);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.settingsCheckboxRow input {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  accent-color: var(--color-accent);
+}
+
+.signedOutEditingSettings .signedOutEditingWarning {
+  padding: 10px;
+  border: 1px solid var(--color-danger-border);
+  border-radius: 12px;
+  background: var(--color-danger-bg);
+  color: var(--color-error);
+  font-weight: 700;
+}
+
 .accountSettingsPrimary {
   width: 100%;
   min-height: 38px;
@@ -760,6 +810,39 @@
 .disconnectActions .button {
   min-height: 36px;
   padding-inline: 12px;
+  font-size: 0.78rem;
+}
+
+.signedOutPrompt {
+  width: min(480px, 100%);
+}
+
+.signedOutPromptNote {
+  padding: var(--space-3);
+  border: 1px solid var(--color-info-border);
+  border-radius: 16px;
+  background: var(--color-info-soft);
+  color: var(--color-text);
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.signedOutPromptRemember {
+  margin-top: 0;
+}
+
+.signedOutPromptActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: var(--space-4);
+}
+
+.signedOutPromptActions .button {
+  min-height: 38px;
+  padding-inline: 14px;
   font-size: 0.78rem;
 }
 

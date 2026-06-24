@@ -162,8 +162,10 @@ export function useFirebaseAuth() {
 
       try {
         await signOut(auth);
+        return true;
       } catch (error) {
         setAuthError(getFriendlyAuthError(error));
+        return false;
       } finally {
         setAuthBusy(false);
       }

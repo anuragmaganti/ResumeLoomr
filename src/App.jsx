@@ -6,11 +6,17 @@ import './styles/preview.css'
 import Header from './components/header';
 import AuthModal from './components/authModal';
 import AccountSettings from './components/accountSettings';
+import SignedOutEditingPrompt from './components/signedOutEditingPrompt';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/editorPanel';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
-import { clearBrowserResumeConnectionData } from './lib/browserConnection.js';
+import {
+  clearBrowserResumeConnectionData,
+  clearLocalResumeWorkspaceData,
+  readSignedOutEditingPreference,
+  writeSignedOutEditingPreference,
+} from './lib/browserConnection.js';
 
 const THEME_STORAGE_KEY = 'resumeloomr:theme';
 
@@ -20,6 +26,9 @@ function App() {
   const [editorStageMaxHeight, setEditorStageMaxHeight] = useState(null);
   const auth = useFirebaseAuth();
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
+  const [isSignedOutPromptOpen, setIsSignedOutPromptOpen] = useState(false);
+  const [isSignOutInProgress, setIsSignOutInProgress] = useState(false);
+  const [signedOutEditingPreference, setSignedOutEditingPreference] = useState(() => readSignedOutEditingPreference());
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') {
       return 'light';
@@ -144,24 +153,93 @@ function App() {
     printResume();
   }
 
+  useEffect(() => {
+    if (!auth.user || signedOutEditingPreference.allow) {
+      return undefined;
+    }
+
+    function handleBeforeUnload(event) {
+      if (syncState !== 'syncing' && syncState !== 'error' && syncState !== 'offline') {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = '';
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [auth.user, signedOutEditingPreference.allow, syncState]);
+
+  function updateSignedOutEditingPreference(nextPreference) {
+    setSignedOutEditingPreference(writeSignedOutEditingPreference(nextPreference));
+  }
+
+  async function completeSignOut({ allowSignedOutEditing }) {
+    setIsSignOutInProgress(true);
+
+    try {
+      await flushActiveCloudDraft({ reason: 'signout' });
+      const signedOut = await auth.signOut();
+
+      if (!signedOut) {
+        return;
+      }
+
+      if (!allowSignedOutEditing) {
+        clearLocalResumeWorkspaceData();
+        window.location.reload();
+      }
+    } finally {
+      setIsSignOutInProgress(false);
+      setIsSignedOutPromptOpen(false);
+    }
+  }
+
   async function handleSignOut() {
+    if (signedOutEditingPreference.skipPrompt) {
+      await completeSignOut({ allowSignedOutEditing: signedOutEditingPreference.allow });
+      return;
+    }
+
+    setIsSignedOutPromptOpen(true);
+  }
+
+  async function handleSignedOutPromptChoice(choice) {
+    if (choice.skipPrompt) {
+      updateSignedOutEditingPreference(choice);
+    } else {
+      updateSignedOutEditingPreference({
+        ...signedOutEditingPreference,
+        allow: choice.allow,
+      });
+    }
+
+    await completeSignOut({ allowSignedOutEditing: choice.allow });
+  }
+
+  async function handleSignOutPromptCancel() {
+    if (isSignOutInProgress) {
+      return;
+    }
+
+    setIsSignedOutPromptOpen(false);
+  }
+
+  async function handleDisconnectBrowser() {
     await flushActiveCloudDraft({ reason: 'signout' });
-    await auth.signOut();
+
+    await auth.clearBrowserConnection();
+    clearBrowserResumeConnectionData();
+    window.location.reload();
   }
 
   function handleOpenAuthFromSettings() {
     setIsAccountSettingsOpen(false);
     auth.openAuthModal();
-  }
-
-  async function handleDisconnectBrowser() {
-    if (auth.user) {
-      await flushActiveCloudDraft({ reason: 'disconnect-browser' });
-    }
-
-    await auth.clearBrowserConnection();
-    clearBrowserResumeConnectionData();
-    window.location.reload();
   }
 
   return (
@@ -206,18 +284,27 @@ function App() {
           onEmailSignUp={auth.signUpWithEmail}
         />
 
+        <SignedOutEditingPrompt
+          isOpen={isSignedOutPromptOpen}
+          busy={auth.authBusy || isSignOutInProgress}
+          onCancel={handleSignOutPromptCancel}
+          onChoose={handleSignedOutPromptChoice}
+        />
+
         <AccountSettings
           isOpen={isAccountSettingsOpen}
           authUser={auth.user}
           connectedAccount={auth.connectedAccount}
           firebaseEnabled={auth.firebaseEnabled}
           trustedDevice={auth.trustedDevice}
+          signedOutEditingPreference={signedOutEditingPreference}
           syncState={syncState}
           busy={auth.authBusy}
           onOpen={() => setIsAccountSettingsOpen(true)}
           onClose={() => setIsAccountSettingsOpen(false)}
           onOpenAuth={handleOpenAuthFromSettings}
           onDisconnectBrowser={handleDisconnectBrowser}
+          onSignedOutEditingPreferenceChange={updateSignedOutEditingPreference}
         />
 
         {notice && (
