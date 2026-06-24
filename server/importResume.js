@@ -48,6 +48,69 @@ const educationCustomSectionSchema = {
     content: stringSchema,
   },
 };
+const sectionBlockEntrySchema = {
+  type: Type.OBJECT,
+  properties: {
+    school: stringSchema,
+    degree: stringSchema,
+    yearsEdu: stringSchema,
+    location: stringSchema,
+    gpa: stringSchema,
+    honors: stringSchema,
+    coursework: stringSchema,
+    awards: stringSchema,
+    programs: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          degree: stringSchema,
+          yearsEdu: stringSchema,
+          gpa: stringSchema,
+          honors: stringSchema,
+        },
+      },
+    },
+    customSections: {
+      type: Type.ARRAY,
+      items: educationCustomSectionSchema,
+    },
+    company: stringSchema,
+    organization: stringSchema,
+    role: stringSchema,
+    groupLabel: stringSchema,
+    yearsExp: stringSchema,
+    years: stringSchema,
+    activities: stringArraySchema,
+    highlights: stringArraySchema,
+    category: stringSchema,
+    items: stringSchema,
+    name: stringSchema,
+    subtitle: stringSchema,
+    summary: stringSchema,
+    issuer: stringSchema,
+    language: stringSchema,
+    proficiency: stringSchema,
+    title: stringSchema,
+    publisher: stringSchema,
+    details: stringSchema,
+  },
+};
+const sectionBlockSchema = {
+  type: Type.OBJECT,
+  properties: {
+    id: stringSchema,
+    kind: {
+      type: Type.STRING,
+      enum: ['education', 'roles', 'skills', 'projects', 'certifications', 'languages', 'awards', 'publications', 'custom'],
+    },
+    title: stringSchema,
+    entries: {
+      type: Type.ARRAY,
+      items: sectionBlockEntrySchema,
+    },
+  },
+};
 const resumeImportResponseSchema = {
   type: Type.OBJECT,
   properties: {
@@ -81,6 +144,10 @@ const resumeImportResponseSchema = {
           type: Type.OBJECT,
           properties: Object.fromEntries(SECTION_ENUM.map((sectionId) => [sectionId, stringSchema])),
         },
+        sections: {
+          type: Type.ARRAY,
+          items: sectionBlockSchema,
+        },
         education: {
           type: Type.ARRAY,
           items: {
@@ -94,6 +161,18 @@ const resumeImportResponseSchema = {
               honors: stringSchema,
               coursework: stringSchema,
               awards: stringSchema,
+              programs: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    degree: stringSchema,
+                    yearsEdu: stringSchema,
+                    gpa: stringSchema,
+                    honors: stringSchema,
+                  },
+                },
+              },
               customSections: {
                 type: Type.ARRAY,
                 items: educationCustomSectionSchema,
@@ -469,7 +548,7 @@ function isLikelySourceBullet(line) {
 }
 
 function isKnownSourceSectionHeader(line) {
-  return /^(?:education|relevant coursework|coursework|internship experience|professional experience|work experience|additional work experience|employment experience|experience|leadership experience|volunteer experience|volunteering|projects?|skills|certifications?|languages|honors?\s*(?:&|and)?\s*awards?|awards|publications?)$/i.test(trimText(line));
+  return /^(?:education|relevant coursework|coursework|internship experience|professional experience|work experience|additional work experience|employment experience|experience|leadership experience|volunteer experience|volunteering|research(?: experience)?|teaching(?: experience)?|military(?: experience| service)?|clinical(?: experience)?|campus involvement|public service|community service|projects?|skills|certifications?|languages|honors?\s*(?:&|and)?\s*awards?|awards|publications?)$/i.test(trimText(line));
 }
 
 function getRoleSectionType(line) {
@@ -479,7 +558,7 @@ function getRoleSectionType(line) {
     return 'leadership';
   }
 
-  if (/^(?:internship experience|professional experience|work experience|additional work experience|employment experience|experience)$/i.test(text)) {
+  if (/^(?:internship experience|professional experience|work experience|additional work experience|employment experience|experience|volunteer experience|volunteering|research(?: experience)?|teaching(?: experience)?|military(?: experience| service)?|clinical(?: experience)?|campus involvement|public service|community service)$/i.test(text)) {
     return 'experience';
   }
 
@@ -561,18 +640,40 @@ function analyzeImportedDraftCoverage(draft) {
   const leadershipDetailCount = countDraftListItems(resume.leadership, 'highlights');
   const volunteeringDetailCount = countDraftListItems(resume.volunteering, 'highlights');
   const projectDetailCount = countDraftListItems(resume.projects, 'highlights');
+  const sectionRoleDetailCount = resume.sections
+    .filter((section) => section.kind === 'roles')
+    .reduce((count, section) => count + countDraftListItems(section.entries, 'activities'), 0);
+  const sectionCustomDetailCount = resume.sections
+    .filter((section) => section.kind === 'custom')
+    .reduce((count, section) => count + countDraftListItems(section.entries, 'highlights'), 0);
+  const sectionAwardCount = resume.sections
+    .filter((section) => section.kind === 'awards')
+    .reduce((count, section) => count + section.entries.filter((entry) => (
+      [entry.title, entry.issuer, entry.years, entry.details].some((value) => trimText(value) !== '')
+    )).length, 0);
   const leadershipAsExperience = resume.experience.some((entry) => /leadership/i.test(trimText(entry.groupLabel)));
+  const roleSectionTitles = resume.sections
+    .filter((section) => section.kind === 'roles')
+    .map((section) => trimText(section.title));
 
   return {
-    bulletLikeDetailCount: educationCustomDetailCount + experienceDetailCount + leadershipDetailCount + volunteeringDetailCount + projectDetailCount,
-    awardCount: topLevelAwardCount + educationAwardCount,
-    hasGpa: resume.education.some((entry) => trimText(entry.gpa) !== ''),
-    hasCoursework: resume.education.some((entry) => trimText(entry.coursework) !== ''),
+    bulletLikeDetailCount: educationCustomDetailCount + experienceDetailCount + leadershipDetailCount + volunteeringDetailCount + projectDetailCount + sectionRoleDetailCount + sectionCustomDetailCount,
+    awardCount: Math.max(topLevelAwardCount + educationAwardCount, sectionAwardCount),
+    hasGpa: resume.education.some((entry) => trimText(entry.gpa) !== '') || resume.sections.some((section) => (
+      section.kind === 'education' && section.entries.some((entry) => trimText(entry.gpa) !== '')
+    )),
+    hasCoursework: resume.education.some((entry) => trimText(entry.coursework) !== '') || resume.sections.some((section) => (
+      section.kind === 'education' && section.entries.some((entry) => trimText(entry.coursework) !== '')
+    )),
     sections: {
-      education: resume.education.some((entry) => [entry.school, entry.degree, entry.yearsEdu, entry.gpa, entry.coursework].some((value) => trimText(value) !== '')),
-      experience: resume.experience.some((entry) => [entry.company, entry.role, entry.yearsExp].some((value) => trimText(value) !== '') || entry.activities.some((value) => trimText(value) !== '')),
-      leadership: leadershipAsExperience || resume.leadership.some((entry) => [entry.organization, entry.role, entry.years].some((value) => trimText(value) !== '') || entry.highlights.some((value) => trimText(value) !== '')),
-      awards: topLevelAwardCount + educationAwardCount > 0,
+      education: resume.education.some((entry) => [entry.school, entry.degree, entry.yearsEdu, entry.gpa, entry.coursework].some((value) => trimText(value) !== '')) ||
+        resume.sections.some((section) => section.kind === 'education' && section.entries.length > 0),
+      experience: resume.experience.some((entry) => [entry.company, entry.role, entry.yearsExp].some((value) => trimText(value) !== '') || entry.activities.some((value) => trimText(value) !== '')) ||
+        roleSectionTitles.length > 0,
+      leadership: leadershipAsExperience ||
+        roleSectionTitles.some((title) => /leadership/i.test(title)) ||
+        resume.leadership.some((entry) => [entry.organization, entry.role, entry.years].some((value) => trimText(value) !== '') || entry.highlights.some((value) => trimText(value) !== '')),
+      awards: topLevelAwardCount + educationAwardCount > 0 || sectionAwardCount > 0,
     },
   };
 }
@@ -657,19 +758,26 @@ function createExtractionPrompt({ fileName, isDocumentInput }) {
     'If the source resume is one page, keep the output compact and do not expand single-line source entries into repeated verbose entries.',
     'Do not omit source bullets. Do not merge multiple source bullets into one output item.',
     'Keep entries in the same order they appear in the source resume.',
+    'Return ordered resume.sections blocks that match the source resume section headings and order.',
+    'personal is not a section block; it always renders first.',
+    'Use kind "roles" for role-like source sections including Internship Experience, Leadership Experience, Additional Work Experience, Research, Teaching, Military, Clinical, Campus Involvement, and Public Service.',
+    'When the source has multiple role-like headings, create one roles block per heading with title exactly matching the source heading.',
     'Map internship, professional, employment, work, and additional work entries into experience[].',
     'When multiple source work headings exist, put that source heading in experience[].groupLabel for each matching entry.',
     'If role-based source headings must be interleaved to preserve order, put those roles in experience[] with groupLabel instead of splitting them into separate top-level sections.',
     'Map leadership entries into leadership[] only when doing so preserves the source section order.',
     'Do not duplicate a source heading in both sectionTitles.experience and experience[].groupLabel. If groupLabel is used for source headings, set sectionTitles.experience to "Experience".',
-    'Use one education entry per institution. Do not repeat the same university for multiple degrees, certificates, or study-abroad lines.',
-    'Merge multiple degrees from the same school into the same education[].degree value.',
+    'Do not repeat the same university for fragmented lines from the same education block.',
+    'For one institution with multiple adjacent degrees, majors, certificates, or study-abroad details, use one education entry and put separate degree/program rows in education[].programs when helpful.',
+    'Keep separate education entries when the same school appears for clearly separate degree periods, such as undergrad and PhD.',
+    'Merge same-school entries only when they share the same date range, one row is missing dates, or the row is clearly a certificate, study-abroad, honors, coursework, or detail fragment attached to the same education block.',
     'Map each work bullet into experience[].activities as a separate string.',
     'Map each leadership bullet into leadership[].highlights as a separate string.',
     'Map education bullets such as certificates or study abroad details into education[].customSections.',
     'Map GPA into education[].gpa.',
     'Map Relevant Coursework into education[].coursework, not into skills and not into a duplicate section.',
     'Map honors and awards into awards[] unless the item is clearly attached to a single education entry.',
+    'Also mirror the same parsed content into the legacy arrays education[], experience[], skills[], projects[], certifications[], languages[], awards[], and publications[] for compatibility.',
   ];
   return [
     'You are extracting structured resume data for ResumeLoomr.',
@@ -884,24 +992,114 @@ function mergeEducationCustomSections(sections) {
   });
 }
 
+function createEducationProgramFromEntry(entry) {
+  if (![entry.degree, entry.yearsEdu, entry.gpa, entry.honors].some((value) => trimText(value) !== '')) {
+    return null;
+  }
+
+  return {
+    id: entry.id ? `${entry.id}-program` : undefined,
+    degree: trimText(entry.degree),
+    yearsEdu: trimText(entry.yearsEdu),
+    gpa: trimText(entry.gpa),
+    honors: trimText(entry.honors),
+  };
+}
+
+function mergeEducationPrograms(entries) {
+  const seen = new Set();
+
+  return entries
+    .filter(Boolean)
+    .filter((program) => [program.degree, program.yearsEdu, program.gpa, program.honors].some((value) => trimText(value) !== ''))
+    .filter((program) => {
+      const key = normalizeComparisonKey([program.degree, program.yearsEdu, program.gpa, program.honors].join('|'));
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+}
+
+function getEducationDateKey(entry) {
+  return normalizeComparisonKey(entry.yearsEdu);
+}
+
+function isEducationDetailFragment(entry) {
+  const degreeKey = normalizeComparisonKey(entry.degree);
+  const hasCustomDetails = entry.customSections.some((section) => trimText(section.content) !== '');
+  const hasAuxiliaryDetails = [entry.gpa, entry.honors, entry.coursework, entry.awards].some((value) => trimText(value) !== '');
+
+  return (
+    /(?:certificate|study abroad|exchange|minor|concentration|honou?r|coursework|scholarship|award)/i.test(degreeKey) ||
+    (hasCustomDetails && !trimText(entry.degree)) ||
+    (hasAuxiliaryDetails && !trimText(entry.degree))
+  );
+}
+
+function shouldMergeEducationEntries(existing, incoming) {
+  const existingDateKey = getEducationDateKey(existing);
+  const incomingDateKey = getEducationDateKey(incoming);
+  const incomingIsDetailFragment = isEducationDetailFragment(incoming);
+  const existingIsDetailFragment = isEducationDetailFragment(existing);
+
+  if (incomingIsDetailFragment || existingIsDetailFragment) {
+    return true;
+  }
+
+  if (existingDateKey && incomingDateKey && existingDateKey !== incomingDateKey) {
+    return false;
+  }
+
+  if (existingDateKey === incomingDateKey) {
+    return true;
+  }
+
+  if (!existingDateKey || !incomingDateKey) {
+    return true;
+  }
+
+  return false;
+}
+
 function compactRepeatedEducationEntries(draft) {
   const education = [];
-  const schoolIndexes = new Map();
 
   for (const entry of draft.resume.education) {
     const schoolKey = normalizeComparisonKey(entry.school);
+    const previousIndex = education.length - 1;
+    const previous = education[previousIndex];
+    const previousSchoolKey = normalizeComparisonKey(previous?.school);
+    const sameSchoolPreviousIndex = schoolKey && previous && previousSchoolKey === schoolKey && shouldMergeEducationEntries(previous, entry)
+      ? previousIndex
+      : -1;
+    const sameDatedSchoolIndex = education.findIndex((candidate) => (
+      schoolKey &&
+      normalizeComparisonKey(candidate.school) === schoolKey &&
+      getEducationDateKey(candidate) &&
+      getEducationDateKey(candidate) === getEducationDateKey(entry)
+    ));
+    const existingIndex = sameSchoolPreviousIndex > -1 ? sameSchoolPreviousIndex : sameDatedSchoolIndex;
 
-    if (!schoolKey || !schoolIndexes.has(schoolKey)) {
-      if (schoolKey) {
-        schoolIndexes.set(schoolKey, education.length);
-      }
-
+    if (!schoolKey || existingIndex < 0) {
       education.push(entry);
       continue;
     }
 
-    const existingIndex = schoolIndexes.get(schoolKey);
     const existing = education[existingIndex];
+    const existingPrograms = Array.isArray(existing.programs) && existing.programs.length > 0
+      ? existing.programs
+      : [createEducationProgramFromEntry(existing)];
+    const incomingPrograms = Array.isArray(entry.programs) && entry.programs.length > 0
+      ? entry.programs
+      : [createEducationProgramFromEntry(entry)];
+    const programs = mergeEducationPrograms([
+      ...existingPrograms,
+      ...incomingPrograms,
+    ]);
 
     education[existingIndex] = {
       ...existing,
@@ -916,6 +1114,7 @@ function compactRepeatedEducationEntries(draft) {
         ...existing.customSections,
         ...entry.customSections,
       ]),
+      programs,
     };
   }
 
@@ -1005,6 +1204,41 @@ function orderExperienceEntriesBySourceSections(experienceEntries, leadershipEnt
   return ordered;
 }
 
+function hasLegacyImportContent(resume) {
+  const hasEducation = resume.education.some((entry) => (
+    [entry.school, entry.degree, entry.yearsEdu, entry.location, entry.gpa, entry.honors, entry.coursework, entry.awards].some((value) => trimText(value) !== '') ||
+    entry.customSections.some((section) => [section.label, section.content].some((value) => trimText(value) !== ''))
+  ));
+  const hasExperience = resume.experience.some((entry) => (
+    [entry.company, entry.role, entry.yearsExp, entry.groupLabel].some((value) => trimText(value) !== '') ||
+    entry.activities.some((value) => trimText(value) !== '')
+  ));
+  const hasCollections = [
+    resume.skills,
+    resume.projects,
+    resume.certifications,
+    resume.volunteering,
+    resume.leadership,
+    resume.languages,
+    resume.awards,
+    resume.publications,
+  ].some((entries) => entries.some((entry) => (
+    Object.entries(entry).some(([key, value]) => {
+      if (key === 'id') {
+        return false;
+      }
+
+      if (Array.isArray(value)) {
+        return value.some((item) => trimText(item) !== '');
+      }
+
+      return trimText(value) !== '';
+    })
+  )));
+
+  return hasEducation || hasExperience || hasCollections;
+}
+
 export function applySourceAwareImportCleanup(parsedImport, sourceCoverage) {
   let draft = normalizeDraftPayload(parsedImport.draft);
 
@@ -1027,6 +1261,16 @@ export function applySourceAwareImportCleanup(parsedImport, sourceCoverage) {
   }
 
   draft = normalizeImportedExperienceTitles(draft);
+
+  if (hasLegacyImportContent(draft.resume)) {
+    draft = normalizeDraftPayload({
+      ...draft,
+      resume: {
+        ...draft.resume,
+        sections: undefined,
+      },
+    });
+  }
 
   return {
     ...parsedImport,
@@ -1108,6 +1352,7 @@ export async function parseResumeWithGemini(file) {
   const isPdf = file.mimeType === PDF_MIME_TYPE;
   let contents;
   let sourceText = '';
+  const importWarnings = [];
 
   if (isPdf) {
     const extractedPdfText = await extractPdfText(file);
@@ -1117,6 +1362,7 @@ export async function parseResumeWithGemini(file) {
       sourceText = extractedPdfAssessment.text;
       contents = createTextGeminiContents(file.fileName, sourceText);
     } else {
+      importWarnings.push('Some sections may need review because this PDF could not be verified from selectable text.');
       contents = createPdfDocumentGeminiContents(file);
     }
   } else {
@@ -1143,7 +1389,13 @@ export async function parseResumeWithGemini(file) {
   const coverageValidation = validateImportedDraftCoverage(parsedImport.draft, sourceCoverage);
 
   if (coverageValidation.ok || !sourceCoverage.hasSourceText) {
-    return parsedImport;
+    return {
+      ...parsedImport,
+      draft: {
+        ...parsedImport.draft,
+        importWarnings,
+      },
+    };
   }
 
   const rawRepairedImport = await generateImportedDraft({
@@ -1167,7 +1419,16 @@ export async function parseResumeWithGemini(file) {
     });
   }
 
-  return repairedImport;
+  return {
+    ...repairedImport,
+    draft: {
+      ...repairedImport.draft,
+      importWarnings: [
+        ...importWarnings,
+        'Some sections may need review because the first extraction pass needed repair.',
+      ],
+    },
+  };
 }
 
 export async function parseImportRequestBody(req) {

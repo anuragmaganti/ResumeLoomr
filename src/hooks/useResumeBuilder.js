@@ -45,6 +45,9 @@ import {
   moveEducationCustomSection,
   moveEducation,
   moveExperience,
+  moveResumeSectionBlock,
+  moveRoleBlockActivity,
+  moveRoleBlockEntry,
   moveSectionOrder,
   normalizeDraftPayload,
   normalizeSectionOrder,
@@ -55,7 +58,11 @@ import {
   removeEducationCustomSection,
   removeEducation,
   removeExperience,
+  removeResumeSectionBlock,
+  removeRoleBlockActivity,
+  removeRoleBlockEntry,
   reorderSectionOrder,
+  reorderResumeSectionBlock,
   sanitizeWorkspaceResumeName,
   updateCollectionEntry,
   updateCollectionTextList,
@@ -65,7 +72,11 @@ import {
   updateExperienceField,
   updatePersonalField,
   updateResumeSetting as updateResumeSettingValue,
+  updateRoleBlockActivity,
+  updateRoleBlockEntry,
   updateSectionTitle,
+  addRoleBlockActivity,
+  addRoleBlockEntry,
   validateResume,
 } from '../lib/resume.js';
 import {
@@ -149,6 +160,14 @@ function readStoredWorkspaceSnapshot() {
       return readStoredResumeDraft(resumeId);
     },
   };
+}
+
+function getDraftEditorSectionIds(draft) {
+  const blockIds = Array.isArray(draft?.resume?.sections)
+    ? draft.resume.sections.map((section) => section.id).filter(Boolean)
+    : SECTION_IDS.filter((sectionId) => sectionId !== 'personal');
+
+  return ['personal', ...blockIds];
 }
 
 function loadStoredWorkspace() {
@@ -715,6 +734,8 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
   }
 
   function loadDraftIntoEditor(nextDraft, { focusPersonal = false } = {}) {
+    const nextSectionIds = getDraftEditorSectionIds(nextDraft);
+
     skipNextAutosaveRef.current = true;
     currentDraftRef.current = nextDraft;
     setResume(nextDraft.resume);
@@ -724,7 +745,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     setSaveState(nextDraft.savedAt ? 'saved' : 'idle');
     resetValidationState();
 
-    if (focusPersonal) {
+    if (focusPersonal || !nextSectionIds.includes(activeTab)) {
       setActiveTab('personal');
     }
   }
@@ -1072,11 +1093,24 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
   function moveSection(sectionId, direction) {
     setSaveState('saving');
+    if (resume.sections?.some((section) => section.id === sectionId)) {
+      updateResume((currentResume) => moveResumeSectionBlock(currentResume, sectionId, direction));
+      return;
+    }
+
     setSectionOrder((currentOrder) => moveSectionOrder(currentOrder, sectionId, direction));
   }
 
   function reorderSection(sectionId, targetSectionId, placement) {
     setSaveState('saving');
+    if (
+      resume.sections?.some((section) => section.id === sectionId) &&
+      resume.sections?.some((section) => section.id === targetSectionId)
+    ) {
+      updateResume((currentResume) => reorderResumeSectionBlock(currentResume, sectionId, targetSectionId, placement));
+      return;
+    }
+
     setSectionOrder((currentOrder) => reorderSectionOrder(currentOrder, sectionId, targetSectionId, placement));
   }
 
@@ -1645,6 +1679,9 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     updateResumeSetting(settingId, delta) {
       updateResume((currentResume) => updateResumeSettingValue(currentResume, settingId, delta));
     },
+    removeResumeSection(sectionId) {
+      updateResume((currentResume) => removeResumeSectionBlock(currentResume, sectionId));
+    },
     updateEducationField(entryId, field, value) {
       updateResume((currentResume) => updateEducationField(currentResume, entryId, field, value));
     },
@@ -1692,6 +1729,30 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     },
     removeActivity(entryId, activityIndex) {
       updateResume((currentResume) => removeActivity(currentResume, entryId, activityIndex));
+    },
+    updateRoleBlockEntry(sectionId, entryId, field, value) {
+      updateResume((currentResume) => updateRoleBlockEntry(currentResume, sectionId, entryId, field, value));
+    },
+    addRoleBlockEntry(sectionId) {
+      updateResume((currentResume) => addRoleBlockEntry(currentResume, sectionId));
+    },
+    moveRoleBlockEntry(sectionId, entryId, direction) {
+      updateResume((currentResume) => moveRoleBlockEntry(currentResume, sectionId, entryId, direction));
+    },
+    removeRoleBlockEntry(sectionId, entryId) {
+      updateResume((currentResume) => removeRoleBlockEntry(currentResume, sectionId, entryId));
+    },
+    updateRoleBlockActivity(sectionId, entryId, activityIndex, value) {
+      updateResume((currentResume) => updateRoleBlockActivity(currentResume, sectionId, entryId, activityIndex, value));
+    },
+    addRoleBlockActivity(sectionId, entryId) {
+      updateResume((currentResume) => addRoleBlockActivity(currentResume, sectionId, entryId));
+    },
+    moveRoleBlockActivity(sectionId, entryId, activityIndex, direction) {
+      updateResume((currentResume) => moveRoleBlockActivity(currentResume, sectionId, entryId, activityIndex, direction));
+    },
+    removeRoleBlockActivity(sectionId, entryId, activityIndex) {
+      updateResume((currentResume) => removeRoleBlockActivity(currentResume, sectionId, entryId, activityIndex));
     },
     updateCollectionEntry(sectionKey, entryId, field, value) {
       updateResume((currentResume) => updateCollectionEntry(currentResume, sectionKey, entryId, field, value));

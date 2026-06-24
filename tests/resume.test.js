@@ -26,6 +26,7 @@ import {
   getPreviewModel,
   moveActivity,
   moveEducationCustomSection,
+  moveResumeSectionBlock,
   moveSectionOrder,
   normalizeDraftPayload,
   normalizeBulletText,
@@ -34,8 +35,11 @@ import {
   removeEducationCustomSection,
   removeEducation,
   removeExperience,
+  removeResumeSectionBlock,
+  reorderResumeSectionBlock,
   reorderSectionOrder,
   updatePersonalField,
+  updateRoleBlockEntry,
   updateResumeSetting,
   updateSectionTitle,
   validateResume,
@@ -529,12 +533,208 @@ test('source-aware import cleanup compacts repeated education and preserves inte
   assert.match(cleaned.draft.resume.education[0].degree, /Political Science/);
   assert.match(cleaned.draft.resume.education[0].degree, /Spanish/);
   assert.match(cleaned.draft.resume.education[0].degree, /Certificate/);
+  assert.equal(cleaned.draft.resume.education[0].programs.length, 3);
   assert.equal(cleaned.draft.resume.sectionTitles.experience, 'Experience');
   assert.deepEqual(
     cleaned.draft.resume.experience.map((entry) => entry.groupLabel),
     ['INTERNSHIP EXPERIENCE', 'LEADERSHIP EXPERIENCE', 'ADDITIONAL WORK EXPERIENCE']
   );
+  assert.deepEqual(
+    getPreviewModel(cleaned.draft.resume).sectionBlocks.map((section) => [section.kind, section.title]),
+    [
+      ['education', 'Education'],
+      ['roles', 'INTERNSHIP EXPERIENCE'],
+      ['roles', 'LEADERSHIP EXPERIENCE'],
+      ['roles', 'ADDITIONAL WORK EXPERIENCE'],
+      ['awards', 'Awards'],
+    ]
+  );
   assert.equal(cleaned.draft.resume.leadership.every((entry) => !entry.organization && !entry.role && !entry.highlights.some(Boolean)), true);
+});
+
+test('preview model renders imported role blocks in source order without duplicate group labels', () => {
+  const imported = normalizeImportedResumeDraft({
+    sectionOrder: ['experience'],
+    resume: {
+      experience: [
+        {
+          company: 'Benton',
+          role: 'Intern',
+          groupLabel: 'INTERNSHIP EXPERIENCE',
+          yearsExp: '2021',
+          activities: ['Drafted motions'],
+        },
+        {
+          company: 'UGA Housing',
+          role: 'Resident Assistant',
+          groupLabel: 'LEADERSHIP EXPERIENCE',
+          yearsExp: '2021',
+          activities: ['Led programs'],
+        },
+        {
+          company: 'UGA Honors Program',
+          role: 'Student Assistant',
+          groupLabel: 'ADDITIONAL WORK EXPERIENCE',
+          yearsExp: '2019',
+          activities: ['Supported office operations'],
+        },
+      ],
+    },
+  });
+  const model = getPreviewModel(imported.draft.resume);
+
+  assert.deepEqual(
+    model.sectionBlocks.map((section) => section.title),
+    ['INTERNSHIP EXPERIENCE', 'LEADERSHIP EXPERIENCE', 'ADDITIONAL WORK EXPERIENCE']
+  );
+  assert.equal(model.sectionBlocks[1].entries[0].company, 'UGA Housing');
+  assert.equal(model.sectionBlocks[1].entries[0].groupLabel, 'LEADERSHIP EXPERIENCE');
+});
+
+test('section block actions reorder and edit dynamic role blocks safely', () => {
+  const imported = normalizeImportedResumeDraft({
+    sectionOrder: ['experience'],
+    resume: {
+      experience: [
+        {
+          company: 'Benton',
+          role: 'Intern',
+          groupLabel: 'INTERNSHIP EXPERIENCE',
+          yearsExp: '2021',
+          activities: ['Drafted motions'],
+        },
+        {
+          company: 'UGA Housing',
+          role: 'Resident Assistant',
+          groupLabel: 'LEADERSHIP EXPERIENCE',
+          yearsExp: '2021',
+          activities: ['Led programs'],
+        },
+      ],
+    },
+  });
+  const [firstBlock, secondBlock] = imported.draft.resume.sections;
+  const reordered = reorderResumeSectionBlock(imported.draft.resume, secondBlock.id, firstBlock.id, 'before');
+  const edited = updateRoleBlockEntry(reordered, secondBlock.id, secondBlock.entries[0].id, 'company', 'University Housing');
+  const movedBack = moveResumeSectionBlock(edited, secondBlock.id, 1);
+
+  assert.deepEqual(
+    movedBack.sections
+      .filter((section) => section.kind === 'roles' && section.entries.some((entry) => entry.company || entry.role || entry.activities.some(Boolean)))
+      .map((section) => section.title),
+    ['INTERNSHIP EXPERIENCE', 'LEADERSHIP EXPERIENCE']
+  );
+  assert.equal(movedBack.sections[1].entries[0].company, 'University Housing');
+  assert.equal(movedBack.experience.find((entry) => entry.id === secondBlock.entries[0].id).company, 'University Housing');
+});
+
+test('source-aware cleanup preserves block-only AI imports when legacy mirrors are absent', () => {
+  const sourceCoverage = analyzeResumeSourceCoverage(`
+    RESEARCH EXPERIENCE
+    Example Lab, Research Assistant 2024
+    • Analyzed survey data
+    • Presented findings
+  `);
+  const imported = normalizeImportedResumeDraft({
+    resume: {
+      sections: [
+        {
+          kind: 'roles',
+          title: 'RESEARCH EXPERIENCE',
+          entries: [
+            {
+              company: 'Example Lab',
+              role: 'Research Assistant',
+              yearsExp: '2024',
+              activities: ['Analyzed survey data', 'Presented findings'],
+            },
+          ],
+        },
+      ],
+    },
+  });
+  const cleaned = applySourceAwareImportCleanup(imported, sourceCoverage);
+  const previewModel = getPreviewModel(cleaned.draft.resume);
+
+  assert.equal(previewModel.sectionBlocks.length, 1);
+  assert.equal(previewModel.sectionBlocks[0].title, 'RESEARCH EXPERIENCE');
+  assert.deepEqual(previewModel.sectionBlocks[0].entries[0].activities, ['Analyzed survey data', 'Presented findings']);
+});
+
+test('removing a section block clears matching legacy mirror content', () => {
+  const resume = createEmptyResume();
+  resume.awards[0].title = 'Hidden Award';
+  const removedAwards = removeResumeSectionBlock(resume, 'awards');
+
+  assert.equal(removedAwards.sections.some((section) => section.id === 'awards'), false);
+  assert.equal(removedAwards.awards.length, 1);
+  assert.equal(removedAwards.awards[0].title, '');
+
+  const imported = normalizeImportedResumeDraft({
+    sectionOrder: ['experience'],
+    resume: {
+      experience: [
+        {
+          company: 'Benton',
+          role: 'Intern',
+          groupLabel: 'INTERNSHIP EXPERIENCE',
+          yearsExp: '2021',
+          activities: ['Drafted motions'],
+        },
+        {
+          company: 'UGA Housing',
+          role: 'Resident Assistant',
+          groupLabel: 'LEADERSHIP EXPERIENCE',
+          yearsExp: '2021',
+          activities: ['Led programs'],
+        },
+      ],
+    },
+  });
+  const leadershipBlock = imported.draft.resume.sections.find((section) => section.title === 'LEADERSHIP EXPERIENCE');
+  const removedRoleBlock = removeResumeSectionBlock(imported.draft.resume, leadershipBlock.id);
+
+  assert.equal(removedRoleBlock.sections.some((section) => section.id === leadershipBlock.id), false);
+  assert.deepEqual(
+    removedRoleBlock.experience.map((entry) => entry.groupLabel),
+    ['INTERNSHIP EXPERIENCE']
+  );
+});
+
+test('source-aware import cleanup does not merge separate degree periods at the same school', () => {
+  const imported = normalizeImportedResumeDraft({
+    sectionOrder: ['education'],
+    resume: {
+      education: [
+        {
+          school: 'School 1',
+          degree: 'Bachelor of Arts',
+          yearsEdu: '2014 - 2018',
+        },
+        {
+          school: 'School 2',
+          degree: 'Master of Public Policy',
+          yearsEdu: '2018 - 2020',
+        },
+        {
+          school: 'School 1',
+          degree: 'PhD in Political Science',
+          yearsEdu: '2021 - 2026',
+        },
+      ],
+    },
+  });
+  const cleaned = applySourceAwareImportCleanup(imported, analyzeResumeSourceCoverage('EDUCATION'));
+
+  assert.equal(cleaned.draft.resume.education.length, 3);
+  assert.deepEqual(
+    cleaned.draft.resume.education.map((entry) => [entry.school, entry.degree, entry.yearsEdu]),
+    [
+      ['School 1', 'Bachelor of Arts', '2014 - 2018'],
+      ['School 2', 'Master of Public Policy', '2018 - 2020'],
+      ['School 1', 'PhD in Political Science', '2021 - 2026'],
+    ]
+  );
 });
 
 test('server import source keeps DOCX text-only and PDF fallback paths', () => {
@@ -1061,6 +1261,18 @@ test('builder conflict detection is scoped to the active resume dirty state', ()
   assert.match(listenerSource, /hasLocalDirty\(activeResumeId\)/);
   assert.doesNotMatch(listenerSource, /if \(localDirtyRef\.current\)/);
   assert.match(deleteSource, /clearResumeDirty\(deletedResumeId\)/);
+});
+
+test('builder resets stale dynamic section tabs when loading a different resume', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const loadDraftStart = source.indexOf('function loadDraftIntoEditor(');
+  const loadDraftEnd = source.indexOf('function persistActiveDraftImmediately', loadDraftStart);
+  const loadDraftSource = source.slice(loadDraftStart, loadDraftEnd);
+
+  assert.match(source, /function getDraftEditorSectionIds\(draft\)/);
+  assert.match(loadDraftSource, /const nextSectionIds = getDraftEditorSectionIds\(nextDraft\)/);
+  assert.match(loadDraftSource, /!nextSectionIds\.includes\(activeTab\)/);
+  assert.match(loadDraftSource, /setActiveTab\('personal'\)/);
 });
 
 test('resume rename is scoped by resume id and updates cloud metadata directly', () => {

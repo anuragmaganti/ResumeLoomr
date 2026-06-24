@@ -10,6 +10,7 @@ import LeadershipForm from "./forms/leadershipForm";
 import LanguagesForm from "./forms/languagesForm";
 import AwardsForm from "./forms/awardsForm";
 import PublicationsForm from "./forms/publicationsForm";
+import RoleBlockForm from "./forms/roleBlockForm";
 import EntryActionMenu from "./forms/entryActionMenu";
 import EditorSettingsRail from "./editorSettingsRail";
 import { resolveSectionTitle } from "../lib/resume";
@@ -86,7 +87,6 @@ const sectionMeta = {
 export default function EditorPanel({
     activeTab,
     setActiveTab,
-    sectionOrder,
     onMoveSection,
     onReorderSection,
     template,
@@ -98,18 +98,29 @@ export default function EditorPanel({
     markTouched,
     maxHeight
 }) {
-    const currentSection = sectionMeta[activeTab];
+    const resumeBlocks = Array.isArray(resume.sections) ? resume.sections : [];
+    const activeBlock = resumeBlocks.find((section) => section.id === activeTab);
     const currentSectionLabel = activeTab === "personal"
-        ? currentSection.label
-        : resolveSectionTitle(resume.sectionTitles, activeTab);
-    const sections = sectionOrder.map((id) => ({
-        id,
-        navLabel: id === "personal" ? sectionMeta[id].navLabel : resolveSectionTitle(resume.sectionTitles, id),
-        navHint: sectionMeta[id].navHint
-    }));
-    const activeSectionIndex = sectionOrder.indexOf(activeTab);
+        ? sectionMeta.personal.label
+        : activeBlock?.title || resolveSectionTitle(resume.sectionTitles, activeTab);
+    const sections = [
+        {
+            id: "personal",
+            navLabel: sectionMeta.personal.navLabel,
+            navHint: sectionMeta.personal.navHint
+        },
+        ...resumeBlocks.map((section) => ({
+            id: section.id,
+            navLabel: section.title,
+            navHint: sectionMeta[section.legacySectionId]?.navHint || sectionMeta[section.kind]?.navHint || (
+                section.kind === "roles" ? "Roles and highlights" : "Section details"
+            )
+        }))
+    ];
+    const activeSectionIndex = sections.findIndex((section) => section.id === activeTab);
     const canMoveSectionUp = activeTab !== "personal" && activeSectionIndex > 1;
-    const canMoveSectionDown = activeTab !== "personal" && activeSectionIndex < sectionOrder.length - 1;
+    const canMoveSectionDown = activeTab !== "personal" && activeSectionIndex > -1 && activeSectionIndex < sections.length - 1;
+    const canRemoveSection = activeTab !== "personal" && resumeBlocks.length > 1;
     const editorWorkspaceStyle = maxHeight
         ? {
             minHeight: `${maxHeight}px`,
@@ -156,8 +167,15 @@ export default function EditorPanel({
                                     moveDownLabel={`Move ${currentSectionLabel} down in the resume order`}
                                     onMoveUp={() => onMoveSection(activeTab, -1)}
                                     onMoveDown={() => onMoveSection(activeTab, 1)}
+                                    removeLabel={`Remove ${currentSectionLabel} section`}
+                                    onRemove={canRemoveSection ? () => {
+                                        const fallbackSection = sections[Math.max(0, activeSectionIndex - 1)] || sections[0];
+                                        actions.removeResumeSection(activeTab);
+                                        setActiveTab(fallbackSection.id);
+                                    } : undefined}
                                     disableUp={!canMoveSectionUp}
                                     disableDown={!canMoveSectionDown}
+                                    disableRemove={!canRemoveSection}
                                 />
                             </div>
                         </div>
@@ -169,7 +187,7 @@ export default function EditorPanel({
                                 <label htmlFor={`section-title-${activeTab}`}>Section name</label>
                                 <input
                                     id={`section-title-${activeTab}`}
-                                    value={resolveSectionTitle(resume.sectionTitles, activeTab)}
+                                    value={currentSectionLabel}
                                     onChange={(event) => actions.updateSectionTitle(activeTab, event.target.value)}
                                 />
                             </div>
@@ -194,6 +212,14 @@ export default function EditorPanel({
                         {activeTab === "experience" && (
                             <ExperienceForm
                                 experience={resume.experience}
+                                actions={actions}
+                                getFieldError={getFieldError}
+                                markTouched={markTouched}
+                            />
+                        )}
+                        {activeBlock?.kind === "roles" && !sectionMeta[activeTab] && (
+                            <RoleBlockForm
+                                section={activeBlock}
                                 actions={actions}
                                 getFieldError={getFieldError}
                                 markTouched={markTouched}

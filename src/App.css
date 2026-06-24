@@ -482,6 +482,12 @@
   color: var(--color-error);
 }
 
+.noticeBanner--warning {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
+  color: var(--color-text);
+}
+
 .noticeDismiss {
   border: 0;
   background: transparent;

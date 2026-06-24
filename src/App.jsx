@@ -212,6 +212,13 @@ function App() {
       await replaceResumeDraft(placeholderResumeId, importedDraft.draft, {
         name: importedDraft.suggestedName || file.name,
       });
+
+      if (importedDraft.draft?.importWarnings?.length > 0) {
+        showNotice({
+          tone: 'warning',
+          message: 'Imported resume added. Some sections may need review.',
+        });
+      }
     } catch (error) {
       showNotice({
         tone: 'error',
