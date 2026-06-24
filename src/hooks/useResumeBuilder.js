@@ -835,6 +835,21 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     return localDirtyResumeIdsRef.current.size > 0;
   }
 
+  function settleCloudSyncState() {
+    if (!isOnline()) {
+      setSyncState('offline');
+      return;
+    }
+
+    if (cloudSaveQueueRef.current.size > 0 || hasAnyLocalDirty()) {
+      setSyncState('syncing');
+      return;
+    }
+
+    setSaveState('saved');
+    setSyncState('saved');
+  }
+
   function logCloudError(error) {
     if (import.meta.env.DEV) {
       console.error('Cloud sync failed', {
@@ -868,9 +883,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         return Promise.resolve(false);
       }
 
+      setSyncState('syncing');
       return mutation
         .then(() => {
           setNotice((currentNotice) => (currentNotice?.tone === 'error' ? null : currentNotice));
+          settleCloudSyncState();
           return true;
         })
         .catch((error) => {
@@ -1522,6 +1539,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     }
 
     loadDraftIntoEditor(readStoredResumeDraft(nextResumeId));
+    settleCloudSyncState();
 
     if (isCloudMode && user?.uid) {
       const cloudDraft = await readCloudDraft(user.uid, nextResumeId, trustedDevice, {
@@ -1530,6 +1548,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       const nextDraft = cloudDraft || readStoredResumeDraft(nextResumeId);
       mirrorCloudDraftLocally(nextResumeId, nextWorkspace, nextDraft);
       loadDraftIntoEditor(nextDraft);
+      settleCloudSyncState();
     }
   }
 

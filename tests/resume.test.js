@@ -909,6 +909,22 @@ test('builder delete waits for online cloud delete before local removal', () => 
   assert.ok(deleteSource.includes('if (!cloudDeleteSucceeded && isOnline())'));
 });
 
+test('successful cloud mutations settle the syncing status', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const mutationStart = source.indexOf('function runCloudMutation(');
+  const mutationEnd = source.indexOf('function mirrorCloudWorkspaceLocally', mutationStart);
+  const mutationSource = source.slice(mutationStart, mutationEnd);
+  const deleteStart = source.indexOf('async function deleteActiveResume()');
+  const deleteEnd = source.indexOf('function useCloudConflictVersion()', deleteStart);
+  const deleteSource = source.slice(deleteStart, deleteEnd);
+
+  assert.ok(mutationStart > -1);
+  assert.match(source, /function settleCloudSyncState\(\)/);
+  assert.match(mutationSource, /setSyncState\('syncing'\)/);
+  assert.match(mutationSource, /settleCloudSyncState\(\)/);
+  assert.ok(deleteSource.indexOf('clearResumeDirty(deletedResumeId)') < deleteSource.indexOf('settleCloudSyncState()'));
+});
+
 test('conflict copy keeps the conflicted resume active instead of activating the copy', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const conflictCopyStart = source.indexOf('async function saveConflictAsCopy()');

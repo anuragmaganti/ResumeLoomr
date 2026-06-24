@@ -1,9 +1,9 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import { createRequire } from 'node:module';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import mammoth from 'mammoth';
-import { PDFParse } from 'pdf-parse';
 import { z } from 'zod';
 
 import {
@@ -27,6 +27,7 @@ const TRUSTED_PDF_TEXT_MIN_CHARACTERS = 450;
 const TRUSTED_PDF_TEXT_MIN_WORDS = 75;
 const TRUSTED_PDF_TEXT_MIN_PRINTABLE_RATIO = 0.85;
 const TRUSTED_PDF_TEXT_MIN_RESUME_SIGNALS = 2;
+const serverRequire = createRequire(import.meta.url);
 const RESUME_SIGNAL_PATTERNS = [
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
   /(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}/,
@@ -477,16 +478,13 @@ async function runWithTimeout(promise, ms) {
 }
 
 async function extractPdfText(file) {
-  const parser = new PDFParse({ data: file.buffer });
-
   try {
-    const result = await runWithTimeout(parser.getText(), PDF_TEXT_EXTRACTION_TIMEOUT_MS);
+    const parsePdf = serverRequire('pdf-parse');
+    const result = await runWithTimeout(parsePdf(file.buffer), PDF_TEXT_EXTRACTION_TIMEOUT_MS);
 
     return normalizeExtractedResumeText(result.text);
   } catch {
     return '';
-  } finally {
-    await parser.destroy().catch(() => {});
   }
 }
 
