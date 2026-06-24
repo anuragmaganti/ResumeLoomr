@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   DRAFT_STORAGE_KEY,
+  DEFAULT_TEMPLATE,
   MAX_WORKSPACE_RESUMES,
   SECTION_IDS,
   WORKSPACE_INDEX_STORAGE_KEY,
@@ -69,9 +70,18 @@ import {
   writeConnectedAccount,
   writeSignedOutEditingPreference,
 } from '../src/lib/browserConnection.js';
+import {
+  DEFAULT_GEMINI_IMPORT_MODEL,
+  IMPORT_FILE_MAX_BYTES,
+  ImportResumeError,
+  assessExtractedResumeText,
+  normalizeImportFilePayload,
+  normalizeImportedResumeDraft,
+} from '../server/importResume.js';
 
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = path.resolve(TEST_FILE_DIR, '../src');
+const SERVER_IMPORT_PATH = path.resolve(TEST_FILE_DIR, '../server/importResume.js');
 
 function createMemoryStorage(initialEntries = []) {
   const values = new Map(initialEntries);
@@ -201,6 +211,152 @@ test('normalizeWorkspaceIndex truncates imported resume names to the supported l
 
   assert.equal(normalized.meta['resume-1'].name.length, 25);
   assert.equal(normalized.meta['resume-1'].name, 'abcdefghijklmnopqrstuvwxy');
+});
+
+test('resume import file normalization rejects unsupported file types', () => {
+  assert.throws(
+    () => normalizeImportFilePayload({
+      fileName: 'resume.txt',
+      mimeType: 'text/plain',
+      fileDataBase64: Buffer.from('plain text').toString('base64'),
+    }),
+    (error) => (
+      error instanceof ImportResumeError &&
+      error.statusCode === 415 &&
+      error.code === 'import/unsupported-file-type'
+    ),
+  );
+});
+
+test('resume import file normalization rejects oversize uploads', () => {
+  assert.throws(
+    () => normalizeImportFilePayload({
+      fileName: 'resume.pdf',
+      mimeType: 'application/pdf',
+      fileDataBase64: Buffer.alloc(IMPORT_FILE_MAX_BYTES + 1).toString('base64'),
+    }),
+    (error) => (
+      error instanceof ImportResumeError &&
+      error.statusCode === 413 &&
+      error.code === 'import/file-too-large'
+    ),
+  );
+});
+
+test('PDF extraction assessment accepts readable resume text', () => {
+  const text = `
+    Jordan Lee
+    jordan.lee@example.com | (555) 123-4567 | linkedin.com/in/jordanlee
+    Product-focused Software Engineer with experience building React and Node tools.
+    Experience
+    Acme Health, Software Engineer, 2021 - Present
+    Built onboarding workflows that reduced manual review time and improved customer activation.
+    Designed reporting dashboards, partnered with product managers, and implemented SQL data checks.
+    Collaborated with design, support, and operations teams to ship reliable improvements every quarter.
+    Education
+    State University, B.S. Computer Science, 2017 - 2021
+    Skills
+    JavaScript, TypeScript, React, Node, SQL, AWS, accessibility, product analytics, communication.
+  `;
+  const assessment = assessExtractedResumeText(text);
+
+  assert.equal(assessment.isTrustworthy, true);
+  assert.ok(assessment.nonWhitespaceCharacters >= 450);
+  assert.ok(assessment.wordCount >= 75);
+  assert.ok(assessment.printableRatio >= 0.85);
+  assert.ok(assessment.resumeSignalCount >= 2);
+});
+
+test('PDF extraction assessment rejects empty scanned-style text', () => {
+  const assessment = assessExtractedResumeText('');
+
+  assert.equal(assessment.isTrustworthy, false);
+  assert.equal(assessment.nonWhitespaceCharacters, 0);
+  assert.equal(assessment.wordCount, 0);
+});
+
+test('PDF extraction assessment rejects garbled text', () => {
+  const assessment = assessExtractedResumeText(`${'\u0001'.repeat(520)} Jordan Lee 2024 Skills`);
+
+  assert.equal(assessment.isTrustworthy, false);
+  assert.ok(assessment.printableRatio < 0.85);
+});
+
+test('PDF extraction assessment accepts unusual but readable resume formatting', () => {
+  const text = `
+    AVERY PATEL // avery@sample.dev // github.com/averypatel
+    Builder of internal products, workflow automation, and customer-facing dashboards.
+    2020 -> Current : Senior Analyst at Northstar Labs
+    Improved weekly planning by building Python, SQL, and spreadsheet automations for operations teams.
+    2018 -> 2020 : Operations Associate at Harbor Studio
+    Managed data cleanup, vendor reporting, onboarding, and process documentation across departments.
+    Created repeatable workflows, trained teammates, and documented quality checks for monthly reporting.
+    University of Michigan | Bachelor of Arts | 2014 -> 2018
+    Tools I use often: SQL, Python, Excel, Looker, Tableau, stakeholder communication, leadership.
+  `;
+  const assessment = assessExtractedResumeText(text);
+
+  assert.equal(assessment.isTrustworthy, true);
+  assert.ok(assessment.resumeSignalCount >= 2);
+});
+
+test('server import source keeps DOCX text-only and PDF fallback paths', () => {
+  const source = fs.readFileSync(SERVER_IMPORT_PATH, 'utf8');
+  const pdfBranchStart = source.indexOf('if (isPdf) {');
+  const pdfBranchEnd = source.indexOf('} else {', pdfBranchStart);
+  const docxBranchEnd = source.indexOf('const response = await ai.models.generateContent', pdfBranchEnd);
+  const pdfBranchSource = source.slice(pdfBranchStart, pdfBranchEnd);
+  const docxBranchSource = source.slice(pdfBranchEnd, docxBranchEnd);
+
+  assert.ok(pdfBranchStart > -1);
+  assert.match(pdfBranchSource, /extractPdfText\(file\)/);
+  assert.match(pdfBranchSource, /assessExtractedResumeText\(extractedPdfText\)/);
+  assert.match(pdfBranchSource, /createTextGeminiContents\(file\.fileName, extractedPdfAssessment\.text\)/);
+  assert.match(pdfBranchSource, /createPdfDocumentGeminiContents\(file\)/);
+  assert.match(docxBranchSource, /extractDocxText\(file\)/);
+  assert.match(docxBranchSource, /createTextGeminiContents\(file\.fileName, text\)/);
+  assert.doesNotMatch(docxBranchSource, /createPdfDocumentGeminiContents/);
+});
+
+test('Gemini resume import output normalizes into a safe draft payload', () => {
+  const imported = normalizeImportedResumeDraft({
+    suggestedName: 'Jane Example Resume',
+    sectionOrder: ['experience', 'education'],
+    resume: {
+      personal: {
+        name: 'Jane Example',
+        email: 'jane@example.com',
+        aboutMe: 'Product-minded software engineer focused on internal tools.',
+      },
+      experience: [
+        {
+          company: 'Acme',
+          role: 'Software Engineer',
+          yearsExp: '2022 - Present',
+          activities: ['Built onboarding workflows that reduced manual review time.'],
+        },
+      ],
+      education: [
+        {
+          school: 'State University',
+          degree: 'B.S. Computer Science',
+          yearsEdu: '2018 - 2022',
+        },
+      ],
+      settings: {
+        textSize: 5,
+      },
+    },
+  }, { sourceFileName: 'jane-example.pdf' });
+
+  assert.equal(DEFAULT_GEMINI_IMPORT_MODEL, 'gemini-2.5-flash-lite');
+  assert.equal(imported.suggestedName, 'Jane Example Resume');
+  assert.equal(imported.draft.template, DEFAULT_TEMPLATE);
+  assert.deepEqual(imported.draft.sectionOrder.slice(0, 3), ['personal', 'experience', 'education']);
+  assert.equal(imported.draft.resume.personal.name, 'Jane Example');
+  assert.equal(imported.draft.resume.experience[0].company, 'Acme');
+  assert.equal(imported.draft.resume.education[0].school, 'State University');
+  assert.equal(imported.draft.resume.settings.textSize, 0);
 });
 
 test('cloud guest mirror keeps the ten most recently updated resumes', () => {
@@ -674,6 +830,28 @@ test('new resumes receive an immediate timestamp for recent local mirroring', ()
   assert.match(createSource, /savedAt: nextPayload\.savedAt,/);
   assert.match(createSource, /createWorkspaceResumeMeta\(nextResumeName, nextPayload\.savedAt\)/);
   assert.match(createSource, /loadDraftIntoEditor\(nextPersistedDraft,/);
+});
+
+test('builder exposes import placeholder and draft replacement actions', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const placeholderStart = source.indexOf('function createImportPlaceholderResume(');
+  const placeholderEnd = source.indexOf('async function replaceResumeDraft(', placeholderStart);
+  const replaceStart = source.indexOf('async function replaceResumeDraft(');
+  const replaceEnd = source.indexOf('async function duplicateActiveResume()', replaceStart);
+  const placeholderSource = source.slice(placeholderStart, placeholderEnd);
+  const replaceSource = source.slice(replaceStart, replaceEnd);
+
+  assert.ok(placeholderStart > -1);
+  assert.ok(replaceStart > -1);
+  assert.match(placeholderSource, /createDraftPayload\(/);
+  assert.match(placeholderSource, /createWorkspaceResumeMeta\(nextResumeName, nextPayload\.savedAt\)/);
+  assert.match(placeholderSource, /mirrorCloudDraftLocally\(nextResumeId, nextWorkspace, nextPersistedDraft\)/);
+  assert.match(placeholderSource, /return nextResumeId/);
+  assert.match(replaceSource, /normalizeDraftPayload\(importedDraft\)/);
+  assert.match(replaceSource, /createDraftPayload\(/);
+  assert.match(replaceSource, /persistExistingDraftState\(resumeId, nextDraft\)/);
+  assert.match(replaceSource, /mirrorCloudDraftLocally\(resumeId, nextWorkspace, nextDraft\)/);
+  assert.match(replaceSource, /flushCloudDraft\(resumeId, nextWorkspace, nextDraft,/);
 });
 
 test('builder reloads the local recent workspace when signing out of cloud mode', () => {

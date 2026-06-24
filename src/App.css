@@ -524,6 +524,10 @@
   background: var(--color-surface);
 }
 
+.importResumeDialog {
+  width: min(480px, 100%);
+}
+
 .settingsLauncher {
   position: fixed;
   left: 18px;
@@ -1010,6 +1014,73 @@
   color: var(--color-error);
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.importResumeForm {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.importResumeDropzone {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: var(--space-5);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 16% 0%, var(--color-accent-soft), transparent 42%),
+    var(--color-surface-muted);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-fast);
+}
+
+.importResumeDropzone:hover,
+.importResumeDropzone:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-soft);
+}
+
+.importResumeDropzone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.importResumeDropzoneTitle {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.importResumeDropzoneHint {
+  position: relative;
+  z-index: 1;
+  color: var(--color-text-subtle);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.importResumeActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.importResumeActions .button {
+  min-height: 38px;
+  padding-inline: 14px;
+  font-size: 0.78rem;
 }
 
 .mobileWorkspaceToggle {

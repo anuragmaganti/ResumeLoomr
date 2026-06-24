@@ -5,12 +5,14 @@ import './styles/forms.css'
 import './styles/preview.css'
 import Header from './components/header';
 import AuthModal from './components/authModal';
+import ImportResumeModal from './components/importResumeModal';
 import AccountSettings from './components/accountSettings';
 import SignedOutEditingPrompt from './components/signedOutEditingPrompt';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/editorPanel';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
+import { importResumeFile } from './lib/importResume.js';
 import {
   clearBrowserResumeConnectionData,
   clearLocalResumeWorkspaceData,
@@ -23,10 +25,13 @@ const THEME_STORAGE_KEY = 'resumeloomr:theme';
 function App() {
   const previewPanelRef = useRef(null);
   const documentTitleRef = useRef('ResumeLoomr | Professional Resume Builder');
+  const authUserRef = useRef(null);
   const [editorStageMaxHeight, setEditorStageMaxHeight] = useState(null);
   const auth = useFirebaseAuth();
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [isSignedOutPromptOpen, setIsSignedOutPromptOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importState, setImportState] = useState({ status: 'idle' });
   const [isSignOutInProgress, setIsSignOutInProgress] = useState(false);
   const [signedOutEditingPreference, setSignedOutEditingPreference] = useState(() => readSignedOutEditingPreference());
   const [theme, setTheme] = useState(() => {
@@ -58,6 +63,7 @@ function App() {
     actions,
     printResume,
     notice,
+    showNotice,
     dismissNotice,
     saveState,
     saveLabel,
@@ -77,6 +83,8 @@ function App() {
     canDeleteActiveResume,
     setActiveResume,
     createResume,
+    createImportPlaceholderResume,
+    replaceResumeDraft,
     duplicateActiveResume,
     renameActiveResume,
     deleteActiveResume,
@@ -85,12 +93,17 @@ function App() {
     authReady: auth.authReady,
     trustedDevice: auth.trustedDevice,
   });
+  const isImportingResume = importState.status === 'processing';
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
       documentTitleRef.current = document.title || documentTitleRef.current;
     }
   }, []);
+
+  useEffect(() => {
+    authUserRef.current = auth.user;
+  }, [auth.user]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -152,6 +165,61 @@ function App() {
   function handlePrint() {
     document.title = activeResumeName || 'Resume';
     printResume();
+  }
+
+  function handleImportResumeClick() {
+    if (!auth.user) {
+      auth.openAuthModal();
+      return;
+    }
+
+    setIsImportModalOpen(true);
+  }
+
+  async function handleImportResumeUpload(file) {
+    if (!auth.user) {
+      setIsImportModalOpen(false);
+      auth.openAuthModal();
+      return;
+    }
+
+    const importUser = auth.user;
+    let placeholderResumeId = null;
+
+    setIsImportModalOpen(false);
+    setImportState({ status: 'processing', fileName: file.name });
+
+    try {
+      placeholderResumeId = createImportPlaceholderResume({ sourceFileName: file.name });
+
+      if (!placeholderResumeId) {
+        throw new Error('Create or delete a resume before importing another file.');
+      }
+
+      setImportState({ status: 'processing', fileName: file.name, resumeId: placeholderResumeId });
+
+      const idToken = await importUser.getIdToken();
+      const importedDraft = await importResumeFile({ file, idToken });
+
+      if (authUserRef.current?.uid !== importUser.uid) {
+        showNotice({
+          tone: 'error',
+          message: 'The import finished after your account changed, so it was not applied.',
+        });
+        return;
+      }
+
+      await replaceResumeDraft(placeholderResumeId, importedDraft.draft, {
+        name: importedDraft.suggestedName || file.name,
+      });
+    } catch (error) {
+      showNotice({
+        tone: 'error',
+        message: error?.message || 'Resume import failed. The blank resume is still editable.',
+      });
+    } finally {
+      setImportState({ status: 'idle' });
+    }
   }
 
   useEffect(() => {
@@ -252,6 +320,8 @@ function App() {
           theme={theme}
           onToggleTheme={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
           onPrint={handlePrint}
+          onImportResume={handleImportResumeClick}
+          isImportingResume={isImportingResume}
           resumeList={resumeList}
           activeResumeId={activeResumeId}
           activeResumeName={activeResumeName}
@@ -283,6 +353,13 @@ function App() {
           onGoogleSignIn={auth.signInWithGoogle}
           onEmailSignIn={auth.signInWithEmail}
           onEmailSignUp={auth.signUpWithEmail}
+        />
+
+        <ImportResumeModal
+          isOpen={isImportModalOpen}
+          busy={isImportingResume}
+          onClose={() => setIsImportModalOpen(false)}
+          onUpload={handleImportResumeUpload}
         />
 
         <SignedOutEditingPrompt

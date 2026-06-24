@@ -22,6 +22,8 @@ export default function Header({
   theme,
   onToggleTheme,
   onPrint,
+  onImportResume,
+  isImportingResume,
   resumeList,
   activeResumeId,
   activeResumeName,
@@ -239,6 +241,17 @@ export default function Header({
           >
             <span className={`themeToggleKnob themeToggleKnob--${theme}`} aria-hidden="true" />
             <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+          </button>
+          <button
+            type="button"
+            className="button buttonSecondary importResumeButton"
+            onClick={onImportResume}
+            disabled={isImportingResume}
+          >
+            {isImportingResume ? (
+              <span className="buttonSpinner" aria-hidden="true" />
+            ) : null}
+            {isImportingResume ? 'Processing...' : 'Import Existing Resume'}
           </button>
           <button type="button" className="button buttonPrimary printButton" onClick={onPrint}>
             Print resume

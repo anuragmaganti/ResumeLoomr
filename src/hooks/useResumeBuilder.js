@@ -716,6 +716,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
   function loadDraftIntoEditor(nextDraft, { focusPersonal = false } = {}) {
     skipNextAutosaveRef.current = true;
+    currentDraftRef.current = nextDraft;
     setResume(nextDraft.resume);
     setTemplate(nextDraft.template);
     setSectionOrder(nextDraft.sectionOrder);
@@ -763,6 +764,9 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
   }
 
   function commitWorkspace(nextWorkspace) {
+    workspaceRef.current = nextWorkspace;
+    activeResumeIdRef.current = nextWorkspace.activeResumeId;
+
     if (!isCloudMode) {
       persistWorkspaceIndex(nextWorkspace);
     }
@@ -1207,6 +1211,142 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     loadDraftIntoEditor(nextPersistedDraft, { focusPersonal: true });
   }
 
+  function createImportPlaceholderResume({ sourceFileName = '' } = {}) {
+    if (!canAddResume) {
+      setNotice({
+        tone: 'error',
+        message: isCloudMode
+          ? `You can keep up to ${CLOUD_WORKSPACE_RESUME_LIMIT} cloud resumes.`
+          : `Guests can keep up to ${MAX_WORKSPACE_RESUMES} local resumes.`,
+      });
+      return null;
+    }
+
+    const previousResumeId = activeResumeId;
+    const persistedPayload = persistActiveDraftImmediately({ flushCloud: false, resumeId: previousResumeId });
+
+    if (!persistedPayload && activeResumeId) {
+      return null;
+    }
+
+    const existingNames = workspace.resumeIds.map((resumeId) => workspace.meta[resumeId]?.name || '');
+    const sourceName = sourceFileName.replace(/\.[^.]+$/, '');
+    const nextResumeId = createWorkspaceResumeId();
+    const nextResumeName = sanitizeWorkspaceResumeName(sourceName, createNextResumeName(existingNames));
+    const nextDraft = createBlankDraftState();
+    const nextPayload = createDraftPayload({
+      resume: nextDraft.resume,
+      template: nextDraft.template,
+      sectionOrder: nextDraft.sectionOrder,
+    });
+    const nextPersistedDraft = {
+      ...nextDraft,
+      savedAt: nextPayload.savedAt,
+    };
+    const nextWorkspace = {
+      ...(persistedPayload
+        ? withWorkspaceResumeMeta(workspace, activeResumeId, { updatedAt: persistedPayload.savedAt })
+        : workspace),
+      activeResumeId: nextResumeId,
+      resumeIds: [...workspace.resumeIds, nextResumeId],
+      meta: {
+        ...workspace.meta,
+        [nextResumeId]: createWorkspaceResumeMeta(nextResumeName, nextPayload.savedAt),
+      },
+    };
+
+    if (!isCloudMode) {
+      persistExistingDraftState(nextResumeId, nextPersistedDraft);
+    }
+
+    commitWorkspace(nextWorkspace);
+
+    if (isCloudMode && user?.uid) {
+      mirrorCloudDraftLocally(nextResumeId, nextWorkspace, nextPersistedDraft);
+
+      if (previousResumeId) {
+        runCloudMutation(() => (
+          writeCloudDraft(
+            user.uid,
+            previousResumeId,
+            nextWorkspace,
+            {
+              resume,
+              template,
+              sectionOrder,
+              savedAt: persistedPayload.savedAt,
+            },
+            trustedDevice,
+            cloudIdentityRef.current,
+          )
+        ));
+      }
+
+      flushCloudDraft(nextResumeId, nextWorkspace, nextPersistedDraft, { reason: 'import-placeholder' });
+    }
+
+    loadDraftIntoEditor(nextPersistedDraft, { focusPersonal: true });
+    return nextResumeId;
+  }
+
+  async function replaceResumeDraft(resumeId, importedDraft, { name } = {}) {
+    const currentWorkspace = workspaceRef.current;
+
+    if (!resumeId || !currentWorkspace.resumeIds.includes(resumeId)) {
+      setNotice({
+        tone: 'error',
+        message: 'The import finished, but the new resume was removed before it could be filled.',
+      });
+      return false;
+    }
+
+    const normalizedDraft = normalizeDraftPayload(importedDraft);
+    const payload = createDraftPayload({
+      resume: normalizedDraft.resume,
+      template: normalizedDraft.template,
+      sectionOrder: normalizedDraft.sectionOrder,
+    });
+    const nextDraft = {
+      resume: payload.resume,
+      template: payload.template,
+      sectionOrder: payload.sectionOrder,
+      savedAt: payload.savedAt,
+    };
+    const existingName = currentWorkspace.meta[resumeId]?.name || 'Imported resume';
+    const nextName = sanitizeWorkspaceResumeName(name, existingName);
+    const nextWorkspace = {
+      ...withWorkspaceResumeMeta(currentWorkspace, resumeId, {
+        name: nextName,
+        updatedAt: payload.savedAt,
+      }),
+      activeResumeId: resumeId,
+    };
+
+    clearCloudSaveTimers(resumeId);
+
+    if (!isCloudMode) {
+      persistExistingDraftState(resumeId, nextDraft);
+    }
+
+    commitWorkspace(nextWorkspace);
+
+    if (isCloudMode && userRef.current?.uid) {
+      mirrorCloudDraftLocally(resumeId, nextWorkspace, nextDraft);
+    }
+
+    loadDraftIntoEditor(nextDraft, { focusPersonal: true });
+
+    if (isCloudMode && userRef.current?.uid) {
+      const savedDraft = await flushCloudDraft(resumeId, nextWorkspace, nextDraft, { reason: 'import-replace' });
+
+      if (!savedDraft && isOnline()) {
+        return true;
+      }
+    }
+
+    return true;
+  }
+
   async function duplicateActiveResume() {
     if (!canAddResume) {
       return;
@@ -1580,6 +1720,9 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     actions,
     printResume,
     notice,
+    showNotice(nextNotice) {
+      setNotice(nextNotice);
+    },
     dismissNotice() {
       setNotice(null);
     },
@@ -1605,6 +1748,8 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     canDeleteActiveResume: workspace.resumeIds.length > 1,
     setActiveResume,
     createResume,
+    createImportPlaceholderResume,
+    replaceResumeDraft,
     duplicateActiveResume,
     renameActiveResume: renameResume,
     deleteActiveResume,
