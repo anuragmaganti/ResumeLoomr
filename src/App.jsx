@@ -176,7 +176,7 @@ function App() {
     setIsImportModalOpen(true);
   }
 
-  async function handleImportResumeUpload(file) {
+  async function handleImportResumeUpload(file, importMode) {
     if (!auth.user) {
       setIsImportModalOpen(false);
       auth.openAuthModal();
@@ -199,7 +199,7 @@ function App() {
       setImportState({ status: 'processing', fileName: file.name, resumeId: placeholderResumeId });
 
       const idToken = await importUser.getIdToken();
-      const importedDraft = await importResumeFile({ file, idToken });
+      const importedDraft = await importResumeFile({ file, idToken, importMode });
 
       if (authUserRef.current?.uid !== importUser.uid) {
         showNotice({

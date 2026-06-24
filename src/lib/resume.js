@@ -538,6 +538,7 @@ export function createExperienceEntry(overrides = {}) {
     id: overrides.id || createId(),
     company: asText(overrides.company),
     role: asText(overrides.role),
+    groupLabel: asText(overrides.groupLabel),
     activities: normalizeStringList(overrides.activities),
     yearsExp: asText(overrides.yearsExp)
   };
@@ -1177,6 +1178,7 @@ export function getPreviewModel(resume) {
       id: entry.id,
       company: trimText(entry.company),
       role: trimText(entry.role),
+      groupLabel: trimText(entry.groupLabel),
       yearsExp: trimText(entry.yearsExp),
       activities: entry.activities.map(normalizeBulletText).filter((item) => item !== '')
     }));

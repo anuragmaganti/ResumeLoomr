@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { validateImportResumeFile } from '../lib/importResume.js';
+import {
+  IMPORT_RESUME_MODE_FULL,
+  IMPORT_RESUME_MODE_ONE_PAGE,
+  validateImportResumeFile,
+} from '../lib/importResume.js';
 
 export default function ImportResumeModal({
   isOpen,
@@ -8,6 +12,7 @@ export default function ImportResumeModal({
   onUpload,
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
+  const [importMode, setImportMode] = useState(IMPORT_RESUME_MODE_FULL);
   const [error, setError] = useState('');
 
   if (!isOpen) {
@@ -29,6 +34,7 @@ export default function ImportResumeModal({
     }
 
     setSelectedFile(null);
+    setImportMode(IMPORT_RESUME_MODE_FULL);
     setError('');
     onClose();
   }
@@ -44,7 +50,7 @@ export default function ImportResumeModal({
 
     setSelectedFile(null);
     setError('');
-    onUpload(selectedFile);
+    onUpload(selectedFile, importMode);
   }
 
   return (
@@ -66,6 +72,38 @@ export default function ImportResumeModal({
         </p>
 
         <form className="importResumeForm" onSubmit={handleSubmit}>
+          <fieldset className="importResumeModeGroup">
+            <legend>Import detail</legend>
+            <label className={`importResumeModeOption ${importMode === IMPORT_RESUME_MODE_FULL ? 'importResumeModeOption--active' : ''}`}>
+              <input
+                type="radio"
+                name="import-resume-mode"
+                value={IMPORT_RESUME_MODE_FULL}
+                checked={importMode === IMPORT_RESUME_MODE_FULL}
+                onChange={() => setImportMode(IMPORT_RESUME_MODE_FULL)}
+                disabled={busy}
+              />
+              <span>
+                <strong>All content</strong>
+                <small>Preserve every bullet, award, GPA, and coursework item. The resume may be longer than one page.</small>
+              </span>
+            </label>
+            <label className={`importResumeModeOption ${importMode === IMPORT_RESUME_MODE_ONE_PAGE ? 'importResumeModeOption--active' : ''}`}>
+              <input
+                type="radio"
+                name="import-resume-mode"
+                value={IMPORT_RESUME_MODE_ONE_PAGE}
+                checked={importMode === IMPORT_RESUME_MODE_ONE_PAGE}
+                onChange={() => setImportMode(IMPORT_RESUME_MODE_ONE_PAGE)}
+                disabled={busy}
+              />
+              <span>
+                <strong>One page</strong>
+                <small>Condense the resume for a shorter draft while keeping each major section represented.</small>
+              </span>
+            </label>
+          </fieldset>
+
           <label className="importResumeDropzone">
             <input
               type="file"

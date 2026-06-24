@@ -68,6 +68,17 @@ export default function ExperienceForm({ experience, actions, getFieldError, mar
                             <FormFieldError message={getFieldError(`experience.${entry.id}.role`)} />
                         </div>
 
+                        <div className="field">
+                            <label htmlFor={`groupLabel-${entry.id}`}>Group label</label>
+                            <input
+                                type="text"
+                                id={`groupLabel-${entry.id}`}
+                                value={entry.groupLabel}
+                                onChange={(event) => actions.updateExperienceField(entry.id, 'groupLabel', event.target.value)}
+                                placeholder="Internship Experience"
+                            />
+                        </div>
+
                         <ReorderableTextList
                             label="Highlights"
                             items={entry.activities}

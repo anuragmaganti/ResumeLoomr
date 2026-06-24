@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { Fragment, useMemo, useRef } from 'react';
 import { getResumePresentationVars, getResumePrintPageRule } from '../lib/resume.js';
 
 function templateClassName(template) {
@@ -138,18 +138,25 @@ export default function ResumePreview({ previewModel, sectionOrder, template, se
             return (
                 <div className="resumeSection experienceDiv" key="experience">
                     <h2>{previewModel.sectionTitles.experience}</h2>
-                    {previewModel.experienceEntries.map((job) => (
-                        <div className="experienceSection" key={job.id}>
-                            {(job.company || job.yearsExp) && (
-                                <div className="companyYearsExpFlex">
-                                    {job.company && <div className="company">{job.company}</div>}
-                                    {job.yearsExp && <div className="yearsExp">{job.yearsExp}</div>}
+                    {previewModel.experienceEntries.map((job, index, entries) => {
+                        const showGroupLabel = job.groupLabel && job.groupLabel !== entries[index - 1]?.groupLabel;
+
+                        return (
+                            <Fragment key={job.id}>
+                                {showGroupLabel && <div className="previewEntryGroupLabel">{job.groupLabel}</div>}
+                                <div className="experienceSection">
+                                    {(job.company || job.yearsExp) && (
+                                        <div className="companyYearsExpFlex">
+                                            {job.company && <div className="company">{job.company}</div>}
+                                            {job.yearsExp && <div className="yearsExp">{job.yearsExp}</div>}
+                                        </div>
+                                    )}
+                                    {job.role && <div className="role">{job.role}</div>}
+                                    {renderBulletEntries(job.activities, job.id)}
                                 </div>
-                            )}
-                            {job.role && <div className="role">{job.role}</div>}
-                            {renderBulletEntries(job.activities, job.id)}
-                        </div>
-                    ))}
+                            </Fragment>
+                        );
+                    })}
                 </div>
             );
         }

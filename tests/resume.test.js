@@ -72,11 +72,15 @@ import {
 } from '../src/lib/browserConnection.js';
 import {
   DEFAULT_GEMINI_IMPORT_MODEL,
+  IMPORT_MODE_FULL,
+  IMPORT_MODE_ONE_PAGE,
   IMPORT_FILE_MAX_BYTES,
   ImportResumeError,
+  analyzeResumeSourceCoverage,
   assessExtractedResumeText,
   normalizeImportFilePayload,
   normalizeImportedResumeDraft,
+  validateImportedDraftCoverage,
 } from '../server/importResume.js';
 
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -243,6 +247,23 @@ test('resume import file normalization rejects oversize uploads', () => {
   );
 });
 
+test('resume import file normalization defaults to full import mode and accepts one-page mode', () => {
+  const fullImport = normalizeImportFilePayload({
+    fileName: 'resume.pdf',
+    mimeType: 'application/pdf',
+    fileDataBase64: Buffer.from('pdf data').toString('base64'),
+  });
+  const onePageImport = normalizeImportFilePayload({
+    fileName: 'resume.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    fileDataBase64: Buffer.from('docx data').toString('base64'),
+    importMode: IMPORT_MODE_ONE_PAGE,
+  });
+
+  assert.equal(fullImport.importMode, IMPORT_MODE_FULL);
+  assert.equal(onePageImport.importMode, IMPORT_MODE_ONE_PAGE);
+});
+
 test('PDF extraction assessment accepts readable resume text', () => {
   const text = `
     Jordan Lee
@@ -300,22 +321,183 @@ test('PDF extraction assessment accepts unusual but readable resume formatting',
   assert.ok(assessment.resumeSignalCount >= 2);
 });
 
+test('resume source coverage detects bullets, GPA, coursework, awards, and major sections', () => {
+  const text = `
+    WALTER WASHINGTON
+    EDUCATION
+    University of Georgia, Honors Program Athens, GA
+    Bachelor of Arts, Political Science May 2023
+    Bachelor of Arts, Spanish GPA: 3.73/4.00
+    Certificate in Personal and Organizational Leadership August 2022 - Present
+    • Participant in selective leadership development program
+    Study Abroad: Oxford University August 2021 - December 2021
+    • Earned 6 credit hours taught by Oxford faculty
+    RELEVANT COURSEWORK
+    Leadership and Personal Development, Business Spanish
+    INTERNSHIP EXPERIENCE
+    Benton, Getchell & Grayson, LLC, Virtual Law Intern August 2021 - Present
+    • Contribute to daily operations of law firm
+    • Draft motions and participate in depositions
+    • Update correspondence of clients
+    The Population Institute, Intern June 2020 - August 2020
+    • Created and negotiated student scholarship program
+    • Managed relations for World Population Day Symposium
+    • Wrote 4 grant proposals
+    • Advocated with Congress and NGOs
+    LEADERSHIP EXPERIENCE
+    UGA Department of University Housing, Resident Assistant August 2021 - Present
+    • Design, implement, and evaluate educational programs
+    • Utilize communication and counseling skills
+    • Quickly respond to crises
+    • Compile annual facility inventory
+    YMCA Camp Harbor, Head Counselor May 2019 - July 2019
+    • Selected by supervisor to interview, hire, and train counselors
+    • Developed leadership training curriculum
+    • Taught leadership lessons to campers
+    • Designed comprehensive camp schedule
+    HONORS & AWARDS
+    HOPE Scholarship Recipient August 2019 - Present
+    Dean's List 5 semesters
+    Governor's Scholarship August 2019 - May 2020
+    UGA Rotary Top 12 Award Winner February 2020
+  `;
+  const coverage = analyzeResumeSourceCoverage(text);
+
+  assert.equal(coverage.bulletCount, 17);
+  assert.equal(coverage.awardCount, 4);
+  assert.equal(coverage.hasGpa, true);
+  assert.equal(coverage.hasCoursework, true);
+  assert.deepEqual(coverage.sections, {
+    education: true,
+    experience: true,
+    leadership: true,
+    awards: true,
+  });
+});
+
+test('full import coverage rejects drafts that drop source highlights and awards', () => {
+  const sourceCoverage = analyzeResumeSourceCoverage(`
+    EDUCATION
+    University of Georgia GPA: 3.73/4.00
+    RELEVANT COURSEWORK
+    Leadership and Personal Development
+    INTERNSHIP EXPERIENCE
+    Acme, Intern 2024
+    • First source bullet
+    • Second source bullet
+    • Third source bullet
+    • Fourth source bullet
+    LEADERSHIP EXPERIENCE
+    Club, President 2024
+    • Fifth source bullet
+    HONORS & AWARDS
+    Award One
+    Award Two
+  `);
+  const imported = normalizeImportedResumeDraft({
+    sectionOrder: ['education', 'experience', 'leadership', 'awards'],
+    resume: {
+      education: [{ school: 'University of Georgia' }],
+      experience: [{ company: 'Acme', role: 'Intern', activities: [] }],
+      leadership: [{ organization: 'Club', role: 'President', highlights: [] }],
+      awards: [],
+    },
+  });
+  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage, IMPORT_MODE_FULL);
+
+  assert.equal(validation.ok, false);
+  assert.match(validation.issues.join(' '), /source bullets/);
+  assert.match(validation.issues.join(' '), /awards/);
+  assert.match(validation.issues.join(' '), /GPA/);
+  assert.match(validation.issues.join(' '), /coursework/i);
+});
+
+test('full import coverage accepts drafts that preserve source details', () => {
+  const sourceCoverage = analyzeResumeSourceCoverage(`
+    EDUCATION
+    University of Georgia GPA: 3.73/4.00
+    Certificate
+    • Leadership certificate detail
+    RELEVANT COURSEWORK
+    Leadership and Personal Development
+    INTERNSHIP EXPERIENCE
+    Acme, Intern 2024
+    • First source bullet
+    • Second source bullet
+    • Third source bullet
+    LEADERSHIP EXPERIENCE
+    Club, President 2024
+    • Fourth source bullet
+    HONORS & AWARDS
+    Award One
+    Award Two
+  `);
+  const imported = normalizeImportedResumeDraft({
+    sectionOrder: ['education', 'experience', 'leadership', 'awards'],
+    resume: {
+      education: [{
+        school: 'University of Georgia',
+        gpa: '3.73/4.00',
+        coursework: 'Leadership and Personal Development',
+        customSections: [{ label: 'Certificate', content: 'Leadership certificate detail' }],
+      }],
+      experience: [{ company: 'Acme', role: 'Intern', activities: ['First source bullet', 'Second source bullet', 'Third source bullet'] }],
+      leadership: [{ organization: 'Club', role: 'President', highlights: ['Fourth source bullet'] }],
+      awards: [{ title: 'Award One' }, { title: 'Award Two' }],
+    },
+  });
+  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage, IMPORT_MODE_FULL);
+
+  assert.equal(validation.ok, true);
+});
+
+test('one-page import coverage allows condensed bullets but not missing major sections', () => {
+  const sourceCoverage = analyzeResumeSourceCoverage(`
+    EDUCATION
+    University of Georgia
+    INTERNSHIP EXPERIENCE
+    Acme, Intern 2024
+    • First source bullet
+    • Second source bullet
+    • Third source bullet
+    • Fourth source bullet
+    LEADERSHIP EXPERIENCE
+    Club, President 2024
+    • Fifth source bullet
+    HONORS & AWARDS
+    Award One
+  `);
+  const condensed = normalizeImportedResumeDraft({
+    sectionOrder: ['education', 'experience', 'leadership', 'awards'],
+    resume: {
+      education: [{ school: 'University of Georgia' }],
+      experience: [{ company: 'Acme', role: 'Intern', activities: ['Strongest bullet'] }],
+      leadership: [{ organization: 'Club', role: 'President', highlights: ['Leadership bullet'] }],
+      awards: [{ title: 'Award One' }],
+    },
+  });
+  const missingLeadership = normalizeImportedResumeDraft({
+    sectionOrder: ['education', 'experience', 'awards'],
+    resume: {
+      education: [{ school: 'University of Georgia' }],
+      experience: [{ company: 'Acme', role: 'Intern', activities: ['Strongest bullet'] }],
+      awards: [{ title: 'Award One' }],
+    },
+  });
+
+  assert.equal(validateImportedDraftCoverage(condensed.draft, sourceCoverage, IMPORT_MODE_ONE_PAGE).ok, true);
+  assert.equal(validateImportedDraftCoverage(missingLeadership.draft, sourceCoverage, IMPORT_MODE_ONE_PAGE).ok, false);
+});
+
 test('server import source keeps DOCX text-only and PDF fallback paths', () => {
   const source = fs.readFileSync(SERVER_IMPORT_PATH, 'utf8');
-  const pdfBranchStart = source.indexOf('if (isPdf) {');
-  const pdfBranchEnd = source.indexOf('} else {', pdfBranchStart);
-  const docxBranchEnd = source.indexOf('const response = await ai.models.generateContent', pdfBranchEnd);
-  const pdfBranchSource = source.slice(pdfBranchStart, pdfBranchEnd);
-  const docxBranchSource = source.slice(pdfBranchEnd, docxBranchEnd);
 
-  assert.ok(pdfBranchStart > -1);
-  assert.match(pdfBranchSource, /extractPdfText\(file\)/);
-  assert.match(pdfBranchSource, /assessExtractedResumeText\(extractedPdfText\)/);
-  assert.match(pdfBranchSource, /createTextGeminiContents\(file\.fileName, extractedPdfAssessment\.text\)/);
-  assert.match(pdfBranchSource, /createPdfDocumentGeminiContents\(file\)/);
-  assert.match(docxBranchSource, /extractDocxText\(file\)/);
-  assert.match(docxBranchSource, /createTextGeminiContents\(file\.fileName, text\)/);
-  assert.doesNotMatch(docxBranchSource, /createPdfDocumentGeminiContents/);
+  assert.match(source, /if \(isPdf\) \{/);
+  assert.match(source, /extractPdfText\(file\)/);
+  assert.match(source, /assessExtractedResumeText\(extractedPdfText\)/);
+  assert.match(source, /createTextGeminiContents\(file\.fileName, sourceText, \{ importMode \}\)/);
+  assert.match(source, /createPdfDocumentGeminiContents\(file, \{ importMode \}\)/);
+  assert.match(source, /sourceText = await extractDocxText\(file\)/);
 });
 
 test('Gemini resume import output normalizes into a safe draft payload', () => {
@@ -332,6 +514,7 @@ test('Gemini resume import output normalizes into a safe draft payload', () => {
         {
           company: 'Acme',
           role: 'Software Engineer',
+          groupLabel: 'Professional Experience',
           yearsExp: '2022 - Present',
           activities: ['Built onboarding workflows that reduced manual review time.'],
         },
@@ -355,8 +538,26 @@ test('Gemini resume import output normalizes into a safe draft payload', () => {
   assert.deepEqual(imported.draft.sectionOrder.slice(0, 3), ['personal', 'experience', 'education']);
   assert.equal(imported.draft.resume.personal.name, 'Jane Example');
   assert.equal(imported.draft.resume.experience[0].company, 'Acme');
+  assert.equal(imported.draft.resume.experience[0].groupLabel, 'Professional Experience');
   assert.equal(imported.draft.resume.education[0].school, 'State University');
   assert.equal(imported.draft.resume.settings.textSize, 0);
+});
+
+test('Gemini resume import normalization moves relevant coursework out of duplicate skills', () => {
+  const imported = normalizeImportedResumeDraft({
+    sectionOrder: ['education', 'skills'],
+    resume: {
+      education: [{ school: 'State University', degree: 'B.A. Political Science' }],
+      skills: [
+        { category: 'Relevant Coursework', items: 'Leadership and Personal Development, Business Spanish' },
+        { category: 'Tools', items: 'Excel, Spanish' },
+      ],
+    },
+  });
+
+  assert.equal(imported.draft.resume.education[0].coursework, 'Leadership and Personal Development, Business Spanish');
+  assert.equal(imported.draft.resume.skills.length, 1);
+  assert.equal(imported.draft.resume.skills[0].category, 'Tools');
 });
 
 test('cloud guest mirror keeps the ten most recently updated resumes', () => {
@@ -1061,6 +1262,7 @@ test('getPreviewModel shapes the expanded resume sections and trims bullet marke
   ];
   resume.experience[0].company = 'Acme';
   resume.experience[0].role = 'Designer';
+  resume.experience[0].groupLabel = 'Professional Experience';
   resume.experience[0].activities = ['• Led redesign', '  - Improved conversion'];
   resume.skills[0].category = 'Product';
   resume.skills[0].items = 'Roadmapping, stakeholder alignment';
@@ -1113,6 +1315,7 @@ test('getPreviewModel shapes the expanded resume sections and trims bullet marke
       { label: 'Leadership', content: 'Led the design club for two semesters.' }
     ]
   );
+  assert.equal(previewModel.experienceEntries[0].groupLabel, 'Professional Experience');
   assert.deepEqual(previewModel.experienceEntries[0].activities, ['Led redesign', 'Improved conversion']);
   assert.equal(previewModel.skillsEntries[0].items, 'Roadmapping, stakeholder alignment');
   assert.deepEqual(previewModel.projectEntries[0].highlights, ['Added live preview', 'Improved print output']);
