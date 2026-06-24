@@ -134,8 +134,7 @@ function asText(value) {
 }
 
 function normalizeWorkspaceResumeName(value, fallback) {
-  const nextName = trimText(value);
-  return nextName || fallback;
+  return sanitizeWorkspaceResumeName(value, fallback);
 }
 
 export function sanitizeWorkspaceResumeName(value, fallback = '') {

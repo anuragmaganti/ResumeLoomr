@@ -359,6 +359,17 @@
   transform: scale(0.92);
 }
 
+.button.accountButton {
+  min-width: 104px;
+  min-height: 34px;
+  padding: 0 10px;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -441,6 +452,564 @@
   color: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+.noticeActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+.conflictBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding: 14px 16px;
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-lg);
+  background: var(--color-warning-soft);
+  color: var(--color-text);
+}
+
+.conflictBanner strong,
+.conflictBanner span {
+  display: block;
+}
+
+.conflictBanner span {
+  margin-top: 3px;
+  color: var(--color-text-subtle);
+  font-size: 0.85rem;
+}
+
+.conflictActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.conflictActions .button {
+  min-height: 34px;
+  padding-inline: 10px;
+  font-size: 0.75rem;
+}
+
+.authOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+}
+
+.authBackdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(49, 88, 213, 0.18), transparent 30%),
+    rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(6px);
+}
+
+.authDialog {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 100%);
+  padding: var(--space-6);
+  background: var(--color-surface);
+}
+
+.settingsLauncher {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 80;
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-muted));
+  color: var(--color-text-subtle);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    background-color var(--transition-base);
+}
+
+.settingsLauncher:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+
+.settingsLauncher svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.accountSettingsOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  pointer-events: none;
+}
+
+.accountSettingsBackdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(3px);
+  pointer-events: auto;
+  cursor: default;
+}
+
+.accountSettingsPanel {
+  position: absolute;
+  left: 18px;
+  bottom: 72px;
+  z-index: 1;
+  display: grid;
+  gap: var(--space-4);
+  width: min(420px, calc(100vw - 36px));
+  padding: var(--space-5);
+  background: var(--color-surface);
+  pointer-events: auto;
+  animation: settingsPanelIn 180ms ease both;
+}
+
+.accountSettingsHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.accountSettingsEyebrow {
+  margin: 0 0 5px;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.accountSettingsHeader h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.connectionSummary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 0 0, var(--color-accent-soft), transparent 42%),
+    var(--color-surface-muted);
+}
+
+.connectionOrb {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-text-muted);
+  box-shadow: inset 0 0 0 6px var(--color-surface);
+}
+
+.connectionOrb.isCloud {
+  border-color: var(--color-success-border);
+  background: var(--color-success);
+}
+
+.connectionOrb.isRemembered {
+  border-color: var(--color-info-border);
+  background: var(--color-info);
+}
+
+.connectionMode {
+  margin: 0 0 4px;
+  color: var(--color-text-subtle);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.connectionAccount {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connectionDetails {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.connectionDetails div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface-soft);
+}
+
+.connectionDetails dt {
+  margin: 0 0 4px;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.connectionDetails dd {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.accountSettingsNote {
+  padding: var(--space-3);
+  border: 1px solid var(--color-info-border);
+  border-radius: 16px;
+  background: var(--color-info-soft);
+  color: var(--color-text);
+}
+
+.accountSettingsNote strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+}
+
+.accountSettingsNote p {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.signedOutEditingSettings {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-soft);
+}
+
+.signedOutEditingSettings h3 {
+  margin: 0 0 5px;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.signedOutEditingSettings p {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.settingsCheckboxRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--color-text-subtle);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.settingsCheckboxRow input {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  accent-color: var(--color-accent);
+}
+
+.signedOutEditingSettings .signedOutEditingWarning {
+  padding: 10px;
+  border: 1px solid var(--color-danger-border);
+  border-radius: 12px;
+  background: var(--color-danger-bg);
+  color: var(--color-error);
+  font-weight: 700;
+}
+
+.accountSettingsPrimary {
+  width: 100%;
+  min-height: 38px;
+}
+
+.disconnectBox {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-danger-bg);
+}
+
+.disconnectBox h3 {
+  margin: 0 0 5px;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.disconnectBox p {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.accountSettingsDanger {
+  width: 100%;
+  min-height: 38px;
+}
+
+.disconnectActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.disconnectActions .button {
+  min-height: 36px;
+  padding-inline: 12px;
+  font-size: 0.78rem;
+}
+
+.signedOutPrompt {
+  width: min(480px, 100%);
+}
+
+.signedOutPromptNote {
+  padding: var(--space-3);
+  border: 1px solid var(--color-info-border);
+  border-radius: 16px;
+  background: var(--color-info-soft);
+  color: var(--color-text);
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.signedOutPromptRemember {
+  margin-top: 0;
+}
+
+.signedOutPromptActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: var(--space-4);
+}
+
+.signedOutPromptActions .button {
+  min-height: 38px;
+  padding-inline: 14px;
+  font-size: 0.78rem;
+}
+
+@keyframes settingsPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.authDialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.authEyebrow {
+  margin: 0 0 6px;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.authDialog h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.authCloseButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--color-danger-border);
+  border-radius: 999px;
+  background: var(--color-danger-bg);
+  color: var(--color-error);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.authIntro {
+  margin: var(--space-3) 0 var(--space-4);
+  color: var(--color-text-subtle);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.authModeTabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: var(--space-3);
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+}
+
+.authModeTab {
+  min-height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-subtle);
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.authModeTab.isActive {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-xs);
+}
+
+.authGoogleButton,
+.authSubmitButton {
+  width: 100%;
+  min-height: 40px;
+}
+
+.authDivider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin: var(--space-4) 0;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.authDivider::before,
+.authDivider::after {
+  content: "";
+  height: 1px;
+  background: var(--color-border);
+}
+
+.authForm {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.authField {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-subtle);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.authField input {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-input-bg);
+  color: var(--color-text);
+}
+
+.authField input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-soft);
+}
+
+.trustedDeviceOption {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-subtle);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.trustedDeviceOption input {
+  margin-top: 2px;
+}
+
+.authError {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-error-border);
+  border-radius: 12px;
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .mobileWorkspaceToggle {
@@ -625,6 +1194,41 @@
   white-space: normal;
   text-wrap: balance;
   overflow-wrap: break-word;
+}
+
+.settingsTemplateControl {
+  cursor: default;
+}
+
+.settingsTemplateSelect {
+  width: 100%;
+  min-width: 0;
+  min-height: 24px;
+  padding: 0 18px 0 7px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  line-height: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
+    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%),
+    linear-gradient(
+      180deg,
+      var(--color-surface-elevated),
+      var(--color-surface-muted)
+    );
+  background-position:
+    calc(100% - 11px) calc(50% - 1px),
+    calc(100% - 7px) calc(50% - 1px),
+    0 0;
+  background-size:
+    4px 4px,
+    4px 4px,
+    100% 100%;
+  background-repeat: no-repeat;
+  box-shadow: none;
 }
 
 .settingsStepper {
@@ -1186,6 +1790,27 @@
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .settingsLauncher {
+    left: 12px;
+    bottom: 12px;
+    width: 38px;
+    height: 38px;
+  }
+
+  .accountSettingsPanel {
+    left: 8px;
+    right: 8px;
+    bottom: 58px;
+    width: auto;
+    max-height: calc(100dvh - 76px);
+    overflow: auto;
+    padding: var(--space-4);
+  }
+
+  .connectionDetails {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media print {
@@ -1202,6 +1827,10 @@
 
   .topbar,
   .noticeBanner,
+  .conflictBanner,
+  .authOverlay,
+  .settingsLauncher,
+  .accountSettingsOverlay,
   .mobileWorkspaceToggle,
   .workspaceColumnEditor,
   .editorPanel {

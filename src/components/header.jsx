@@ -21,9 +21,6 @@ export default function Header({
   saveLabel,
   theme,
   onToggleTheme,
-  template,
-  templateOptions,
-  onTemplateChange,
   onPrint,
   resumeList,
   activeResumeId,
@@ -35,6 +32,14 @@ export default function Header({
   onDuplicateResume,
   onRenameResume,
   onDeleteResume,
+  authUser,
+  authReady,
+  firebaseEnabled,
+  trustedDevice,
+  isCloudMode,
+  syncState,
+  onOpenAuth,
+  onSignOut,
 }) {
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
@@ -75,8 +80,8 @@ export default function Header({
   function commitRename() {
     const trimmedValue = renameValue.trim();
 
-    if (trimmedValue) {
-      onRenameResume(trimmedValue);
+    if (trimmedValue && renamingId) {
+      onRenameResume(renamingId, trimmedValue);
     }
 
     cancelRename();
@@ -220,6 +225,11 @@ export default function Header({
           <span className={`statusBadge statusBadge--${saveState}`}>
             {saveLabel}
           </span>
+          {isCloudMode ? (
+            <span className={`statusBadge statusBadge--${syncState === 'error' ? 'error' : 'info'}`}>
+              {trustedDevice ? 'Trusted device' : 'Cloud'}
+            </span>
+          ) : null}
           <button
             type="button"
             className="button buttonSecondary themeToggle"
@@ -230,25 +240,24 @@ export default function Header({
             <span className={`themeToggleKnob themeToggleKnob--${theme}`} aria-hidden="true" />
             <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
           </button>
-          <label className="visuallyHidden" htmlFor="header-template-select">
-            Template
-          </label>
-          <select
-            id="header-template-select"
-            className="toolbarSelect topbarTemplateSelect"
-            value={template}
-            onChange={(event) => onTemplateChange(event.target.value)}
-            aria-label="Choose resume template"
-          >
-            {templateOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
           <button type="button" className="button buttonPrimary printButton" onClick={onPrint}>
             Print resume
           </button>
+          {authUser ? (
+            <button type="button" className="button buttonSecondary accountButton" onClick={onSignOut}>
+              Sign out
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="button buttonSecondary accountButton"
+              onClick={onOpenAuth}
+              disabled={!authReady || !firebaseEnabled}
+              title={firebaseEnabled ? 'Sign in to sync resumes' : 'Firebase is not configured yet'}
+            >
+              Sign in
+            </button>
+          )}
         </div>
       </div>
     </header>
