@@ -1,6 +1,5 @@
 import {
   MAX_WORKSPACE_RESUMES,
-  RESUME_STORAGE_KEY_PREFIX,
   WORKSPACE_INDEX_STORAGE_KEY,
   createResumeStorageKey,
   normalizeSectionOrder,
@@ -81,25 +80,6 @@ export function createGuestMirrorWorkspace(workspace, limit = MAX_WORKSPACE_RESU
       resumeIds.map((resumeId) => [resumeId, normalizedWorkspace.meta[resumeId]]),
     ),
   });
-}
-
-function pruneUnmirroredResumeDrafts(storage, mirrorWorkspace) {
-  const mirroredResumeIds = new Set(mirrorWorkspace.resumeIds);
-  const keysToRemove = [];
-
-  for (let index = 0; index < storage.length; index += 1) {
-    const key = storage.key(index);
-
-    if (key?.startsWith(RESUME_STORAGE_KEY_PREFIX)) {
-      const resumeId = key.slice(RESUME_STORAGE_KEY_PREFIX.length);
-
-      if (!mirroredResumeIds.has(resumeId)) {
-        keysToRemove.push(key);
-      }
-    }
-  }
-
-  keysToRemove.forEach((key) => storage.removeItem(key));
 }
 
 function writeCloudMirrorManifest({ uid, workspace, storage }) {
@@ -197,7 +177,6 @@ export function persistCloudWorkspaceMirror({ uid, workspace, readDraft, storage
   backupGuestWorkspaceBeforeCloudMirror(targetStorage);
   const mirrorWorkspace = createGuestMirrorWorkspace(workspace);
 
-  pruneUnmirroredResumeDrafts(targetStorage, mirrorWorkspace);
   targetStorage.setItem(WORKSPACE_INDEX_STORAGE_KEY, JSON.stringify(mirrorWorkspace));
   writeCloudMirrorManifest({ uid, workspace: mirrorWorkspace, storage: targetStorage });
 
@@ -224,7 +203,6 @@ export function persistCloudDraftMirror({ uid, resumeId, workspace, draft, stora
   backupGuestWorkspaceBeforeCloudMirror(targetStorage);
   const mirrorWorkspace = createGuestMirrorWorkspace(workspace);
 
-  pruneUnmirroredResumeDrafts(targetStorage, mirrorWorkspace);
   targetStorage.setItem(WORKSPACE_INDEX_STORAGE_KEY, JSON.stringify(mirrorWorkspace));
   writeCloudMirrorManifest({ uid, workspace: mirrorWorkspace, storage: targetStorage });
 

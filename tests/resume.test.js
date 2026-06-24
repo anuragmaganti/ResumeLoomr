@@ -242,7 +242,7 @@ test('cloud guest mirror prioritizes recently edited resumes over recently made 
   assert.equal(mirror.meta['resume-2'], undefined);
 });
 
-test('cloud guest mirror backs up existing guest workspace once and prunes non-recent draft keys', () => {
+test('cloud guest mirror backs up existing guest workspace without deleting non-recent draft keys', () => {
   const existingWorkspace = normalizeWorkspaceIndex({
     activeResumeId: 'guest-1',
     resumeIds: ['guest-1'],
@@ -288,7 +288,7 @@ test('cloud guest mirror backs up existing guest workspace once and prunes non-r
 
   assert.equal(JSON.parse(backup.workspaceRaw).meta['guest-1'].name, 'Guest Resume');
   assert.equal(JSON.parse(backup.drafts['guest-1']).savedAt, 'guest');
-  assert.equal(storage.getItem(createResumeStorageKey('unrelated')), null);
+  assert.equal(JSON.parse(storage.getItem(createResumeStorageKey('unrelated'))).savedAt, 'keep-me');
   assert.deepEqual(mirroredWorkspace.resumeIds, ['cloud-1']);
   assert.equal(mirroredDraft.savedAt, '2026-01-02T00:00:00.000Z');
   assert.deepEqual(manifest.resumeIds, ['cloud-1']);
@@ -296,7 +296,7 @@ test('cloud guest mirror backs up existing guest workspace once and prunes non-r
   assert.equal(readCloudMirrorManifest('other-user', storage), null);
 });
 
-test('cloud draft mirror writes only mirrored resume drafts', () => {
+test('cloud draft mirror writes visible mirrored drafts without deleting older local drafts', () => {
   const storage = createMemoryStorage([
     [createResumeStorageKey('resume-2'), JSON.stringify({ savedAt: 'stale' })],
   ]);
@@ -330,7 +330,7 @@ test('cloud draft mirror writes only mirrored resume drafts', () => {
   });
 
   assert.equal(JSON.parse(storage.getItem(createResumeStorageKey('resume-11'))).template, 'compact');
-  assert.equal(storage.getItem(createResumeStorageKey('resume-2')), null);
+  assert.equal(JSON.parse(storage.getItem(createResumeStorageKey('resume-2'))).savedAt, 'stale');
   assert.deepEqual(JSON.parse(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY)).resumeIds, [
     'resume-1',
     'resume-11',
@@ -690,7 +690,7 @@ test('builder reloads the local recent workspace when signing out of cloud mode'
   assert.match(signOutBranchSource, /wasCloudModeRef\.current = false/);
 });
 
-test('builder normalizes stale local workspaces to the recent ten on refresh', () => {
+test('builder normalizes stale local workspaces to the recent ten without deleting hidden drafts', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const loadStart = source.indexOf('function loadStoredWorkspace()');
   const loadEnd = source.indexOf('function formatSavedAt(', loadStart);
@@ -698,11 +698,11 @@ test('builder normalizes stale local workspaces to the recent ten on refresh', (
 
   assert.ok(loadStart > -1);
   assert.match(source, /createGuestMirrorWorkspace,/);
-  assert.match(source, /function pruneStoredResumeDraftsToWorkspace\(workspace\)/);
+  assert.doesNotMatch(source, /function pruneStoredResumeDraftsToWorkspace\(workspace\)/);
   assert.match(loadSource, /const localWorkspace = createGuestMirrorWorkspace\(normalizedWorkspace\)/);
   assert.match(loadSource, /persistWorkspaceIndex\(localWorkspace\)/);
   assert.match(loadSource, /refreshCloudMirrorManifest\(localWorkspace\)/);
-  assert.match(loadSource, /pruneStoredResumeDraftsToWorkspace\(localWorkspace\)/);
+  assert.doesNotMatch(loadSource, /removeItem\(createResumeStorageKey/);
   assert.match(loadSource, /workspace: localWorkspace,/);
 });
 

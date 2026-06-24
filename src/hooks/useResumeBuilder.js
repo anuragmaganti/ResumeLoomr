@@ -20,7 +20,6 @@ import {
   DRAFT_STORAGE_KEY,
   DEFAULT_TEMPLATE,
   MAX_WORKSPACE_RESUMES,
-  RESUME_STORAGE_KEY_PREFIX,
   SECTION_IDS,
   TEMPLATE_OPTIONS,
   WORKSPACE_INDEX_STORAGE_KEY,
@@ -111,29 +110,6 @@ function persistExistingDraftState(resumeId, draft) {
   window.localStorage.setItem(createResumeStorageKey(resumeId), JSON.stringify(serializeDraftState(draft)));
 }
 
-function pruneStoredResumeDraftsToWorkspace(workspace) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  const resumeIds = new Set(workspace.resumeIds);
-  const keysToRemove = [];
-
-  for (let index = 0; index < window.localStorage.length; index += 1) {
-    const key = window.localStorage.key(index);
-
-    if (key?.startsWith(RESUME_STORAGE_KEY_PREFIX)) {
-      const resumeId = key.slice(RESUME_STORAGE_KEY_PREFIX.length);
-
-      if (!resumeIds.has(resumeId)) {
-        keysToRemove.push(key);
-      }
-    }
-  }
-
-  keysToRemove.forEach((key) => window.localStorage.removeItem(key));
-}
-
 function readStoredResumeDraft(resumeId) {
   if (typeof window === 'undefined' || !resumeId) {
     return createBlankDraftState();
@@ -207,7 +183,6 @@ function loadStoredWorkspace() {
       }
 
       refreshCloudMirrorManifest(localWorkspace);
-      pruneStoredResumeDraftsToWorkspace(localWorkspace);
 
       return {
         workspace: localWorkspace,
