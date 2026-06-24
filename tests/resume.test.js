@@ -583,6 +583,22 @@ test('builder source uses a per-resume cloud save queue instead of one global sa
   assert.equal(/cloudSaveTimeoutRef|cloudForceSaveRef/.test(source), false);
 });
 
+test('builder conflict detection is scoped to the active resume dirty state', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const listenerStart = source.indexOf('return subscribeCloudDraft(');
+  const listenerEnd = source.indexOf('// The active resume listener should restart', listenerStart);
+  const listenerSource = source.slice(listenerStart, listenerEnd);
+  const deleteStart = source.indexOf('async function deleteActiveResume()');
+  const deleteEnd = source.indexOf('function useCloudConflictVersion()', deleteStart);
+  const deleteSource = source.slice(deleteStart, deleteEnd);
+
+  assert.ok(listenerStart > -1);
+  assert.match(source, /localDirtyResumeIdsRef\s*=\s*useRef\(new Set\(\)\)/);
+  assert.match(listenerSource, /hasLocalDirty\(activeResumeId\)/);
+  assert.doesNotMatch(listenerSource, /if \(localDirtyRef\.current\)/);
+  assert.match(deleteSource, /clearResumeDirty\(deletedResumeId\)/);
+});
+
 test('builder reconciles signed-out local workspace changes on every sign-in', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const bootstrapStart = source.indexOf('async function bootstrapCloudWorkspace()');

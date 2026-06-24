@@ -330,6 +330,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
   const skipNextAutosaveRef = useRef(false);
   const skipNextCloudSnapshotRef = useRef(false);
   const localDirtyRef = useRef(false);
+  const localDirtyResumeIdsRef = useRef(new Set());
   const currentDraftRef = useRef(initialWorkspaceState.draft);
   const workspaceRef = useRef(initialWorkspaceState.workspace);
   const activeResumeIdRef = useRef(initialWorkspaceState.workspace.activeResumeId);
@@ -396,7 +397,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       setCloudReady(false);
       setSyncState('idle');
       setConflict(null);
-      localDirtyRef.current = false;
+      clearLocalDirtyState();
       return undefined;
     }
 
@@ -474,7 +475,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         skipNextAutosaveRef.current = true;
         setWorkspace(normalizedWorkspace);
         loadDraftIntoEditor(nextDraft);
-        localDirtyRef.current = false;
+        clearLocalDirtyState();
         setCloudReady(true);
         setSyncState('saved');
       } catch {
@@ -534,7 +535,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
               savedAt: payload.savedAt,
             };
 
-            localDirtyRef.current = true;
+            markResumeDirty(activeResumeId);
             setSyncState(isOnline() ? 'syncing' : 'offline');
             mirrorCloudDraftLocally(activeResumeId, nextWorkspace, draft);
 
@@ -586,7 +587,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       user.uid,
       trustedDevice,
       (remoteWorkspace, rawWorkspace) => {
-        if (rawWorkspace?.sessionId === cloudSessionIdRef.current || localDirtyRef.current) {
+        if (rawWorkspace?.sessionId === cloudSessionIdRef.current || hasAnyLocalDirty()) {
           return;
         }
 
@@ -626,7 +627,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
           return;
         }
 
-        if (localDirtyRef.current) {
+        if (hasLocalDirty(activeResumeId)) {
           setConflict({
             remoteDraft,
             rawDraft,
@@ -773,6 +774,39 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       }
     });
     cloudSaveQueueRef.current.clear();
+  }
+
+  function syncGlobalDirtyFlag() {
+    localDirtyRef.current = localDirtyResumeIdsRef.current.size > 0;
+  }
+
+  function markResumeDirty(resumeId) {
+    if (resumeId) {
+      localDirtyResumeIdsRef.current.add(resumeId);
+    }
+
+    syncGlobalDirtyFlag();
+  }
+
+  function clearResumeDirty(resumeId) {
+    if (resumeId) {
+      localDirtyResumeIdsRef.current.delete(resumeId);
+    }
+
+    syncGlobalDirtyFlag();
+  }
+
+  function clearLocalDirtyState() {
+    localDirtyResumeIdsRef.current.clear();
+    syncGlobalDirtyFlag();
+  }
+
+  function hasLocalDirty(resumeId) {
+    return Boolean(resumeId && localDirtyResumeIdsRef.current.has(resumeId));
+  }
+
+  function hasAnyLocalDirty() {
+    return localDirtyResumeIdsRef.current.size > 0;
   }
 
   function logCloudError(error) {
@@ -958,7 +992,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         savedAt: draftDoc?.savedAt || draft.savedAt || new Date().toISOString(),
       };
 
-      localDirtyRef.current = false;
+      clearResumeDirty(resumeId);
       lastRemoteVersionByResumeRef.current.set(resumeId, draftDoc?.version || 0);
       mirrorCloudDraftLocally(resumeId, nextWorkspace, mirroredDraft);
       setSavedAt(mirroredDraft.savedAt);
@@ -1291,6 +1325,10 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       }
     }
 
+    clearResumeDirty(deletedResumeId);
+    setConflict((currentConflict) => (
+      currentConflict?.resumeId === deletedResumeId ? null : currentConflict
+    ));
     window.localStorage.removeItem(createResumeStorageKey(deletedResumeId));
     commitWorkspace(nextWorkspace);
 
@@ -1318,14 +1356,14 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     skipNextAutosaveRef.current = true;
     mirrorCloudDraftLocally(conflict.resumeId || activeResumeId, workspace, conflict.remoteDraft);
     loadDraftIntoEditor(conflict.remoteDraft);
-    localDirtyRef.current = false;
+    clearResumeDirty(conflict.resumeId || activeResumeId);
     setConflict(null);
     setSyncState('saved');
   }
 
   function keepLocalConflictVersion() {
     setConflict(null);
-    localDirtyRef.current = true;
+    markResumeDirty(conflict?.resumeId || activeResumeId);
     flushCloudDraft();
   }
 
@@ -1388,7 +1426,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
     skipNextAutosaveRef.current = true;
     loadDraftIntoEditor(conflict.remoteDraft);
-    localDirtyRef.current = false;
+    clearResumeDirty(originalResumeId);
     setConflict(null);
     setNotice({ tone: 'success', message: 'Saved this device’s version as a copy.' });
   }
