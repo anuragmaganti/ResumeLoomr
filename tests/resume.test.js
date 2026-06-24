@@ -87,6 +87,7 @@ import {
   normalizeImportFilePayload,
   normalizeImportedResumeDraft,
   scoreImportedDraftCoverage,
+  shouldAttemptImportRepair,
   validateImportedDraftCoverage,
 } from '../server/importResume.js';
 
@@ -483,6 +484,61 @@ test('import coverage counts rendered details once instead of double-counting le
   assert.equal(validation.ok, false);
   assert.equal(score.coverage.bulletLikeDetailCount, 3);
   assert.match(validation.issues.join(' '), /3 of 5/);
+});
+
+test('import repair is skipped for usable drafts with only detail coverage uncertainty', () => {
+  const sourceCoverage = analyzeResumeSourceCoverage(`
+    EXPERIENCE
+    Acme, Analyst 2024
+    • First source bullet
+    • Second source bullet
+    • Third source bullet
+    • Fourth source bullet
+  `);
+  const imported = normalizeImportedResumeDraft({
+    resume: {
+      experience: [
+        {
+          company: 'Acme',
+          role: 'Analyst',
+          yearsExp: '2024',
+          activities: ['First source bullet', 'Second source bullet'],
+        },
+      ],
+    },
+  });
+  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage);
+
+  assert.equal(validation.ok, false);
+  assert.match(validation.issues.join(' '), /source bullets/);
+  assert.equal(shouldAttemptImportRepair(validation, imported.draft), false);
+});
+
+test('import repair still runs when a major source section is missing', () => {
+  const sourceCoverage = analyzeResumeSourceCoverage(`
+    EDUCATION
+    Example University
+    EXPERIENCE
+    Acme, Analyst 2024
+    • First source bullet
+  `);
+  const imported = normalizeImportedResumeDraft({
+    resume: {
+      experience: [
+        {
+          company: 'Acme',
+          role: 'Analyst',
+          yearsExp: '2024',
+          activities: ['First source bullet'],
+        },
+      ],
+    },
+  });
+  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage);
+
+  assert.equal(validation.ok, false);
+  assert.match(validation.issues.join(' '), /Education section/);
+  assert.equal(shouldAttemptImportRepair(validation, imported.draft), true);
 });
 
 test('import repair keeps the higher-detail candidate instead of blindly using repair output', () => {

@@ -722,6 +722,20 @@ export function hasUsableImportedDraft(draft) {
   return getPreviewModel(normalized.resume).hasContent;
 }
 
+export function shouldAttemptImportRepair(coverageValidation, draft) {
+  if (!coverageValidation || coverageValidation.ok) {
+    return false;
+  }
+
+  if (!hasUsableImportedDraft(draft)) {
+    return true;
+  }
+
+  return coverageValidation.issues.some((issue) => (
+    /section was detected in the source but not imported|honors and awards were detected in the source but not imported/i.test(issue)
+  ));
+}
+
 export function scoreImportedDraftCoverage(draft, sourceCoverage) {
   const validation = validateImportedDraftCoverage(draft, sourceCoverage);
   const coverage = analyzeImportedDraftCoverage(draft);
@@ -1422,6 +1436,19 @@ export async function parseResumeWithGemini(file) {
       draft: {
         ...parsedImport.draft,
         importWarnings,
+      },
+    };
+  }
+
+  if (!shouldAttemptImportRepair(coverageValidation, parsedImport.draft)) {
+    return {
+      ...parsedImport,
+      draft: {
+        ...parsedImport.draft,
+        importWarnings: [
+          ...importWarnings,
+          'Some sections may need review because the import could not verify every source detail.',
+        ],
       },
     };
   }
