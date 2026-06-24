@@ -73,6 +73,7 @@ import {
   persistCloudDraftMirror,
   persistCloudWorkspaceMirror,
   readCloudMirrorManifest,
+  refreshCloudMirrorManifest,
 } from '../lib/localWorkspaceMirror.js';
 
 function createBlankDraftState() {
@@ -205,6 +206,7 @@ function loadStoredWorkspace() {
         persistWorkspaceIndex(localWorkspace);
       }
 
+      refreshCloudMirrorManifest(localWorkspace);
       pruneStoredResumeDraftsToWorkspace(localWorkspace);
 
       return {
@@ -1176,9 +1178,18 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     const nextResumeId = createWorkspaceResumeId();
     const nextResumeName = createNextResumeName(existingNames);
     const nextDraft = createBlankDraftState();
+    const nextPayload = createDraftPayload({
+      resume: nextDraft.resume,
+      template: nextDraft.template,
+      sectionOrder: nextDraft.sectionOrder,
+    });
+    const nextPersistedDraft = {
+      ...nextDraft,
+      savedAt: nextPayload.savedAt,
+    };
 
     if (!isCloudMode) {
-      persistExistingDraftState(nextResumeId, nextDraft);
+      persistExistingDraftState(nextResumeId, nextPersistedDraft);
     }
 
     const nextWorkspace = {
@@ -1189,14 +1200,14 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       resumeIds: [...workspace.resumeIds, nextResumeId],
       meta: {
         ...workspace.meta,
-        [nextResumeId]: createWorkspaceResumeMeta(nextResumeName),
+        [nextResumeId]: createWorkspaceResumeMeta(nextResumeName, nextPayload.savedAt),
       },
     };
 
     commitWorkspace(nextWorkspace);
 
     if (isCloudMode && user?.uid) {
-      mirrorCloudDraftLocally(nextResumeId, nextWorkspace, nextDraft);
+      mirrorCloudDraftLocally(nextResumeId, nextWorkspace, nextPersistedDraft);
 
       if (previousResumeId) {
         await flushCloudDraft(previousResumeId, nextWorkspace, {
@@ -1208,11 +1219,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       }
 
       await runCloudMutation(() => (
-        writeCloudDraft(user.uid, nextResumeId, nextWorkspace, nextDraft, trustedDevice, cloudIdentityRef.current)
+        writeCloudDraft(user.uid, nextResumeId, nextWorkspace, nextPersistedDraft, trustedDevice, cloudIdentityRef.current)
       ));
     }
 
-    loadDraftIntoEditor(nextDraft, { focusPersonal: true });
+    loadDraftIntoEditor(nextPersistedDraft, { focusPersonal: true });
   }
 
   async function duplicateActiveResume() {
@@ -1312,7 +1323,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       return;
     }
 
-    const nextWorkspace = withWorkspaceResumeMeta(workspace, targetResumeId, { name: trimmedName });
+    const renamedAt = new Date().toISOString();
+    const nextWorkspace = withWorkspaceResumeMeta(workspace, targetResumeId, {
+      name: trimmedName,
+      updatedAt: renamedAt,
+    });
     commitWorkspace(nextWorkspace);
 
     if (isCloudMode && user?.uid) {

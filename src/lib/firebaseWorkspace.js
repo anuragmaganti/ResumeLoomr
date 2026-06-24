@@ -159,10 +159,6 @@ export function getCloudImportKey(uid) {
   return `${CLOUD_IMPORT_PREFIX}${uid}`;
 }
 
-export function hasImportedGuestWorkspace(uid) {
-  return typeof window !== 'undefined' && window.localStorage.getItem(getCloudImportKey(uid)) === 'true';
-}
-
 export function markGuestWorkspaceImported(uid) {
   if (typeof window !== 'undefined') {
     window.localStorage.setItem(getCloudImportKey(uid), 'true');
@@ -438,57 +434,6 @@ export async function importWorkspaceToCloud(uid, workspace, readDraft, trustedD
   };
 
   batch.set(workspaceRef, createCloudWorkspaceDoc(nextWorkspace, cloudIdentity, now));
-
-  await batch.commit();
-  return nextWorkspace;
-}
-
-export async function appendWorkspaceToCloud(uid, cloudWorkspace, localWorkspace, readDraft, trustedDevice, identity) {
-  const workspaceRef = getWorkspaceDocRef(uid, trustedDevice);
-
-  if (!workspaceRef) {
-    return null;
-  }
-
-  const normalizedCloudWorkspace = normalizeWorkspaceIndex(cloudWorkspace);
-  const normalizedLocalWorkspace = normalizeWorkspaceIndex(localWorkspace);
-  const cloudIdentity = normalizeCloudIdentity(identity);
-  const remainingSlots = CLOUD_WORKSPACE_RESUME_LIMIT - normalizedCloudWorkspace.resumeIds.length;
-
-  if (remainingSlots <= 0) {
-    return normalizedCloudWorkspace;
-  }
-
-  const existingNames = normalizedCloudWorkspace.resumeIds.map((resumeId) => normalizedCloudWorkspace.meta[resumeId]?.name || '');
-  const importedIds = normalizedLocalWorkspace.resumeIds.slice(0, remainingSlots);
-  const batch = writeBatch(workspaceRef.firestore);
-  const nextWorkspace = {
-    ...normalizedCloudWorkspace,
-    resumeIds: [...normalizedCloudWorkspace.resumeIds],
-    meta: { ...normalizedCloudWorkspace.meta },
-  };
-
-  for (const resumeId of importedIds) {
-    const draft = readDraft(resumeId);
-    const sourceName = normalizedLocalWorkspace.meta[resumeId]?.name || 'Resume';
-    const nextName = existingNames.includes(sourceName)
-      ? createDuplicateResumeName(sourceName, existingNames)
-      : sourceName;
-
-    existingNames.push(nextName);
-    nextWorkspace.resumeIds.push(resumeId);
-    nextWorkspace.meta[resumeId] = createWorkspaceResumeMeta(nextName, new Date().toISOString());
-    const draftDoc = createCloudDraftDoc({ resumeId, name: nextName, draft, identity: cloudIdentity });
-
-    validateCloudDraftPayload(draftDoc);
-    batch.set(
-      doc(collection(workspaceRef.firestore, 'users', uid, 'resumes'), resumeId),
-      draftDoc,
-      { merge: true },
-    );
-  }
-
-  batch.set(workspaceRef, createCloudWorkspaceDoc(nextWorkspace, cloudIdentity));
 
   await batch.commit();
   return nextWorkspace;

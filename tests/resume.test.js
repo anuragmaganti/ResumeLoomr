@@ -55,6 +55,7 @@ import {
   persistCloudDraftMirror,
   persistCloudWorkspaceMirror,
   readCloudMirrorManifest,
+  refreshCloudMirrorManifest,
 } from '../src/lib/localWorkspaceMirror.js';
 import {
   CONNECTED_ACCOUNT_STORAGE_KEY,
@@ -354,6 +355,30 @@ test('cloud draft mirror writes only mirrored resume drafts', () => {
   assert.equal(JSON.parse(storage.getItem(createResumeStorageKey('resume-1'))).template, 'compact');
 });
 
+test('cloud mirror manifest refreshes after stale local workspace normalization', () => {
+  const storage = createMemoryStorage([
+    [GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY, JSON.stringify({
+      uid: 'user-1',
+      activeResumeId: 'resume-1',
+      resumeIds: ['resume-1', 'resume-2'],
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })],
+  ]);
+  const workspace = normalizeWorkspaceIndex({
+    activeResumeId: 'resume-11',
+    resumeIds: ['resume-11', 'resume-10'],
+    meta: {
+      'resume-11': { name: 'Resume 11', updatedAt: '2026-02-01T00:00:00.000Z' },
+      'resume-10': { name: 'Resume 10', updatedAt: '2026-01-31T00:00:00.000Z' },
+    },
+  });
+
+  refreshCloudMirrorManifest(workspace, storage);
+
+  assert.deepEqual(readCloudMirrorManifest('user-1', storage).resumeIds, ['resume-11', 'resume-10']);
+  assert.equal(readCloudMirrorManifest('user-1', storage).activeResumeId, 'resume-11');
+});
+
 test('connected account helpers persist user-facing account context', () => {
   const storage = createMemoryStorage();
   const account = writeConnectedAccount({
@@ -629,10 +654,25 @@ test('resume rename is scoped by resume id and updates cloud metadata directly',
   assert.match(headerSource, /onRenameResume\(renamingId, trimmedValue\)/);
   assert.match(renameSource, /const targetResumeId = resumeId \|\| activeResumeId;/);
   assert.match(renameSource, /withWorkspaceResumeMeta\(workspace, targetResumeId,/);
+  assert.match(renameSource, /updatedAt: renamedAt,/);
   assert.match(renameSource, /renameCloudResume\(user\.uid, targetResumeId,/);
   assert.match(firebaseSource, /export async function renameCloudResume/);
   assert.match(firebaseSource, /batch\.set\(\s*workspaceRef,/);
   assert.match(firebaseSource, /batch\.set\(\s*draftRef,/);
+});
+
+test('new resumes receive an immediate timestamp for recent local mirroring', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const createStart = source.indexOf('async function createResume()');
+  const createEnd = source.indexOf('async function duplicateActiveResume()', createStart);
+  const createSource = source.slice(createStart, createEnd);
+
+  assert.ok(createStart > -1);
+  assert.match(createSource, /const nextPayload = createDraftPayload\(/);
+  assert.match(createSource, /const nextPersistedDraft = \{/);
+  assert.match(createSource, /savedAt: nextPayload\.savedAt,/);
+  assert.match(createSource, /createWorkspaceResumeMeta\(nextResumeName, nextPayload\.savedAt\)/);
+  assert.match(createSource, /loadDraftIntoEditor\(nextPersistedDraft,/);
 });
 
 test('builder reloads the local recent workspace when signing out of cloud mode', () => {
@@ -661,6 +701,7 @@ test('builder normalizes stale local workspaces to the recent ten on refresh', (
   assert.match(source, /function pruneStoredResumeDraftsToWorkspace\(workspace\)/);
   assert.match(loadSource, /const localWorkspace = createGuestMirrorWorkspace\(normalizedWorkspace\)/);
   assert.match(loadSource, /persistWorkspaceIndex\(localWorkspace\)/);
+  assert.match(loadSource, /refreshCloudMirrorManifest\(localWorkspace\)/);
   assert.match(loadSource, /pruneStoredResumeDraftsToWorkspace\(localWorkspace\)/);
   assert.match(loadSource, /workspace: localWorkspace,/);
 });
@@ -675,6 +716,7 @@ test('builder reconciles signed-out local workspace changes on every sign-in', (
   assert.match(bootstrapSource, /readCloudMirrorManifest\(uid\)/);
   assert.match(bootstrapSource, /syncLocalWorkspaceToCloud\(/);
   assert.doesNotMatch(bootstrapSource, /hasImportedGuestWorkspace/);
+  assert.doesNotMatch(source, /export async function appendWorkspaceToCloud/);
 });
 
 test('builder delete waits for online cloud delete before local removal', () => {

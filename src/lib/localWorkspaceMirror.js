@@ -142,6 +142,26 @@ export function readCloudMirrorManifest(uid, storage) {
   };
 }
 
+export function refreshCloudMirrorManifest(workspace, storage) {
+  const targetStorage = getDefaultStorage(storage);
+
+  if (!targetStorage || !workspace) {
+    return null;
+  }
+
+  const manifest = safeJsonParse(targetStorage.getItem(GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY));
+
+  if (!manifest?.uid) {
+    return null;
+  }
+
+  return writeCloudMirrorManifest({
+    uid: manifest.uid,
+    workspace,
+    storage: targetStorage,
+  });
+}
+
 export function backupGuestWorkspaceBeforeCloudMirror(storage) {
   const targetStorage = getDefaultStorage(storage);
 
