@@ -173,6 +173,10 @@
   align-items: baseline;
 }
 
+.companyRoleLine {
+  min-width: 0;
+}
+
 .educationDegreeRow {
   display: flex;
   flex-wrap: wrap;

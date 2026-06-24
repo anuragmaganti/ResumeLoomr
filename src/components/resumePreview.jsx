@@ -163,13 +163,18 @@ export default function ResumePreview({ previewModel, template, settings, panelR
                 <h2>{block.title}</h2>
                 {block.entries.map((job) => (
                     <div className="experienceSection" key={job.id}>
-                        {(job.company || job.yearsExp) && (
+                        {(job.company || job.role || job.yearsExp) && (
                             <div className="companyYearsExpFlex">
-                                {job.company && <div className="company">{job.company}</div>}
+                                {(job.company || job.role) && (
+                                    <div className="companyRoleLine">
+                                        {job.company && <span className="company">{job.company}</span>}
+                                        {job.company && job.role && <span className="roleSeparator">, </span>}
+                                        {job.role && <span className="role">{job.role}</span>}
+                                    </div>
+                                )}
                                 {job.yearsExp && <div className="yearsExp">{job.yearsExp}</div>}
                             </div>
                         )}
-                        {job.role && <div className="role">{job.role}</div>}
                         {renderBulletEntries(job.activities, job.id)}
                     </div>
                 ))}
