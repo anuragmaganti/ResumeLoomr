@@ -90,6 +90,7 @@ import {
   normalizeImportFilePayload,
   normalizeImportedResumeDraft,
   scoreImportedDraftCoverage,
+  shouldRejectIncompleteImportedDraft,
   shouldAttemptImportRepair,
   validateImportedDraftCoverage,
 } from '../server/importResume.js';
@@ -994,7 +995,7 @@ test('Gemini resume import output normalizes into a safe draft payload', () => {
   assert.equal(imported.draft.resume.settings.textSize, 0);
 });
 
-test('Gemini 3 import config uses thinking level without legacy temperature', () => {
+test('Gemini 3 import config uses medium thinking without legacy temperature', () => {
   const config = createGeminiImportGenerationConfig('gemini-3.1-flash-lite', {
     GEMINI_THINKING_LEVEL: '',
     GEMINI_MAX_OUTPUT_TOKENS: '',
@@ -1032,6 +1033,39 @@ test('Gemini import config clamps output tokens and rejects invalid thinking lev
   assert.equal(invalidConfig.maxOutputTokens, 65536);
   assert.equal(lowConfig.thinkingConfig.thinkingLevel, 'minimal');
   assert.equal(lowConfig.maxOutputTokens, 1024);
+});
+
+test('severely incomplete imports are rejected after coverage validation fails', () => {
+  const sourceCoverage = analyzeResumeSourceCoverage(`
+    EDUCATION
+    University of Georgia
+    GPA: 3.73
+    RELEVANT COURSEWORK
+    Leadership and Business Spanish
+    INTERNSHIP EXPERIENCE
+    Benton, Intern 2021
+    • Drafted motions
+    • Updated client correspondence
+    LEADERSHIP EXPERIENCE
+    UGA Housing, Resident Assistant
+    • Designed programs
+    • Responded to crises
+    HONORS & AWARDS
+    HOPE Scholarship
+    Dean's List
+  `);
+  const imported = normalizeImportedResumeDraft({
+    resume: {
+      personal: {
+        name: 'Walter Washington',
+        phone: '(706) 555-1234',
+      },
+    },
+  });
+  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage);
+
+  assert.equal(validation.ok, false);
+  assert.equal(shouldRejectIncompleteImportedDraft(validation, imported.draft, sourceCoverage), true);
 });
 
 test('Gemini resume import normalization moves relevant coursework out of duplicate skills', () => {

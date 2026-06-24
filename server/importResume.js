@@ -18,7 +18,7 @@ import {
 export const IMPORT_FILE_MAX_BYTES = 3 * 1024 * 1024;
 export const DEFAULT_AI_IMPORT_DAILY_LIMIT = 10;
 export const DEFAULT_GEMINI_IMPORT_MODEL = 'gemini-3.1-flash-lite';
-export const DEFAULT_GEMINI_THINKING_LEVEL = 'low';
+export const DEFAULT_GEMINI_THINKING_LEVEL = 'medium';
 export const DEFAULT_GEMINI_MAX_OUTPUT_TOKENS = 20000;
 export const PDF_TEXT_EXTRACTION_TIMEOUT_MS = 2000;
 export const GEMINI_GENERATE_RETRY_DELAYS_MS = [750, 1500];
@@ -32,6 +32,12 @@ const TRUSTED_PDF_TEXT_MIN_WORDS = 75;
 const TRUSTED_PDF_TEXT_MIN_PRINTABLE_RATIO = 0.85;
 const TRUSTED_PDF_TEXT_MIN_RESUME_SIGNALS = 2;
 const GEMINI_THINKING_LEVELS = new Set(['minimal', 'low', 'medium', 'high']);
+const GEMINI_THINKING_ESCALATION = {
+  minimal: 'low',
+  low: 'medium',
+  medium: 'high',
+  high: 'high',
+};
 const GEMINI_MIN_OUTPUT_TOKENS = 1024;
 const GEMINI_MAX_OUTPUT_TOKENS = 65536;
 const serverRequire = createRequire(import.meta.url);
@@ -675,6 +681,17 @@ function analyzeImportedDraftCoverage(draft) {
   };
 }
 
+function countImportedCoverageSignals(importedCoverage) {
+  return [
+    importedCoverage.sections.education,
+    importedCoverage.sections.experience,
+    importedCoverage.sections.leadership,
+    importedCoverage.sections.awards,
+    importedCoverage.hasGpa,
+    importedCoverage.hasCoursework,
+  ].filter(Boolean).length;
+}
+
 export function validateImportedDraftCoverage(draft, sourceCoverage) {
   if (!sourceCoverage?.hasSourceText) {
     return { ok: true, issues: [] };
@@ -726,6 +743,36 @@ export function validateImportedDraftCoverage(draft, sourceCoverage) {
 export function hasUsableImportedDraft(draft) {
   const normalized = normalizeDraftPayload(draft);
   return getPreviewModel(normalized.resume).hasContent;
+}
+
+export function shouldRejectIncompleteImportedDraft(coverageValidation, draft, sourceCoverage) {
+  if (!sourceCoverage?.hasSourceText || coverageValidation?.ok) {
+    return false;
+  }
+
+  if (!hasUsableImportedDraft(draft)) {
+    return true;
+  }
+
+  const importedCoverage = analyzeImportedDraftCoverage(draft);
+  const missingCriticalSignalCount = (coverageValidation.issues || []).filter((issue) => (
+    /section was detected|honors and awards|GPA|Relevant coursework/i.test(issue)
+  )).length;
+  const importedSignalCount = countImportedCoverageSignals(importedCoverage);
+  const sourceSignalCount = [
+    sourceCoverage.sections.education,
+    sourceCoverage.sections.experience,
+    sourceCoverage.sections.leadership,
+    sourceCoverage.sections.awards,
+    sourceCoverage.hasGpa,
+    sourceCoverage.hasCoursework,
+  ].filter(Boolean).length;
+
+  return (
+    missingCriticalSignalCount >= 2 ||
+    (sourceSignalCount >= 3 && importedSignalCount <= 1) ||
+    (sourceCoverage.bulletCount >= 6 && importedCoverage.bulletLikeDetailCount === 0)
+  );
 }
 
 export function shouldAttemptImportRepair(coverageValidation, draft) {
@@ -862,14 +909,24 @@ function createPdfDocumentGeminiContents(file) {
   ];
 }
 
-function createRepairGeminiContents({ fileName, text, previousDraft, issues }) {
+function createRepairGeminiContents({ fileName, text, previousDraft, issues, sourceCoverage }) {
   return [
     {
       text: [
         createExtractionPrompt({ fileName, isDocumentInput: false }),
         'The previous JSON response failed ResumeLoomr coverage validation.',
         `Coverage problems: ${issues.join(' ')}`,
-        'Return a corrected complete JSON object only. Preserve all source facts required by the import mode.',
+        'Return a corrected complete JSON object only. Do not return a personal-details-only response.',
+        'Every detected source section must be represented as a resume.sections block. Every source bullet/detail must be represented as an activity, custom education detail, award detail, or equivalent field.',
+        'Source coverage summary:',
+        JSON.stringify({
+          bulletCount: sourceCoverage?.bulletCount || 0,
+          awardCount: sourceCoverage?.awardCount || 0,
+          hasGpa: sourceCoverage?.hasGpa || false,
+          hasCoursework: sourceCoverage?.hasCoursework || false,
+          sections: sourceCoverage?.sections || {},
+          roleSectionOrder: sourceCoverage?.roleSectionOrder || [],
+        }),
         'Previous normalized draft JSON:',
         JSON.stringify(previousDraft),
         'Source resume text:',
@@ -1029,7 +1086,7 @@ function getGeminiMaxOutputTokens(env = process.env) {
   return Math.min(GEMINI_MAX_OUTPUT_TOKENS, Math.max(GEMINI_MIN_OUTPUT_TOKENS, parsedValue));
 }
 
-export function createGeminiImportGenerationConfig(model, env = process.env) {
+export function createGeminiImportGenerationConfig(model, env = process.env, options = {}) {
   const maxOutputTokens = getGeminiMaxOutputTokens(env);
   const baseConfig = {
     responseMimeType: 'application/json',
@@ -1047,7 +1104,21 @@ export function createGeminiImportGenerationConfig(model, env = process.env) {
   return {
     ...baseConfig,
     thinkingConfig: {
-      thinkingLevel: getGeminiThinkingLevel(env),
+      thinkingLevel: options.thinkingLevel || getGeminiThinkingLevel(env),
+    },
+  };
+}
+
+function createGeminiRepairGenerationConfig(model, generationConfig) {
+  if (!isGemini3Model(model) || !generationConfig.thinkingConfig?.thinkingLevel) {
+    return generationConfig;
+  }
+
+  return {
+    ...generationConfig,
+    thinkingConfig: {
+      ...generationConfig.thinkingConfig,
+      thinkingLevel: GEMINI_THINKING_ESCALATION[generationConfig.thinkingConfig.thinkingLevel] || 'high',
     },
   };
 }
@@ -1529,6 +1600,7 @@ export async function parseResumeWithGemini(file) {
   const ai = new GoogleGenAI({ apiKey });
   const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_IMPORT_MODEL;
   const generationConfig = createGeminiImportGenerationConfig(model);
+  const repairGenerationConfig = createGeminiRepairGenerationConfig(model, generationConfig);
   const isPdf = file.mimeType === PDF_MIME_TYPE;
   let contents;
   let sourceText = '';
@@ -1573,6 +1645,7 @@ export async function parseResumeWithGemini(file) {
   const importDiagnostics = {
     model,
     thinkingLevel: generationConfig.thinkingConfig?.thinkingLevel,
+    repairThinkingLevel: repairGenerationConfig.thinkingConfig?.thinkingLevel,
     maxOutputTokens: generationConfig.maxOutputTokens,
     fileName: trimText(file.fileName).slice(0, 120),
     mimeType: file.mimeType,
@@ -1620,6 +1693,7 @@ export async function parseResumeWithGemini(file) {
         usedRepair: false,
         coverageOk: false,
         coverageIssueCount: coverageValidation.issues.length,
+        coverageIssues: coverageValidation.issues,
       },
       draft: {
         ...parsedImport.draft,
@@ -1639,9 +1713,10 @@ export async function parseResumeWithGemini(file) {
       text: sourceText,
       previousDraft: parsedImport.draft,
       issues: coverageValidation.issues,
+      sourceCoverage,
     }),
     sourceFileName: file.fileName,
-    generationConfig,
+    generationConfig: repairGenerationConfig,
     diagnostics: {
       ...importDiagnostics,
       phase: 'repair',
@@ -1652,10 +1727,17 @@ export async function parseResumeWithGemini(file) {
   const bestImport = chooseBestImportedDraftCandidate([parsedImport, repairedImport], sourceCoverage);
   const bestCoverageValidation = bestImport.validation;
 
-  if (!bestCoverageValidation.ok && !hasUsableImportedDraft(bestImport.candidate.draft)) {
-    throw new ImportResumeError('Resume import could not extract usable information. Try again with another file.', {
+  if (shouldRejectIncompleteImportedDraft(bestCoverageValidation, bestImport.candidate.draft, sourceCoverage)) {
+    throw new ImportResumeError('Resume import returned too little information. Try again with the same file.', {
       statusCode: 502,
       code: 'import/incomplete-ai-response',
+      diagnostics: {
+        ...importDiagnostics,
+        usedRepair: true,
+        coverageOk: false,
+        coverageIssueCount: bestCoverageValidation.issues.length,
+        coverageIssues: bestCoverageValidation.issues,
+      },
     });
   }
 
@@ -1666,6 +1748,7 @@ export async function parseResumeWithGemini(file) {
       usedRepair: true,
       coverageOk: bestCoverageValidation.ok,
       coverageIssueCount: bestCoverageValidation.issues.length,
+      coverageIssues: bestCoverageValidation.issues,
     },
     draft: {
       ...bestImport.candidate.draft,
