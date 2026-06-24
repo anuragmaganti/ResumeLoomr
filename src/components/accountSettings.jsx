@@ -148,7 +148,7 @@ export default function AccountSettings({
                   })}
                 />
                 <span>
-                  Keep my first 10 resumes available for signed-out editing on this browser.
+                  Keep my 10 most recent resumes available for signed-out editing on this browser.
                 </span>
               </label>
               <label className="settingsCheckboxRow">
