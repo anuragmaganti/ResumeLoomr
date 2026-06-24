@@ -81,10 +81,12 @@ import {
   analyzeResumeSourceCoverage,
   applySourceAwareImportCleanup,
   assessExtractedResumeText,
+  chooseBestImportedDraftCandidate,
   getGeminiErrorDetails,
   hasUsableImportedDraft,
   normalizeImportFilePayload,
   normalizeImportedResumeDraft,
+  scoreImportedDraftCoverage,
   validateImportedDraftCoverage,
 } from '../server/importResume.js';
 
@@ -451,6 +453,75 @@ test('incomplete but usable imports can be applied with a warning instead of bei
   assert.equal(validation.ok, false);
   assert.equal(hasUsableImportedDraft(imported.draft), true);
   assert.equal(hasUsableImportedDraft(emptyImport.draft), false);
+});
+
+test('import coverage counts rendered details once instead of double-counting legacy mirrors', () => {
+  const sourceCoverage = analyzeResumeSourceCoverage(`
+    EXPERIENCE
+    Acme, Analyst 2024
+    • First source bullet
+    • Second source bullet
+    • Third source bullet
+    • Fourth source bullet
+    • Fifth source bullet
+  `);
+  const imported = normalizeImportedResumeDraft({
+    resume: {
+      experience: [
+        {
+          company: 'Acme',
+          role: 'Analyst',
+          yearsExp: '2024',
+          activities: ['First source bullet', 'Second source bullet', 'Third source bullet'],
+        },
+      ],
+    },
+  });
+  const validation = validateImportedDraftCoverage(imported.draft, sourceCoverage);
+  const score = scoreImportedDraftCoverage(imported.draft, sourceCoverage);
+
+  assert.equal(validation.ok, false);
+  assert.equal(score.coverage.bulletLikeDetailCount, 3);
+  assert.match(validation.issues.join(' '), /3 of 5/);
+});
+
+test('import repair keeps the higher-detail candidate instead of blindly using repair output', () => {
+  const sourceCoverage = analyzeResumeSourceCoverage(`
+    EXPERIENCE
+    Acme, Analyst 2024
+    • First source bullet
+    • Second source bullet
+    • Third source bullet
+    • Fourth source bullet
+  `);
+  const firstImport = normalizeImportedResumeDraft({
+    resume: {
+      experience: [
+        {
+          company: 'Acme',
+          role: 'Analyst',
+          yearsExp: '2024',
+          activities: ['First source bullet', 'Second source bullet', 'Third source bullet'],
+        },
+      ],
+    },
+  });
+  const weakerRepair = normalizeImportedResumeDraft({
+    resume: {
+      experience: [
+        {
+          company: 'Acme',
+          role: 'Analyst',
+          yearsExp: '2024',
+          activities: ['First source bullet'],
+        },
+      ],
+    },
+  });
+  const best = chooseBestImportedDraftCandidate([firstImport, weakerRepair], sourceCoverage);
+
+  assert.equal(best.candidate, firstImport);
+  assert.equal(best.coverage.bulletLikeDetailCount, 3);
 });
 
 test('full import coverage accepts drafts that preserve source details', () => {

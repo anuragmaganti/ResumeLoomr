@@ -613,8 +613,8 @@ export function analyzeResumeSourceCoverage(text) {
     hasCoursework: hasSection(/^relevant coursework$|^coursework$/i),
     sections: {
       education: hasSection(/^education$/i),
-      experience: hasSection(/^(?:internship experience|professional experience|work experience|additional work experience|employment experience|experience)$/i),
-      leadership: hasSection(/^leadership experience$/i),
+      experience: roleSectionOrder.some((section) => section.type === 'experience'),
+      leadership: roleSectionOrder.some((section) => section.type === 'leadership'),
       awards: hasSection(/^honors?\s*(?:&|and)?\s*awards?$|^awards$/i),
     },
     roleSectionOrder,
@@ -629,52 +629,42 @@ function countDraftListItems(entries, field) {
 
 function analyzeImportedDraftCoverage(draft) {
   const normalized = normalizeDraftPayload(draft);
-  const { resume } = normalized;
-  const educationCustomDetailCount = resume.education.reduce((count, entry) => (
-    count + entry.customSections.filter((section) => trimText(section.content) !== '').length
+  const previewModel = getPreviewModel(normalized.resume);
+  const sectionBlocks = previewModel.sectionBlocks;
+  const educationBlocks = sectionBlocks.filter((section) => section.kind === 'education');
+  const roleBlocks = sectionBlocks.filter((section) => section.kind === 'roles');
+  const projectBlocks = sectionBlocks.filter((section) => section.kind === 'projects');
+  const customBlocks = sectionBlocks.filter((section) => section.kind === 'custom');
+  const awardBlocks = sectionBlocks.filter((section) => section.kind === 'awards');
+  const educationCustomDetailCount = educationBlocks.reduce((count, section) => (
+    count + section.entries.reduce((entryCount, entry) => (
+      entryCount + entry.customSections.filter((customSection) => trimText(customSection.content) !== '').length
+    ), 0)
   ), 0);
-  const educationAwardCount = resume.education.reduce((count, entry) => count + countDelimitedDetails(entry.awards), 0);
-  const topLevelAwardCount = resume.awards.filter((entry) => (
-    [entry.title, entry.issuer, entry.years, entry.details].some((value) => trimText(value) !== '')
-  )).length;
-  const experienceDetailCount = countDraftListItems(resume.experience, 'activities');
-  const leadershipDetailCount = countDraftListItems(resume.leadership, 'highlights');
-  const volunteeringDetailCount = countDraftListItems(resume.volunteering, 'highlights');
-  const projectDetailCount = countDraftListItems(resume.projects, 'highlights');
-  const sectionRoleDetailCount = resume.sections
-    .filter((section) => section.kind === 'roles')
-    .reduce((count, section) => count + countDraftListItems(section.entries, 'activities'), 0);
-  const sectionCustomDetailCount = resume.sections
-    .filter((section) => section.kind === 'custom')
-    .reduce((count, section) => count + countDraftListItems(section.entries, 'highlights'), 0);
-  const sectionAwardCount = resume.sections
-    .filter((section) => section.kind === 'awards')
-    .reduce((count, section) => count + section.entries.filter((entry) => (
+  const educationAwardCount = educationBlocks.reduce((count, section) => (
+    count + section.entries.reduce((entryCount, entry) => entryCount + countDelimitedDetails(entry.awards), 0)
+  ), 0);
+  const roleDetailCount = roleBlocks.reduce((count, section) => count + countDraftListItems(section.entries, 'activities'), 0);
+  const projectDetailCount = projectBlocks.reduce((count, section) => count + countDraftListItems(section.entries, 'highlights'), 0);
+  const customDetailCount = customBlocks.reduce((count, section) => count + countDraftListItems(section.entries, 'highlights'), 0);
+  const topLevelAwardCount = awardBlocks.reduce((count, section) => (
+    count + section.entries.filter((entry) => (
       [entry.title, entry.issuer, entry.years, entry.details].some((value) => trimText(value) !== '')
-    )).length, 0);
-  const leadershipAsExperience = resume.experience.some((entry) => /leadership/i.test(trimText(entry.groupLabel)));
-  const roleSectionTitles = resume.sections
-    .filter((section) => section.kind === 'roles')
+    )).length
+  ), 0);
+  const roleSectionTitles = roleBlocks
     .map((section) => trimText(section.title));
 
   return {
-    bulletLikeDetailCount: educationCustomDetailCount + experienceDetailCount + leadershipDetailCount + volunteeringDetailCount + projectDetailCount + sectionRoleDetailCount + sectionCustomDetailCount,
-    awardCount: Math.max(topLevelAwardCount + educationAwardCount, sectionAwardCount),
-    hasGpa: resume.education.some((entry) => trimText(entry.gpa) !== '') || resume.sections.some((section) => (
-      section.kind === 'education' && section.entries.some((entry) => trimText(entry.gpa) !== '')
-    )),
-    hasCoursework: resume.education.some((entry) => trimText(entry.coursework) !== '') || resume.sections.some((section) => (
-      section.kind === 'education' && section.entries.some((entry) => trimText(entry.coursework) !== '')
-    )),
+    bulletLikeDetailCount: educationCustomDetailCount + roleDetailCount + projectDetailCount + customDetailCount,
+    awardCount: topLevelAwardCount + educationAwardCount,
+    hasGpa: educationBlocks.some((section) => section.entries.some((entry) => trimText(entry.gpa) !== '')),
+    hasCoursework: educationBlocks.some((section) => section.entries.some((entry) => trimText(entry.coursework) !== '')),
     sections: {
-      education: resume.education.some((entry) => [entry.school, entry.degree, entry.yearsEdu, entry.gpa, entry.coursework].some((value) => trimText(value) !== '')) ||
-        resume.sections.some((section) => section.kind === 'education' && section.entries.length > 0),
-      experience: resume.experience.some((entry) => [entry.company, entry.role, entry.yearsExp].some((value) => trimText(value) !== '') || entry.activities.some((value) => trimText(value) !== '')) ||
-        roleSectionTitles.length > 0,
-      leadership: leadershipAsExperience ||
-        roleSectionTitles.some((title) => /leadership/i.test(title)) ||
-        resume.leadership.some((entry) => [entry.organization, entry.role, entry.years].some((value) => trimText(value) !== '') || entry.highlights.some((value) => trimText(value) !== '')),
-      awards: topLevelAwardCount + educationAwardCount > 0 || sectionAwardCount > 0,
+      education: educationBlocks.length > 0,
+      experience: roleBlocks.length > 0,
+      leadership: roleSectionTitles.some((title) => /leadership/i.test(title)),
+      awards: topLevelAwardCount + educationAwardCount > 0,
     },
   };
 }
@@ -730,6 +720,38 @@ export function validateImportedDraftCoverage(draft, sourceCoverage) {
 export function hasUsableImportedDraft(draft) {
   const normalized = normalizeDraftPayload(draft);
   return getPreviewModel(normalized.resume).hasContent;
+}
+
+export function scoreImportedDraftCoverage(draft, sourceCoverage) {
+  const validation = validateImportedDraftCoverage(draft, sourceCoverage);
+  const coverage = analyzeImportedDraftCoverage(draft);
+  const bulletScore = sourceCoverage?.bulletCount
+    ? Math.min(coverage.bulletLikeDetailCount, sourceCoverage.bulletCount) * 10
+    : coverage.bulletLikeDetailCount * 10;
+  const awardScore = sourceCoverage?.awardCount
+    ? Math.min(coverage.awardCount, sourceCoverage.awardCount) * 8
+    : coverage.awardCount * 8;
+  const sectionScore = Object.values(coverage.sections).filter(Boolean).length * 12;
+  const detailScore = [
+    sourceCoverage?.hasGpa ? coverage.hasGpa : false,
+    sourceCoverage?.hasCoursework ? coverage.hasCoursework : false,
+  ].filter(Boolean).length * 8;
+  const completenessBonus = validation.ok ? 1000 : 0;
+
+  return {
+    validation,
+    coverage,
+    score: completenessBonus + bulletScore + awardScore + sectionScore + detailScore - (validation.issues.length * 25),
+  };
+}
+
+export function chooseBestImportedDraftCandidate(candidates, sourceCoverage) {
+  return candidates
+    .map((candidate) => ({
+      candidate,
+      ...scoreImportedDraftCoverage(candidate.draft, sourceCoverage),
+    }))
+    .sort((a, b) => b.score - a.score)[0];
 }
 
 async function runWithTimeout(promise, ms) {
@@ -1416,9 +1438,10 @@ export async function parseResumeWithGemini(file) {
     sourceFileName: file.fileName,
   });
   const repairedImport = applySourceAwareImportCleanup(rawRepairedImport, sourceCoverage);
-  const repairedCoverageValidation = validateImportedDraftCoverage(repairedImport.draft, sourceCoverage);
+  const bestImport = chooseBestImportedDraftCandidate([parsedImport, repairedImport], sourceCoverage);
+  const bestCoverageValidation = bestImport.validation;
 
-  if (!repairedCoverageValidation.ok && !hasUsableImportedDraft(repairedImport.draft)) {
+  if (!bestCoverageValidation.ok && !hasUsableImportedDraft(bestImport.candidate.draft)) {
     throw new ImportResumeError('Resume import could not extract usable information. Try again with another file.', {
       statusCode: 502,
       code: 'import/incomplete-ai-response',
@@ -1426,12 +1449,12 @@ export async function parseResumeWithGemini(file) {
   }
 
   return {
-    ...repairedImport,
+    ...bestImport.candidate,
     draft: {
-      ...repairedImport.draft,
+      ...bestImport.candidate.draft,
       importWarnings: [
         ...importWarnings,
-        repairedCoverageValidation.ok
+        bestCoverageValidation.ok
           ? 'Some sections may need review because the first extraction pass needed repair.'
           : 'Some sections may need review because the import could not verify every source detail.',
       ],
