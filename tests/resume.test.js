@@ -982,6 +982,33 @@ test('Gemini provider errors expose status details for typed API responses', () 
   assert.match(details.message, /high demand/);
 });
 
+test('Gemini provider errors detect daily quota exhaustion details', () => {
+  const error = new Error(JSON.stringify({
+    error: {
+      code: 429,
+      message: 'You exceeded your current quota. Please check your plan and billing details.',
+      status: 'RESOURCE_EXHAUSTED',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+          violations: [
+            {
+              quotaMetric: 'generativelanguage.googleapis.com/generate_content_free_tier_requests',
+              quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+            },
+          ],
+        },
+      ],
+    },
+  }));
+  const details = getGeminiErrorDetails(error);
+
+  assert.equal(details.statusCode, 429);
+  assert.equal(details.status, 'RESOURCE_EXHAUSTED');
+  assert.equal(details.isDailyQuota, true);
+  assert.equal(details.quotaViolations[0].quotaId, 'GenerateRequestsPerDayPerProjectPerModel-FreeTier');
+});
+
 test('cloud guest mirror keeps the ten most recently updated resumes', () => {
   const resumeIds = Array.from({ length: MAX_WORKSPACE_RESUMES + 2 }, (_, index) => `resume-${index + 1}`);
   const workspace = normalizeWorkspaceIndex({

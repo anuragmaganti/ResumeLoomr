@@ -897,47 +897,93 @@ function parseJsonErrorMessage(message) {
   }
 }
 
+function getNumericStatusCode(...values) {
+  const numericValue = values.find((value) => {
+    if (value === null || value === undefined || value === '') {
+      return false;
+    }
+
+    return Number.isFinite(Number(value));
+  });
+
+  return Number(numericValue || 0);
+}
+
+function getQuotaViolations(parsedError) {
+  return (Array.isArray(parsedError?.details) ? parsedError.details : [])
+    .flatMap((detail) => (Array.isArray(detail?.violations) ? detail.violations : []))
+    .map((violation) => ({
+      quotaMetric: trimText(violation?.quotaMetric),
+      quotaId: trimText(violation?.quotaId),
+    }))
+    .filter((violation) => violation.quotaMetric || violation.quotaId);
+}
+
 export function getGeminiErrorDetails(error) {
   const parsedError = parseJsonErrorMessage(error?.message || '');
-  const statusCode = Number(error?.status || error?.statusCode || error?.code || parsedError?.code || 0);
-  const status = trimText(error?.status || parsedError?.status);
+  const statusCode = getNumericStatusCode(error?.statusCode, error?.code, parsedError?.code, error?.status);
+  const status = trimText(parsedError?.status || (Number.isFinite(Number(error?.status)) ? '' : error?.status));
   const message = trimText(parsedError?.message || error?.message);
+  const quotaViolations = getQuotaViolations(parsedError);
+  const quotaText = [message, ...quotaViolations.flatMap((violation) => [violation.quotaMetric, violation.quotaId])]
+    .filter(Boolean)
+    .join(' ');
+  const isDailyQuota = /(?:per\s*day|perday|requestsperday|daily|rpd)/i.test(quotaText);
 
   return {
     statusCode,
     status,
     message,
+    quotaViolations,
+    isDailyQuota,
   };
 }
 
 function isRetryableGeminiError(error) {
   const { statusCode, status } = getGeminiErrorDetails(error);
 
+  if (statusCode === 429 || status === 'RESOURCE_EXHAUSTED') {
+    return false;
+  }
+
   return (
-    [429, 500, 502, 503, 504].includes(statusCode) ||
-    ['RESOURCE_EXHAUSTED', 'UNAVAILABLE', 'DEADLINE_EXCEEDED', 'INTERNAL'].includes(status)
+    [500, 502, 503, 504].includes(statusCode) ||
+    ['UNAVAILABLE', 'DEADLINE_EXCEEDED', 'INTERNAL'].includes(status)
   );
 }
 
 function createGeminiUnavailableError(error, diagnostics = null) {
-  const { statusCode, status, message } = getGeminiErrorDetails(error);
+  const {
+    statusCode,
+    status,
+    message,
+    quotaViolations,
+    isDailyQuota,
+  } = getGeminiErrorDetails(error);
   const providerDiagnostics = {
     ...diagnostics,
     providerStatusCode: statusCode || undefined,
     providerStatus: status || undefined,
     providerMessage: message ? message.slice(0, 500) : undefined,
+    providerQuotaViolations: quotaViolations.length > 0 ? quotaViolations : undefined,
+    providerIsDailyQuota: isDailyQuota || undefined,
   };
 
   if (statusCode === 429 || status === 'RESOURCE_EXHAUSTED') {
-    return new ImportResumeError('The AI import service is busy right now. Try again in a minute.', {
-      statusCode: 503,
-      code: 'import/ai-rate-limited',
-      diagnostics: providerDiagnostics,
-    });
+    return new ImportResumeError(
+      isDailyQuota
+        ? 'Daily AI import quota reached. Try again after Gemini resets your daily limit.'
+        : 'AI import rate limit reached. Try again in a minute.',
+      {
+        statusCode: 429,
+        code: isDailyQuota ? 'import/ai-daily-quota' : 'import/ai-rate-limited',
+        diagnostics: providerDiagnostics,
+      },
+    );
   }
 
   if (statusCode === 503 || status === 'UNAVAILABLE') {
-    return new ImportResumeError('The AI import service is temporarily busy. Try again in a minute.', {
+    return new ImportResumeError('The AI import provider is temporarily unavailable. Try again in a minute.', {
       statusCode: 503,
       code: 'import/ai-unavailable',
       diagnostics: providerDiagnostics,
