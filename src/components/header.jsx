@@ -80,8 +80,8 @@ export default function Header({
   function commitRename() {
     const trimmedValue = renameValue.trim();
 
-    if (trimmedValue) {
-      onRenameResume(trimmedValue);
+    if (trimmedValue && renamingId) {
+      onRenameResume(renamingId, trimmedValue);
     }
 
     cancelRename();

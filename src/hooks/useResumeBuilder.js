@@ -9,6 +9,7 @@ import {
   markGuestWorkspaceImported,
   readCloudDraft,
   readCloudWorkspace,
+  renameCloudResume,
   subscribeCloudDraft,
   subscribeCloudWorkspace,
   syncLocalWorkspaceToCloud,
@@ -1259,23 +1260,28 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     });
   }
 
-  function renameActiveResume(nextName) {
-    const currentName = workspace.meta[activeResumeId]?.name || '';
+  function renameResume(resumeId, nextName) {
+    const targetResumeId = resumeId || activeResumeId;
+    const currentName = workspace.meta[targetResumeId]?.name || '';
     const trimmedName = sanitizeWorkspaceResumeName(nextName, currentName);
 
-    if (!trimmedName || !activeResumeId || trimmedName === workspace.meta[activeResumeId]?.name) {
+    if (!trimmedName || !targetResumeId || trimmedName === workspace.meta[targetResumeId]?.name) {
       return;
     }
 
-    const nextWorkspace = withWorkspaceResumeMeta(workspace, activeResumeId, { name: trimmedName });
+    const nextWorkspace = withWorkspaceResumeMeta(workspace, targetResumeId, { name: trimmedName });
     commitWorkspace(nextWorkspace);
 
     if (isCloudMode && user?.uid) {
-      mirrorCloudDraftLocally(activeResumeId, nextWorkspace, currentDraftRef.current);
+      mirrorCloudWorkspaceLocally(nextWorkspace);
+
+      if (targetResumeId === activeResumeId) {
+        mirrorCloudDraftLocally(targetResumeId, nextWorkspace, currentDraftRef.current);
+      }
+
       runCloudMutation(() => (
-        writeCloudWorkspace(user.uid, nextWorkspace, trustedDevice, cloudIdentityRef.current)
+        renameCloudResume(user.uid, targetResumeId, nextWorkspace, trustedDevice, cloudIdentityRef.current)
       ));
-      scheduleCloudSave(activeResumeId, nextWorkspace, currentDraftRef.current);
     }
   }
 
@@ -1560,7 +1566,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     setActiveResume,
     createResume,
     duplicateActiveResume,
-    renameActiveResume,
+    renameActiveResume: renameResume,
     deleteActiveResume,
   };
 }

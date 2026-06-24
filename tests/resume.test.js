@@ -599,6 +599,24 @@ test('builder conflict detection is scoped to the active resume dirty state', ()
   assert.match(deleteSource, /clearResumeDirty\(deletedResumeId\)/);
 });
 
+test('resume rename is scoped by resume id and updates cloud metadata directly', () => {
+  const builderSource = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const headerSource = fs.readFileSync(path.resolve(SRC_DIR, 'components/header.jsx'), 'utf8');
+  const firebaseSource = fs.readFileSync(path.resolve(SRC_DIR, 'lib/firebaseWorkspace.js'), 'utf8');
+  const renameStart = builderSource.indexOf('function renameResume(');
+  const renameEnd = builderSource.indexOf('async function deleteActiveResume()', renameStart);
+  const renameSource = builderSource.slice(renameStart, renameEnd);
+
+  assert.ok(renameStart > -1);
+  assert.match(headerSource, /onRenameResume\(renamingId, trimmedValue\)/);
+  assert.match(renameSource, /const targetResumeId = resumeId \|\| activeResumeId;/);
+  assert.match(renameSource, /withWorkspaceResumeMeta\(workspace, targetResumeId,/);
+  assert.match(renameSource, /renameCloudResume\(user\.uid, targetResumeId,/);
+  assert.match(firebaseSource, /export async function renameCloudResume/);
+  assert.match(firebaseSource, /batch\.set\(\s*workspaceRef,/);
+  assert.match(firebaseSource, /batch\.set\(\s*draftRef,/);
+});
+
 test('builder reconciles signed-out local workspace changes on every sign-in', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const bootstrapStart = source.indexOf('async function bootstrapCloudWorkspace()');

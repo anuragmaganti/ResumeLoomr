@@ -313,6 +313,42 @@ export async function writeCloudWorkspace(uid, workspace, trustedDevice, identit
   };
 }
 
+export async function renameCloudResume(uid, resumeId, workspace, trustedDevice, identity) {
+  const workspaceRef = getWorkspaceDocRef(uid, trustedDevice);
+  const draftRef = getResumeDocRef(uid, resumeId, trustedDevice);
+
+  if (!workspaceRef || !draftRef) {
+    return null;
+  }
+
+  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+  const name = normalizedWorkspace.meta[resumeId]?.name || 'Resume';
+  const cloudIdentity = normalizeCloudIdentity(identity);
+  const now = new Date().toISOString();
+  const version = Date.now();
+  const batch = writeBatch(workspaceRef.firestore);
+
+  batch.set(workspaceRef, createCloudWorkspaceDoc(normalizedWorkspace, cloudIdentity, now, version));
+  batch.set(
+    draftRef,
+    {
+      name,
+      updatedAt: now,
+      version,
+      deviceId: cloudIdentity.deviceId,
+      sessionId: cloudIdentity.sessionId,
+    },
+    { merge: true },
+  );
+
+  await batch.commit();
+  return {
+    name,
+    updatedAt: now,
+    version,
+  };
+}
+
 export async function writeCloudDraft(uid, resumeId, workspace, draft, trustedDevice, identity) {
   const workspaceRef = getWorkspaceDocRef(uid, trustedDevice);
   const draftRef = getResumeDocRef(uid, resumeId, trustedDevice);
