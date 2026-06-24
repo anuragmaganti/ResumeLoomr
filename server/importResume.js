@@ -7,8 +7,6 @@ import mammoth from 'mammoth';
 import { z } from 'zod';
 
 import {
-  DEFAULT_TEMPLATE,
-  SECTION_IDS,
   getPreviewModel,
   normalizeDraftPayload,
   sanitizeWorkspaceResumeName,
@@ -50,192 +48,7 @@ const importStringArrayJsonSchema = {
   type: 'array',
   items: importStringJsonSchema,
 };
-const importEducationProgramJsonSchema = {
-  type: 'object',
-  properties: {
-    degree: importStringJsonSchema,
-    yearsEdu: importStringJsonSchema,
-    gpa: importStringJsonSchema,
-    honors: importStringJsonSchema,
-  },
-  additionalProperties: false,
-};
-const importEducationCustomSectionJsonSchema = {
-  type: 'object',
-  properties: {
-    label: importStringJsonSchema,
-    content: importStringJsonSchema,
-  },
-  additionalProperties: false,
-};
-const importSectionBlockEntryJsonSchema = {
-  type: 'object',
-  properties: {
-    school: importStringJsonSchema,
-    degree: importStringJsonSchema,
-    yearsEdu: importStringJsonSchema,
-    location: importStringJsonSchema,
-    gpa: importStringJsonSchema,
-    honors: importStringJsonSchema,
-    coursework: importStringJsonSchema,
-    awards: importStringJsonSchema,
-    programs: {
-      type: 'array',
-      items: importEducationProgramJsonSchema,
-    },
-    customSections: {
-      type: 'array',
-      items: importEducationCustomSectionJsonSchema,
-    },
-    company: importStringJsonSchema,
-    organization: importStringJsonSchema,
-    role: importStringJsonSchema,
-    groupLabel: importStringJsonSchema,
-    yearsExp: importStringJsonSchema,
-    years: importStringJsonSchema,
-    activities: importStringArrayJsonSchema,
-    highlights: importStringArrayJsonSchema,
-    category: importStringJsonSchema,
-    items: importStringJsonSchema,
-    name: importStringJsonSchema,
-    subtitle: importStringJsonSchema,
-    summary: importStringJsonSchema,
-    issuer: importStringJsonSchema,
-    language: importStringJsonSchema,
-    proficiency: importStringJsonSchema,
-    title: importStringJsonSchema,
-    publisher: importStringJsonSchema,
-    details: importStringJsonSchema,
-  },
-  additionalProperties: false,
-};
-const importSectionBlockJsonSchema = {
-  type: 'object',
-  properties: {
-    id: importStringJsonSchema,
-    sourceSectionId: importStringJsonSchema,
-    kind: {
-      type: 'string',
-      enum: IMPORT_SECTION_KINDS,
-    },
-    title: importStringJsonSchema,
-    entries: {
-      type: 'array',
-      minItems: 1,
-      items: importSectionBlockEntryJsonSchema,
-    },
-  },
-  required: ['kind', 'title', 'entries'],
-  additionalProperties: false,
-};
-const resumeImportResponseJsonSchema = {
-  $schema: 'https://json-schema.org/draft/2020-12/schema',
-  type: 'object',
-  properties: {
-    suggestedName: importStringJsonSchema,
-    resume: {
-      type: 'object',
-      properties: {
-        personal: {
-          type: 'object',
-          properties: {
-            name: importStringJsonSchema,
-            headline: importStringJsonSchema,
-            location: importStringJsonSchema,
-            phone: importStringJsonSchema,
-            email: importStringJsonSchema,
-            linkedinUrl: importStringJsonSchema,
-            portfolioUrl: importStringJsonSchema,
-            githubUrl: importStringJsonSchema,
-            customField: importStringJsonSchema,
-            aboutMe: importStringJsonSchema,
-          },
-          additionalProperties: false,
-        },
-        sections: {
-          type: 'array',
-          minItems: 1,
-          items: importSectionBlockJsonSchema,
-        },
-      },
-      required: ['personal', 'sections'],
-      additionalProperties: false,
-    },
-  },
-  required: ['resume'],
-  additionalProperties: false,
-};
-
 const importStringSchema = z.string().optional().default('');
-const importStringArraySchema = z.array(z.string()).optional().default([]);
-const importEducationProgramWireSchema = z.object({
-  degree: importStringSchema,
-  yearsEdu: importStringSchema,
-  gpa: importStringSchema,
-  honors: importStringSchema,
-}).strict();
-const importEducationCustomSectionWireSchema = z.object({
-  label: importStringSchema,
-  content: importStringSchema,
-}).strict();
-const importSectionBlockEntryWireSchema = z.object({
-  school: importStringSchema,
-  degree: importStringSchema,
-  yearsEdu: importStringSchema,
-  location: importStringSchema,
-  gpa: importStringSchema,
-  honors: importStringSchema,
-  coursework: importStringSchema,
-  awards: importStringSchema,
-  programs: z.array(importEducationProgramWireSchema).optional().default([]),
-  customSections: z.array(importEducationCustomSectionWireSchema).optional().default([]),
-  company: importStringSchema,
-  organization: importStringSchema,
-  role: importStringSchema,
-  groupLabel: importStringSchema,
-  yearsExp: importStringSchema,
-  years: importStringSchema,
-  activities: importStringArraySchema,
-  highlights: importStringArraySchema,
-  category: importStringSchema,
-  items: importStringSchema,
-  name: importStringSchema,
-  subtitle: importStringSchema,
-  summary: importStringSchema,
-  issuer: importStringSchema,
-  language: importStringSchema,
-  proficiency: importStringSchema,
-  title: importStringSchema,
-  publisher: importStringSchema,
-  details: importStringSchema,
-}).strict();
-const importSectionBlockWireSchema = z.object({
-  id: importStringSchema,
-  sourceSectionId: importStringSchema,
-  kind: z.enum(IMPORT_SECTION_KINDS),
-  title: z.string().min(1),
-  entries: z.array(importSectionBlockEntryWireSchema).min(1),
-}).strict();
-const importResumeWireSchema = z.object({
-  personal: z.object({
-    name: importStringSchema,
-    headline: importStringSchema,
-    location: importStringSchema,
-    phone: importStringSchema,
-    email: importStringSchema,
-    linkedinUrl: importStringSchema,
-    portfolioUrl: importStringSchema,
-    githubUrl: importStringSchema,
-    customField: importStringSchema,
-    aboutMe: importStringSchema,
-  }).strict(),
-  sections: z.array(importSectionBlockWireSchema).min(1),
-}).strict();
-const importWireSchema = z.object({
-  suggestedName: importStringSchema,
-  resume: importResumeWireSchema,
-}).strict();
-
 const sourceDocumentSectionJsonSchema = {
   type: 'object',
   properties: {
@@ -604,32 +417,6 @@ function getRoleSectionType(line) {
   return '';
 }
 
-function getSectionLines(lines, headerPattern) {
-  const startIndex = lines.findIndex((line) => headerPattern.test(line));
-
-  if (startIndex < 0) {
-    return [];
-  }
-
-  const endIndex = lines.findIndex((line, index) => index > startIndex && isKnownSourceSectionHeader(line));
-  return lines.slice(startIndex + 1, endIndex < 0 ? lines.length : endIndex);
-}
-
-function countDelimitedDetails(value) {
-  const text = trimText(value);
-
-  if (!text) {
-    return 0;
-  }
-
-  const parts = text
-    .split(/\n|;|•/g)
-    .map(trimText)
-    .filter(Boolean);
-
-  return Math.max(1, parts.length);
-}
-
 function slugifyImportId(value, fallback = 'section') {
   const slug = trimText(value)
     .toLowerCase()
@@ -713,113 +500,12 @@ function countAwardsInSourceLines(lines) {
   )).length;
 }
 
-function summarizeSourceLines(lines) {
-  const text = lines.join('\n');
-
-  return {
-    bulletCount: lines.filter(isLikelySourceBullet).length,
-    roleEntryCount: countRoleEntriesInSourceLines(lines),
-    awardCount: countAwardsInSourceLines(lines),
-    hasGpa: /\bGPA\b\s*:?\s*\d/i.test(text),
-    hasCoursework: false,
-  };
-}
-
-export function createResumeSourceOutline(text) {
-  const normalizedText = normalizeExtractedResumeText(text);
-  const lines = normalizedText
-    .split(/\n+/g)
+function countDelimitedDetails(value) {
+  return trimText(value)
+    .split(/\n|,|;/g)
     .map(trimText)
-    .filter(Boolean);
-  const sourceSections = [];
-  let currentSection = null;
-  let lastEducationSectionId = '';
-
-  lines.forEach((line) => {
-    const headerInfo = getSourceSectionHeaderInfo(line);
-
-    if (headerInfo) {
-      const id = `source-${slugifyImportId(headerInfo.title)}-${sourceSections.length + 1}`;
-      currentSection = {
-        id,
-        ...headerInfo,
-        lines: [],
-        attachedToSectionId: headerInfo.kind === 'education-detail' ? lastEducationSectionId : '',
-      };
-      sourceSections.push(currentSection);
-
-      if (headerInfo.kind === 'education') {
-        lastEducationSectionId = id;
-      }
-
-      return;
-    }
-
-    if (currentSection) {
-      currentSection.lines.push(line);
-    }
-  });
-
-  const requiredBlocks = sourceSections
-    .filter((section) => section.kind !== 'education-detail')
-    .map((section) => {
-      const summary = summarizeSourceLines(section.lines);
-      const attachedCoursework = sourceSections.some((candidate) => (
-        candidate.kind === 'education-detail' &&
-        candidate.attachedToSectionId === section.id &&
-        candidate.lines.some((line) => trimText(line) !== '')
-      ));
-
-      return {
-        id: section.id,
-        title: section.title,
-        kind: section.kind,
-        roleType: section.roleType,
-        bulletCount: summary.bulletCount,
-        roleEntryCount: section.kind === 'roles' ? summary.roleEntryCount : 0,
-        awardCount: section.kind === 'awards' ? summary.awardCount : 0,
-        hasGpa: summary.hasGpa,
-        hasCoursework: section.kind === 'education' && attachedCoursework,
-      };
-    });
-
-  return {
-    hasSourceText: normalizedText.length > 0,
-    requiredBlocks,
-    bulletCount: requiredBlocks.reduce((count, block) => count + block.bulletCount, 0),
-    awardCount: requiredBlocks.reduce((count, block) => count + block.awardCount, 0),
-    hasGpa: requiredBlocks.some((block) => block.hasGpa),
-    hasCoursework: requiredBlocks.some((block) => block.hasCoursework),
-  };
-}
-
-export function analyzeResumeSourceCoverage(text) {
-  const normalizedText = normalizeExtractedResumeText(text);
-  const lines = normalizedText
-    .split(/\n+/g)
-    .map(trimText)
-    .filter(Boolean);
-  const awardsLines = getSectionLines(lines, /^honors?\s*(?:&|and)?\s*awards?$|^awards$/i)
-    .filter((line) => !isLikelySourceBullet(line));
-  const hasSection = (pattern) => lines.some((line) => pattern.test(line));
-  const roleSectionOrder = lines
-    .map((line) => ({ label: line, type: getRoleSectionType(line) }))
-    .filter((section) => section.type);
-
-  return {
-    hasSourceText: normalizedText.length > 0,
-    bulletCount: lines.filter(isLikelySourceBullet).length,
-    awardCount: awardsLines.length,
-    hasGpa: /\bGPA\b\s*:?\s*\d/i.test(normalizedText),
-    hasCoursework: hasSection(/^relevant coursework$|^coursework$/i),
-    sections: {
-      education: hasSection(/^education$/i),
-      experience: roleSectionOrder.some((section) => section.type === 'experience'),
-      leadership: roleSectionOrder.some((section) => section.type === 'leadership'),
-      awards: hasSection(/^honors?\s*(?:&|and)?\s*awards?$|^awards$/i),
-    },
-    roleSectionOrder,
-  };
+    .filter(Boolean)
+    .length;
 }
 
 function countDraftListItems(entries, field) {
@@ -853,8 +539,6 @@ function analyzeImportedDraftCoverage(draft) {
       [entry.title, entry.issuer, entry.years, entry.details].some((value) => trimText(value) !== '')
     )).length
   ), 0);
-  const roleSectionTitles = roleBlocks
-    .map((section) => trimText(section.title));
 
   return {
     bulletLikeDetailCount: educationCustomDetailCount + roleDetailCount + projectDetailCount + customDetailCount,
@@ -863,8 +547,7 @@ function analyzeImportedDraftCoverage(draft) {
     hasCoursework: educationBlocks.some((section) => section.entries.some((entry) => trimText(entry.coursework) !== '')),
     sections: {
       education: educationBlocks.length > 0,
-      experience: roleBlocks.length > 0,
-      leadership: roleSectionTitles.some((title) => /leadership/i.test(title)),
+      roles: roleBlocks.length > 0,
       awards: topLevelAwardCount + educationAwardCount > 0,
     },
   };
@@ -877,9 +560,10 @@ function getImportedSectionBlocks(draft) {
 
 function countImportedEducationDetails(block) {
   return block.entries.reduce((count, entry) => (
-    count + entry.customSections.reduce((sectionCount, section) => (
-      sectionCount + countDelimitedDetails(section.content)
-    ), 0)
+    count +
+    entry.customSections.filter((section) => trimText(section.content) !== '').length +
+    (trimText(entry.coursework) ? 1 : 0) +
+    (trimText(entry.gpa) ? 1 : 0)
   ), 0);
 }
 
@@ -949,8 +633,8 @@ function findImportedBlockForSource(importedBlocks, sourceBlock) {
   ));
 }
 
-function validateImportedDraftAgainstSourceOutline(draft, sourceOutline) {
-  if (!sourceOutline?.hasSourceText || !Array.isArray(sourceOutline.requiredBlocks) || sourceOutline.requiredBlocks.length === 0) {
+function validateImportedDraftAgainstSourceCoverage(draft, sourceCoverage) {
+  if (!sourceCoverage?.hasSourceText || !Array.isArray(sourceCoverage.blocks) || sourceCoverage.blocks.length === 0) {
     return [];
   }
 
@@ -976,7 +660,7 @@ function validateImportedDraftAgainstSourceOutline(draft, sourceOutline) {
 
   let lastMatchedIndex = -1;
 
-  sourceOutline.requiredBlocks.forEach((sourceBlock) => {
+  sourceCoverage.blocks.forEach((sourceBlock) => {
     const importedBlockIndex = importedBlocks.findIndex((block) => block === findImportedBlockForSource(importedBlocks, sourceBlock));
     const importedBlock = importedBlockIndex >= 0 ? importedBlocks[importedBlockIndex] : null;
 
@@ -1028,18 +712,7 @@ function validateImportedDraftAgainstSourceOutline(draft, sourceOutline) {
   return issues;
 }
 
-function countImportedCoverageSignals(importedCoverage) {
-  return [
-    importedCoverage.sections.education,
-    importedCoverage.sections.experience,
-    importedCoverage.sections.leadership,
-    importedCoverage.sections.awards,
-    importedCoverage.hasGpa,
-    importedCoverage.hasCoursework,
-  ].filter(Boolean).length;
-}
-
-export function validateImportedDraftCoverage(draft, sourceCoverage, sourceOutline = null) {
+export function validateImportedDraftCoverage(draft, sourceCoverage) {
   if (!sourceCoverage?.hasSourceText) {
     return { ok: true, issues: [] };
   }
@@ -1051,12 +724,8 @@ export function validateImportedDraftCoverage(draft, sourceCoverage, sourceOutli
     issues.push('Education section was detected in the source but not imported.');
   }
 
-  if (sourceCoverage.sections.experience && !importedCoverage.sections.experience) {
-    issues.push('Experience section was detected in the source but not imported.');
-  }
-
-  if (sourceCoverage.sections.leadership && !importedCoverage.sections.leadership) {
-    issues.push('Leadership section was detected in the source but not imported.');
+  if (sourceCoverage.sections.roles && !importedCoverage.sections.roles) {
+    issues.push('Role sections were detected in the source but not imported.');
   }
 
   if (sourceCoverage.sections.awards && !importedCoverage.sections.awards) {
@@ -1081,93 +750,12 @@ export function validateImportedDraftCoverage(draft, sourceCoverage, sourceOutli
     issues.push(`Only ${importedCoverage.awardCount} of ${sourceCoverage.awardCount} awards were imported.`);
   }
 
-  issues.push(...validateImportedDraftAgainstSourceOutline(draft, sourceOutline));
+  issues.push(...validateImportedDraftAgainstSourceCoverage(draft, sourceCoverage));
 
   return {
     ok: issues.length === 0,
     issues: Array.from(new Set(issues)),
   };
-}
-
-export function hasUsableImportedDraft(draft) {
-  const normalized = normalizeDraftPayload(draft);
-  return getPreviewModel(normalized.resume).hasContent;
-}
-
-export function shouldRejectIncompleteImportedDraft(coverageValidation, draft, sourceCoverage) {
-  if (!sourceCoverage?.hasSourceText || coverageValidation?.ok) {
-    return false;
-  }
-
-  if (!hasUsableImportedDraft(draft)) {
-    return true;
-  }
-
-  const importedCoverage = analyzeImportedDraftCoverage(draft);
-  const missingCriticalSignalCount = (coverageValidation.issues || []).filter((issue) => (
-    /section was detected|honors and awards|GPA|Relevant coursework/i.test(issue)
-  )).length;
-  const importedSignalCount = countImportedCoverageSignals(importedCoverage);
-  const sourceSignalCount = [
-    sourceCoverage.sections.education,
-    sourceCoverage.sections.experience,
-    sourceCoverage.sections.leadership,
-    sourceCoverage.sections.awards,
-    sourceCoverage.hasGpa,
-    sourceCoverage.hasCoursework,
-  ].filter(Boolean).length;
-
-  return (
-    missingCriticalSignalCount >= 2 ||
-    (sourceSignalCount >= 3 && importedSignalCount <= 1) ||
-    (sourceCoverage.bulletCount >= 6 && importedCoverage.bulletLikeDetailCount === 0)
-  );
-}
-
-export function shouldAttemptImportRepair(coverageValidation, draft) {
-  if (!coverageValidation || coverageValidation.ok) {
-    return false;
-  }
-
-  if (!hasUsableImportedDraft(draft)) {
-    return true;
-  }
-
-  return coverageValidation.issues.some((issue) => (
-    /section was detected in the source but not imported|honors and awards were detected in the source but not imported/i.test(issue)
-  ));
-}
-
-export function scoreImportedDraftCoverage(draft, sourceCoverage, sourceOutline = null) {
-  const validation = validateImportedDraftCoverage(draft, sourceCoverage, sourceOutline);
-  const coverage = analyzeImportedDraftCoverage(draft);
-  const bulletScore = sourceCoverage?.bulletCount
-    ? Math.min(coverage.bulletLikeDetailCount, sourceCoverage.bulletCount) * 10
-    : coverage.bulletLikeDetailCount * 10;
-  const awardScore = sourceCoverage?.awardCount
-    ? Math.min(coverage.awardCount, sourceCoverage.awardCount) * 8
-    : coverage.awardCount * 8;
-  const sectionScore = Object.values(coverage.sections).filter(Boolean).length * 12;
-  const detailScore = [
-    sourceCoverage?.hasGpa ? coverage.hasGpa : false,
-    sourceCoverage?.hasCoursework ? coverage.hasCoursework : false,
-  ].filter(Boolean).length * 8;
-  const completenessBonus = validation.ok ? 1000 : 0;
-
-  return {
-    validation,
-    coverage,
-    score: completenessBonus + bulletScore + awardScore + sectionScore + detailScore - (validation.issues.length * 25),
-  };
-}
-
-export function chooseBestImportedDraftCandidate(candidates, sourceCoverage, sourceOutline = null) {
-  return candidates
-    .map((candidate) => ({
-      candidate,
-      ...scoreImportedDraftCoverage(candidate.draft, sourceCoverage, sourceOutline),
-    }))
-    .sort((a, b) => b.score - a.score)[0];
 }
 
 async function runWithTimeout(promise, ms) {
@@ -1284,7 +872,7 @@ function isLikelyGenericSourceSectionHeader(line, { index = 0, seenContact = fal
     return false;
   }
 
-  const hasSectionKeyword = /\b(?:experience|employment|education|coursework|skills?|toolkit|technologies|projects?|portfolio|certifications?|licenses?|languages?|awards?|honors?|publications?|research|teaching|leadership|volunteer|service|community|engagement|activities|involvement|affiliations?|memberships?|summary|profile|objective|interests?|highlights|accomplishments?)\b/i.test(text);
+  const hasSectionKeyword = /\b(?:experience|employment|education|coursework|skills?|toolkit|technologies|projects?|portfolio|certifications?|licenses?|languages?|awards|honors?|publications?|research|teaching|volunteer|service|community|engagement|activities|involvement|affiliations?|memberships?|summary|profile|objective|interests?|highlights|accomplishments?)\b/i.test(text);
   const isMostlyUppercase = getLetterCaseRatio(text) >= 0.76 && words.length <= 6;
   const isTitleLike = !/[,|:]/.test(text) && text.length <= 42;
 
@@ -1465,6 +1053,56 @@ function summarizeSourceDocument(sourceDocument) {
   };
 }
 
+export function createSourceDocumentCoverage(sourceDocument) {
+  const normalizedDocument = normalizeSourceDocument(sourceDocument);
+  const blocks = [];
+  let lastEducationBlock = null;
+
+  normalizedDocument.sections.forEach((section) => {
+    const kind = classifySourceSectionKind(section.title, section.lines);
+    const text = section.lines.join('\n');
+
+    if (kind === 'education-detail') {
+      if (lastEducationBlock) {
+        lastEducationBlock.hasCoursework = lastEducationBlock.hasCoursework || section.lines.some((line) => trimText(line) !== '');
+      }
+
+      return;
+    }
+
+    const block = {
+      id: section.id,
+      title: section.title,
+      kind,
+      bulletCount: section.lines.filter(isLikelySourceBullet).length,
+      roleEntryCount: kind === 'roles' ? countRoleEntriesInSourceLines(section.lines) : 0,
+      awardCount: kind === 'awards' ? countAwardsInSourceLines(section.lines) : 0,
+      hasGpa: /\bGPA\b\s*:?\s*\d/i.test(text),
+      hasCoursework: false,
+    };
+
+    blocks.push(block);
+
+    if (kind === 'education') {
+      lastEducationBlock = block;
+    }
+  });
+
+  return {
+    hasSourceText: normalizedDocument.hasSourceText,
+    blocks,
+    bulletCount: blocks.reduce((count, block) => count + block.bulletCount, 0),
+    awardCount: blocks.reduce((count, block) => count + block.awardCount, 0),
+    hasGpa: blocks.some((block) => block.hasGpa),
+    hasCoursework: blocks.some((block) => block.hasCoursework),
+    sections: {
+      education: blocks.some((block) => block.kind === 'education'),
+      roles: blocks.some((block) => block.kind === 'roles'),
+      awards: blocks.some((block) => block.kind === 'awards'),
+    },
+  };
+}
+
 function sourceDocumentToText(sourceDocument) {
   const normalizedDocument = normalizeSourceDocument(sourceDocument);
 
@@ -1475,35 +1113,6 @@ function sourceDocumentToText(sourceDocument) {
       ...section.lines,
     ]),
   ].join('\n');
-}
-
-function summarizeSourceOutline(sourceOutline) {
-  if (!sourceOutline?.hasSourceText) {
-    return {
-      hasSourceText: false,
-      requiredBlocks: [],
-    };
-  }
-
-  return {
-    hasSourceText: true,
-    totals: {
-      bulletCount: sourceOutline.bulletCount,
-      awardCount: sourceOutline.awardCount,
-      hasGpa: sourceOutline.hasGpa,
-      hasCoursework: sourceOutline.hasCoursework,
-    },
-    requiredBlocks: sourceOutline.requiredBlocks.map((block) => ({
-      sourceSectionId: block.id,
-      title: block.title,
-      kind: block.kind,
-      bulletCount: block.bulletCount,
-      roleEntryCount: block.roleEntryCount,
-      awardCount: block.awardCount,
-      hasGpa: block.hasGpa,
-      hasCoursework: block.hasCoursework,
-    })),
-  };
 }
 
 function parseSourceDocumentWireOutput(text) {
@@ -2183,13 +1792,37 @@ export function compileSourceDocumentToImportedDraft(sourceDocument, sourceMappi
     sections.push(compileSourceSectionBlock(section, mappingById.get(section.id), []));
   });
 
-  return normalizeImportedResumeDraft({
+  return finalizeSourceImportDraft({
     suggestedName: sourceMapping?.suggestedName || personal.name,
+    personal,
+    sections,
+    sourceFileName,
+  });
+}
+
+function finalizeSourceImportDraft({
+  personal,
+  sections,
+  suggestedName = '',
+  sourceFileName = '',
+}) {
+  const normalizedDraft = normalizeDraftPayload({
     resume: {
       personal,
       sections,
+      settings: undefined,
     },
-  }, { sourceFileName });
+  });
+  const personalName = normalizedDraft.resume.personal.name;
+  const fallbackName = trimText(sourceFileName).replace(/\.[^.]+$/, '') || 'Imported resume';
+
+  return {
+    suggestedName: sanitizeWorkspaceResumeName(suggestedName || personalName || fallbackName, fallbackName),
+    draft: {
+      ...normalizedDraft,
+      savedAt: null,
+    },
+  };
 }
 
 function parseGeminiJson(text) {
@@ -2205,37 +1838,6 @@ function parseGeminiJson(text) {
       code: 'import/invalid-ai-response',
     });
   }
-}
-
-export function parseGeminiImportWireOutput(text) {
-  const parsedJson = parseGeminiJson(text);
-  const parsedOutput = importWireSchema.safeParse(parsedJson);
-
-  if (!parsedOutput.success) {
-    throw new ImportResumeError('The AI response was missing required resume sections.', {
-      statusCode: 502,
-      code: 'import/invalid-ai-response',
-      diagnostics: {
-        validationIssueCount: parsedOutput.error.issues.length,
-        validationIssues: parsedOutput.error.issues.slice(0, 8).map((issue) => ({
-          path: issue.path.join('.'),
-          code: issue.code,
-        })),
-      },
-    });
-  }
-
-  return {
-    ...parsedOutput.data,
-    resume: {
-      ...parsedOutput.data.resume,
-      sections: parsedOutput.data.resume.sections.map((section) => {
-        const nextSection = { ...section };
-        delete nextSection.sourceSectionId;
-        return nextSection;
-      }),
-    },
-  };
 }
 
 function parseJsonErrorMessage(message) {
@@ -2377,56 +1979,25 @@ export function createGeminiImportGenerationConfig(model, env = process.env, opt
   const maxOutputTokens = getGeminiMaxOutputTokens(env);
   const baseConfig = {
     responseMimeType: 'application/json',
-    responseJsonSchema: options.responseJsonSchema || resumeImportResponseJsonSchema,
     maxOutputTokens,
   };
+  const responseConfig = options.responseJsonSchema
+    ? { ...baseConfig, responseJsonSchema: options.responseJsonSchema }
+    : baseConfig;
 
   if (!isGemini3Model(model)) {
     return {
-      ...baseConfig,
+      ...responseConfig,
       temperature: 0.1,
     };
   }
 
   return {
-    ...baseConfig,
+    ...responseConfig,
     thinkingConfig: {
       thinkingLevel: options.thinkingLevel || getGeminiThinkingLevel(env),
     },
   };
-}
-
-function removeRelevantCourseworkSkillDuplicates(draft) {
-  const courseworkSkills = draft.resume.skills.filter((entry) => /^(?:relevant\s+)?coursework$/i.test(trimText(entry.category)));
-
-  if (courseworkSkills.length === 0) {
-    return draft;
-  }
-
-  const courseworkText = courseworkSkills
-    .map((entry) => trimText(entry.items))
-    .filter(Boolean)
-    .join(', ');
-  const education = draft.resume.education.map((entry, index) => {
-    if (index !== 0 || trimText(entry.coursework) || !courseworkText) {
-      return entry;
-    }
-
-    return {
-      ...entry,
-      coursework: courseworkText,
-    };
-  });
-  const skills = draft.resume.skills.filter((entry) => !/^(?:relevant\s+)?coursework$/i.test(trimText(entry.category)));
-
-  return normalizeDraftPayload({
-    ...draft,
-    resume: {
-      ...draft.resume,
-      education,
-      skills,
-    },
-  });
 }
 
 function normalizeComparisonKey(value) {
@@ -2459,369 +2030,6 @@ function mergeUniqueText(values, separator = '; ') {
       return true;
     })
     .join(separator);
-}
-
-function mergeEducationCustomSections(sections) {
-  const seen = new Set();
-
-  return sections.filter((section) => {
-    const label = trimText(section.label);
-    const content = trimText(section.content);
-
-    if (!label && !content) {
-      return false;
-    }
-
-    const key = `${normalizeComparisonKey(label)}:${normalizeComparisonKey(content)}`;
-
-    if (seen.has(key)) {
-      return false;
-    }
-
-    seen.add(key);
-    return true;
-  });
-}
-
-function createEducationProgramFromEntry(entry) {
-  if (![entry.degree, entry.yearsEdu, entry.gpa, entry.honors].some((value) => trimText(value) !== '')) {
-    return null;
-  }
-
-  return {
-    id: entry.id ? `${entry.id}-program` : undefined,
-    degree: trimText(entry.degree),
-    yearsEdu: trimText(entry.yearsEdu),
-    gpa: trimText(entry.gpa),
-    honors: trimText(entry.honors),
-  };
-}
-
-function mergeEducationPrograms(entries) {
-  const seen = new Set();
-
-  return entries
-    .filter(Boolean)
-    .filter((program) => [program.degree, program.yearsEdu, program.gpa, program.honors].some((value) => trimText(value) !== ''))
-    .filter((program) => {
-      const key = normalizeComparisonKey([program.degree, program.yearsEdu, program.gpa, program.honors].join('|'));
-
-      if (seen.has(key)) {
-        return false;
-      }
-
-      seen.add(key);
-      return true;
-    });
-}
-
-function getEducationDateKey(entry) {
-  return normalizeComparisonKey(entry.yearsEdu);
-}
-
-function isEducationDetailFragment(entry) {
-  const degreeKey = normalizeComparisonKey(entry.degree);
-  const hasCustomDetails = entry.customSections.some((section) => trimText(section.content) !== '');
-  const hasAuxiliaryDetails = [entry.gpa, entry.honors, entry.coursework, entry.awards].some((value) => trimText(value) !== '');
-
-  return (
-    /(?:certificate|study abroad|exchange|minor|concentration|honou?r|coursework|scholarship|award)/i.test(degreeKey) ||
-    (hasCustomDetails && !trimText(entry.degree)) ||
-    (hasAuxiliaryDetails && !trimText(entry.degree))
-  );
-}
-
-function shouldMergeEducationEntries(existing, incoming) {
-  const existingDateKey = getEducationDateKey(existing);
-  const incomingDateKey = getEducationDateKey(incoming);
-  const incomingIsDetailFragment = isEducationDetailFragment(incoming);
-  const existingIsDetailFragment = isEducationDetailFragment(existing);
-
-  if (incomingIsDetailFragment || existingIsDetailFragment) {
-    return true;
-  }
-
-  if (existingDateKey && incomingDateKey && existingDateKey !== incomingDateKey) {
-    return false;
-  }
-
-  if (existingDateKey === incomingDateKey) {
-    return true;
-  }
-
-  if (!existingDateKey || !incomingDateKey) {
-    return true;
-  }
-
-  return false;
-}
-
-function compactRepeatedEducationEntries(draft) {
-  const education = [];
-
-  for (const entry of draft.resume.education) {
-    const schoolKey = normalizeComparisonKey(entry.school);
-    const previousIndex = education.length - 1;
-    const previous = education[previousIndex];
-    const previousSchoolKey = normalizeComparisonKey(previous?.school);
-    const sameSchoolPreviousIndex = schoolKey && previous && previousSchoolKey === schoolKey && shouldMergeEducationEntries(previous, entry)
-      ? previousIndex
-      : -1;
-    const sameDatedSchoolIndex = education.findIndex((candidate) => (
-      schoolKey &&
-      normalizeComparisonKey(candidate.school) === schoolKey &&
-      getEducationDateKey(candidate) &&
-      getEducationDateKey(candidate) === getEducationDateKey(entry)
-    ));
-    const existingIndex = sameSchoolPreviousIndex > -1 ? sameSchoolPreviousIndex : sameDatedSchoolIndex;
-
-    if (!schoolKey || existingIndex < 0) {
-      education.push(entry);
-      continue;
-    }
-
-    const existing = education[existingIndex];
-    const existingPrograms = Array.isArray(existing.programs) && existing.programs.length > 0
-      ? existing.programs
-      : [createEducationProgramFromEntry(existing)];
-    const incomingPrograms = Array.isArray(entry.programs) && entry.programs.length > 0
-      ? entry.programs
-      : [createEducationProgramFromEntry(entry)];
-    const programs = mergeEducationPrograms([
-      ...existingPrograms,
-      ...incomingPrograms,
-    ]);
-
-    education[existingIndex] = {
-      ...existing,
-      degree: mergeUniqueText([existing.degree, entry.degree]),
-      yearsEdu: trimText(existing.yearsEdu) || trimText(entry.yearsEdu),
-      location: trimText(existing.location) || trimText(entry.location),
-      gpa: trimText(existing.gpa) || trimText(entry.gpa),
-      honors: mergeUniqueText([existing.honors, entry.honors]),
-      coursework: mergeUniqueText([existing.coursework, entry.coursework], ', '),
-      awards: mergeUniqueText([existing.awards, entry.awards]),
-      customSections: mergeEducationCustomSections([
-        ...existing.customSections,
-        ...entry.customSections,
-      ]),
-      programs,
-    };
-  }
-
-  return normalizeDraftPayload({
-    ...draft,
-    resume: {
-      ...draft.resume,
-      education,
-    },
-  });
-}
-
-function normalizeImportedExperienceTitles(draft) {
-  const groupLabelKeys = new Set(
-    draft.resume.experience
-      .map((entry) => normalizeComparisonKey(entry.groupLabel))
-      .filter(Boolean)
-  );
-  const experienceTitleKey = normalizeComparisonKey(draft.resume.sectionTitles.experience);
-  const shouldUseGenericExperienceTitle = groupLabelKeys.size > 1 || groupLabelKeys.has(experienceTitleKey);
-
-  if (!shouldUseGenericExperienceTitle) {
-    return draft;
-  }
-
-  return normalizeDraftPayload({
-    ...draft,
-    resume: {
-      ...draft.resume,
-      sectionTitles: {
-        ...draft.resume.sectionTitles,
-        experience: 'Experience',
-      },
-    },
-  });
-}
-
-function sourceHasInterleavedLeadership(roleSectionOrder) {
-  const leadershipIndex = roleSectionOrder.findIndex((section) => section.type === 'leadership');
-
-  return (
-    leadershipIndex > -1 &&
-    roleSectionOrder.some((section, index) => index < leadershipIndex && section.type === 'experience') &&
-    roleSectionOrder.some((section, index) => index > leadershipIndex && section.type === 'experience')
-  );
-}
-
-function orderExperienceEntriesBySourceSections(experienceEntries, leadershipEntries, roleSectionOrder) {
-  const usedExperienceIds = new Set();
-  const leadershipGroup = roleSectionOrder.find((section) => section.type === 'leadership')?.label || 'Leadership Experience';
-  const leadershipAsExperience = leadershipEntries
-    .filter((entry) => (
-      [entry.organization, entry.role, entry.years].some((value) => trimText(value) !== '') ||
-      entry.highlights.some((value) => trimText(value) !== '')
-    ))
-    .map((entry) => ({
-      id: entry.id,
-      company: entry.organization,
-      role: entry.role,
-      groupLabel: leadershipGroup,
-      yearsExp: entry.years,
-      activities: entry.highlights,
-    }));
-  const ordered = [];
-
-  for (const sourceSection of roleSectionOrder) {
-    if (sourceSection.type === 'leadership') {
-      ordered.push(...leadershipAsExperience);
-      continue;
-    }
-
-    const sourceKey = normalizeComparisonKey(sourceSection.label);
-    const matchingEntries = experienceEntries.filter((entry) => normalizeComparisonKey(entry.groupLabel) === sourceKey);
-
-    for (const entry of matchingEntries) {
-      usedExperienceIds.add(entry.id);
-      ordered.push(entry);
-    }
-  }
-
-  for (const entry of experienceEntries) {
-    if (!usedExperienceIds.has(entry.id)) {
-      ordered.push(entry);
-    }
-  }
-
-  return ordered;
-}
-
-function hasLegacyImportContent(resume) {
-  const hasEducation = resume.education.some((entry) => (
-    [entry.school, entry.degree, entry.yearsEdu, entry.location, entry.gpa, entry.honors, entry.coursework, entry.awards].some((value) => trimText(value) !== '') ||
-    entry.customSections.some((section) => [section.label, section.content].some((value) => trimText(value) !== ''))
-  ));
-  const hasExperience = resume.experience.some((entry) => (
-    [entry.company, entry.role, entry.yearsExp, entry.groupLabel].some((value) => trimText(value) !== '') ||
-    entry.activities.some((value) => trimText(value) !== '')
-  ));
-  const hasCollections = [
-    resume.skills,
-    resume.projects,
-    resume.certifications,
-    resume.volunteering,
-    resume.leadership,
-    resume.languages,
-    resume.awards,
-    resume.publications,
-  ].some((entries) => entries.some((entry) => (
-    Object.entries(entry).some(([key, value]) => {
-      if (key === 'id') {
-        return false;
-      }
-
-      if (Array.isArray(value)) {
-        return value.some((item) => trimText(item) !== '');
-      }
-
-      return trimText(value) !== '';
-    })
-  )));
-
-  return hasEducation || hasExperience || hasCollections;
-}
-
-function rawImportValueHasContent(value) {
-  if (Array.isArray(value)) {
-    return value.some(rawImportValueHasContent);
-  }
-
-  if (value && typeof value === 'object') {
-    return Object.entries(value).some(([key, childValue]) => (
-      key !== 'id' && rawImportValueHasContent(childValue)
-    ));
-  }
-
-  return trimText(value) !== '';
-}
-
-function hasRawSectionBlockContent(sections) {
-  return Array.isArray(sections) && sections.some((section) => (
-    section &&
-    typeof section === 'object' &&
-    Array.isArray(section.entries) &&
-    section.entries.some(rawImportValueHasContent)
-  ));
-}
-
-export function applySourceAwareImportCleanup(parsedImport, sourceCoverage) {
-  let draft = normalizeDraftPayload(parsedImport.draft);
-  const hasModelSectionBlocks = parsedImport.sourceShape?.hasSectionBlocks === true;
-
-  draft = compactRepeatedEducationEntries(draft);
-
-  if (sourceHasInterleavedLeadership(sourceCoverage?.roleSectionOrder || [])) {
-    draft = normalizeDraftPayload({
-      ...draft,
-      sectionOrder: draft.sectionOrder.filter((sectionId) => sectionId !== 'leadership'),
-      resume: {
-        ...draft.resume,
-        experience: orderExperienceEntriesBySourceSections(
-          draft.resume.experience,
-          draft.resume.leadership,
-          sourceCoverage.roleSectionOrder,
-        ),
-        leadership: [],
-      },
-    });
-  }
-
-  draft = normalizeImportedExperienceTitles(draft);
-
-  if (!hasModelSectionBlocks && hasLegacyImportContent(draft.resume)) {
-    draft = normalizeDraftPayload({
-      ...draft,
-      resume: {
-        ...draft.resume,
-        sections: undefined,
-      },
-    });
-  }
-
-  return {
-    ...parsedImport,
-    draft: {
-      ...draft,
-      savedAt: null,
-    },
-  };
-}
-
-export function normalizeImportedResumeDraft(aiOutput, { sourceFileName = '' } = {}) {
-  const output = aiOutput && typeof aiOutput === 'object' ? aiOutput : {};
-  const resumeCandidate = output.resume && typeof output.resume === 'object' ? output.resume : output;
-  const hasSectionBlocks = hasRawSectionBlockContent(resumeCandidate.sections);
-  const normalizedDraft = removeRelevantCourseworkSkillDuplicates(normalizeDraftPayload({
-    template: DEFAULT_TEMPLATE,
-    sectionOrder: output.sectionOrder,
-    resume: {
-      ...resumeCandidate,
-      settings: undefined,
-    },
-  }));
-  const personalName = normalizedDraft.resume.personal.name;
-  const fallbackName = trimText(sourceFileName).replace(/\.[^.]+$/, '') || 'Imported resume';
-  const suggestedName = sanitizeWorkspaceResumeName(output.suggestedName || personalName || fallbackName, fallbackName);
-
-  return {
-    suggestedName,
-    sourceShape: {
-      hasSectionBlocks,
-    },
-    draft: {
-      ...normalizedDraft,
-      savedAt: null,
-    },
-  };
 }
 
 export async function parseResumeWithGemini(file) {
@@ -2907,8 +2115,7 @@ export async function parseResumeWithGemini(file) {
     });
   }
 
-  const sourceCoverage = analyzeResumeSourceCoverage(sourceText);
-  const sourceOutline = createResumeSourceOutline(sourceText);
+  const sourceCoverage = createSourceDocumentCoverage(sourceDocument);
 
   const importDiagnostics = {
     model,
@@ -2921,7 +2128,7 @@ export async function parseResumeWithGemini(file) {
     sourceMode,
     sourceTextCharacters: sourceText.length,
     sourceDocument: summarizeSourceDocument(sourceDocument),
-    sourceOutline: summarizeSourceOutline(sourceOutline),
+    sourceCoverage,
     extraction: extractionDiagnostics,
   };
 
@@ -2946,11 +2153,8 @@ export async function parseResumeWithGemini(file) {
     importWarnings.push('Some sections may need review because the AI could not classify every source section.');
   }
 
-  const parsedImport = applySourceAwareImportCleanup(
-    compileSourceDocumentToImportedDraft(sourceDocument, sourceMapping, { sourceFileName: file.fileName }),
-    sourceCoverage,
-  );
-  const coverageValidation = validateImportedDraftCoverage(parsedImport.draft, sourceCoverage, sourceOutline);
+  const parsedImport = compileSourceDocumentToImportedDraft(sourceDocument, sourceMapping, { sourceFileName: file.fileName });
+  const coverageValidation = validateImportedDraftCoverage(parsedImport.draft, sourceCoverage);
 
   if (!coverageValidation.ok) {
     importWarnings.push('Some sections may need review because the import could not verify every source detail.');
