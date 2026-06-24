@@ -617,6 +617,21 @@ test('resume rename is scoped by resume id and updates cloud metadata directly',
   assert.match(firebaseSource, /batch\.set\(\s*draftRef,/);
 });
 
+test('builder reloads the local first-ten workspace when signing out of cloud mode', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const signOutBranchStart = source.indexOf('if (!user) {');
+  const signOutBranchEnd = source.indexOf('return undefined;', signOutBranchStart);
+  const signOutBranchSource = source.slice(signOutBranchStart, signOutBranchEnd);
+
+  assert.ok(signOutBranchStart > -1);
+  assert.match(source, /wasCloudModeRef\s*=\s*useRef\(false\)/);
+  assert.match(signOutBranchSource, /if \(wasCloudModeRef\.current\)/);
+  assert.match(signOutBranchSource, /const storedWorkspace = loadStoredWorkspace\(\)/);
+  assert.match(signOutBranchSource, /setWorkspace\(storedWorkspace\.workspace\)/);
+  assert.match(signOutBranchSource, /loadDraftIntoEditor\(storedWorkspace\.draft\)/);
+  assert.match(signOutBranchSource, /wasCloudModeRef\.current = false/);
+});
+
 test('builder reconciles signed-out local workspace changes on every sign-in', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const bootstrapStart = source.indexOf('async function bootstrapCloudWorkspace()');

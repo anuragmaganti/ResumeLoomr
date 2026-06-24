@@ -338,6 +338,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
   const cloudSaveQueueRef = useRef(new Map());
   const userRef = useRef(user);
   const printViewRef = useRef(null);
+  const wasCloudModeRef = useRef(false);
   const cloudDeviceIdRef = useRef(getCloudDeviceId());
   const cloudSessionIdRef = useRef(getCloudSessionId());
   const cloudIdentityRef = useRef({
@@ -395,6 +396,14 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     }
 
     if (!user) {
+      if (wasCloudModeRef.current) {
+        const storedWorkspace = loadStoredWorkspace();
+
+        setWorkspace(storedWorkspace.workspace);
+        loadDraftIntoEditor(storedWorkspace.draft);
+      }
+
+      wasCloudModeRef.current = false;
       setCloudReady(false);
       setSyncState('idle');
       setConflict(null);
@@ -402,6 +411,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       return undefined;
     }
 
+    wasCloudModeRef.current = true;
     let cancelled = false;
     const uid = user.uid;
 
