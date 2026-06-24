@@ -17,7 +17,7 @@ import {
 } from './resume.js';
 import { getFirebaseDb } from './firebaseClient.js';
 
-export const CLOUD_WORKSPACE_RESUME_LIMIT = 25;
+export const CLOUD_WORKSPACE_RESUME_LIMIT = 50;
 export const CLOUD_WORKSPACE_SCHEMA_VERSION = 1;
 export const CLOUD_IMPORT_PREFIX = 'resumeloomr:firebase-imported:';
 export const CLOUD_TRUSTED_DEVICE_KEY = 'resumeloomr:firebase-trusted-device';

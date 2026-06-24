@@ -45,13 +45,7 @@ function safeJsonParse(rawValue) {
 
 export function createGuestMirrorWorkspace(workspace, limit = MAX_WORKSPACE_RESUMES) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
-  const defaultResumeIds = normalizedWorkspace.resumeIds.slice(0, limit);
-  const resumeIds = normalizedWorkspace.activeResumeId && !defaultResumeIds.includes(normalizedWorkspace.activeResumeId)
-    ? [
-        normalizedWorkspace.activeResumeId,
-        ...defaultResumeIds.filter((resumeId) => resumeId !== normalizedWorkspace.activeResumeId).slice(0, limit - 1),
-      ]
-    : defaultResumeIds;
+  const resumeIds = normalizedWorkspace.resumeIds.slice(0, limit);
   const activeResumeId = resumeIds.includes(normalizedWorkspace.activeResumeId)
     ? normalizedWorkspace.activeResumeId
     : resumeIds[0] || '';

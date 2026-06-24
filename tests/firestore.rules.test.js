@@ -110,6 +110,14 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
       activeResumeId: 'resume-2',
       resumeIds: ['resume-2'],
     })));
+    await assertSucceeds(ownerDb.doc('users/user-a/workspace/main').set(createWorkspaceDoc({
+      activeResumeId: 'resume-50',
+      resumeIds: Array.from({ length: 50 }, (_, index) => `resume-${index + 1}`),
+    })));
+    await assertFails(ownerDb.doc('users/user-a/workspace/main').set(createWorkspaceDoc({
+      activeResumeId: 'resume-51',
+      resumeIds: Array.from({ length: 51 }, (_, index) => `resume-${index + 1}`),
+    })));
     await assertFails(ownerDb.doc('users/user-a/workspace/main').set(createWorkspaceDoc({
       activeResumeId: 'resume-1',
       resumeIds: ['resume-2'],
@@ -117,7 +125,11 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
     await assertFails(ownerDb.doc('users/user-a/workspace/main').set(createWorkspaceDoc({
       meta: {
         'resume-1': {
-          name: 'abcdefghijklmnopqrstuvwxyz',
+          name: 'Resume 1',
+          updatedAt: '2026-06-23T12:00:00.000Z',
+        },
+        'resume-extra': {
+          name: 'Extra',
           updatedAt: '2026-06-23T12:00:00.000Z',
         },
       },

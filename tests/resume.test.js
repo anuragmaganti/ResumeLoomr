@@ -44,6 +44,7 @@ import {
   CLOUD_IMPORT_PREFIX,
   CLOUD_SESSION_ID_KEY,
   CLOUD_TRUSTED_DEVICE_KEY,
+  CLOUD_WORKSPACE_RESUME_LIMIT,
   getCloudSessionId,
   validateCloudDraftPayload,
 } from '../src/lib/firebaseWorkspace.js';
@@ -137,6 +138,7 @@ test('workspace helpers build stable storage keys and metadata', () => {
 
   assert.match(resumeId, /^id-|^[0-9a-f-]{8,}$/i);
   assert.equal(MAX_WORKSPACE_RESUMES, 10);
+  assert.equal(CLOUD_WORKSPACE_RESUME_LIMIT, 50);
   assert.equal(createResumeStorageKey('abc123'), 'resumeloomr:resume:abc123');
   assert.deepEqual(createWorkspaceResumeMeta('Resume 4', '2026-03-26T12:00:00.000Z'), {
     name: 'Resume 4',
@@ -207,9 +209,32 @@ test('cloud guest mirror caps signed-in resumes to the guest workspace limit', (
   const mirror = createGuestMirrorWorkspace(workspace);
 
   assert.equal(mirror.resumeIds.length, MAX_WORKSPACE_RESUMES);
-  assert.deepEqual(mirror.resumeIds, ['resume-12', ...resumeIds.slice(0, MAX_WORKSPACE_RESUMES - 1)]);
-  assert.equal(mirror.activeResumeId, 'resume-12');
-  assert.equal(mirror.meta['resume-10'], undefined);
+  assert.deepEqual(mirror.resumeIds, resumeIds.slice(0, MAX_WORKSPACE_RESUMES));
+  assert.equal(mirror.activeResumeId, 'resume-1');
+  assert.equal(mirror.meta['resume-11'], undefined);
+});
+
+test('cloud guest mirror follows workspace order when a resume moves into the first ten', () => {
+  const resumeIds = Array.from({ length: MAX_WORKSPACE_RESUMES + 2 }, (_, index) => `resume-${index + 1}`);
+  const reorderedResumeIds = [
+    'resume-1',
+    'resume-2',
+    'resume-12',
+    ...resumeIds.filter((resumeId) => !['resume-1', 'resume-2', 'resume-12'].includes(resumeId)),
+  ];
+  const workspace = normalizeWorkspaceIndex({
+    activeResumeId: 'resume-1',
+    resumeIds: reorderedResumeIds,
+    meta: Object.fromEntries(resumeIds.map((resumeId, index) => [
+      resumeId,
+      { name: `Resume ${index + 1}`, updatedAt: '' },
+    ])),
+  });
+  const mirror = createGuestMirrorWorkspace(workspace);
+
+  assert.deepEqual(mirror.resumeIds, reorderedResumeIds.slice(0, MAX_WORKSPACE_RESUMES));
+  assert.equal(mirror.resumeIds[2], 'resume-12');
+  assert.equal(mirror.meta['resume-12'].name, 'Resume 12');
 });
 
 test('cloud guest mirror backs up existing guest workspace once and preserves unrelated draft keys', () => {
