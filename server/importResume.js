@@ -14,7 +14,7 @@ import {
 } from '../src/lib/resume.js';
 
 export const IMPORT_FILE_MAX_BYTES = 3 * 1024 * 1024;
-export const DEFAULT_AI_IMPORT_DAILY_LIMIT = 10;
+export const DEFAULT_AI_IMPORT_DAILY_LIMIT = 30;
 export const DEFAULT_GEMINI_IMPORT_MODEL = 'gemini-3.1-flash-lite';
 export const DEFAULT_GEMINI_THINKING_LEVEL = 'medium';
 export const DEFAULT_GEMINI_MAX_OUTPUT_TOKENS = 20000;
