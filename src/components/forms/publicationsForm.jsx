@@ -3,10 +3,31 @@ import CollapsibleEntryCard from "./collapsibleEntryCard";
 import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 
-export default function PublicationsForm({ publications, actions, getFieldError, markTouched }) {
+export default function PublicationsForm({ publications = [], section, actions, getFieldError, markTouched }) {
+  const entries = section?.entries || publications;
+  const sectionId = section?.id || '';
+  const isBlockEditor = Boolean(sectionId);
+  const pathFor = (entryId, field) => (
+    isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `publications.${entryId}.${field}`
+  );
+  const updateEntry = (entryId, field, value) => (
+    isBlockEditor
+      ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
+      : actions.updateCollectionEntry('publications', entryId, field, value)
+  );
+  const addEntry = () => (
+    isBlockEditor ? actions.addSectionBlockEntry(sectionId) : actions.addCollectionEntry('publications')
+  );
+  const moveEntry = (entryId, direction) => (
+    isBlockEditor ? actions.moveSectionBlockEntry(sectionId, entryId, direction) : actions.moveCollectionEntry('publications', entryId, direction)
+  );
+  const removeEntry = (entryId) => (
+    isBlockEditor ? actions.removeSectionBlockEntry(sectionId, entryId) : actions.removeCollectionEntry('publications', entryId)
+  );
+
   return (
     <div className="formStack">
-      {publications.map((entry, index) => (
+      {entries.map((entry, index) => (
         <CollapsibleEntryCard
           key={entry.id}
           summary={buildEntrySummary(
@@ -19,12 +40,12 @@ export default function PublicationsForm({ publications, actions, getFieldError,
           moveUpLabel={`Move publication ${index + 1} up`}
           moveDownLabel={`Move publication ${index + 1} down`}
           removeLabel={`Remove publication ${index + 1}`}
-          onMoveUp={() => actions.moveCollectionEntry('publications', entry.id, -1)}
-          onMoveDown={() => actions.moveCollectionEntry('publications', entry.id, 1)}
-          onRemove={() => actions.removeCollectionEntry('publications', entry.id)}
+          onMoveUp={() => moveEntry(entry.id, -1)}
+          onMoveDown={() => moveEntry(entry.id, 1)}
+          onRemove={() => removeEntry(entry.id)}
           disableUp={index === 0}
-          disableDown={index === publications.length - 1}
-          disableRemove={publications.length === 1}
+          disableDown={index === entries.length - 1}
+          disableRemove={entries.length === 1}
         >
           <form onSubmit={(event) => event.preventDefault()}>
             <div className="fieldGrid fieldGridTwo">
@@ -34,11 +55,11 @@ export default function PublicationsForm({ publications, actions, getFieldError,
                   type="text"
                   id={`publication-title-${entry.id}`}
                   value={entry.title}
-                  onChange={(event) => actions.updateCollectionEntry('publications', entry.id, 'title', event.target.value)}
-                  onBlur={() => markTouched(`publications.${entry.id}.title`)}
+                  onChange={(event) => updateEntry(entry.id, 'title', event.target.value)}
+                  onBlur={() => markTouched(pathFor(entry.id, 'title'))}
                   placeholder="Designing for clarity in high-density interfaces"
                 />
-                <FormFieldError message={getFieldError(`publications.${entry.id}.title`)} />
+                <FormFieldError message={getFieldError(pathFor(entry.id, 'title'))} />
               </div>
 
               <div className="field">
@@ -47,8 +68,8 @@ export default function PublicationsForm({ publications, actions, getFieldError,
                   type="text"
                   id={`publication-years-${entry.id}`}
                   value={entry.years}
-                  onChange={(event) => actions.updateCollectionEntry('publications', entry.id, 'years', event.target.value)}
-                  onBlur={() => markTouched(`publications.${entry.id}.years`)}
+                  onChange={(event) => updateEntry(entry.id, 'years', event.target.value)}
+                  onBlur={() => markTouched(pathFor(entry.id, 'years'))}
                   placeholder="2024"
                 />
               </div>
@@ -60,8 +81,8 @@ export default function PublicationsForm({ publications, actions, getFieldError,
                 type="text"
                 id={`publication-publisher-${entry.id}`}
                 value={entry.publisher}
-                onChange={(event) => actions.updateCollectionEntry('publications', entry.id, 'publisher', event.target.value)}
-                onBlur={() => markTouched(`publications.${entry.id}.publisher`)}
+                onChange={(event) => updateEntry(entry.id, 'publisher', event.target.value)}
+                onBlur={() => markTouched(pathFor(entry.id, 'publisher'))}
                 placeholder="Smashing Magazine"
               />
             </div>
@@ -71,8 +92,8 @@ export default function PublicationsForm({ publications, actions, getFieldError,
               <AutoResizeTextarea
                 id={`publication-details-${entry.id}`}
                 value={entry.details}
-                onChange={(event) => actions.updateCollectionEntry('publications', entry.id, 'details', event.target.value)}
-                onBlur={() => markTouched(`publications.${entry.id}.details`)}
+                onChange={(event) => updateEntry(entry.id, 'details', event.target.value)}
+                onBlur={() => markTouched(pathFor(entry.id, 'details'))}
                 rows={2}
                 placeholder="Add context like co-authors, publication type, or impact."
               />
@@ -81,7 +102,7 @@ export default function PublicationsForm({ publications, actions, getFieldError,
         </CollapsibleEntryCard>
       ))}
 
-      <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addCollectionEntry('publications')}>
+      <button className="button buttonSecondary addEntryButton" type="button" onClick={addEntry}>
         Add publication
       </button>
     </div>

@@ -2,10 +2,31 @@ import CollapsibleEntryCard from "./collapsibleEntryCard";
 import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 
-export default function LanguagesForm({ languages, actions, getFieldError, markTouched }) {
+export default function LanguagesForm({ languages = [], section, actions, getFieldError, markTouched }) {
+  const entries = section?.entries || languages;
+  const sectionId = section?.id || '';
+  const isBlockEditor = Boolean(sectionId);
+  const pathFor = (entryId, field) => (
+    isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `languages.${entryId}.${field}`
+  );
+  const updateEntry = (entryId, field, value) => (
+    isBlockEditor
+      ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
+      : actions.updateCollectionEntry('languages', entryId, field, value)
+  );
+  const addEntry = () => (
+    isBlockEditor ? actions.addSectionBlockEntry(sectionId) : actions.addCollectionEntry('languages')
+  );
+  const moveEntry = (entryId, direction) => (
+    isBlockEditor ? actions.moveSectionBlockEntry(sectionId, entryId, direction) : actions.moveCollectionEntry('languages', entryId, direction)
+  );
+  const removeEntry = (entryId) => (
+    isBlockEditor ? actions.removeSectionBlockEntry(sectionId, entryId) : actions.removeCollectionEntry('languages', entryId)
+  );
+
   return (
     <div className="formStack">
-      {languages.map((entry, index) => (
+      {entries.map((entry, index) => (
         <CollapsibleEntryCard
           key={entry.id}
           summary={buildEntrySummary(
@@ -18,12 +39,12 @@ export default function LanguagesForm({ languages, actions, getFieldError, markT
           moveUpLabel={`Move language ${index + 1} up`}
           moveDownLabel={`Move language ${index + 1} down`}
           removeLabel={`Remove language ${index + 1}`}
-          onMoveUp={() => actions.moveCollectionEntry('languages', entry.id, -1)}
-          onMoveDown={() => actions.moveCollectionEntry('languages', entry.id, 1)}
-          onRemove={() => actions.removeCollectionEntry('languages', entry.id)}
+          onMoveUp={() => moveEntry(entry.id, -1)}
+          onMoveDown={() => moveEntry(entry.id, 1)}
+          onRemove={() => removeEntry(entry.id)}
           disableUp={index === 0}
-          disableDown={index === languages.length - 1}
-          disableRemove={languages.length === 1}
+          disableDown={index === entries.length - 1}
+          disableRemove={entries.length === 1}
         >
           <form onSubmit={(event) => event.preventDefault()}>
             <div className="fieldGrid fieldGridTwo">
@@ -33,11 +54,11 @@ export default function LanguagesForm({ languages, actions, getFieldError, markT
                   type="text"
                   id={`language-name-${entry.id}`}
                   value={entry.language}
-                  onChange={(event) => actions.updateCollectionEntry('languages', entry.id, 'language', event.target.value)}
-                  onBlur={() => markTouched(`languages.${entry.id}.language`)}
+                  onChange={(event) => updateEntry(entry.id, 'language', event.target.value)}
+                  onBlur={() => markTouched(pathFor(entry.id, 'language'))}
                   placeholder="Spanish"
                 />
-                <FormFieldError message={getFieldError(`languages.${entry.id}.language`)} />
+                <FormFieldError message={getFieldError(pathFor(entry.id, 'language'))} />
               </div>
 
               <div className="field">
@@ -46,8 +67,8 @@ export default function LanguagesForm({ languages, actions, getFieldError, markT
                   type="text"
                   id={`language-proficiency-${entry.id}`}
                   value={entry.proficiency}
-                  onChange={(event) => actions.updateCollectionEntry('languages', entry.id, 'proficiency', event.target.value)}
-                  onBlur={() => markTouched(`languages.${entry.id}.proficiency`)}
+                  onChange={(event) => updateEntry(entry.id, 'proficiency', event.target.value)}
+                  onBlur={() => markTouched(pathFor(entry.id, 'proficiency'))}
                   placeholder="Professional working proficiency"
                 />
               </div>
@@ -56,7 +77,7 @@ export default function LanguagesForm({ languages, actions, getFieldError, markT
         </CollapsibleEntryCard>
       ))}
 
-      <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addCollectionEntry('languages')}>
+      <button className="button buttonSecondary addEntryButton" type="button" onClick={addEntry}>
         Add language
       </button>
     </div>

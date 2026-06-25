@@ -223,6 +223,8 @@ export function createCloudDraftDoc({ resumeId, name, draft, identity, deviceId,
     template: draft.template,
     sectionOrder: draft.sectionOrder,
   });
+  const savedAt = getTimestamp(draft?.savedAt) > 0 ? draft.savedAt : payload.savedAt;
+  const version = getTimestamp(savedAt) || Date.now();
 
   return {
     schemaVersion: CLOUD_WORKSPACE_SCHEMA_VERSION,
@@ -231,9 +233,9 @@ export function createCloudDraftDoc({ resumeId, name, draft, identity, deviceId,
     template: payload.template,
     sectionOrder: payload.sectionOrder,
     resume: payload.resume,
-    savedAt: payload.savedAt,
-    updatedAt: payload.savedAt,
-    version: Date.now(),
+    savedAt,
+    updatedAt: savedAt,
+    version,
     deviceId: cloudIdentity.deviceId,
     sessionId: cloudIdentity.sessionId,
     deletedAt,

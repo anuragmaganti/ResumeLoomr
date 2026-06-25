@@ -45,6 +45,9 @@ import {
   moveEducationCustomSection,
   moveEducation,
   moveExperience,
+  moveResumeSectionBlock,
+  moveRoleBlockActivity,
+  moveRoleBlockEntry,
   moveSectionOrder,
   normalizeDraftPayload,
   normalizeSectionOrder,
@@ -55,7 +58,15 @@ import {
   removeEducationCustomSection,
   removeEducation,
   removeExperience,
+  removeResumeSectionBlock,
+  removeRoleBlockActivity,
+  removeRoleBlockEntry,
+  removeSectionBlockEducationCustomSection,
+  removeSectionBlockEducationProgram,
+  removeSectionBlockEntry,
+  removeSectionBlockTextListItem,
   reorderSectionOrder,
+  reorderResumeSectionBlock,
   sanitizeWorkspaceResumeName,
   updateCollectionEntry,
   updateCollectionTextList,
@@ -65,7 +76,23 @@ import {
   updateExperienceField,
   updatePersonalField,
   updateResumeSetting as updateResumeSettingValue,
+  updateRoleBlockActivity,
+  updateRoleBlockEntry,
+  updateSectionBlockEducationCustomSection,
+  updateSectionBlockEducationProgram,
+  updateSectionBlockEntry,
+  updateSectionBlockTextList,
   updateSectionTitle,
+  addRoleBlockActivity,
+  addRoleBlockEntry,
+  addSectionBlockEducationCustomSection,
+  addSectionBlockEducationProgram,
+  addSectionBlockEntry,
+  addSectionBlockTextListItem,
+  moveSectionBlockEducationCustomSection,
+  moveSectionBlockEducationProgram,
+  moveSectionBlockEntry,
+  moveSectionBlockTextListItem,
   validateResume,
 } from '../lib/resume.js';
 import {
@@ -149,6 +176,14 @@ function readStoredWorkspaceSnapshot() {
       return readStoredResumeDraft(resumeId);
     },
   };
+}
+
+function getDraftEditorSectionIds(draft) {
+  const blockIds = Array.isArray(draft?.resume?.sections)
+    ? draft.resume.sections.map((section) => section.id).filter(Boolean)
+    : SECTION_IDS.filter((sectionId) => sectionId !== 'personal');
+
+  return ['personal', ...blockIds];
 }
 
 function loadStoredWorkspace() {
@@ -271,6 +306,11 @@ function shouldReadFirestoreCache(trustedDevice) {
 
 function isOnline() {
   return typeof navigator === 'undefined' || navigator.onLine;
+}
+
+function getSavedAtTimestamp(value) {
+  const timestamp = Date.parse(value || '');
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 async function resolveReadableCloudWorkspace({ uid, workspace, trustedDevice }) {
@@ -715,7 +755,10 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
   }
 
   function loadDraftIntoEditor(nextDraft, { focusPersonal = false } = {}) {
+    const nextSectionIds = getDraftEditorSectionIds(nextDraft);
+
     skipNextAutosaveRef.current = true;
+    currentDraftRef.current = nextDraft;
     setResume(nextDraft.resume);
     setTemplate(nextDraft.template);
     setSectionOrder(nextDraft.sectionOrder);
@@ -723,7 +766,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     setSaveState(nextDraft.savedAt ? 'saved' : 'idle');
     resetValidationState();
 
-    if (focusPersonal) {
+    if (focusPersonal || !nextSectionIds.includes(activeTab)) {
       setActiveTab('personal');
     }
   }
@@ -763,6 +806,9 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
   }
 
   function commitWorkspace(nextWorkspace) {
+    workspaceRef.current = nextWorkspace;
+    activeResumeIdRef.current = nextWorkspace.activeResumeId;
+
     if (!isCloudMode) {
       persistWorkspaceIndex(nextWorkspace);
     }
@@ -831,6 +877,21 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     return localDirtyResumeIdsRef.current.size > 0;
   }
 
+  function settleCloudSyncState() {
+    if (!isOnline()) {
+      setSyncState('offline');
+      return;
+    }
+
+    if (cloudSaveQueueRef.current.size > 0 || hasAnyLocalDirty()) {
+      setSyncState('syncing');
+      return;
+    }
+
+    setSaveState('saved');
+    setSyncState('saved');
+  }
+
   function logCloudError(error) {
     if (import.meta.env.DEV) {
       console.error('Cloud sync failed', {
@@ -864,9 +925,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         return Promise.resolve(false);
       }
 
+      setSyncState('syncing');
       return mutation
         .then(() => {
           setNotice((currentNotice) => (currentNotice?.tone === 'error' ? null : currentNotice));
+          settleCloudSyncState();
           return true;
         })
         .catch((error) => {
@@ -983,6 +1046,45 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     return flushActiveCloudDraft({ reason: 'retry' });
   }
 
+  function getLatestKnownDraftForResume(resumeId) {
+    if (resumeId === activeResumeIdRef.current) {
+      return currentDraftRef.current;
+    }
+
+    return readStoredResumeDraft(resumeId);
+  }
+
+  function isStaleDraftSnapshot(resumeId, draft) {
+    const snapshotTimestamp = getSavedAtTimestamp(draft?.savedAt);
+
+    if (!snapshotTimestamp) {
+      return false;
+    }
+
+    const workspaceTimestamp = getSavedAtTimestamp(workspaceRef.current.meta[resumeId]?.updatedAt);
+    const latestDraftTimestamp = getSavedAtTimestamp(getLatestKnownDraftForResume(resumeId)?.savedAt);
+
+    return Math.max(workspaceTimestamp, latestDraftTimestamp) > snapshotTimestamp;
+  }
+
+  function repairStaleCloudWrite(resumeId) {
+    if (!isCloudMode || !cloudReady || !userRef.current?.uid || !resumeId) {
+      return;
+    }
+
+    const latestDraft = getLatestKnownDraftForResume(resumeId);
+
+    if (!latestDraft?.savedAt) {
+      return;
+    }
+
+    const nextWorkspace = withWorkspaceResumeMeta(workspaceRef.current, resumeId, {
+      updatedAt: latestDraft.savedAt,
+    });
+
+    scheduleCloudSave(resumeId, nextWorkspace, latestDraft, 'stale-write-repair');
+  }
+
   async function flushCloudDraft(
     resumeId = activeResumeIdRef.current,
     nextWorkspace = workspaceRef.current,
@@ -997,6 +1099,12 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     }
 
     clearCloudSaveTimers(resumeId);
+
+    if (isStaleDraftSnapshot(resumeId, draft)) {
+      settleCloudSyncState();
+      return null;
+    }
+
     setSyncState(isOnline() ? 'syncing' : 'offline');
 
     try {
@@ -1013,6 +1121,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         ...draft,
         savedAt: draftDoc?.savedAt || draft.savedAt || new Date().toISOString(),
       };
+
+      if (isStaleDraftSnapshot(resumeId, mirroredDraft)) {
+        repairStaleCloudWrite(resumeId);
+        return draftDoc;
+      }
 
       clearResumeDirty(resumeId);
       lastRemoteVersionByResumeRef.current.set(resumeId, draftDoc?.version || 0);
@@ -1051,11 +1164,24 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
   function moveSection(sectionId, direction) {
     setSaveState('saving');
+    if (resume.sections?.some((section) => section.id === sectionId)) {
+      updateResume((currentResume) => moveResumeSectionBlock(currentResume, sectionId, direction));
+      return;
+    }
+
     setSectionOrder((currentOrder) => moveSectionOrder(currentOrder, sectionId, direction));
   }
 
   function reorderSection(sectionId, targetSectionId, placement) {
     setSaveState('saving');
+    if (
+      resume.sections?.some((section) => section.id === sectionId) &&
+      resume.sections?.some((section) => section.id === targetSectionId)
+    ) {
+      updateResume((currentResume) => reorderResumeSectionBlock(currentResume, sectionId, targetSectionId, placement));
+      return;
+    }
+
     setSectionOrder((currentOrder) => reorderSectionOrder(currentOrder, sectionId, targetSectionId, placement));
   }
 
@@ -1205,6 +1331,142 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     }
 
     loadDraftIntoEditor(nextPersistedDraft, { focusPersonal: true });
+  }
+
+  function createImportPlaceholderResume({ sourceFileName = '' } = {}) {
+    if (!canAddResume) {
+      setNotice({
+        tone: 'error',
+        message: isCloudMode
+          ? `You can keep up to ${CLOUD_WORKSPACE_RESUME_LIMIT} cloud resumes.`
+          : `Guests can keep up to ${MAX_WORKSPACE_RESUMES} local resumes.`,
+      });
+      return null;
+    }
+
+    const previousResumeId = activeResumeId;
+    const persistedPayload = persistActiveDraftImmediately({ flushCloud: false, resumeId: previousResumeId });
+
+    if (!persistedPayload && activeResumeId) {
+      return null;
+    }
+
+    const existingNames = workspace.resumeIds.map((resumeId) => workspace.meta[resumeId]?.name || '');
+    const sourceName = sourceFileName.replace(/\.[^.]+$/, '');
+    const nextResumeId = createWorkspaceResumeId();
+    const nextResumeName = sanitizeWorkspaceResumeName(sourceName, createNextResumeName(existingNames));
+    const nextDraft = createBlankDraftState();
+    const nextPayload = createDraftPayload({
+      resume: nextDraft.resume,
+      template: nextDraft.template,
+      sectionOrder: nextDraft.sectionOrder,
+    });
+    const nextPersistedDraft = {
+      ...nextDraft,
+      savedAt: nextPayload.savedAt,
+    };
+    const nextWorkspace = {
+      ...(persistedPayload
+        ? withWorkspaceResumeMeta(workspace, activeResumeId, { updatedAt: persistedPayload.savedAt })
+        : workspace),
+      activeResumeId: nextResumeId,
+      resumeIds: [...workspace.resumeIds, nextResumeId],
+      meta: {
+        ...workspace.meta,
+        [nextResumeId]: createWorkspaceResumeMeta(nextResumeName, nextPayload.savedAt),
+      },
+    };
+
+    if (!isCloudMode) {
+      persistExistingDraftState(nextResumeId, nextPersistedDraft);
+    }
+
+    commitWorkspace(nextWorkspace);
+
+    if (isCloudMode && user?.uid) {
+      mirrorCloudDraftLocally(nextResumeId, nextWorkspace, nextPersistedDraft);
+
+      if (previousResumeId) {
+        runCloudMutation(() => (
+          writeCloudDraft(
+            user.uid,
+            previousResumeId,
+            nextWorkspace,
+            {
+              resume,
+              template,
+              sectionOrder,
+              savedAt: persistedPayload.savedAt,
+            },
+            trustedDevice,
+            cloudIdentityRef.current,
+          )
+        ));
+      }
+
+      flushCloudDraft(nextResumeId, nextWorkspace, nextPersistedDraft, { reason: 'import-placeholder' });
+    }
+
+    loadDraftIntoEditor(nextPersistedDraft, { focusPersonal: true });
+    return nextResumeId;
+  }
+
+  async function replaceResumeDraft(resumeId, importedDraft, { name } = {}) {
+    const currentWorkspace = workspaceRef.current;
+
+    if (!resumeId || !currentWorkspace.resumeIds.includes(resumeId)) {
+      setNotice({
+        tone: 'error',
+        message: 'The import finished, but the new resume was removed before it could be filled.',
+      });
+      return false;
+    }
+
+    const normalizedDraft = normalizeDraftPayload(importedDraft);
+    const payload = createDraftPayload({
+      resume: normalizedDraft.resume,
+      template: normalizedDraft.template,
+      sectionOrder: normalizedDraft.sectionOrder,
+    });
+    const nextDraft = {
+      resume: payload.resume,
+      template: payload.template,
+      sectionOrder: payload.sectionOrder,
+      savedAt: payload.savedAt,
+    };
+    const existingName = currentWorkspace.meta[resumeId]?.name || 'Imported resume';
+    const nextName = sanitizeWorkspaceResumeName(name, existingName);
+    const nextWorkspace = {
+      ...withWorkspaceResumeMeta(currentWorkspace, resumeId, {
+        name: nextName,
+        updatedAt: payload.savedAt,
+      }),
+      activeResumeId: resumeId,
+    };
+
+    clearCloudSaveTimers(resumeId);
+
+    if (!isCloudMode) {
+      persistExistingDraftState(resumeId, nextDraft);
+    }
+
+    commitWorkspace(nextWorkspace);
+
+    if (isCloudMode && userRef.current?.uid) {
+      mirrorCloudDraftLocally(resumeId, nextWorkspace, nextDraft);
+    }
+
+    loadDraftIntoEditor(nextDraft, { focusPersonal: true });
+
+    if (isCloudMode && userRef.current?.uid) {
+      const savedDraft = await flushCloudDraft(resumeId, nextWorkspace, nextDraft, { reason: 'import-replace' });
+
+      if (!savedDraft && isOnline()) {
+        return true;
+      }
+    }
+
+    return true;
   }
 
   async function duplicateActiveResume() {
@@ -1382,6 +1644,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     }
 
     loadDraftIntoEditor(readStoredResumeDraft(nextResumeId));
+    settleCloudSyncState();
 
     if (isCloudMode && user?.uid) {
       const cloudDraft = await readCloudDraft(user.uid, nextResumeId, trustedDevice, {
@@ -1390,6 +1653,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       const nextDraft = cloudDraft || readStoredResumeDraft(nextResumeId);
       mirrorCloudDraftLocally(nextResumeId, nextWorkspace, nextDraft);
       loadDraftIntoEditor(nextDraft);
+      settleCloudSyncState();
     }
   }
 
@@ -1486,6 +1750,9 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     updateResumeSetting(settingId, delta) {
       updateResume((currentResume) => updateResumeSettingValue(currentResume, settingId, delta));
     },
+    removeResumeSection(sectionId) {
+      updateResume((currentResume) => removeResumeSectionBlock(currentResume, sectionId));
+    },
     updateEducationField(entryId, field, value) {
       updateResume((currentResume) => updateEducationField(currentResume, entryId, field, value));
     },
@@ -1534,6 +1801,78 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     removeActivity(entryId, activityIndex) {
       updateResume((currentResume) => removeActivity(currentResume, entryId, activityIndex));
     },
+    updateRoleBlockEntry(sectionId, entryId, field, value) {
+      updateResume((currentResume) => updateRoleBlockEntry(currentResume, sectionId, entryId, field, value));
+    },
+    addRoleBlockEntry(sectionId) {
+      updateResume((currentResume) => addRoleBlockEntry(currentResume, sectionId));
+    },
+    moveRoleBlockEntry(sectionId, entryId, direction) {
+      updateResume((currentResume) => moveRoleBlockEntry(currentResume, sectionId, entryId, direction));
+    },
+    removeRoleBlockEntry(sectionId, entryId) {
+      updateResume((currentResume) => removeRoleBlockEntry(currentResume, sectionId, entryId));
+    },
+    updateRoleBlockActivity(sectionId, entryId, activityIndex, value) {
+      updateResume((currentResume) => updateRoleBlockActivity(currentResume, sectionId, entryId, activityIndex, value));
+    },
+    addRoleBlockActivity(sectionId, entryId) {
+      updateResume((currentResume) => addRoleBlockActivity(currentResume, sectionId, entryId));
+    },
+    moveRoleBlockActivity(sectionId, entryId, activityIndex, direction) {
+      updateResume((currentResume) => moveRoleBlockActivity(currentResume, sectionId, entryId, activityIndex, direction));
+    },
+    removeRoleBlockActivity(sectionId, entryId, activityIndex) {
+      updateResume((currentResume) => removeRoleBlockActivity(currentResume, sectionId, entryId, activityIndex));
+    },
+    updateSectionBlockEntry(sectionId, entryId, field, value) {
+      updateResume((currentResume) => updateSectionBlockEntry(currentResume, sectionId, entryId, field, value));
+    },
+    addSectionBlockEntry(sectionId) {
+      updateResume((currentResume) => addSectionBlockEntry(currentResume, sectionId));
+    },
+    moveSectionBlockEntry(sectionId, entryId, direction) {
+      updateResume((currentResume) => moveSectionBlockEntry(currentResume, sectionId, entryId, direction));
+    },
+    removeSectionBlockEntry(sectionId, entryId) {
+      updateResume((currentResume) => removeSectionBlockEntry(currentResume, sectionId, entryId));
+    },
+    updateSectionBlockTextList(sectionId, entryId, field, itemIndex, value) {
+      updateResume((currentResume) => updateSectionBlockTextList(currentResume, sectionId, entryId, field, itemIndex, value));
+    },
+    addSectionBlockTextListItem(sectionId, entryId, field) {
+      updateResume((currentResume) => addSectionBlockTextListItem(currentResume, sectionId, entryId, field));
+    },
+    moveSectionBlockTextListItem(sectionId, entryId, field, itemIndex, direction) {
+      updateResume((currentResume) => moveSectionBlockTextListItem(currentResume, sectionId, entryId, field, itemIndex, direction));
+    },
+    removeSectionBlockTextListItem(sectionId, entryId, field, itemIndex) {
+      updateResume((currentResume) => removeSectionBlockTextListItem(currentResume, sectionId, entryId, field, itemIndex));
+    },
+    updateSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, field, value) {
+      updateResume((currentResume) => updateSectionBlockEducationCustomSection(currentResume, sectionId, entryId, sectionIndex, field, value));
+    },
+    addSectionBlockEducationCustomSection(sectionId, entryId) {
+      updateResume((currentResume) => addSectionBlockEducationCustomSection(currentResume, sectionId, entryId));
+    },
+    moveSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, direction) {
+      updateResume((currentResume) => moveSectionBlockEducationCustomSection(currentResume, sectionId, entryId, sectionIndex, direction));
+    },
+    removeSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex) {
+      updateResume((currentResume) => removeSectionBlockEducationCustomSection(currentResume, sectionId, entryId, sectionIndex));
+    },
+    updateSectionBlockEducationProgram(sectionId, entryId, programIndex, field, value) {
+      updateResume((currentResume) => updateSectionBlockEducationProgram(currentResume, sectionId, entryId, programIndex, field, value));
+    },
+    addSectionBlockEducationProgram(sectionId, entryId) {
+      updateResume((currentResume) => addSectionBlockEducationProgram(currentResume, sectionId, entryId));
+    },
+    moveSectionBlockEducationProgram(sectionId, entryId, programIndex, direction) {
+      updateResume((currentResume) => moveSectionBlockEducationProgram(currentResume, sectionId, entryId, programIndex, direction));
+    },
+    removeSectionBlockEducationProgram(sectionId, entryId, programIndex) {
+      updateResume((currentResume) => removeSectionBlockEducationProgram(currentResume, sectionId, entryId, programIndex));
+    },
     updateCollectionEntry(sectionKey, entryId, field, value) {
       updateResume((currentResume) => updateCollectionEntry(currentResume, sectionKey, entryId, field, value));
     },
@@ -1580,6 +1919,9 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     actions,
     printResume,
     notice,
+    showNotice(nextNotice) {
+      setNotice(nextNotice);
+    },
     dismissNotice() {
       setNotice(null);
     },
@@ -1605,6 +1947,8 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     canDeleteActiveResume: workspace.resumeIds.length > 1,
     setActiveResume,
     createResume,
+    createImportPlaceholderResume,
+    replaceResumeDraft,
     duplicateActiveResume,
     renameActiveResume: renameResume,
     deleteActiveResume,

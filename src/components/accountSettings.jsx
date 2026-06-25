@@ -4,21 +4,6 @@ function formatAccountName(account, fallback = 'Unknown account') {
   return account?.email || account?.displayName || fallback;
 }
 
-function formatConnectionDate(value) {
-  const date = new Date(value);
-
-  if (!value || Number.isNaN(date.getTime())) {
-    return 'Not recorded';
-  }
-
-  return date.toLocaleString([], {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
 export default function AccountSettings({
   isOpen,
   authUser,
@@ -26,7 +11,6 @@ export default function AccountSettings({
   firebaseEnabled,
   trustedDevice,
   signedOutEditingPreference,
-  syncState,
   busy,
   onOpen,
   onClose,
@@ -91,8 +75,7 @@ export default function AccountSettings({
           >
             <div className="accountSettingsHeader">
               <div>
-                <p className="accountSettingsEyebrow">Browser settings</p>
-                <h2 id="account-settings-title">Connection</h2>
+                <h2 id="account-settings-title">Settings</h2>
               </div>
               <button type="button" className="authCloseButton" onClick={closeSettings} aria-label="Close settings">
                 x
@@ -109,33 +92,11 @@ export default function AccountSettings({
               </div>
             </div>
 
-            <dl className="connectionDetails">
-              <div>
-                <dt>Cloud sync</dt>
-                <dd>{isSignedIn ? syncState || 'ready' : 'Off'}</dd>
-              </div>
-              <div>
-                <dt>Offline storage</dt>
-                <dd>{trustedDevice ? 'Trusted browser cache' : 'This browser only'}</dd>
-              </div>
-              <div>
-                <dt>Last connected</dt>
-                <dd>{formatConnectionDate(connectedAccount?.lastConnectedAt)}</dd>
-              </div>
-            </dl>
-
-            <div className="accountSettingsNote">
-              <strong>How this works</strong>
-              <p>
-                Local browser data keeps the editor fast. When signed in, cloud sync backs up your resumes and makes them available on other devices.
-              </p>
-            </div>
-
             <div className="signedOutEditingSettings">
               <div>
-                <h3>Signed-out editing</h3>
+                <h3>Keep resumes available after sign out</h3>
                 <p>
-                  Choose whether this browser keeps local resume copies after you sign out. Turn this off on shared computers.
+                  Stores your 10 most recent resumes on this browser so you can edit without signing in. Turn off on shared computers.
                 </p>
               </div>
               <label className="settingsCheckboxRow">
@@ -148,7 +109,7 @@ export default function AccountSettings({
                   })}
                 />
                 <span>
-                  Keep my 10 most recent resumes available for signed-out editing on this browser.
+                  Keep resumes available after sign out
                 </span>
               </label>
               <label className="settingsCheckboxRow">
@@ -212,8 +173,8 @@ export default function AccountSettings({
                 ) : (
                   <>
                     <div>
-                      <h3>Use this browser locally again</h3>
-                      <p>Remove the account link and local resume copies from this browser. Cloud data is not deleted.</p>
+                      <h3>Remove account from this browser</h3>
+                      <p>Clears local resume copies and account connection on this browser only. Your cloud resumes are not deleted.</p>
                     </div>
                     <button
                       type="button"

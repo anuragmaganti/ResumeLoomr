@@ -1,0 +1,108 @@
+import AutoResizeTextarea from "../autoResizeTextarea";
+import CollapsibleEntryCard from "./collapsibleEntryCard";
+import { buildEntrySummary } from "./buildEntrySummary";
+import FormFieldError from "./formFieldError";
+import ReorderableTextList from "./reorderableTextList";
+
+export default function CustomBlockForm({ section, actions, getFieldError, markTouched }) {
+  const entries = section.entries || [];
+  const pathFor = (entryId, field) => `sections.${section.id}.${entryId}.${field}`;
+
+  return (
+    <div className="formStack">
+      {entries.map((entry, index) => (
+        <CollapsibleEntryCard
+          key={entry.id}
+          summary={buildEntrySummary(
+            [entry.title, entry.subtitle || entry.details, entry.years],
+            "Add title and details"
+          )}
+          fallbackSummary="Add title and details"
+          expandLabel={`${section.title} entry ${index + 1}`}
+          menuLabel={`${section.title} entry ${index + 1} actions`}
+          moveUpLabel={`Move ${section.title} entry ${index + 1} up`}
+          moveDownLabel={`Move ${section.title} entry ${index + 1} down`}
+          removeLabel={`Remove ${section.title} entry ${index + 1}`}
+          onMoveUp={() => actions.moveSectionBlockEntry(section.id, entry.id, -1)}
+          onMoveDown={() => actions.moveSectionBlockEntry(section.id, entry.id, 1)}
+          onRemove={() => actions.removeSectionBlockEntry(section.id, entry.id)}
+          disableUp={index === 0}
+          disableDown={index === entries.length - 1}
+          disableRemove={entries.length === 1}
+        >
+          <form onSubmit={(event) => event.preventDefault()}>
+            <div className="fieldGrid fieldGridTwo">
+              <div className="field">
+                <label htmlFor={`custom-title-${section.id}-${entry.id}`}>Title</label>
+                <input
+                  type="text"
+                  id={`custom-title-${section.id}-${entry.id}`}
+                  value={entry.title}
+                  onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'title', event.target.value)}
+                  onBlur={() => markTouched(pathFor(entry.id, 'title'))}
+                  placeholder="Entry title"
+                />
+                <FormFieldError message={getFieldError(pathFor(entry.id, 'title'))} />
+              </div>
+
+              <div className="field">
+                <label htmlFor={`custom-years-${section.id}-${entry.id}`}>Date</label>
+                <input
+                  type="text"
+                  id={`custom-years-${section.id}-${entry.id}`}
+                  value={entry.years}
+                  onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'years', event.target.value)}
+                  onBlur={() => markTouched(pathFor(entry.id, 'years'))}
+                  placeholder="2024"
+                />
+              </div>
+            </div>
+
+            <div className="field">
+              <label htmlFor={`custom-subtitle-${section.id}-${entry.id}`}>Subtitle</label>
+              <input
+                type="text"
+                id={`custom-subtitle-${section.id}-${entry.id}`}
+                value={entry.subtitle}
+                onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'subtitle', event.target.value)}
+                onBlur={() => markTouched(pathFor(entry.id, 'subtitle'))}
+                placeholder="Optional context"
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor={`custom-details-${section.id}-${entry.id}`}>Details</label>
+              <AutoResizeTextarea
+                id={`custom-details-${section.id}-${entry.id}`}
+                value={entry.details}
+                onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'details', event.target.value)}
+                onBlur={() => markTouched(pathFor(entry.id, 'details'))}
+                rows={2}
+                placeholder="Add details for this entry."
+              />
+            </div>
+
+            <ReorderableTextList
+              label="Highlights"
+              items={entry.highlights}
+              idPrefix={`custom-highlights-${section.id}-${entry.id}`}
+              pathPrefix={pathFor(entry.id, 'highlights')}
+              placeholder="Add a detail or bullet."
+              addLabel="Add highlight"
+              getFieldError={getFieldError}
+              markTouched={markTouched}
+              onChangeItem={(itemIndex, value) => actions.updateSectionBlockTextList(section.id, entry.id, 'highlights', itemIndex, value)}
+              onMoveItem={(itemIndex, direction) => actions.moveSectionBlockTextListItem(section.id, entry.id, 'highlights', itemIndex, direction)}
+              onRemoveItem={(itemIndex) => actions.removeSectionBlockTextListItem(section.id, entry.id, 'highlights', itemIndex)}
+              onAddItem={() => actions.addSectionBlockTextListItem(section.id, entry.id, 'highlights')}
+            />
+          </form>
+        </CollapsibleEntryCard>
+      ))}
+
+      <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addSectionBlockEntry(section.id)}>
+        Add entry
+      </button>
+    </div>
+  );
+}

@@ -25,6 +25,7 @@ import {
   getPreviewModel,
   moveActivity,
   moveEducationCustomSection,
+  moveResumeSectionBlock,
   moveSectionOrder,
   normalizeDraftPayload,
   normalizeBulletText,
@@ -33,9 +34,15 @@ import {
   removeEducationCustomSection,
   removeEducation,
   removeExperience,
+  removeResumeSectionBlock,
+  reorderResumeSectionBlock,
   reorderSectionOrder,
   updatePersonalField,
+  updateRoleBlockEntry,
   updateResumeSetting,
+  updateSectionBlockEducationCustomSection,
+  updateSectionBlockEducationProgram,
+  updateSectionBlockEntry,
   updateSectionTitle,
   validateResume,
 } from '../src/lib/resume.js';
@@ -46,6 +53,7 @@ import {
   CLOUD_SESSION_ID_KEY,
   CLOUD_TRUSTED_DEVICE_KEY,
   CLOUD_WORKSPACE_RESUME_LIMIT,
+  createCloudDraftDoc,
   getCloudSessionId,
   validateCloudDraftPayload,
 } from '../src/lib/firebaseWorkspace.js';
@@ -69,9 +77,25 @@ import {
   writeConnectedAccount,
   writeSignedOutEditingPreference,
 } from '../src/lib/browserConnection.js';
+import {
+  DEFAULT_GEMINI_MAX_OUTPUT_TOKENS,
+  DEFAULT_GEMINI_IMPORT_MODEL,
+  DEFAULT_GEMINI_THINKING_LEVEL,
+  IMPORT_FILE_MAX_BYTES,
+  ImportResumeError,
+  assessExtractedResumeText,
+  compileSourceDocumentToImportedDraft,
+  createGeminiImportGenerationConfig,
+  createSourceDocumentCoverage,
+  createSourceDocumentFromText,
+  getGeminiErrorDetails,
+  normalizeImportFilePayload,
+  validateImportedDraftCoverage,
+} from '../server/importResume.js';
 
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = path.resolve(TEST_FILE_DIR, '../src');
+const SERVER_IMPORT_PATH = path.resolve(TEST_FILE_DIR, '../server/importResume.js');
 
 function createMemoryStorage(initialEntries = []) {
   const values = new Map(initialEntries);
@@ -201,6 +225,679 @@ test('normalizeWorkspaceIndex truncates imported resume names to the supported l
 
   assert.equal(normalized.meta['resume-1'].name.length, 25);
   assert.equal(normalized.meta['resume-1'].name, 'abcdefghijklmnopqrstuvwxy');
+});
+
+test('resume import file normalization rejects unsupported file types', () => {
+  assert.throws(
+    () => normalizeImportFilePayload({
+      fileName: 'resume.txt',
+      mimeType: 'text/plain',
+      fileDataBase64: Buffer.from('plain text').toString('base64'),
+    }),
+    (error) => (
+      error instanceof ImportResumeError &&
+      error.statusCode === 415 &&
+      error.code === 'import/unsupported-file-type'
+    ),
+  );
+});
+
+test('resume import file normalization rejects oversize uploads', () => {
+  assert.throws(
+    () => normalizeImportFilePayload({
+      fileName: 'resume.pdf',
+      mimeType: 'application/pdf',
+      fileDataBase64: Buffer.alloc(IMPORT_FILE_MAX_BYTES + 1).toString('base64'),
+    }),
+    (error) => (
+      error instanceof ImportResumeError &&
+      error.statusCode === 413 &&
+      error.code === 'import/file-too-large'
+    ),
+  );
+});
+
+test('resume import file normalization reads valid PDF and DOCX uploads', () => {
+  const pdfImport = normalizeImportFilePayload({
+    fileName: 'resume.pdf',
+    mimeType: 'application/pdf',
+    fileDataBase64: Buffer.from('pdf data').toString('base64'),
+  });
+  const docxImport = normalizeImportFilePayload({
+    fileName: 'resume.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    fileDataBase64: Buffer.from('docx data').toString('base64'),
+  });
+
+  assert.equal(pdfImport.mimeType, 'application/pdf');
+  assert.equal(docxImport.mimeType, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+});
+
+test('PDF extraction assessment accepts readable resume text', () => {
+  const text = `
+    Jordan Lee
+    jordan.lee@example.com | (555) 123-4567 | linkedin.com/in/jordanlee
+    Product-focused Software Engineer with experience building React and Node tools.
+    Experience
+    Acme Health, Software Engineer, 2021 - Present
+    Built onboarding workflows that reduced manual review time and improved customer activation.
+    Designed reporting dashboards, partnered with product managers, and implemented SQL data checks.
+    Collaborated with design, support, and operations teams to ship reliable improvements every quarter.
+    Education
+    State University, B.S. Computer Science, 2017 - 2021
+    Skills
+    JavaScript, TypeScript, React, Node, SQL, AWS, accessibility, product analytics, communication.
+  `;
+  const assessment = assessExtractedResumeText(text);
+
+  assert.equal(assessment.isTrustworthy, true);
+  assert.ok(assessment.nonWhitespaceCharacters >= 450);
+  assert.ok(assessment.wordCount >= 75);
+  assert.ok(assessment.printableRatio >= 0.85);
+  assert.ok(assessment.resumeSignalCount >= 2);
+});
+
+test('PDF extraction assessment rejects empty scanned-style text', () => {
+  const assessment = assessExtractedResumeText('');
+
+  assert.equal(assessment.isTrustworthy, false);
+  assert.equal(assessment.nonWhitespaceCharacters, 0);
+  assert.equal(assessment.wordCount, 0);
+});
+
+test('PDF extraction assessment rejects garbled text', () => {
+  const assessment = assessExtractedResumeText(`${'\u0001'.repeat(520)} Jordan Lee 2024 Skills`);
+
+  assert.equal(assessment.isTrustworthy, false);
+  assert.ok(assessment.printableRatio < 0.85);
+});
+
+test('PDF extraction assessment accepts unusual but readable resume formatting', () => {
+  const text = `
+    AVERY PATEL // avery@sample.dev // github.com/averypatel
+    Builder of internal products, workflow automation, and customer-facing dashboards.
+    2020 -> Current : Senior Analyst at Northstar Labs
+    Improved weekly planning by building Python, SQL, and spreadsheet automations for operations teams.
+    2018 -> 2020 : Operations Associate at Harbor Studio
+    Managed data cleanup, vendor reporting, onboarding, and process documentation across departments.
+    Created repeatable workflows, trained teammates, and documented quality checks for monthly reporting.
+    University of Michigan | Bachelor of Arts | 2014 -> 2018
+    Tools I use often: SQL, Python, Excel, Looker, Tableau, stakeholder communication, leadership.
+  `;
+  const assessment = assessExtractedResumeText(text);
+
+  assert.equal(assessment.isTrustworthy, true);
+  assert.ok(assessment.resumeSignalCount >= 2);
+});
+
+test('source document coverage detects ordered blocks and required detail signals', () => {
+  const sourceDocument = createSourceDocumentFromText(`
+    WALTER WASHINGTON
+    EDUCATION
+    University of Georgia, Honors Program Athens, GA
+    Bachelor of Arts, Political Science May 2023
+    Bachelor of Arts, Spanish GPA: 3.73/4.00
+    Certificate in Personal and Organizational Leadership August 2022 - Present
+    • Participant in selective leadership development program
+    Study Abroad: Oxford University August 2021 - December 2021
+    • Earned 6 credit hours taught by Oxford faculty
+    RELEVANT COURSEWORK
+    Leadership and Personal Development, Business Spanish
+    INTERNSHIP EXPERIENCE
+    Benton, Getchell & Grayson, LLC, Virtual Law Intern August 2021 - Present
+    • Contribute to daily operations of law firm
+    • Draft motions and participate in depositions
+    • Update correspondence of clients
+    The Population Institute, Intern June 2020 - August 2020
+    • Created and negotiated student scholarship program
+    • Managed relations for World Population Day Symposium
+    • Wrote 4 grant proposals
+    • Advocated with Congress and NGOs
+    LEADERSHIP EXPERIENCE
+    UGA Department of University Housing, Resident Assistant August 2021 - Present
+    • Design, implement, and evaluate educational programs
+    • Utilize communication and counseling skills
+    • Quickly respond to crises
+    • Compile annual facility inventory
+    YMCA Camp Harbor, Head Counselor May 2019 - July 2019
+    • Selected by supervisor to interview, hire, and train counselors
+    • Developed leadership training curriculum
+    • Taught leadership lessons to campers
+    • Designed comprehensive camp schedule
+    ADDITIONAL WORK EXPERIENCE
+    UGA Honors Program, Student Assistant September 2019 - Present
+    HONORS & AWARDS
+    HOPE Scholarship Recipient August 2019 - Present
+    Dean's List 5 semesters
+    Governor's Scholarship August 2019 - May 2020
+    UGA Rotary Top 12 Award Winner February 2020
+  `);
+  const coverage = createSourceDocumentCoverage(sourceDocument);
+
+  assert.deepEqual(
+    coverage.blocks.map((block) => [block.title, block.kind]),
+    [
+      ['EDUCATION', 'education'],
+      ['INTERNSHIP EXPERIENCE', 'roles'],
+      ['LEADERSHIP EXPERIENCE', 'roles'],
+      ['ADDITIONAL WORK EXPERIENCE', 'roles'],
+      ['HONORS & AWARDS', 'awards'],
+    ]
+  );
+  assert.equal(coverage.bulletCount, 17);
+  assert.equal(coverage.awardCount, 4);
+  assert.equal(coverage.hasGpa, true);
+  assert.equal(coverage.hasCoursework, true);
+  assert.deepEqual(coverage.sections, {
+    education: true,
+    roles: true,
+    awards: true,
+  });
+  assert.equal(coverage.blocks.find((block) => block.title === 'INTERNSHIP EXPERIENCE').roleEntryCount, 2);
+  assert.equal(coverage.blocks.find((block) => block.title === 'LEADERSHIP EXPERIENCE').roleEntryCount, 2);
+});
+
+test('source document segmentation handles generic section headings', () => {
+  const sourceDocument = createSourceDocumentFromText(`
+    JORDAN EXAMPLE
+    jordan@example.com | Austin, TX | github.com/jordan
+    CAREER HIGHLIGHTS
+    • Built a public-sector workflow used by 10 teams
+    • Reduced reporting time by 40%
+    TECHNICAL TOOLKIT
+    JavaScript, React, SQL, Python
+    COMMUNITY ENGAGEMENT
+    Code Club, Mentor January 2022 - Present
+    • Coached students through weekly coding labs
+  `);
+
+  assert.deepEqual(
+    sourceDocument.sections.map((section) => section.title),
+    ['CAREER HIGHLIGHTS', 'TECHNICAL TOOLKIT', 'COMMUNITY ENGAGEMENT']
+  );
+  assert.equal(sourceDocument.personalLines[0], 'JORDAN EXAMPLE');
+  assert.equal(sourceDocument.sections[0].lines.length, 2);
+});
+
+test('source-first compiler preserves ordered role bullets, education details, and awards', () => {
+  const sourceText = `
+    WALTER WASHINGTON
+    wwashington@uofga.edu ● Athens, GA 30602 ● (706) 555-1234 ● linkedin.com/in/wwashington
+    EDUCATION
+    University of Georgia, Honors Program Athens, GA
+    Bachelor of Arts, Political Science | School of Public & International Affairs May 2023
+    Bachelor of Arts, Spanish | Franklin College of Arts & Sciences GPA: 3.73/4.00
+    Certificate in Personal and Organizational Leadership August 2022 - Present
+    • Participant in highly selective year-long leadership development program
+    Study Abroad: Oxford University | Oxford, England August 2021 - December 2021
+    • Earned 6 credit hours taught by Oxford faculty
+    RELEVANT COURSEWORK
+    Leadership and Personal Development, Business Spanish
+    INTERNSHIP EXPERIENCE
+    Benton, Getchell & Grayson, LLC, Virtual Law Intern | Remote August 2021 - Present
+    • Contribute to daily operations of law firm
+    • Draft motions and participate in depositions
+    • Update correspondence of clients
+    The Population Institute, Intern | Washington, D.C. June 2020 - August 2020
+    • Created and negotiated student scholarship program
+    • Managed relations for World Population Day Symposium
+    • Wrote 4 grant proposals
+    • Advocated with Congress and NGOs
+    LEADERSHIP EXPERIENCE
+    UGA Department of University Housing, Resident Assistant | Athens, GA August 2021 - Present
+    • Design, implement, and evaluate educational programs, including an Effective
+    Leadership workshop series
+    • Utilize communication and counseling skills
+    • Quickly respond to crises
+    • Compile annual facility inventory
+    YMCA Camp Harbor, Head Counselor | Gainesville, GA May 2019 - July 2019
+    • Selected by supervisor to interview, hire, and train counselors
+    • Developed leadership training curriculum
+    • Taught leadership lessons to campers
+    • Designed comprehensive camp schedule
+    ADDITIONAL WORK EXPERIENCE
+    UGA Honors Program, Student Assistant | Athens, GA September 2019 - Present
+    Russell Hall, Desk Assistant | Athens, GA August 2020 - May 2021
+    Dillard's, Sales Associate | Alpharetta, GA May 2018 - August 2019
+    HONORS & AWARDS
+    HOPE Scholarship Recipient August 2019 - Present
+    Dean's List 5 semesters
+    Governor's Scholarship August 2019 - May 2020
+    UGA Rotary Top 12 Award Winner February 2020
+  `;
+  const sourceDocument = createSourceDocumentFromText(sourceText);
+  const imported = compileSourceDocumentToImportedDraft(sourceDocument, null, {
+    sourceFileName: 'government_leadership_resume25.pdf',
+  });
+  const previewModel = getPreviewModel(imported.draft.resume);
+  const validation = validateImportedDraftCoverage(imported.draft, createSourceDocumentCoverage(sourceDocument));
+
+  assert.equal(imported.draft.resume.personal.name, 'WALTER WASHINGTON');
+  assert.equal(imported.draft.resume.personal.email, 'wwashington@uofga.edu');
+  assert.deepEqual(
+    previewModel.sectionBlocks.map((section) => [section.title, section.kind]),
+    [
+      ['EDUCATION', 'education'],
+      ['INTERNSHIP EXPERIENCE', 'roles'],
+      ['LEADERSHIP EXPERIENCE', 'roles'],
+      ['ADDITIONAL WORK EXPERIENCE', 'roles'],
+      ['HONORS & AWARDS', 'awards'],
+    ]
+  );
+  assert.equal(previewModel.sectionBlocks.find((section) => section.title === 'EDUCATION').entries.length, 1);
+  assert.equal(previewModel.sectionBlocks.find((section) => section.title === 'INTERNSHIP EXPERIENCE').entries.length, 2);
+  assert.equal(previewModel.sectionBlocks.find((section) => section.title === 'LEADERSHIP EXPERIENCE').entries[0].activities.length, 4);
+  assert.equal(previewModel.sectionBlocks.find((section) => section.title === 'ADDITIONAL WORK EXPERIENCE').entries.length, 3);
+  assert.equal(previewModel.sectionBlocks.find((section) => section.title === 'HONORS & AWARDS').entries.length, 4);
+  assert.equal(validation.ok, true);
+});
+
+test('source-first coverage warns when compiled sections drop source details', () => {
+  const sourceDocument = createSourceDocumentFromText(`
+    EDUCATION
+    University of Georgia GPA: 3.73/4.00
+    RELEVANT COURSEWORK
+    Leadership and Personal Development
+    EXPERIENCE
+    Acme, Intern 2024
+    • First source bullet
+    • Second source bullet
+    • Third source bullet
+    • Fourth source bullet
+    HONORS & AWARDS
+    Award One
+    Award Two
+  `);
+  const sourceCoverage = createSourceDocumentCoverage(sourceDocument);
+  const incompleteDraft = normalizeDraftPayload({
+    resume: {
+      personal: { name: 'Walter Washington' },
+      sections: [
+        {
+          id: 'roles-experience',
+          kind: 'roles',
+          title: 'EXPERIENCE',
+          entries: [
+            {
+              id: 'role-1',
+              company: 'Acme',
+              role: 'Intern',
+              activities: ['First source bullet'],
+            },
+          ],
+        },
+      ],
+    },
+  });
+  const validation = validateImportedDraftCoverage(incompleteDraft, sourceCoverage);
+
+  assert.equal(validation.ok, false);
+  assert.match(validation.issues.join(' '), /Education section/);
+  assert.match(validation.issues.join(' '), /awards/);
+  assert.match(validation.issues.join(' '), /GPA/);
+  assert.match(validation.issues.join(' '), /coursework/i);
+  assert.match(validation.issues.join(' '), /1 of 4/);
+});
+
+test('preview model renders role section blocks in source order without duplicate group labels', () => {
+  const draft = normalizeDraftPayload({
+    resume: {
+      sections: [
+        {
+          id: 'roles-internship',
+          kind: 'roles',
+          title: 'INTERNSHIP EXPERIENCE',
+          entries: [
+            {
+              id: 'internship-entry',
+              company: 'Benton',
+              role: 'Intern',
+              yearsExp: '2021',
+              activities: ['Drafted motions'],
+            },
+          ],
+        },
+        {
+          id: 'roles-leadership',
+          kind: 'roles',
+          title: 'LEADERSHIP EXPERIENCE',
+          entries: [
+            {
+              id: 'leadership-entry',
+              company: 'UGA Housing',
+              role: 'Resident Assistant',
+              yearsExp: '2021',
+              activities: ['Led programs'],
+            },
+          ],
+        },
+        {
+          id: 'roles-additional-work',
+          kind: 'roles',
+          title: 'ADDITIONAL WORK EXPERIENCE',
+          entries: [
+            {
+              id: 'work-entry',
+              company: 'UGA Honors Program',
+              role: 'Student Assistant',
+              yearsExp: '2019',
+              activities: ['Supported office operations'],
+            },
+          ],
+        },
+      ],
+    },
+  });
+  const model = getPreviewModel(draft.resume);
+
+  assert.deepEqual(
+    model.sectionBlocks.map((section) => section.title),
+    ['INTERNSHIP EXPERIENCE', 'LEADERSHIP EXPERIENCE', 'ADDITIONAL WORK EXPERIENCE']
+  );
+  assert.equal(model.sectionBlocks[1].entries[0].company, 'UGA Housing');
+  assert.equal(model.sectionBlocks[1].title, 'LEADERSHIP EXPERIENCE');
+});
+
+test('section block actions reorder and edit dynamic role blocks safely', () => {
+  const draft = normalizeDraftPayload({
+    resume: {
+      sections: [
+        {
+          id: 'roles-internship',
+          kind: 'roles',
+          title: 'INTERNSHIP EXPERIENCE',
+          entries: [
+            {
+              id: 'internship-entry',
+              company: 'Benton',
+              role: 'Intern',
+              yearsExp: '2021',
+              activities: ['Drafted motions'],
+            },
+          ],
+        },
+        {
+          id: 'roles-leadership',
+          kind: 'roles',
+          title: 'LEADERSHIP EXPERIENCE',
+          entries: [
+            {
+              id: 'leadership-entry',
+              company: 'UGA Housing',
+              role: 'Resident Assistant',
+              yearsExp: '2021',
+              activities: ['Led programs'],
+            },
+          ],
+        },
+      ],
+    },
+  });
+  const [firstBlock, secondBlock] = draft.resume.sections;
+  const reordered = reorderResumeSectionBlock(draft.resume, secondBlock.id, firstBlock.id, 'before');
+  const edited = updateRoleBlockEntry(reordered, secondBlock.id, secondBlock.entries[0].id, 'company', 'University Housing');
+  const movedBack = moveResumeSectionBlock(edited, secondBlock.id, 1);
+
+  assert.deepEqual(
+    movedBack.sections
+      .filter((section) => section.kind === 'roles' && section.entries.some((entry) => entry.company || entry.role || entry.activities.some(Boolean)))
+      .map((section) => section.title),
+    ['INTERNSHIP EXPERIENCE', 'LEADERSHIP EXPERIENCE']
+  );
+  assert.equal(movedBack.sections[1].entries[0].company, 'University Housing');
+});
+
+test('block-first actions edit imported education and awards blocks shown in preview', () => {
+  const draft = normalizeDraftPayload({
+    resume: {
+      sections: [
+        {
+          id: 'education-imported',
+          kind: 'education',
+          title: 'EDUCATION',
+          entries: [
+            {
+              id: 'education-entry',
+              school: 'University of Georgia',
+              location: 'Athens, GA',
+              programs: [
+                {
+                  id: 'program-1',
+                  degree: 'Bachelor of Arts, Political Science',
+                  yearsEdu: 'May 2023',
+                  gpa: '3.73/4.00',
+                },
+              ],
+              coursework: 'Leadership and Personal Development',
+              customSections: [{ id: 'custom-1', label: 'Study Abroad', content: 'Oxford University' }],
+            },
+          ],
+        },
+        {
+          id: 'awards-imported',
+          kind: 'awards',
+          title: 'HONORS & AWARDS',
+          entries: [
+            {
+              id: 'award-1',
+              title: 'HOPE Scholarship Recipient',
+              years: 'August 2019 - Present',
+            },
+          ],
+        },
+      ],
+    },
+  });
+  const editedSchool = updateSectionBlockEntry(draft.resume, 'education-imported', 'education-entry', 'school', 'University of Georgia Honors Program');
+  const editedProgram = updateSectionBlockEducationProgram(editedSchool, 'education-imported', 'education-entry', 0, 'gpa', '3.80/4.00');
+  const editedCustom = updateSectionBlockEducationCustomSection(editedProgram, 'education-imported', 'education-entry', 0, 'content', 'Oxford University tutorial program');
+  const editedAward = updateSectionBlockEntry(editedCustom, 'awards-imported', 'award-1', 'details', 'Merit scholarship');
+  const previewModel = getPreviewModel(editedAward);
+
+  assert.equal(editedAward.sections[0].entries[0].school, 'University of Georgia Honors Program');
+  assert.equal(editedAward.sections[0].entries[0].programs[0].gpa, '3.80/4.00');
+  assert.equal(editedAward.sections[0].entries[0].customSections[0].content, 'Oxford University tutorial program');
+  assert.equal(editedAward.sections[1].entries[0].details, 'Merit scholarship');
+  assert.equal(editedAward.education[0].school, 'University of Georgia Honors Program');
+  assert.equal(editedAward.awards[0].details, 'Merit scholarship');
+  assert.equal(previewModel.sectionBlocks[0].entries[0].programs[0].gpa, '3.80/4.00');
+  assert.equal(previewModel.sectionBlocks[1].entries[0].details, 'Merit scholarship');
+});
+
+test('normalization refreshes stale legacy fixed blocks into section blocks', () => {
+  const draft = normalizeDraftPayload({
+    resume: {
+      education: [
+        {
+          id: 'education-entry',
+          school: 'Fresh Legacy University',
+          degree: 'B.A. Economics',
+          yearsEdu: '2024',
+        },
+      ],
+      sections: [
+        {
+          id: 'education',
+          kind: 'education',
+          title: 'Education',
+          legacySectionId: 'education',
+          entries: [
+            {
+              id: 'education-entry',
+              school: 'Stale Block University',
+              degree: 'Old Degree',
+              yearsEdu: '2020',
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(draft.resume.sections[0].entries[0].school, 'Fresh Legacy University');
+  assert.equal(getPreviewModel(draft.resume).sectionBlocks[0].entries[0].school, 'Fresh Legacy University');
+});
+
+test('removing a section block clears matching legacy mirror content', () => {
+  const resume = createEmptyResume();
+  resume.awards[0].title = 'Hidden Award';
+  const removedAwards = removeResumeSectionBlock(resume, 'awards');
+
+  assert.equal(removedAwards.sections.some((section) => section.id === 'awards'), false);
+  assert.equal(removedAwards.awards.length, 1);
+  assert.equal(removedAwards.awards[0].title, '');
+
+  const draft = normalizeDraftPayload({
+    resume: {
+      sections: [
+        {
+          id: 'roles-internship',
+          kind: 'roles',
+          title: 'INTERNSHIP EXPERIENCE',
+          entries: [
+            {
+              id: 'internship-entry',
+              company: 'Benton',
+              role: 'Intern',
+              yearsExp: '2021',
+              activities: ['Drafted motions'],
+            },
+          ],
+        },
+        {
+          id: 'roles-leadership',
+          kind: 'roles',
+          title: 'LEADERSHIP EXPERIENCE',
+          entries: [
+            {
+              id: 'leadership-entry',
+              company: 'UGA Housing',
+              role: 'Resident Assistant',
+              yearsExp: '2021',
+              activities: ['Led programs'],
+            },
+          ],
+        },
+      ],
+    },
+  });
+  const leadershipBlock = draft.resume.sections.find((section) => section.title === 'LEADERSHIP EXPERIENCE');
+  const removedRoleBlock = removeResumeSectionBlock(draft.resume, leadershipBlock.id);
+
+  assert.equal(removedRoleBlock.sections.some((section) => section.id === leadershipBlock.id), false);
+  assert.deepEqual(
+    removedRoleBlock.sections.filter((section) => section.kind === 'roles').map((section) => section.title),
+    ['INTERNSHIP EXPERIENCE']
+  );
+});
+
+test('server import source keeps DOCX text-only and PDF fallback paths', () => {
+  const source = fs.readFileSync(SERVER_IMPORT_PATH, 'utf8');
+
+  assert.match(source, /if \(isPdf\) \{/);
+  assert.match(source, /extractPdfText\(file\)/);
+  assert.match(source, /assessExtractedResumeText\(extractedPdfText\)/);
+  assert.match(source, /sourceDocument = createSourceDocumentFromText\(sourceText\)/);
+  assert.match(source, /generateSourceDocumentFromGemini\(\{/);
+  assert.match(source, /generateSourceMappingFromGemini\(\{/);
+  assert.match(source, /compileSourceDocumentToImportedDraft\(sourceDocument, sourceMapping/);
+  assert.match(source, /createSourceDocumentCoverage\(sourceDocument\)/);
+  assert.match(source, /sourceText = await extractDocxText\(file\)/);
+});
+
+test('Gemini 3 import config uses explicit source schemas without legacy temperature', () => {
+  const responseJsonSchema = {
+    type: 'object',
+    properties: {
+      sections: { type: 'array', items: { type: 'object' } },
+    },
+    required: ['sections'],
+  };
+  const config = createGeminiImportGenerationConfig('gemini-3.1-flash-lite', {
+    GEMINI_THINKING_LEVEL: '',
+    GEMINI_MAX_OUTPUT_TOKENS: '',
+  }, { responseJsonSchema });
+  const configWithoutSchema = createGeminiImportGenerationConfig('gemini-3.1-flash-lite', {
+    GEMINI_THINKING_LEVEL: '',
+    GEMINI_MAX_OUTPUT_TOKENS: '',
+  });
+
+  assert.equal(DEFAULT_GEMINI_IMPORT_MODEL, 'gemini-3.1-flash-lite');
+  assert.equal(config.responseMimeType, 'application/json');
+  assert.equal(config.responseJsonSchema, responseJsonSchema);
+  assert.equal(Object.hasOwn(configWithoutSchema, 'responseJsonSchema'), false);
+  assert.equal(config.thinkingConfig.thinkingLevel, DEFAULT_GEMINI_THINKING_LEVEL);
+  assert.equal(config.maxOutputTokens, DEFAULT_GEMINI_MAX_OUTPUT_TOKENS);
+  assert.equal(Object.hasOwn(config, 'temperature'), false);
+});
+
+test('Gemini import config keeps 2.5 rollback tuning without thinking level', () => {
+  const config = createGeminiImportGenerationConfig('gemini-2.5-flash-lite', {
+    GEMINI_THINKING_LEVEL: 'high',
+    GEMINI_MAX_OUTPUT_TOKENS: '12000',
+  });
+
+  assert.equal(config.temperature, 0.1);
+  assert.equal(config.maxOutputTokens, 12000);
+  assert.equal(Object.hasOwn(config, 'thinkingConfig'), false);
+});
+
+test('Gemini import config clamps output tokens and rejects invalid thinking levels', () => {
+  const invalidConfig = createGeminiImportGenerationConfig('gemini-3.1-flash-lite', {
+    GEMINI_THINKING_LEVEL: 'unsupported',
+    GEMINI_MAX_OUTPUT_TOKENS: '999999',
+  });
+  const lowConfig = createGeminiImportGenerationConfig('gemini-3.1-flash-lite', {
+    GEMINI_THINKING_LEVEL: 'minimal',
+    GEMINI_MAX_OUTPUT_TOKENS: '12',
+  });
+
+  assert.equal(invalidConfig.thinkingConfig.thinkingLevel, DEFAULT_GEMINI_THINKING_LEVEL);
+  assert.equal(invalidConfig.maxOutputTokens, 65536);
+  assert.equal(lowConfig.thinkingConfig.thinkingLevel, 'minimal');
+  assert.equal(lowConfig.maxOutputTokens, 1024);
+});
+
+test('Gemini provider errors expose status details for typed API responses', () => {
+  const error = new Error(JSON.stringify({
+    error: {
+      code: 503,
+      message: 'This model is currently experiencing high demand. Please try again later.',
+      status: 'UNAVAILABLE',
+    },
+  }));
+  const details = getGeminiErrorDetails(error);
+
+  assert.equal(details.statusCode, 503);
+  assert.equal(details.status, 'UNAVAILABLE');
+  assert.match(details.message, /high demand/);
+});
+
+test('Gemini provider errors detect daily quota exhaustion details', () => {
+  const error = new Error(JSON.stringify({
+    error: {
+      code: 429,
+      message: 'You exceeded your current quota. Please check your plan and billing details.',
+      status: 'RESOURCE_EXHAUSTED',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+          violations: [
+            {
+              quotaMetric: 'generativelanguage.googleapis.com/generate_content_free_tier_requests',
+              quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+            },
+          ],
+        },
+      ],
+    },
+  }));
+  const details = getGeminiErrorDetails(error);
+
+  assert.equal(details.statusCode, 429);
+  assert.equal(details.status, 'RESOURCE_EXHAUSTED');
+  assert.equal(details.isDailyQuota, true);
+  assert.equal(details.quotaViolations[0].quotaId, 'GenerateRequestsPerDayPerProjectPerModel-FreeTier');
 });
 
 test('cloud guest mirror keeps the ten most recently updated resumes', () => {
@@ -604,6 +1301,28 @@ test('cloud draft payload guard rejects oversized documents before Firestore wri
   );
 });
 
+test('cloud draft docs preserve the source draft timestamp for stale write ordering', () => {
+  const savedAt = '2026-06-24T12:34:56.000Z';
+  const draftDoc = createCloudDraftDoc({
+    resumeId: 'resume-imported',
+    name: 'Imported Resume',
+    draft: {
+      resume: createEmptyResume(),
+      template: 'modern',
+      sectionOrder: SECTION_IDS,
+      savedAt,
+    },
+    identity: {
+      deviceId: 'device-1',
+      sessionId: 'session-1',
+    },
+  });
+
+  assert.equal(draftDoc.savedAt, savedAt);
+  assert.equal(draftDoc.updatedAt, savedAt);
+  assert.equal(draftDoc.version, Date.parse(savedAt));
+});
+
 test('cloud workspace writes replace the index document instead of merging stale meta keys', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'lib/firebaseWorkspace.js'), 'utf8');
   const workspaceWriteLines = source
@@ -643,6 +1362,18 @@ test('builder conflict detection is scoped to the active resume dirty state', ()
   assert.match(deleteSource, /clearResumeDirty\(deletedResumeId\)/);
 });
 
+test('builder resets stale dynamic section tabs when loading a different resume', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const loadDraftStart = source.indexOf('function loadDraftIntoEditor(');
+  const loadDraftEnd = source.indexOf('function persistActiveDraftImmediately', loadDraftStart);
+  const loadDraftSource = source.slice(loadDraftStart, loadDraftEnd);
+
+  assert.match(source, /function getDraftEditorSectionIds\(draft\)/);
+  assert.match(loadDraftSource, /const nextSectionIds = getDraftEditorSectionIds\(nextDraft\)/);
+  assert.match(loadDraftSource, /!nextSectionIds\.includes\(activeTab\)/);
+  assert.match(loadDraftSource, /setActiveTab\('personal'\)/);
+});
+
 test('resume rename is scoped by resume id and updates cloud metadata directly', () => {
   const builderSource = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const headerSource = fs.readFileSync(path.resolve(SRC_DIR, 'components/header.jsx'), 'utf8');
@@ -674,6 +1405,28 @@ test('new resumes receive an immediate timestamp for recent local mirroring', ()
   assert.match(createSource, /savedAt: nextPayload\.savedAt,/);
   assert.match(createSource, /createWorkspaceResumeMeta\(nextResumeName, nextPayload\.savedAt\)/);
   assert.match(createSource, /loadDraftIntoEditor\(nextPersistedDraft,/);
+});
+
+test('builder exposes import placeholder and draft replacement actions', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const placeholderStart = source.indexOf('function createImportPlaceholderResume(');
+  const placeholderEnd = source.indexOf('async function replaceResumeDraft(', placeholderStart);
+  const replaceStart = source.indexOf('async function replaceResumeDraft(');
+  const replaceEnd = source.indexOf('async function duplicateActiveResume()', replaceStart);
+  const placeholderSource = source.slice(placeholderStart, placeholderEnd);
+  const replaceSource = source.slice(replaceStart, replaceEnd);
+
+  assert.ok(placeholderStart > -1);
+  assert.ok(replaceStart > -1);
+  assert.match(placeholderSource, /createDraftPayload\(/);
+  assert.match(placeholderSource, /createWorkspaceResumeMeta\(nextResumeName, nextPayload\.savedAt\)/);
+  assert.match(placeholderSource, /mirrorCloudDraftLocally\(nextResumeId, nextWorkspace, nextPersistedDraft\)/);
+  assert.match(placeholderSource, /return nextResumeId/);
+  assert.match(replaceSource, /normalizeDraftPayload\(importedDraft\)/);
+  assert.match(replaceSource, /createDraftPayload\(/);
+  assert.match(replaceSource, /persistExistingDraftState\(resumeId, nextDraft\)/);
+  assert.match(replaceSource, /mirrorCloudDraftLocally\(resumeId, nextWorkspace, nextDraft\)/);
+  assert.match(replaceSource, /flushCloudDraft\(resumeId, nextWorkspace, nextDraft,/);
 });
 
 test('builder reloads the local recent workspace when signing out of cloud mode', () => {
@@ -729,6 +1482,22 @@ test('builder delete waits for online cloud delete before local removal', () => 
   assert.ok(deleteStart > -1);
   assert.ok(deleteSource.indexOf('deleteCloudResume(') < deleteSource.indexOf('window.localStorage.removeItem'));
   assert.ok(deleteSource.includes('if (!cloudDeleteSucceeded && isOnline())'));
+});
+
+test('successful cloud mutations settle the syncing status', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const mutationStart = source.indexOf('function runCloudMutation(');
+  const mutationEnd = source.indexOf('function mirrorCloudWorkspaceLocally', mutationStart);
+  const mutationSource = source.slice(mutationStart, mutationEnd);
+  const deleteStart = source.indexOf('async function deleteActiveResume()');
+  const deleteEnd = source.indexOf('function useCloudConflictVersion()', deleteStart);
+  const deleteSource = source.slice(deleteStart, deleteEnd);
+
+  assert.ok(mutationStart > -1);
+  assert.match(source, /function settleCloudSyncState\(\)/);
+  assert.match(mutationSource, /setSyncState\('syncing'\)/);
+  assert.match(mutationSource, /settleCloudSyncState\(\)/);
+  assert.ok(deleteSource.indexOf('clearResumeDirty(deletedResumeId)') < deleteSource.indexOf('settleCloudSyncState()'));
 });
 
 test('conflict copy keeps the conflicted resume active instead of activating the copy', () => {
@@ -867,6 +1636,7 @@ test('getPreviewModel shapes the expanded resume sections and trims bullet marke
   ];
   resume.experience[0].company = 'Acme';
   resume.experience[0].role = 'Designer';
+  resume.experience[0].groupLabel = 'Professional Experience';
   resume.experience[0].activities = ['• Led redesign', '  - Improved conversion'];
   resume.skills[0].category = 'Product';
   resume.skills[0].items = 'Roadmapping, stakeholder alignment';
@@ -919,6 +1689,7 @@ test('getPreviewModel shapes the expanded resume sections and trims bullet marke
       { label: 'Leadership', content: 'Led the design club for two semesters.' }
     ]
   );
+  assert.equal(previewModel.experienceEntries[0].groupLabel, 'Professional Experience');
   assert.deepEqual(previewModel.experienceEntries[0].activities, ['Led redesign', 'Improved conversion']);
   assert.equal(previewModel.skillsEntries[0].items, 'Roadmapping, stakeholder alignment');
   assert.deepEqual(previewModel.projectEntries[0].highlights, ['Added live preview', 'Improved print output']);

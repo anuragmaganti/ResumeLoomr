@@ -5,7 +5,7 @@ function templateClassName(template) {
     return `resumePage--${template}`;
 }
 
-export default function ResumePreview({ previewModel, sectionOrder, template, settings, panelRef }) {
+export default function ResumePreview({ previewModel, template, settings, panelRef }) {
     const resumeRef = useRef(null);
     const presentationVars = useMemo(() => getResumePresentationVars(settings, template), [settings, template]);
     const printPageRule = useMemo(() => getResumePrintPageRule(settings, template), [settings, template]);
@@ -58,49 +58,71 @@ export default function ResumePreview({ previewModel, sectionOrder, template, se
         );
     }
 
-    const orderedSections = sectionOrder.map((sectionId) => {
-        if (sectionId === "personal" && previewModel.showPersonal) {
-            return (
-                <div className="resumeSection personalSection" key="personal">
-                    <h1>{previewModel.personal.name || "Your Name"}</h1>
-
-                    {previewModel.personal.headline && (
-                        <div className="personalHeadline">{previewModel.personal.headline}</div>
-                    )}
-
-                    {personalDetails.length > 0 && (
-                        <div className={`personalDetails ${personalDetails.length >= 4 ? 'personalDetails--wrap' : ''}`}>
-                            {personalDetails.map((detail, index) => (
-                                <span key={`${detail}-${index}`}>{detail}</span>
-                            ))}
-                        </div>
-                    )}
-
-                    {previewModel.personal.aboutMe && (
-                        <div className="aboutMe">{previewModel.personal.aboutMe}</div>
-                    )}
-                </div>
-            );
+    function renderPersonalSection() {
+        if (!previewModel.showPersonal) {
+            return null;
         }
 
-        if (sectionId === "education" && previewModel.showEducation) {
-            return (
-                <div className="resumeSection educationDiv" key="education">
-                    <h2>{previewModel.sectionTitles.education}</h2>
-                    {previewModel.educationEntries.map((institution) => (
-                        <div className="educationSection" key={institution.id}>
-                            {(institution.school || institution.location || institution.yearsEdu) && (
-                                <div className="degreeYearsEduFlex">
-                                    {(institution.school || institution.location) && (
-                                        <div className="schoolLocation">
-                                            {institution.school && <span className="school">{institution.school}</span>}
-                                            {institution.location && <span className="eduLocation">{institution.location}</span>}
+        return (
+            <div className="resumeSection personalSection" key="personal">
+                <h1>{previewModel.personal.name || "Your Name"}</h1>
+
+                {previewModel.personal.headline && (
+                    <div className="personalHeadline">{previewModel.personal.headline}</div>
+                )}
+
+                {personalDetails.length > 0 && (
+                    <div className={`personalDetails ${personalDetails.length >= 4 ? 'personalDetails--wrap' : ''}`}>
+                        {personalDetails.map((detail, index) => (
+                            <span key={`${detail}-${index}`}>{detail}</span>
+                        ))}
+                    </div>
+                )}
+
+                {previewModel.personal.aboutMe && (
+                    <div className="aboutMe">{previewModel.personal.aboutMe}</div>
+                )}
+            </div>
+        );
+    }
+
+    function renderEducationSection(block) {
+        return (
+            <div className="resumeSection educationDiv" key={block.id}>
+                <h2>{block.title}</h2>
+                {block.entries.map((institution) => (
+                    <div className="educationSection" key={institution.id}>
+                        {(institution.school || institution.location || institution.yearsEdu) && (
+                            <div className="degreeYearsEduFlex">
+                                {(institution.school || institution.location) && (
+                                    <div className="schoolLocation">
+                                        {institution.school && <span className="school">{institution.school}</span>}
+                                        {institution.location && <span className="eduLocation">{institution.location}</span>}
+                                    </div>
+                                )}
+                                {institution.yearsEdu && <div className="yearsEdu">{institution.yearsEdu}</div>}
+                            </div>
+                        )}
+                        {institution.programs?.length > 0 ? (
+                            institution.programs.map((program) => (
+                                <div className="schoolLocationRow" key={program.id}>
+                                    <div className="educationDegreeRow">
+                                        {program.degree && <div className="degree">{program.degree}</div>}
+                                        {program.honors && (
+                                            <div className="educationMeta">
+                                                <span>{program.honors}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {(program.yearsEdu || program.gpa) && (
+                                        <div className="yearsEdu educationGpa">
+                                            {[program.yearsEdu, program.gpa ? `GPA: ${program.gpa}` : ''].filter(Boolean).join(' | ')}
                                         </div>
                                     )}
-                                    {institution.yearsEdu && <div className="yearsEdu">{institution.yearsEdu}</div>}
                                 </div>
-                            )}
-                            {(institution.degree || institution.honors || institution.gpa) && (
+                            ))
+                        ) : (
+                            (institution.degree || institution.honors || institution.gpa) && (
                                 <div className="schoolLocationRow">
                                     <div className="educationDegreeRow">
                                         {institution.degree && <div className="degree">{institution.degree}</div>}
@@ -112,165 +134,180 @@ export default function ResumePreview({ previewModel, sectionOrder, template, se
                                     </div>
                                     {institution.gpa && <div className="yearsEdu educationGpa">GPA: {institution.gpa}</div>}
                                 </div>
-                            )}
-                            {institution.coursework && (
-                                <div className="educationDetail">
-                                    <span className="educationDetailLabel">Relevant coursework:</span> {institution.coursework}
-                                </div>
-                            )}
-                            {institution.awards && (
-                                <div className="educationDescription">
-                                    <span className="educationDetailLabel">Awards:</span> {institution.awards}
-                                </div>
-                            )}
-                            {institution.customSections.map((section) => (
-                                <div className="educationDescription" key={section.id}>
-                                    <span className="educationDetailLabel">{section.label || 'Custom section'}:</span> {section.content}
-                                </div>
-                            ))}
-                        </div>
-                    ))}
-                </div>
-            );
-        }
-
-        if (sectionId === "experience" && previewModel.showExperience) {
-            return (
-                <div className="resumeSection experienceDiv" key="experience">
-                    <h2>{previewModel.sectionTitles.experience}</h2>
-                    {previewModel.experienceEntries.map((job) => (
-                        <div className="experienceSection" key={job.id}>
-                            {(job.company || job.yearsExp) && (
-                                <div className="companyYearsExpFlex">
-                                    {job.company && <div className="company">{job.company}</div>}
-                                    {job.yearsExp && <div className="yearsExp">{job.yearsExp}</div>}
-                                </div>
-                            )}
-                            {job.role && <div className="role">{job.role}</div>}
-                            {renderBulletEntries(job.activities, job.id)}
-                        </div>
-                    ))}
-                </div>
-            );
-        }
-
-        if (sectionId === "skills" && previewModel.showSkills) {
-            return (
-                <div className="resumeSection skillsDiv" key="skills">
-                    <h2>{previewModel.sectionTitles.skills}</h2>
-                    {previewModel.skillsEntries.map((entry) => (
-                        <div className="skillGroup" key={entry.id}>
-                            {entry.category && <div className="skillGroupTitle">{entry.category}</div>}
-                            <div className="skillGroupItems">{entry.items}</div>
-                        </div>
-                    ))}
-                </div>
-            );
-        }
-
-        if (sectionId === "projects" && previewModel.showProjects) {
-            return (
-                <div className="resumeSection projectsDiv" key="projects">
-                    <h2>{previewModel.sectionTitles.projects}</h2>
-                    {previewModel.projectEntries.map((entry) => (
-                        <div className="previewEntry" key={entry.id}>
-                            <div className="previewEntryHeader">
-                                <div className="previewEntryTitle">{entry.name}</div>
-                                {entry.years && <div className="previewEntryMeta">{entry.years}</div>}
+                            )
+                        )}
+                        {institution.coursework && (
+                            <div className="educationDetail">
+                                <span className="educationDetailLabel">Relevant coursework:</span> {institution.coursework}
                             </div>
-                            {entry.subtitle && <div className="previewEntrySubtitle">{entry.subtitle}</div>}
-                            {entry.summary && <div className="previewEntryDetail">{entry.summary}</div>}
-                            {renderBulletEntries(entry.highlights, entry.id)}
+                        )}
+                        {institution.awards && (
+                            <div className="educationDescription">
+                                <span className="educationDetailLabel">Awards:</span> {institution.awards}
+                            </div>
+                        )}
+                        {institution.customSections.map((section) => (
+                            <div className="educationDescription" key={section.id}>
+                                <span className="educationDetailLabel">{section.label || 'Custom section'}:</span> {section.content}
+                            </div>
+                        ))}
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    function renderRolesSection(block) {
+        return (
+            <div className="resumeSection experienceDiv" key={block.id}>
+                <h2>{block.title}</h2>
+                {block.entries.map((job) => (
+                    <div className="experienceSection" key={job.id}>
+                        {(job.company || job.role || job.yearsExp) && (
+                            <div className="companyYearsExpFlex">
+                                {(job.company || job.role) && (
+                                    <div className="companyRoleLine">
+                                        {job.company && <span className="company">{job.company}</span>}
+                                        {job.company && job.role && <span className="roleSeparator">, </span>}
+                                        {job.role && <span className="role">{job.role}</span>}
+                                    </div>
+                                )}
+                                {job.yearsExp && <div className="yearsExp">{job.yearsExp}</div>}
+                            </div>
+                        )}
+                        {renderBulletEntries(job.activities, job.id)}
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    function renderSkillsSection(block) {
+        return (
+            <div className="resumeSection skillsDiv" key={block.id}>
+                <h2>{block.title}</h2>
+                {block.entries.map((entry) => (
+                    <div className="skillGroup" key={entry.id}>
+                        {entry.category && <div className="skillGroupTitle">{entry.category}</div>}
+                        <div className="skillGroupItems">{entry.items}</div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    function renderProjectsSection(block) {
+        return (
+            <div className="resumeSection projectsDiv" key={block.id}>
+                <h2>{block.title}</h2>
+                {block.entries.map((entry) => (
+                    <div className="previewEntry" key={entry.id}>
+                        <div className="previewEntryHeader">
+                            <div className="previewEntryTitle">{entry.name}</div>
+                            {entry.years && <div className="previewEntryMeta">{entry.years}</div>}
                         </div>
-                    ))}
-                </div>
-            );
+                        {entry.subtitle && <div className="previewEntrySubtitle">{entry.subtitle}</div>}
+                        {entry.summary && <div className="previewEntryDetail">{entry.summary}</div>}
+                        {renderBulletEntries(entry.highlights, entry.id)}
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    function renderLanguagesSection(block) {
+        return (
+            <div className="resumeSection languagesDiv" key={block.id}>
+                <h2>{block.title}</h2>
+                {block.entries.map((entry) => (
+                    <div className="previewEntry previewEntry--tight" key={entry.id}>
+                        <div className="previewInlineHeader">
+                            <div className="previewEntryTitle">{entry.language}</div>
+                            {entry.proficiency && <div className="previewEntryMeta">{entry.proficiency}</div>}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    function renderCustomSection(block) {
+        return (
+            <div className="resumeSection customDiv" key={block.id}>
+                <h2>{block.title}</h2>
+                {block.entries.map((entry) => (
+                    <div className="previewEntry" key={entry.id}>
+                        <div className="previewEntryHeader">
+                            <div className="previewEntryTitle">{entry.title}</div>
+                            {entry.years && <div className="previewEntryMeta">{entry.years}</div>}
+                        </div>
+                        {entry.subtitle && <div className="previewEntrySubtitle">{entry.subtitle}</div>}
+                        {entry.details && <div className="previewEntryDetail">{entry.details}</div>}
+                        {renderBulletEntries(entry.highlights, entry.id)}
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    function renderSectionBlock(block) {
+        if (block.kind === "education") {
+            return renderEducationSection(block);
         }
 
-        if (sectionId === "certifications" && previewModel.showCertifications) {
+        if (block.kind === "roles") {
+            return renderRolesSection(block);
+        }
+
+        if (block.kind === "skills") {
+            return renderSkillsSection(block);
+        }
+
+        if (block.kind === "projects") {
+            return renderProjectsSection(block);
+        }
+
+        if (block.kind === "certifications") {
             return renderSimpleMetaSection({
-                title: previewModel.sectionTitles.certifications,
-                entries: previewModel.certificationEntries,
-                sectionClassName: 'certificationsDiv',
+                title: block.title,
+                entries: block.entries,
+                sectionClassName: `certificationsDiv ${block.id}`,
                 detailKey: 'details',
                 secondaryKey: 'issuer'
             });
         }
 
-        if (sectionId === "volunteering" && previewModel.showVolunteering) {
-            return (
-                <div className="resumeSection volunteeringDiv" key="volunteering">
-                    <h2>{previewModel.sectionTitles.volunteering}</h2>
-                    {previewModel.volunteeringEntries.map((entry) => (
-                        <div className="previewEntry" key={entry.id}>
-                            <div className="previewEntryHeader">
-                                <div className="previewEntryTitle">{entry.organization}</div>
-                                {entry.years && <div className="previewEntryMeta">{entry.years}</div>}
-                            </div>
-                            {entry.role && <div className="previewEntrySubtitle">{entry.role}</div>}
-                            {renderBulletEntries(entry.highlights, entry.id)}
-                        </div>
-                    ))}
-                </div>
-            );
+        if (block.kind === "languages") {
+            return renderLanguagesSection(block);
         }
 
-        if (sectionId === "leadership" && previewModel.showLeadership) {
-            return (
-                <div className="resumeSection leadershipDiv" key="leadership">
-                    <h2>{previewModel.sectionTitles.leadership}</h2>
-                    {previewModel.leadershipEntries.map((entry) => (
-                        <div className="previewEntry" key={entry.id}>
-                            <div className="previewEntryHeader">
-                                <div className="previewEntryTitle">{entry.organization}</div>
-                                {entry.years && <div className="previewEntryMeta">{entry.years}</div>}
-                            </div>
-                            {entry.role && <div className="previewEntrySubtitle">{entry.role}</div>}
-                            {renderBulletEntries(entry.highlights, entry.id)}
-                        </div>
-                    ))}
-                </div>
-            );
-        }
-
-        if (sectionId === "languages" && previewModel.showLanguages) {
-            return (
-                <div className="resumeSection languagesDiv" key="languages">
-                    <h2>{previewModel.sectionTitles.languages}</h2>
-                    {previewModel.languageEntries.map((entry) => (
-                        <div className="previewEntry previewEntry--tight" key={entry.id}>
-                            <div className="previewInlineHeader">
-                                <div className="previewEntryTitle">{entry.language}</div>
-                                {entry.proficiency && <div className="previewEntryMeta">{entry.proficiency}</div>}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            );
-        }
-
-        if (sectionId === "awards" && previewModel.showAwards) {
+        if (block.kind === "awards") {
             return renderSimpleMetaSection({
-                title: previewModel.sectionTitles.awards,
-                entries: previewModel.awardEntries,
-                sectionClassName: 'awardsDiv',
+                title: block.title,
+                entries: block.entries,
+                sectionClassName: `awardsDiv ${block.id}`,
                 detailKey: 'details',
                 secondaryKey: 'issuer'
             });
         }
 
-        if (sectionId === "publications" && previewModel.showPublications) {
+        if (block.kind === "publications") {
             return renderSimpleMetaSection({
-                title: previewModel.sectionTitles.publications,
-                entries: previewModel.publicationEntries,
-                sectionClassName: 'publicationsDiv',
+                title: block.title,
+                entries: block.entries,
+                sectionClassName: `publicationsDiv ${block.id}`,
                 detailKey: 'details',
                 secondaryKey: 'publisher'
             });
         }
 
-        return null;
-    }).filter(Boolean);
+        return renderCustomSection(block);
+    }
+
+    const orderedSections = [
+        renderPersonalSection(),
+        ...previewModel.sectionBlocks.map(renderSectionBlock)
+    ].filter(Boolean);
 
     return (
         <>

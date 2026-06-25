@@ -16,6 +16,7 @@
   --resume-section-heading-gap: 8px;
   --resume-entry-gap: 6px;
   --resume-repeated-entry-gap: 8px;
+  --resume-dense-entry-gap: 2px;
   --resume-detail-gap: 4px;
   --resume-list-gap: 4px;
   --resume-print-min-height: 10in;
@@ -74,6 +75,7 @@
 .educationSection,
 .experienceSection,
 .previewEntry,
+.previewEntryGroupLabel,
 .skillGroup {
   break-inside: avoid;
   page-break-inside: avoid;
@@ -137,17 +139,34 @@
   margin-top: var(--resume-entry-gap);
 }
 
+.previewEntryGroupLabel {
+  margin-top: var(--resume-entry-gap);
+  color: var(--resume-page-muted);
+  font-size: var(--resume-meta-size);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: var(--resume-detail-line-height);
+  text-transform: uppercase;
+}
+
+.previewEntryGroupLabel + .experienceSection {
+  margin-top: max(0px, calc(var(--resume-detail-gap) - 1px));
+}
+
 .educationDiv > .educationSection + .educationSection,
 .experienceDiv > .experienceSection + .experienceSection,
-.skillsDiv > .skillGroup + .skillGroup,
 .projectsDiv > .previewEntry + .previewEntry,
-.certificationsDiv > .previewEntry + .previewEntry,
 .volunteeringDiv > .previewEntry + .previewEntry,
-.leadershipDiv > .previewEntry + .previewEntry,
+.leadershipDiv > .previewEntry + .previewEntry {
+  margin-top: var(--resume-repeated-entry-gap);
+}
+
+.skillsDiv > .skillGroup + .skillGroup,
+.certificationsDiv > .previewEntry + .previewEntry,
 .languagesDiv > .previewEntry + .previewEntry,
 .awardsDiv > .previewEntry + .previewEntry,
 .publicationsDiv > .previewEntry + .previewEntry {
-  margin-top: var(--resume-repeated-entry-gap);
+  margin-top: var(--resume-dense-entry-gap);
 }
 
 .degreeYearsEduFlex,
@@ -156,6 +175,10 @@
   justify-content: space-between;
   gap: 16px;
   align-items: baseline;
+}
+
+.companyRoleLine {
+  min-width: 0;
 }
 
 .educationDegreeRow {
@@ -179,7 +202,6 @@
 
 .company,
 .school,
-.role,
 .previewEntryTitle,
 .skillGroupTitle {
   color: var(--resume-page-text);
@@ -187,9 +209,14 @@
 }
 
 .degree,
+.role,
 .previewEntrySubtitle {
   color: var(--resume-page-muted);
   font-weight: 600;
+}
+
+.role {
+  font-style: italic;
 }
 
 .yearsEdu,
@@ -296,7 +323,7 @@
 }
 
 .previewEntry--tight {
-  margin-top: var(--resume-repeated-entry-gap);
+  margin-top: var(--resume-dense-entry-gap);
 }
 
 .resumeEmptyState {

@@ -349,6 +349,29 @@
   box-shadow: 0 8px 18px rgba(49, 88, 213, 0.16);
 }
 
+.importResumeButton {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.buttonSpinner {
+  width: 0.82em;
+  height: 0.82em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  animation: buttonSpinnerSpin 720ms linear infinite;
+}
+
+@keyframes buttonSpinnerSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .statusBadge {
   display: inline-flex;
   align-items: center;
