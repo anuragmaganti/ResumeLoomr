@@ -321,6 +321,33 @@ function getSavedAtTimestamp(value) {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function createFallbackCloudImportDraft({ localWorkspace, currentDraft, fallbackResumeId }) {
+  const payload = createDraftPayload({
+    resume: currentDraft.resume,
+    template: currentDraft.template,
+    sectionOrder: currentDraft.sectionOrder,
+  });
+  const resumeId = fallbackResumeId || localWorkspace.activeResumeId || createWorkspaceResumeId();
+  const name = localWorkspace.meta[resumeId]?.name || 'Resume 1';
+  const draft = {
+    resume: payload.resume,
+    template: payload.template,
+    sectionOrder: payload.sectionOrder,
+    savedAt: payload.savedAt,
+  };
+
+  return {
+    workspace: normalizeWorkspaceIndex({
+      activeResumeId: resumeId,
+      resumeIds: [resumeId],
+      meta: {
+        [resumeId]: createWorkspaceResumeMeta(name, payload.savedAt),
+      },
+    }),
+    draft,
+  };
+}
+
 async function resolveReadableCloudWorkspace({ uid, workspace, trustedDevice }) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const orderedResumeIds = [
@@ -495,6 +522,23 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
             trustedDevice,
             cloudIdentityRef.current,
           );
+
+          if (!nextWorkspace) {
+            const fallbackImport = createFallbackCloudImportDraft({
+              localWorkspace: localSnapshot.workspace,
+              currentDraft: currentDraftRef.current,
+              fallbackResumeId: localSnapshot.activeResumeId || activeResumeIdRef.current,
+            });
+
+            nextWorkspace = await importWorkspaceToCloud(
+              uid,
+              fallbackImport.workspace,
+              (resumeId) => (resumeId === fallbackImport.workspace.activeResumeId ? fallbackImport.draft : null),
+              trustedDevice,
+              cloudIdentityRef.current,
+            );
+          }
+
           markGuestWorkspaceImported(uid);
         } else {
           nextWorkspace = await syncLocalWorkspaceToCloud(
@@ -510,7 +554,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         }
 
         if (cancelled || !nextWorkspace) {
-          return;
+          throw new Error('Cloud workspace could not be created from local drafts.');
         }
 
         const resolvedCloudWorkspace = await resolveReadableCloudWorkspace({
@@ -905,12 +949,10 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
   }
 
   function logCloudError(error) {
-    if (import.meta.env.DEV) {
-      console.error('Cloud sync failed', {
-        code: error?.code,
-        message: error?.message,
-      });
-    }
+    console.error('Cloud sync failed', {
+      code: error?.code,
+      message: error?.message,
+    });
   }
 
   function getCloudSyncErrorMessage(error) {

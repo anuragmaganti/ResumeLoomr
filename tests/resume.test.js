@@ -1637,6 +1637,19 @@ test('builder reconciles signed-out local workspace changes on every sign-in', (
   assert.doesNotMatch(source, /export async function appendWorkspaceToCloud/);
 });
 
+test('builder falls back to the current draft when first cloud import has no readable local drafts', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const bootstrapStart = source.indexOf('async function bootstrapCloudWorkspace()');
+  const bootstrapEnd = source.indexOf('const resolvedCloudWorkspace = await resolveReadableCloudWorkspace', bootstrapStart);
+  const bootstrapSource = source.slice(bootstrapStart, bootstrapEnd);
+
+  assert.match(source, /function createFallbackCloudImportDraft/);
+  assert.match(bootstrapSource, /if \(!nextWorkspace\) \{/);
+  assert.match(bootstrapSource, /createFallbackCloudImportDraft\(/);
+  assert.match(bootstrapSource, /currentDraftRef\.current/);
+  assert.match(source, /Cloud workspace could not be created from local drafts/);
+});
+
 test('builder delete waits for online cloud delete before local removal', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const deleteStart = source.indexOf('async function deleteActiveResume()');
