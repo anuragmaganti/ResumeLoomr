@@ -3,6 +3,9 @@ export const WORKSPACE_INDEX_STORAGE_KEY = 'resumeloomr:index:v1';
 export const RESUME_STORAGE_KEY_PREFIX = 'resumeloomr:resume:';
 export const MAX_WORKSPACE_RESUME_NAME_LENGTH = 25;
 export const MAX_WORKSPACE_RESUMES = 10;
+export const SECTION_BLOCK_ID_MAX_LENGTH = 100;
+export const SECTION_BLOCK_TITLE_MAX_LENGTH = 80;
+export const SECTION_BLOCK_LEGACY_ID_MAX_LENGTH = 32;
 export const DEFAULT_TEMPLATE = 'modern';
 export const TEMPLATE_OPTIONS = [
   { id: 'modern', label: 'Modern' },
@@ -241,6 +244,27 @@ function slugifySectionId(value, fallback = 'section') {
 function createSectionBlockId(kind, title, index = 0) {
   const suffix = index > 0 ? `-${index + 1}` : '';
   return `${kind}-${slugifySectionId(title, kind)}${suffix}`;
+}
+
+function clampSectionBlockText(value, maxLength, fallback = '') {
+  const text = trimText(value).slice(0, maxLength).trim();
+  return text || trimText(fallback).slice(0, maxLength).trim();
+}
+
+function createUniqueSectionBlockId(rawId, usedIds) {
+  const fallbackId = 'section';
+  const baseId = clampSectionBlockText(rawId, SECTION_BLOCK_ID_MAX_LENGTH, fallbackId) || fallbackId;
+  let id = baseId;
+  let duplicateIndex = 2;
+
+  while (usedIds.has(id) || id === 'personal') {
+    const suffix = `-${duplicateIndex}`;
+    const baseLength = Math.max(1, SECTION_BLOCK_ID_MAX_LENGTH - suffix.length);
+    id = `${baseId.slice(0, baseLength).replace(/-+$/g, '')}${suffix}`;
+    duplicateIndex += 1;
+  }
+
+  return id;
 }
 
 export function resolveSectionTitle(sectionTitles, sectionId) {
@@ -934,15 +958,9 @@ export function normalizeResumeSections(candidate, legacyResume, sectionOrder = 
 
     const kind = normalizeSectionBlockKind(section.kind);
     const fallbackTitle = SECTION_TITLE_DEFAULTS[section.legacySectionId] || (kind === 'roles' ? 'Experience' : 'Custom');
-    const title = trimText(section.title) || fallbackTitle;
+    const title = clampSectionBlockText(section.title, SECTION_BLOCK_TITLE_MAX_LENGTH, fallbackTitle) || fallbackTitle;
     const rawId = trimText(section.id) || createSectionBlockId(kind, title, index);
-    let id = rawId;
-    let duplicateIndex = 2;
-
-    while (usedIds.has(id) || id === 'personal') {
-      id = `${rawId}-${duplicateIndex}`;
-      duplicateIndex += 1;
-    }
+    const id = createUniqueSectionBlockId(rawId, usedIds);
 
     usedIds.add(id);
     const legacyEntries = refreshLegacyEntries ? getLegacySectionBlockEntries({ ...section, title }, kind, legacyResume) : null;
@@ -951,7 +969,9 @@ export function normalizeResumeSections(candidate, legacyResume, sectionOrder = 
       id,
       kind,
       title,
-      legacySectionId: Object.hasOwn(LEGACY_SECTION_KIND_MAP, section.legacySectionId) ? section.legacySectionId : '',
+      legacySectionId: Object.hasOwn(LEGACY_SECTION_KIND_MAP, section.legacySectionId)
+        ? clampSectionBlockText(section.legacySectionId, SECTION_BLOCK_LEGACY_ID_MAX_LENGTH)
+        : '',
       entries: normalizeSectionBlockEntries(kind, legacyEntries || section.entries)
     });
   });

@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 import {
   DRAFT_STORAGE_KEY,
   MAX_WORKSPACE_RESUMES,
+  SECTION_BLOCK_ID_MAX_LENGTH,
+  SECTION_BLOCK_LEGACY_ID_MAX_LENGTH,
+  SECTION_BLOCK_TITLE_MAX_LENGTH,
   SECTION_IDS,
   WORKSPACE_INDEX_STORAGE_KEY,
   addEducationCustomSection,
@@ -740,6 +743,38 @@ test('normalization refreshes stale legacy fixed blocks into section blocks', ()
 
   assert.equal(draft.resume.sections[0].entries[0].school, 'Fresh Legacy University');
   assert.equal(getPreviewModel(draft.resume).sectionBlocks[0].entries[0].school, 'Fresh Legacy University');
+});
+
+test('normalizeDraftPayload caps section block metadata to Firestore-safe limits', () => {
+  const longId = `custom-${'very-long-section-id-'.repeat(10)}`;
+  const longTitle = `Long Imported Section ${'Details '.repeat(20)}`;
+  const draft = normalizeDraftPayload({
+    resume: {
+      sections: [
+        {
+          id: longId,
+          kind: 'custom',
+          title: longTitle,
+          legacySectionId: 'experience-extra-long-legacy-section-id',
+          entries: [{ id: 'custom-entry-1', title: 'Imported detail' }],
+        },
+        {
+          id: longId,
+          kind: 'custom',
+          title: longTitle,
+          entries: [{ id: 'custom-entry-2', title: 'Imported detail' }],
+        },
+      ],
+    },
+  });
+
+  assert.equal(draft.resume.sections.length, 2);
+  assert.equal(draft.resume.sections[0].id.length <= SECTION_BLOCK_ID_MAX_LENGTH, true);
+  assert.equal(draft.resume.sections[1].id.length <= SECTION_BLOCK_ID_MAX_LENGTH, true);
+  assert.notEqual(draft.resume.sections[0].id, draft.resume.sections[1].id);
+  assert.equal(draft.resume.sections[0].title.length <= SECTION_BLOCK_TITLE_MAX_LENGTH, true);
+  assert.equal(draft.resume.sections[0].legacySectionId.length <= SECTION_BLOCK_LEGACY_ID_MAX_LENGTH, true);
+  assert.equal(draft.resume.sections[1].legacySectionId, '');
 });
 
 test('removing a section block clears matching legacy mirror content', () => {

@@ -548,8 +548,12 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         clearLocalDirtyState();
         setCloudReady(true);
         setSyncState('saved');
-      } catch {
+      } catch (error) {
         if (!cancelled) {
+          console.error('Cloud workspace bootstrap failed', {
+            code: error?.code,
+            message: error?.message,
+          });
           setCloudReady(false);
           setSaveState('error');
           setSyncState('error');

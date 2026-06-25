@@ -211,6 +211,14 @@ test('firestore rules validate resume section blocks', { skip: !FIRESTORE_EMULAT
         entries: [],
       }),
     ])));
+    await assertSucceeds(resumeRef.set(createResumeDocWithSections([
+      {
+        id: 'custom-without-legacy',
+        kind: 'custom',
+        title: 'Imported Custom Section',
+        entries: [{ id: 'custom-entry', title: 'Raw section' }],
+      },
+    ])));
     await assertFails(resumeRef.set(createResumeDocWithSections([
       createSectionBlock({
         kind: 'unknown',

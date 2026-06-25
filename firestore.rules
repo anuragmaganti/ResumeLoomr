@@ -109,8 +109,10 @@ service cloud.firestore {
         isString(section.title) &&
         section.title.size() > 0 &&
         section.title.size() <= 80 &&
-        isString(section.legacySectionId) &&
-        section.legacySectionId.size() <= 32 &&
+        (!section.keys().hasAny(['legacySectionId']) || (
+          isString(section.legacySectionId) &&
+          section.legacySectionId.size() <= 32
+        )) &&
         section.entries is list &&
         section.entries.size() <= 100;
     }
