@@ -326,6 +326,26 @@ export function reorderWorkspaceResumes(workspace, sourceResumeId, targetResumeI
   });
 }
 
+export function reorderWorkspaceResumesToMatch(workspace, orderedResumeIds) {
+  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+  const requestedOrder = Array.from(new Set(
+    (Array.isArray(orderedResumeIds) ? orderedResumeIds : [])
+      .filter((resumeId) => trimText(resumeId) !== '')
+  ));
+
+  if (
+    requestedOrder.length !== normalizedWorkspace.resumeIds.length ||
+    requestedOrder.some((resumeId) => !normalizedWorkspace.resumeIds.includes(resumeId))
+  ) {
+    return normalizedWorkspace;
+  }
+
+  return normalizeWorkspaceIndex({
+    ...normalizedWorkspace,
+    resumeIds: requestedOrder,
+  });
+}
+
 export function createEmptyWorkspaceIndex() {
   return {
     activeResumeId: '',
@@ -1115,6 +1135,24 @@ export function reorderSectionOrder(sectionOrder, sectionId, targetSectionId, pl
   return normalizeSectionOrder(nextOrder);
 }
 
+export function reorderSectionOrderToMatch(sectionOrder, orderedSectionIds) {
+  const normalizedOrder = normalizeSectionOrder(sectionOrder);
+  const requestedOrder = Array.from(new Set(
+    (Array.isArray(orderedSectionIds) ? orderedSectionIds : [])
+      .filter((sectionId) => trimText(sectionId) !== '' && sectionId !== 'personal')
+  ));
+  const currentSections = normalizedOrder.filter((sectionId) => sectionId !== 'personal');
+
+  if (
+    requestedOrder.length !== currentSections.length ||
+    requestedOrder.some((sectionId) => !currentSections.includes(sectionId))
+  ) {
+    return normalizedOrder;
+  }
+
+  return normalizeSectionOrder(['personal', ...requestedOrder]);
+}
+
 export function updatePersonalField(resume, field, value) {
   return {
     ...resume,
@@ -1265,10 +1303,32 @@ export function reorderResumeSectionBlock(resume, sectionId, targetSectionId, pl
   insertIndex = Math.max(0, Math.min(insertIndex, nextSections.length));
   nextSections.splice(insertIndex, 0, section);
 
-  return {
+  return syncLegacyMirrorsFromSections({
     ...resume,
     sections: nextSections
-  };
+  });
+}
+
+export function reorderResumeSectionBlocksToMatch(resume, orderedSectionIds) {
+  const sections = normalizeResumeSections(resume.sections, resume);
+  const requestedOrder = Array.from(new Set(
+    (Array.isArray(orderedSectionIds) ? orderedSectionIds : [])
+      .filter((sectionId) => trimText(sectionId) !== '' && sectionId !== 'personal')
+  ));
+
+  if (
+    requestedOrder.length !== sections.length ||
+    requestedOrder.some((sectionId) => !sections.some((section) => section.id === sectionId))
+  ) {
+    return resume;
+  }
+
+  const sectionsById = new Map(sections.map((section) => [section.id, section]));
+
+  return syncLegacyMirrorsFromSections({
+    ...resume,
+    sections: requestedOrder.map((sectionId) => sectionsById.get(sectionId))
+  });
 }
 
 export function removeResumeSectionBlock(resume, sectionId) {

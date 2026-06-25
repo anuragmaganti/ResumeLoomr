@@ -57,6 +57,7 @@ function App() {
     sectionOrder,
     moveSection,
     reorderSection,
+    reorderSections,
     mobileView,
     setMobileView,
     previewModel,
@@ -89,7 +90,7 @@ function App() {
     replaceResumeDraft,
     duplicateActiveResume,
     renameActiveResume,
-    reorderResume,
+    reorderResumes,
     deleteActiveResume,
   } = useResumeBuilder({
     user: auth.user,
@@ -355,7 +356,7 @@ function App() {
           onCreateResume={createResume}
           onDuplicateResume={duplicateActiveResume}
           onRenameResume={renameActiveResume}
-          onReorderResume={reorderResume}
+          onReorderResumes={reorderResumes}
           onDeleteResume={deleteActiveResume}
           authUser={auth.user}
           authReady={auth.authReady}
@@ -472,6 +473,7 @@ function App() {
               sectionOrder={sectionOrder}
               onMoveSection={moveSection}
               onReorderSection={reorderSection}
+              onReorderSections={reorderSections}
               template={template}
               templateOptions={templateOptions}
               onTemplateChange={setTemplate}

@@ -1,4 +1,21 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+    closestCenter,
+    DndContext,
+    DragOverlay,
+    useSensor,
+    useSensors
+} from "@dnd-kit/core";
+import {
+    arrayMove,
+    rectSortingStrategy,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from "../lib/sortableSensors.js";
 
 const defaultSections = [
     { id: "personal", navLabel: "Personal", navHint: "Name, contact, summary" },
@@ -6,141 +23,194 @@ const defaultSections = [
     { id: "experience", navLabel: "Experience", navHint: "Roles and highlights" }
 ];
 
-const SECTION_DRAG_MIME_TYPE = "application/x-resumeloomr-section";
-let transparentDragImageElement = null;
+function getSectionIds(sections) {
+    return sections.map((section) => section.id);
+}
 
-function getTransparentDragImage() {
-    if (typeof document === "undefined") {
+function SectionTabContent({ section, index }) {
+    return (
+        <>
+            <span className="tabIndex" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+            <span className="tabCopy">
+                <span className="tabLabel">{section.navLabel}</span>
+                <span className="tabHint">{section.navHint}</span>
+            </span>
+        </>
+    );
+}
+
+function SortableSectionTab({
+    section,
+    index,
+    isActive,
+    isLocked,
+    setActiveTab
+}) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({
+        id: section.id,
+        disabled: isLocked
+    });
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition
+    };
+
+    return (
+        <button
+            ref={setNodeRef}
+            className={[
+                "tabButton",
+                isActive ? "isActive" : "",
+                isDragging ? "isSortingPlaceholder" : "",
+                isLocked ? "isLocked" : ""
+            ].filter(Boolean).join(" ")}
+            style={style}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => setActiveTab(section.id)}
+            {...attributes}
+            {...listeners}
+        >
+            <SectionTabContent section={section} index={index} />
+        </button>
+    );
+}
+
+function SectionTabOverlay({ section, index, isActive, style }) {
+    if (!section) {
         return null;
     }
 
-    if (transparentDragImageElement?.isConnected) {
-        return transparentDragImageElement;
-    }
-
-    const element = document.createElement("div");
-    element.setAttribute("aria-hidden", "true");
-    element.style.position = "fixed";
-    element.style.top = "0";
-    element.style.left = "0";
-    element.style.width = "1px";
-    element.style.height = "1px";
-    element.style.opacity = "0";
-    element.style.pointerEvents = "none";
-    element.style.zIndex = "-1";
-
-    document.body.appendChild(element);
-    transparentDragImageElement = element;
-    return transparentDragImageElement;
+    return (
+        <div className={`tabButton tabButtonOverlay${isActive ? " isActive" : ""}`} style={style}>
+            <SectionTabContent section={section} index={index} />
+        </div>
+    );
 }
 
 export default function SectionTabs({
     activeTab,
     setActiveTab,
     sections = defaultSections,
+    onReorderSections,
     onReorderSection
 }) {
-    const [draggedSectionId, setDraggedSectionId] = useState(null);
+    const [activeDragId, setActiveDragId] = useState(null);
+    const [activeDragRect, setActiveDragRect] = useState(null);
+    const sectionIds = useMemo(() => getSectionIds(sections), [sections]);
+    const sectionById = useMemo(
+        () => new Map(sections.map((section) => [section.id, section])),
+        [sections]
+    );
+    const orderedSections = useMemo(
+        () => sectionIds.map((sectionId) => sectionById.get(sectionId)).filter(Boolean),
+        [sectionIds, sectionById]
+    );
+    const activeDragSection = activeDragId ? sectionById.get(activeDragId) : null;
+    const activeDragIndex = activeDragId ? sectionIds.indexOf(activeDragId) : -1;
+    const canReorder = Boolean(onReorderSections || onReorderSection);
+    const sensors = useSensors(
+        useSensor(ResumeLoomrPointerSensor, {
+            activationConstraint: {
+                distance: 6
+            }
+        }),
+        useSensor(ResumeLoomrKeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates
+        })
+    );
 
-    useEffect(() => {
-        getTransparentDragImage();
-    }, []);
+    function handleSectionDragStart(event) {
+        const sectionId = String(event.active.id);
 
-    function clearDragState() {
-        setDraggedSectionId(null);
+        if (sectionId === "personal" || !canReorder) {
+            return;
+        }
+
+        setActiveDragId(sectionId);
+        const rect = event.active.rect.current.initial;
+        setActiveDragRect(rect ? { width: rect.width, height: rect.height } : null);
     }
 
-    function handleDragStart(event, sectionId) {
-        if (sectionId === "personal" || !onReorderSection) {
-            event.preventDefault();
-            return;
-        }
-
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData(SECTION_DRAG_MIME_TYPE, sectionId);
-        const dragImage = getTransparentDragImage();
-
-        if (dragImage) {
-            event.dataTransfer.setDragImage(dragImage, 0, 0);
-        }
-
-        setDraggedSectionId(sectionId);
+    function resetSectionDragState() {
+        setActiveDragId(null);
+        setActiveDragRect(null);
     }
 
-    function handleDragOver(event, sectionId) {
-        if (!draggedSectionId || draggedSectionId === sectionId || sectionId === "personal") {
+    function handleSectionDragEnd(event) {
+        const activeId = String(event.active.id);
+        const overId = event.over?.id ? String(event.over.id) : "";
+
+        setActiveDragId(null);
+        setActiveDragRect(null);
+
+        if (!canReorder || activeId === "personal" || !overId || overId === "personal" || activeId === overId) {
             return;
         }
 
-        const draggedIndex = sections.findIndex((section) => section.id === draggedSectionId);
-        const targetIndex = sections.findIndex((section) => section.id === sectionId);
+        const oldIndex = sectionIds.indexOf(activeId);
+        const newIndex = sectionIds.indexOf(overId);
 
-        if (draggedIndex < 1 || targetIndex < 1) {
+        if (oldIndex >= 1 && newIndex >= 1 && oldIndex !== newIndex) {
+            const nextSectionIds = arrayMove(sectionIds, oldIndex, newIndex);
+
+            if (onReorderSections) {
+                onReorderSections(nextSectionIds);
+            } else if (event.over?.id && onReorderSection) {
+                onReorderSection(activeId, String(event.over.id), "before");
+            }
+
+            setActiveTab(activeId);
             return;
         }
-
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-
-        const { top, height } = event.currentTarget.getBoundingClientRect();
-        const pointerY = event.clientY - top;
-
-        if (draggedIndex < targetIndex && pointerY < height * 0.55) {
-            return;
-        }
-
-        if (draggedIndex > targetIndex && pointerY > height * 0.45) {
-            return;
-        }
-
-        onReorderSection?.(
-            draggedSectionId,
-            sectionId,
-            draggedIndex < targetIndex ? "after" : "before"
-        );
     }
 
-    function handleDrop(event) {
-        event.preventDefault();
-        if (draggedSectionId) {
-            setActiveTab(draggedSectionId);
-        }
-        clearDragState();
-    }
+    const sectionDragOverlay = (
+        <DragOverlay adjustScale={false} zIndex={1000}>
+            <SectionTabOverlay
+                section={activeDragSection}
+                index={activeDragIndex}
+                isActive={activeDragId === activeTab}
+                style={activeDragRect ? {
+                    width: `${activeDragRect.width}px`,
+                    height: `${activeDragRect.height}px`
+                } : undefined}
+            />
+        </DragOverlay>
+    );
 
-    return(
-        <div className="tabs" role="tablist" aria-label="Resume sections">
-            {sections.map((section, index) => (
-                <button
-                    key={section.id}
-                    className={[
-                        "tabButton",
-                        activeTab === section.id ? "isActive" : "",
-                        draggedSectionId === section.id ? "isDragging" : "",
-                        section.id === "personal" ? "isLocked" : ""
-                    ].filter(Boolean).join(" ")}
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === section.id}
-                    draggable={section.id !== "personal" && Boolean(onReorderSection)}
-                    onClick={() => setActiveTab(section.id)}
-                    onPointerDown={() => {
-                        if (section.id !== "personal" && onReorderSection) {
-                            getTransparentDragImage();
-                        }
-                    }}
-                    onDragStart={(event) => handleDragStart(event, section.id)}
-                    onDragOver={(event) => handleDragOver(event, section.id)}
-                    onDrop={handleDrop}
-                    onDragEnd={clearDragState}
-                >
-                    <span className="tabIndex" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
-                    <span className="tabCopy">
-                        <span className="tabLabel">{section.navLabel}</span>
-                        <span className="tabHint">{section.navHint}</span>
-                    </span>
-                </button>
-            ))}
-        </div>
-    )
+    return (
+        <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleSectionDragStart}
+            onDragEnd={handleSectionDragEnd}
+            onDragCancel={resetSectionDragState}
+        >
+            <SortableContext items={sectionIds} strategy={rectSortingStrategy}>
+                <div className="tabs" role="tablist" aria-label="Resume sections">
+                    {orderedSections.map((section, index) => (
+                        <SortableSectionTab
+                            key={section.id}
+                            section={section}
+                            index={index}
+                            isActive={activeTab === section.id}
+                            isLocked={section.id === "personal" || !canReorder}
+                            setActiveTab={setActiveTab}
+                        />
+                    ))}
+                </div>
+            </SortableContext>
+
+            {typeof document === "undefined" ? sectionDragOverlay : createPortal(sectionDragOverlay, document.body)}
+        </DndContext>
+    );
 }

@@ -84,6 +84,7 @@ export default function EditorPanel({
     setActiveTab,
     onMoveSection,
     onReorderSection,
+    onReorderSections,
     template,
     templateOptions,
     onTemplateChange,
@@ -198,6 +199,7 @@ export default function EditorPanel({
                             setActiveTab={setActiveTab}
                             sections={sections}
                             onReorderSection={onReorderSection}
+                            onReorderSections={onReorderSections}
                         />
                     </aside>
                 </div>

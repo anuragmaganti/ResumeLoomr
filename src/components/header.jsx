@@ -1,34 +1,168 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  rectSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { MAX_WORKSPACE_RESUME_NAME_LENGTH, sanitizeWorkspaceResumeName } from "../lib/resume.js";
+import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from "../lib/sortableSensors.js";
 import BrandMark from "./brandMark";
 import EntryActionMenu from "./forms/entryActionMenu";
 
-const RESUME_DRAG_MIME_TYPE = "application/x-resumeloomr-resume";
-let transparentDragImageElement = null;
+function getResumeIds(resumeList) {
+  return resumeList.map((resume) => resume.id);
+}
 
-function getTransparentDragImage() {
-  if (typeof document === "undefined") {
+function ResumePillContents({
+  resume,
+  isActive,
+  isRenaming,
+  renameValue,
+  canAddResume,
+  canDeleteActiveResume,
+  onSetActiveResume,
+  onStartRename,
+  onRenameValueChange,
+  onCommitRename,
+  onCancelRename,
+  onStartRenamingActiveResume,
+  onDuplicateResume,
+  onDeleteResume,
+}) {
+  if (isRenaming) {
+    return (
+      <form
+        className="resumePillRenameForm"
+        data-dnd-no-drag="true"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onCommitRename();
+        }}
+      >
+        <input
+          className="resumePillRenameInput"
+          value={renameValue}
+          onChange={(event) => onRenameValueChange(event.target.value)}
+          onBlur={onCommitRename}
+          maxLength={MAX_WORKSPACE_RESUME_NAME_LENGTH}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              onCancelRename();
+            }
+          }}
+          aria-label="Rename active resume"
+          autoFocus
+        />
+      </form>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className="resumePillButton"
+        onClick={() => onSetActiveResume(resume.id)}
+        onDoubleClick={() => onStartRename(resume)}
+        aria-pressed={isActive}
+      >
+        <span className="resumePillLabel">{resume.name}</span>
+      </button>
+
+      {isActive ? (
+        <span className="resumePillMenuHost" data-dnd-no-drag="true">
+          <EntryActionMenu
+            menuLabel={`${resume.name} actions`}
+            extraItems={[
+              {
+                label: 'Rename',
+                onSelect: onStartRenamingActiveResume,
+              },
+              {
+                label: 'Duplicate',
+                onSelect: onDuplicateResume,
+                disabled: !canAddResume,
+              },
+              {
+                label: 'Delete',
+                onSelect: onDeleteResume,
+                tone: 'danger',
+                disabled: !canDeleteActiveResume,
+              },
+            ]}
+            buttonClassName="resumePillMenuButton"
+          />
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+function SortableResumePill({
+  resume,
+  isActive,
+  isRenaming,
+  children,
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: resume.id,
+    disabled: isRenaming,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={[
+        'resumePill',
+        isActive ? 'isActive' : '',
+        isRenaming ? 'isEditing' : '',
+        isDragging ? 'isSortingPlaceholder' : '',
+      ].filter(Boolean).join(' ')}
+      style={style}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ResumePillOverlay({ resume, isActive, style }) {
+  if (!resume) {
     return null;
   }
 
-  if (transparentDragImageElement?.isConnected) {
-    return transparentDragImageElement;
-  }
-
-  const element = document.createElement("div");
-  element.setAttribute("aria-hidden", "true");
-  element.style.position = "fixed";
-  element.style.top = "0";
-  element.style.left = "0";
-  element.style.width = "1px";
-  element.style.height = "1px";
-  element.style.opacity = "0";
-  element.style.pointerEvents = "none";
-  element.style.zIndex = "-1";
-
-  document.body.appendChild(element);
-  transparentDragImageElement = element;
-  return transparentDragImageElement;
+  return (
+    <div className={`resumePill resumePillOverlay${isActive ? ' isActive' : ''}`} style={style}>
+      <span className="resumePillButton">
+        <span className="resumePillLabel">{resume.name}</span>
+      </span>
+      {isActive ? <span className="button resumePillMenuButton">•••</span> : null}
+    </div>
+  );
 }
 
 export default function Header({
@@ -48,7 +182,7 @@ export default function Header({
   onCreateResume,
   onDuplicateResume,
   onRenameResume,
-  onReorderResume,
+  onReorderResumes,
   onDeleteResume,
   authUser,
   authReady,
@@ -61,11 +195,24 @@ export default function Header({
 }) {
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
-  const [draggedResumeId, setDraggedResumeId] = useState(null);
-
-  useEffect(() => {
-    getTransparentDragImage();
-  }, []);
+  const [activeDragId, setActiveDragId] = useState(null);
+  const [activeDragRect, setActiveDragRect] = useState(null);
+  const resumeIds = useMemo(() => getResumeIds(resumeList), [resumeList]);
+  const resumeById = useMemo(
+    () => new Map(resumeList.map((resume) => [resume.id, resume])),
+    [resumeList],
+  );
+  const activeDragResume = activeDragId ? resumeById.get(activeDragId) : null;
+  const sensors = useSensors(
+    useSensor(ResumeLoomrPointerSensor, {
+      activationConstraint: {
+        distance: 6,
+      },
+    }),
+    useSensor(ResumeLoomrKeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   function startRenamingActiveResume() {
     setRenamingId(activeResumeId);
@@ -108,192 +255,117 @@ export default function Header({
     }
   }
 
-  function clearDragState() {
-    setDraggedResumeId(null);
-  }
-
-  function shouldIgnoreDragStart(event) {
-    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-
-    return Boolean(
-      target?.closest('.entryMenu, .resumePillRenameForm, .resumePillRenameInput')
-    );
-  }
-
-  function handleDragStart(event, resumeId) {
-    if (!onReorderResume || renamingId || shouldIgnoreDragStart(event)) {
-      event.preventDefault();
+  function handleResumeDragStart(event) {
+    if (!onReorderResumes) {
       return;
     }
 
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData(RESUME_DRAG_MIME_TYPE, resumeId);
-    event.dataTransfer.setData('text/plain', resumeId);
-    const dragImage = getTransparentDragImage();
-
-    if (dragImage) {
-      event.dataTransfer.setDragImage(dragImage, 0, 0);
-    }
-
-    setDraggedResumeId(resumeId);
+    cancelRename();
+    setActiveDragId(String(event.active.id));
+    const rect = event.active.rect.current.initial;
+    setActiveDragRect(rect ? { width: rect.width, height: rect.height } : null);
   }
 
-  function getResumeDropPlacement(event) {
-    const { left, top, width, height } = event.currentTarget.getBoundingClientRect();
-    const pointerX = event.clientX - left;
-    const pointerY = event.clientY - top;
-
-    if (pointerY > height * 0.62) {
-      return 'after';
-    }
-
-    if (pointerY < height * 0.38) {
-      return 'before';
-    }
-
-    return pointerX > width * 0.5 ? 'after' : 'before';
+  function resetResumeDragState() {
+    setActiveDragId(null);
+    setActiveDragRect(null);
   }
 
-  function handleDragOver(event, targetResumeId) {
-    if (!draggedResumeId || draggedResumeId === targetResumeId || !onReorderResume) {
+  function handleResumeDragEnd(event) {
+    const activeId = String(event.active.id);
+    const overId = event.over?.id ? String(event.over.id) : '';
+
+    setActiveDragId(null);
+    setActiveDragRect(null);
+
+    if (!overId || activeId === overId || !onReorderResumes) {
       return;
     }
 
-    const draggedIndex = resumeList.findIndex((resume) => resume.id === draggedResumeId);
-    const targetIndex = resumeList.findIndex((resume) => resume.id === targetResumeId);
+    const oldIndex = resumeIds.indexOf(activeId);
+    const newIndex = resumeIds.indexOf(overId);
 
-    if (draggedIndex < 0 || targetIndex < 0) {
-      return;
+    if (oldIndex >= 0 && newIndex >= 0 && oldIndex !== newIndex) {
+      const nextResumeIds = arrayMove(resumeIds, oldIndex, newIndex);
+      onReorderResumes(nextResumeIds);
     }
-
-    const placement = getResumeDropPlacement(event);
-
-    if (draggedIndex < targetIndex && placement !== 'after') {
-      return;
-    }
-
-    if (draggedIndex > targetIndex && placement !== 'before') {
-      return;
-    }
-
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    onReorderResume(draggedResumeId, targetResumeId, placement);
   }
 
-  function handleDrop(event) {
-    if (draggedResumeId) {
-      event.preventDefault();
-    }
-
-    clearDragState();
-  }
+  const resumeDragOverlay = (
+    <DragOverlay adjustScale={false} zIndex={1000}>
+      <ResumePillOverlay
+        resume={activeDragResume}
+        isActive={activeDragId === activeResumeId}
+        style={activeDragRect ? {
+          width: `${activeDragRect.width}px`,
+          height: `${activeDragRect.height}px`,
+        } : undefined}
+      />
+    </DragOverlay>
+  );
 
   const resumeWorkspaceControls = (
     <section className="resumeSubbar panel" aria-label="Resume versions">
       <div className="resumeWorkspaceBar" aria-label="Resumes">
-        <div className="resumePillStrip">
-          {resumeList.map((resume) => {
-            const isActive = resume.id === activeResumeId;
-            const isRenaming = resume.id === renamingId;
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleResumeDragStart}
+          onDragEnd={handleResumeDragEnd}
+          onDragCancel={resetResumeDragState}
+        >
+          <SortableContext items={resumeIds} strategy={rectSortingStrategy}>
+            <div className="resumePillStrip">
+              {resumeList.map((resume) => {
+                const isActive = resume.id === activeResumeId;
+                const isRenaming = resume.id === renamingId;
 
-            return (
-              <div
-                key={resume.id}
-                className={[
-                  'resumePill',
-                  isActive ? 'isActive' : '',
-                  isRenaming ? 'isEditing' : '',
-                  draggedResumeId === resume.id ? 'isDragging' : '',
-                ].filter(Boolean).join(' ')}
-                draggable={!isRenaming && Boolean(onReorderResume)}
-                onDragStart={(event) => handleDragStart(event, resume.id)}
-                onDragOver={(event) => handleDragOver(event, resume.id)}
-                onDrop={handleDrop}
-                onDragEnd={clearDragState}
-              >
-                {isRenaming ? (
-                  <form
-                    className="resumePillRenameForm"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      commitRename();
-                    }}
+                return (
+                  <SortableResumePill
+                    key={resume.id}
+                    resume={resume}
+                    isActive={isActive}
+                    isRenaming={isRenaming}
                   >
-                    <input
-                      className="resumePillRenameInput"
-                      value={renameValue}
-                      onChange={(event) => setRenameValue(event.target.value)}
-                      onBlur={commitRename}
-                      maxLength={MAX_WORKSPACE_RESUME_NAME_LENGTH}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Escape') {
-                          event.preventDefault();
-                          cancelRename();
-                        }
-                      }}
-                      aria-label="Rename active resume"
-                      autoFocus
-                    />
-                  </form>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="resumePillButton"
-                      onClick={() => {
+                    <ResumePillContents
+                      resume={resume}
+                      isActive={isActive}
+                      isRenaming={isRenaming}
+                      renameValue={renameValue}
+                      canAddResume={canAddResume}
+                      canDeleteActiveResume={canDeleteActiveResume}
+                      onSetActiveResume={(resumeId) => {
                         cancelRename();
-                        onSetActiveResume(resume.id);
+                        onSetActiveResume(resumeId);
                       }}
-                      onDoubleClick={() => {
-                        startRenamingResume(resume);
-                      }}
-                      aria-pressed={isActive}
-                    >
-                      <span className="resumePillLabel">{resume.name}</span>
-                    </button>
+                      onStartRename={startRenamingResume}
+                      onRenameValueChange={setRenameValue}
+                      onCommitRename={commitRename}
+                      onCancelRename={cancelRename}
+                      onStartRenamingActiveResume={startRenamingActiveResume}
+                      onDuplicateResume={onDuplicateResume}
+                      onDeleteResume={handleDeleteResume}
+                    />
+                  </SortableResumePill>
+                );
+              })}
 
-                    {isActive ? (
-                      <EntryActionMenu
-                        menuLabel={`${resume.name} actions`}
-                        extraItems={[
-                          {
-                            label: 'Rename',
-                            onSelect: startRenamingActiveResume,
-                          },
-                          {
-                            label: 'Duplicate',
-                            onSelect: onDuplicateResume,
-                            disabled: !canAddResume,
-                          },
-                          {
-                            label: 'Delete',
-                            onSelect: handleDeleteResume,
-                            tone: 'danger',
-                            disabled: !canDeleteActiveResume,
-                          },
-                        ]}
-                        buttonClassName="resumePillMenuButton"
-                      />
-                    ) : null}
-                  </>
-                )}
-              </div>
-            );
-          })}
+              <button
+                type="button"
+                className="button buttonSecondary resumeNewButton"
+                disabled={!canAddResume}
+                onClick={() => {
+                  cancelRename();
+                  onCreateResume();
+                }}
+              >
+                + New
+              </button>
+            </div>
+          </SortableContext>
 
-          <button
-            type="button"
-            className="button buttonSecondary resumeNewButton"
-            disabled={!canAddResume}
-            onClick={() => {
-              cancelRename();
-              onCreateResume();
-            }}
-          >
-            + New
-          </button>
-        </div>
+          {typeof document === 'undefined' ? resumeDragOverlay : createPortal(resumeDragOverlay, document.body)}
+        </DndContext>
       </div>
     </section>
   );

@@ -66,8 +66,11 @@ import {
   removeSectionBlockEntry,
   removeSectionBlockTextListItem,
   reorderSectionOrder,
+  reorderSectionOrderToMatch,
   reorderResumeSectionBlock,
+  reorderResumeSectionBlocksToMatch,
   reorderWorkspaceResumes,
+  reorderWorkspaceResumesToMatch,
   sanitizeWorkspaceResumeName,
   updateCollectionEntry,
   updateCollectionTextList,
@@ -1230,6 +1233,20 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     setSectionOrder((currentOrder) => reorderSectionOrder(currentOrder, sectionId, targetSectionId, placement));
   }
 
+  function reorderSections(nextSectionIds) {
+    setSaveState('saving');
+    const blockSectionIds = Array.isArray(resume.sections)
+      ? resume.sections.map((section) => section.id)
+      : [];
+
+    if (blockSectionIds.length > 0) {
+      updateResume((currentResume) => reorderResumeSectionBlocksToMatch(currentResume, nextSectionIds));
+      return;
+    }
+
+    setSectionOrder((currentOrder) => reorderSectionOrderToMatch(currentOrder, nextSectionIds));
+  }
+
   function markTouched(path) {
     setTouched((currentTouched) => (
       currentTouched[path]
@@ -1681,6 +1698,46 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     }
   }
 
+  async function reorderResumes(nextResumeIds) {
+    const currentWorkspace = workspaceRef.current;
+    const reorderedWorkspace = reorderWorkspaceResumesToMatch(currentWorkspace, nextResumeIds);
+
+    if (reorderedWorkspace.resumeIds.join('\u0000') === currentWorkspace.resumeIds.join('\u0000')) {
+      return;
+    }
+
+    const currentActiveResumeId = activeResumeIdRef.current;
+    const persistedPayload = currentActiveResumeId
+      ? persistActiveDraftImmediately({ flushCloud: false, resumeId: currentActiveResumeId })
+      : null;
+    const nextWorkspace = persistedPayload && currentActiveResumeId
+      ? withWorkspaceResumeMeta(reorderedWorkspace, currentActiveResumeId, { updatedAt: persistedPayload.savedAt })
+      : reorderedWorkspace;
+
+    commitWorkspace(nextWorkspace);
+
+    if (isCloudMode && userRef.current?.uid) {
+      const activeDraft = persistedPayload && currentActiveResumeId
+        ? {
+            ...currentDraftRef.current,
+            savedAt: persistedPayload.savedAt,
+          }
+        : null;
+
+      if (activeDraft) {
+        await flushCloudDraft(currentActiveResumeId, nextWorkspace, activeDraft, { reason: 'resume-reorder' });
+      }
+
+      await runCloudMutation(() => (
+        writeCloudWorkspace(userRef.current.uid, nextWorkspace, trustedDevice, cloudIdentityRef.current)
+      ));
+      await mirrorCloudWorkspaceLocallyWithTopDrafts(
+        nextWorkspace,
+        activeDraft && currentActiveResumeId ? new Map([[currentActiveResumeId, activeDraft]]) : new Map(),
+      );
+    }
+  }
+
   async function deleteActiveResume() {
     if (!activeResumeId || workspace.resumeIds.length <= 1) {
       return;
@@ -2003,6 +2060,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     sectionOrder,
     moveSection,
     reorderSection,
+    reorderSections,
     mobileView,
     setMobileView,
     previewModel,
@@ -2047,6 +2105,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     duplicateActiveResume,
     renameActiveResume: renameResume,
     reorderResume,
+    reorderResumes,
     deleteActiveResume,
   };
 }

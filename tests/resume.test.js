@@ -36,8 +36,11 @@ import {
   removeExperience,
   removeResumeSectionBlock,
   reorderResumeSectionBlock,
+  reorderResumeSectionBlocksToMatch,
   reorderSectionOrder,
+  reorderSectionOrderToMatch,
   reorderWorkspaceResumes,
+  reorderWorkspaceResumesToMatch,
   updatePersonalField,
   updateRoleBlockEntry,
   updateResumeSetting,
@@ -935,6 +938,24 @@ test('workspace resume reorder ignores invalid ids and no-op drops', () => {
   assert.deepEqual(reorderWorkspaceResumes(workspace, 'resume-1', 'resume-1', 'before'), workspace);
 });
 
+test('workspace resume exact-order reorder preserves active resume and rejects invalid orders', () => {
+  const workspace = normalizeWorkspaceIndex({
+    activeResumeId: 'resume-2',
+    resumeIds: ['resume-1', 'resume-2', 'resume-3'],
+    meta: {
+      'resume-1': { name: 'Resume 1', updatedAt: '' },
+      'resume-2': { name: 'Resume 2', updatedAt: '' },
+      'resume-3': { name: 'Resume 3', updatedAt: '' },
+    },
+  });
+  const reordered = reorderWorkspaceResumesToMatch(workspace, ['resume-3', 'resume-1', 'resume-2']);
+
+  assert.deepEqual(reordered.resumeIds, ['resume-3', 'resume-1', 'resume-2']);
+  assert.equal(reordered.activeResumeId, 'resume-2');
+  assert.deepEqual(reorderWorkspaceResumesToMatch(workspace, ['resume-3', 'resume-1']), workspace);
+  assert.deepEqual(reorderWorkspaceResumesToMatch(workspace, ['resume-3', 'resume-1', 'missing']), workspace);
+});
+
 test('cloud guest mirror keeps the first ten resumes in rail order', () => {
   const resumeIds = Array.from({ length: MAX_WORKSPACE_RESUMES + 2 }, (_, index) => `resume-${index + 1}`);
   const workspace = normalizeWorkspaceIndex({
@@ -1640,6 +1661,70 @@ test('reorderSectionOrder keeps personal fixed while dragging sections into plac
     ['personal', 'education', 'experience', 'skills', 'projects']
   );
   assert.equal(reorderSectionOrder(baseOrder, 'projects', 'personal', 'before')[0], 'personal');
+});
+
+test('reorderSectionOrderToMatch keeps personal fixed and rejects invalid exact orders', () => {
+  const baseOrder = SECTION_IDS;
+  const reorderedOrder = [
+    'projects',
+    ...SECTION_IDS.filter((sectionId) => sectionId !== 'personal' && sectionId !== 'projects'),
+  ];
+
+  assert.deepEqual(
+    reorderSectionOrderToMatch(baseOrder, reorderedOrder).slice(0, 5),
+    ['personal', 'projects', 'education', 'experience', 'skills']
+  );
+  assert.deepEqual(
+    reorderSectionOrderToMatch(baseOrder, ['projects', 'education', 'skills']),
+    baseOrder
+  );
+  assert.deepEqual(
+    reorderSectionOrderToMatch(baseOrder, ['projects', 'education', 'skills', 'missing']),
+    baseOrder
+  );
+});
+
+test('reorderResumeSectionBlocksToMatch reorders block sections and preserves legacy mirrors', () => {
+  const draft = normalizeDraftPayload({
+    resume: {
+      sections: [
+        {
+          id: 'education-block',
+          kind: 'education',
+          title: 'Education',
+          entries: [{ id: 'edu-1', institution: 'UGA', degree: 'BBA' }],
+        },
+        {
+          id: 'experience-block',
+          kind: 'roles',
+          title: 'Experience',
+          entries: [{ id: 'role-1', company: 'Acme', role: 'Analyst', activities: ['Built reports'] }],
+        },
+        {
+          id: 'skills-block',
+          kind: 'skills',
+          title: 'Skills',
+          entries: [{ id: 'skills-1', category: 'Tools', items: 'Excel' }],
+        },
+      ],
+    },
+  });
+  const reordered = reorderResumeSectionBlocksToMatch(draft.resume, [
+    'skills-block',
+    'experience-block',
+    'education-block',
+  ]);
+
+  assert.deepEqual(reordered.sections.map((section) => section.id), [
+    'skills-block',
+    'experience-block',
+    'education-block',
+  ]);
+  assert.equal(reordered.sections[1].entries[0].company, 'Acme');
+  assert.deepEqual(
+    reorderResumeSectionBlocksToMatch(draft.resume, ['skills-block', 'experience-block']).sections.map((section) => section.id),
+    draft.resume.sections.map((section) => section.id)
+  );
 });
 
 test('updateResumeSetting clamps stepper values to the supported range', () => {
