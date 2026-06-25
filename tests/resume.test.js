@@ -60,6 +60,7 @@ import {
   CLOUD_SESSION_ID_KEY,
   CLOUD_TRUSTED_DEVICE_KEY,
   CLOUD_WORKSPACE_RESUME_LIMIT,
+  createCloudImportSnapshot,
   createCloudDraftDoc,
   getCloudSessionId,
   validateCloudDraftPayload,
@@ -1433,6 +1434,57 @@ test('cloud draft docs preserve the source draft timestamp for stale write order
   assert.equal(draftDoc.savedAt, savedAt);
   assert.equal(draftDoc.updatedAt, savedAt);
   assert.equal(draftDoc.version, Date.parse(savedAt));
+});
+
+test('cloud import skips stale local workspace ids instead of failing first login sync', () => {
+  const savedAt = '2026-06-15T12:34:56.000Z';
+  const validDraft = {
+    resume: createEmptyResume(),
+    template: 'modern',
+    sectionOrder: SECTION_IDS,
+    savedAt,
+  };
+  const oversizedDraft = {
+    resume: {
+      ...createEmptyResume(),
+      education: Array.from({ length: 101 }, (_, index) => ({ id: `education-${index}` })),
+    },
+    template: 'modern',
+    sectionOrder: SECTION_IDS,
+    savedAt,
+  };
+  const workspace = {
+    activeResumeId: 'missing-resume',
+    resumeIds: ['missing-resume', 'valid-resume', 'oversized-resume'],
+    meta: {
+      'missing-resume': createWorkspaceResumeMeta('Missing resume', savedAt),
+      'valid-resume': createWorkspaceResumeMeta('Valid resume', savedAt),
+      'oversized-resume': createWorkspaceResumeMeta('Oversized resume', savedAt),
+    },
+  };
+  const originalConsoleError = console.error;
+
+  console.error = () => {};
+  try {
+    const snapshot = createCloudImportSnapshot(
+      workspace,
+      (resumeId) => {
+        if (resumeId === 'valid-resume') return validDraft;
+        if (resumeId === 'oversized-resume') return oversizedDraft;
+        return null;
+      },
+      { deviceId: 'device-1', sessionId: 'session-1' },
+    );
+
+    assert.deepEqual(snapshot.workspace.resumeIds, ['valid-resume']);
+    assert.equal(snapshot.workspace.activeResumeId, 'valid-resume');
+    assert.deepEqual(Object.keys(snapshot.workspace.meta), ['valid-resume']);
+    assert.equal(snapshot.draftDocsByResumeId.has('valid-resume'), true);
+    assert.equal(snapshot.draftDocsByResumeId.has('missing-resume'), false);
+    assert.equal(snapshot.draftDocsByResumeId.has('oversized-resume'), false);
+  } finally {
+    console.error = originalConsoleError;
+  }
 });
 
 test('cloud workspace writes replace the index document instead of merging stale meta keys', () => {

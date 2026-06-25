@@ -398,6 +398,59 @@ export async function deleteCloudResume(uid, resumeId, workspace, trustedDevice,
   return now;
 }
 
+export function createCloudImportSnapshot(workspace, readDraft, identity, { limit = CLOUD_WORKSPACE_RESUME_LIMIT } = {}) {
+  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+  const cloudIdentity = normalizeCloudIdentity(identity);
+  const cappedResumeIds = normalizedWorkspace.resumeIds.slice(0, limit);
+  const draftDocsByResumeId = new Map();
+  const nextResumeIds = [];
+  const nextMeta = {};
+
+  for (const resumeId of cappedResumeIds) {
+    const draft = readDraft(resumeId);
+
+    if (!draft) {
+      continue;
+    }
+
+    const name = normalizedWorkspace.meta[resumeId]?.name || 'Resume';
+
+    try {
+      const draftDoc = createCloudDraftDoc({
+        resumeId,
+        name,
+        draft,
+        identity: cloudIdentity,
+      });
+
+      validateCloudDraftPayload(draftDoc);
+      draftDocsByResumeId.set(resumeId, draftDoc);
+      nextResumeIds.push(resumeId);
+      nextMeta[resumeId] = createWorkspaceResumeMeta(name, draftDoc.updatedAt);
+    } catch (error) {
+      console.error('Skipped unreadable local resume during cloud import', {
+        code: error?.code,
+        resumeId,
+      });
+    }
+  }
+
+  if (nextResumeIds.length === 0) {
+    return null;
+  }
+
+  return {
+    workspace: {
+      activeResumeId: nextResumeIds.includes(normalizedWorkspace.activeResumeId)
+        ? normalizedWorkspace.activeResumeId
+        : nextResumeIds[0],
+      resumeIds: nextResumeIds,
+      meta: nextMeta,
+    },
+    draftDocsByResumeId,
+  };
+}
+
 export async function importWorkspaceToCloud(uid, workspace, readDraft, trustedDevice, identity) {
   const workspaceRef = getWorkspaceDocRef(uid, trustedDevice);
 
@@ -405,40 +458,23 @@ export async function importWorkspaceToCloud(uid, workspace, readDraft, trustedD
     return null;
   }
 
-  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
-  const cloudIdentity = normalizeCloudIdentity(identity);
-  const cappedResumeIds = normalizedWorkspace.resumeIds.slice(0, CLOUD_WORKSPACE_RESUME_LIMIT);
+  const importSnapshot = createCloudImportSnapshot(workspace, readDraft, identity);
+
+  if (!importSnapshot) {
+    return null;
+  }
+
   const now = new Date().toISOString();
   const batch = writeBatch(workspaceRef.firestore);
-  const nextMeta = {};
 
-  for (const resumeId of cappedResumeIds) {
-    const draft = readDraft(resumeId);
-    const name = normalizedWorkspace.meta[resumeId]?.name || 'Resume';
-    const draftDoc = createCloudDraftDoc({
-      resumeId,
-      name,
-      draft,
-      identity: cloudIdentity,
-    });
-
-    validateCloudDraftPayload(draftDoc);
-    nextMeta[resumeId] = createWorkspaceResumeMeta(name, draftDoc.updatedAt);
+  for (const [resumeId, draftDoc] of importSnapshot.draftDocsByResumeId.entries()) {
     batch.set(doc(collection(workspaceRef.firestore, 'users', uid, 'resumes'), resumeId), draftDoc, { merge: true });
   }
 
-  const nextWorkspace = {
-    activeResumeId: cappedResumeIds.includes(normalizedWorkspace.activeResumeId)
-      ? normalizedWorkspace.activeResumeId
-      : cappedResumeIds[0],
-    resumeIds: cappedResumeIds,
-    meta: nextMeta,
-  };
-
-  batch.set(workspaceRef, createCloudWorkspaceDoc(nextWorkspace, cloudIdentity, now));
+  batch.set(workspaceRef, createCloudWorkspaceDoc(importSnapshot.workspace, identity, now));
 
   await batch.commit();
-  return nextWorkspace;
+  return importSnapshot.workspace;
 }
 
 export async function syncLocalWorkspaceToCloud(
