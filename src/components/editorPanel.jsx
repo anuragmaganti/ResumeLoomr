@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import SectionTabs from "./sectionTabs";
 import PersonalForm from "./forms/personalForm";
 import SectionBlockForm from "./forms/sectionBlockForm";
@@ -93,8 +93,10 @@ export default function EditorPanel({
     getFieldError,
     markTouched,
     maxHeight,
-    previewEditTarget
+    previewEditTarget,
+    onClearPreviewEditTarget
 }) {
+    const handledPreviewRequestIdRef = useRef(0);
     const resumeBlocks = Array.isArray(resume.sections) ? resume.sections : [];
     const activeBlock = resumeBlocks.find((section) => section.id === activeTab);
     const currentSectionLabel = activeTab === "personal"
@@ -124,11 +126,21 @@ export default function EditorPanel({
             '--editor-stage-max-height': `${maxHeight}px`
         }
         : undefined;
+    const setManualActiveTab = (sectionId) => {
+        onClearPreviewEditTarget?.();
+        setActiveTab(sectionId);
+    };
 
     useEffect(() => {
-        if (!previewEditTarget?.requestId || !previewEditTarget.path) {
+        if (
+            !previewEditTarget?.requestId ||
+            !previewEditTarget.path ||
+            handledPreviewRequestIdRef.current === previewEditTarget.requestId
+        ) {
             return undefined;
         }
+
+        handledPreviewRequestIdRef.current = previewEditTarget.requestId;
 
         if (previewEditTarget.sectionId && previewEditTarget.sectionId !== activeTab) {
             setActiveTab(previewEditTarget.sectionId);
@@ -196,7 +208,7 @@ export default function EditorPanel({
                     <aside className="editorRail panel">
                         <SectionTabs
                             activeTab={activeTab}
-                            setActiveTab={setActiveTab}
+                            setActiveTab={setManualActiveTab}
                             sections={sections}
                             onReorderSection={onReorderSection}
                             onReorderSections={onReorderSections}

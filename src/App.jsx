@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css'
 import './styles/buttons.css'
 import './styles/forms.css'
@@ -184,6 +184,16 @@ function App() {
     setActiveTab(target.sectionId);
     setMobileView('editor');
   }
+
+  const clearPreviewEditTarget = useCallback((requestId) => {
+    setPreviewEditTarget((currentTarget) => {
+      if (requestId && currentTarget?.requestId !== requestId) {
+        return currentTarget;
+      }
+
+      return null;
+    });
+  }, []);
 
   function handleImportResumeClick() {
     if (!auth.user) {
@@ -483,6 +493,7 @@ function App() {
               markTouched={markTouched}
               maxHeight={editorStageMaxHeight}
               previewEditTarget={previewEditTarget}
+              onClearPreviewEditTarget={clearPreviewEditTarget}
             />
           </div>
 
