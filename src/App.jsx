@@ -89,6 +89,7 @@ function App() {
     replaceResumeDraft,
     duplicateActiveResume,
     renameActiveResume,
+    reorderResume,
     deleteActiveResume,
   } = useResumeBuilder({
     user: auth.user,
@@ -354,6 +355,7 @@ function App() {
           onCreateResume={createResume}
           onDuplicateResume={duplicateActiveResume}
           onRenameResume={renameActiveResume}
+          onReorderResume={reorderResume}
           onDeleteResume={deleteActiveResume}
           authUser={auth.user}
           authReady={auth.authReady}

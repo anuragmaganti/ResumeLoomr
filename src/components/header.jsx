@@ -1,37 +1,34 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { MAX_WORKSPACE_RESUME_NAME_LENGTH, sanitizeWorkspaceResumeName } from "../lib/resume.js";
 import BrandMark from "./brandMark";
 import EntryActionMenu from "./forms/entryActionMenu";
 
-const DEFAULT_VISIBLE_RESUME_CAPACITY = 4;
-const RESUME_ROW_GAP = 8;
-const RESUME_ROW_PADDING = 4;
-const FALLBACK_RESUME_PILL_WIDTH = 158;
-const FALLBACK_MORE_BUTTON_WIDTH = 58;
-const FALLBACK_NEW_BUTTON_WIDTH = 70;
+const RESUME_DRAG_MIME_TYPE = "application/x-resumeloomr-resume";
+let transparentDragImageElement = null;
 
-function getVisibleResumeIds(resumeList, activeResumeId, visibleCapacity) {
-  const boundedCapacity = Math.max(1, Math.min(visibleCapacity, resumeList.length));
-  const visibleIds = new Set(resumeList.slice(0, boundedCapacity).map((resume) => resume.id));
-
-  if (!visibleIds.has(activeResumeId) && activeResumeId && resumeList.length > boundedCapacity) {
-    visibleIds.delete(resumeList[boundedCapacity - 1]?.id);
-    visibleIds.add(activeResumeId);
+function getTransparentDragImage() {
+  if (typeof document === "undefined") {
+    return null;
   }
 
-  return visibleIds;
-}
+  if (transparentDragImageElement?.isConnected) {
+    return transparentDragImageElement;
+  }
 
-function getMeasuredResumeWidths(measureElement) {
-  const widths = new Map();
+  const element = document.createElement("div");
+  element.setAttribute("aria-hidden", "true");
+  element.style.position = "fixed";
+  element.style.top = "0";
+  element.style.left = "0";
+  element.style.width = "1px";
+  element.style.height = "1px";
+  element.style.opacity = "0";
+  element.style.pointerEvents = "none";
+  element.style.zIndex = "-1";
 
-  measureElement
-    ?.querySelectorAll('[data-resume-measure-id]')
-    .forEach((element) => {
-      widths.set(element.dataset.resumeMeasureId, element.getBoundingClientRect().width);
-    });
-
-  return widths;
+  document.body.appendChild(element);
+  transparentDragImageElement = element;
+  return transparentDragImageElement;
 }
 
 export default function Header({
@@ -51,6 +48,7 @@ export default function Header({
   onCreateResume,
   onDuplicateResume,
   onRenameResume,
+  onReorderResume,
   onDeleteResume,
   authUser,
   authReady,
@@ -61,96 +59,13 @@ export default function Header({
   onOpenAuth,
   onSignOut,
 }) {
-  const resumeWorkspaceRef = useRef(null);
-  const resumeMeasureRef = useRef(null);
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
-  const [visibleResumeCapacity, setVisibleResumeCapacity] = useState(DEFAULT_VISIBLE_RESUME_CAPACITY);
+  const [draggedResumeId, setDraggedResumeId] = useState(null);
 
-  useLayoutEffect(() => {
-    const workspaceElement = resumeWorkspaceRef.current;
-    const measureElement = resumeMeasureRef.current;
-
-    if (!workspaceElement || !measureElement || resumeList.length === 0) {
-      return undefined;
-    }
-
-    let animationFrameId = null;
-
-    function measureCapacity() {
-      const availableWidth = workspaceElement.getBoundingClientRect().width;
-      const measuredResumeWidths = getMeasuredResumeWidths(measureElement);
-      const moreButtonWidth =
-        measureElement.querySelector('[data-resume-measure-more]')?.getBoundingClientRect().width
-        ?? FALLBACK_MORE_BUTTON_WIDTH;
-      const newButtonWidth =
-        measureElement.querySelector('[data-resume-measure-new]')?.getBoundingClientRect().width
-        ?? FALLBACK_NEW_BUTTON_WIDTH;
-
-      for (let capacity = resumeList.length; capacity >= 1; capacity -= 1) {
-        const visibleIds = getVisibleResumeIds(resumeList, activeResumeId, capacity);
-        const hasOverflow = visibleIds.size < resumeList.length;
-        const visibleWidth = resumeList.reduce((total, resume) => {
-          if (!visibleIds.has(resume.id)) {
-            return total;
-          }
-
-          return total + (measuredResumeWidths.get(resume.id) ?? FALLBACK_RESUME_PILL_WIDTH);
-        }, 0);
-        const itemCount = visibleIds.size + 1 + (hasOverflow ? 1 : 0);
-        const requiredWidth =
-          visibleWidth
-          + newButtonWidth
-          + (hasOverflow ? moreButtonWidth : 0)
-          + Math.max(0, itemCount - 1) * RESUME_ROW_GAP
-          + RESUME_ROW_PADDING;
-
-        if (requiredWidth <= availableWidth || capacity === 1) {
-          setVisibleResumeCapacity((currentCapacity) => (
-            currentCapacity === capacity ? currentCapacity : capacity
-          ));
-          return;
-        }
-      }
-    }
-
-    function scheduleMeasure() {
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-      }
-
-      animationFrameId = requestAnimationFrame(measureCapacity);
-    }
-
-    scheduleMeasure();
-
-    const resizeObserver = new ResizeObserver(scheduleMeasure);
-    resizeObserver.observe(workspaceElement);
-    resizeObserver.observe(measureElement);
-    window.addEventListener('resize', scheduleMeasure);
-
-    return () => {
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-      }
-
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', scheduleMeasure);
-    };
-  }, [activeResumeId, resumeList]);
-
-  const visibleResumeIds = useMemo(
-    () => getVisibleResumeIds(resumeList, activeResumeId, visibleResumeCapacity),
-    [activeResumeId, resumeList, visibleResumeCapacity],
-  );
-  const visibleResumes = useMemo(
-    () => resumeList.filter((resume) => visibleResumeIds.has(resume.id)),
-    [resumeList, visibleResumeIds],
-  );
-  const overflowResumes = useMemo(
-    () => resumeList.filter((resume) => !visibleResumeIds.has(resume.id)),
-    [resumeList, visibleResumeIds],
-  );
+  useEffect(() => {
+    getTransparentDragImage();
+  }, []);
 
   function startRenamingActiveResume() {
     setRenamingId(activeResumeId);
@@ -193,18 +108,109 @@ export default function Header({
     }
   }
 
+  function clearDragState() {
+    setDraggedResumeId(null);
+  }
+
+  function shouldIgnoreDragStart(event) {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+
+    return Boolean(
+      target?.closest('.entryMenu, .resumePillRenameForm, .resumePillRenameInput')
+    );
+  }
+
+  function handleDragStart(event, resumeId) {
+    if (!onReorderResume || renamingId || shouldIgnoreDragStart(event)) {
+      event.preventDefault();
+      return;
+    }
+
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(RESUME_DRAG_MIME_TYPE, resumeId);
+    event.dataTransfer.setData('text/plain', resumeId);
+    const dragImage = getTransparentDragImage();
+
+    if (dragImage) {
+      event.dataTransfer.setDragImage(dragImage, 0, 0);
+    }
+
+    setDraggedResumeId(resumeId);
+  }
+
+  function getResumeDropPlacement(event) {
+    const { left, top, width, height } = event.currentTarget.getBoundingClientRect();
+    const pointerX = event.clientX - left;
+    const pointerY = event.clientY - top;
+
+    if (pointerY > height * 0.62) {
+      return 'after';
+    }
+
+    if (pointerY < height * 0.38) {
+      return 'before';
+    }
+
+    return pointerX > width * 0.5 ? 'after' : 'before';
+  }
+
+  function handleDragOver(event, targetResumeId) {
+    if (!draggedResumeId || draggedResumeId === targetResumeId || !onReorderResume) {
+      return;
+    }
+
+    const draggedIndex = resumeList.findIndex((resume) => resume.id === draggedResumeId);
+    const targetIndex = resumeList.findIndex((resume) => resume.id === targetResumeId);
+
+    if (draggedIndex < 0 || targetIndex < 0) {
+      return;
+    }
+
+    const placement = getResumeDropPlacement(event);
+
+    if (draggedIndex < targetIndex && placement !== 'after') {
+      return;
+    }
+
+    if (draggedIndex > targetIndex && placement !== 'before') {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    onReorderResume(draggedResumeId, targetResumeId, placement);
+  }
+
+  function handleDrop(event) {
+    if (draggedResumeId) {
+      event.preventDefault();
+    }
+
+    clearDragState();
+  }
+
   const resumeWorkspaceControls = (
     <section className="resumeSubbar panel" aria-label="Resume versions">
-      <div className="resumeWorkspaceBar" ref={resumeWorkspaceRef} aria-label="Resumes">
+      <div className="resumeWorkspaceBar" aria-label="Resumes">
         <div className="resumePillStrip">
-          {visibleResumes.map((resume) => {
+          {resumeList.map((resume) => {
             const isActive = resume.id === activeResumeId;
             const isRenaming = resume.id === renamingId;
 
             return (
               <div
                 key={resume.id}
-                className={`resumePill${isActive ? ' isActive' : ''}${isRenaming ? ' isEditing' : ''}`}
+                className={[
+                  'resumePill',
+                  isActive ? 'isActive' : '',
+                  isRenaming ? 'isEditing' : '',
+                  draggedResumeId === resume.id ? 'isDragging' : '',
+                ].filter(Boolean).join(' ')}
+                draggable={!isRenaming && Boolean(onReorderResume)}
+                onDragStart={(event) => handleDragStart(event, resume.id)}
+                onDragOver={(event) => handleDragOver(event, resume.id)}
+                onDrop={handleDrop}
+                onDragEnd={clearDragState}
               >
                 {isRenaming ? (
                   <form
@@ -276,22 +282,6 @@ export default function Header({
             );
           })}
 
-          {overflowResumes.length > 0 ? (
-            <EntryActionMenu
-              menuLabel="More resumes"
-              triggerContent="More"
-              buttonClassName="resumeOverflowButton"
-              extraItems={overflowResumes.map((resume) => ({
-                key: resume.id,
-                label: resume.name,
-                onSelect: () => {
-                  cancelRename();
-                  onSetActiveResume(resume.id);
-                },
-              }))}
-            />
-          ) : null}
-
           <button
             type="button"
             className="button buttonSecondary resumeNewButton"
@@ -303,29 +293,6 @@ export default function Header({
           >
             + New
           </button>
-        </div>
-
-        <div className="resumeMeasureStrip" ref={resumeMeasureRef} aria-hidden="true">
-          {resumeList.map((resume) => (
-            <div
-              key={resume.id}
-              className={`resumePill${resume.id === activeResumeId ? ' isActive' : ''}`}
-              data-resume-measure-id={resume.id}
-            >
-              <span className="resumePillButton">
-                <span className="resumePillLabel">{resume.name}</span>
-              </span>
-              {resume.id === activeResumeId ? (
-                <span className="button resumePillMenuButton">•••</span>
-              ) : null}
-            </div>
-          ))}
-          <span className="button entryMenuButton resumeOverflowButton" data-resume-measure-more>
-            More
-          </span>
-          <span className="button buttonSecondary resumeNewButton" data-resume-measure-new>
-            + New
-          </span>
         </div>
       </div>
     </section>

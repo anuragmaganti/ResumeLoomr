@@ -293,6 +293,39 @@ export function normalizeWorkspaceIndex(candidate) {
   };
 }
 
+export function reorderWorkspaceResumes(workspace, sourceResumeId, targetResumeId, placement = 'before') {
+  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+
+  if (!sourceResumeId || !targetResumeId || sourceResumeId === targetResumeId) {
+    return normalizedWorkspace;
+  }
+
+  const currentIndex = normalizedWorkspace.resumeIds.indexOf(sourceResumeId);
+  const targetIndex = normalizedWorkspace.resumeIds.indexOf(targetResumeId);
+
+  if (currentIndex < 0 || targetIndex < 0) {
+    return normalizedWorkspace;
+  }
+
+  const nextResumeIds = normalizedWorkspace.resumeIds.filter((resumeId) => resumeId !== sourceResumeId);
+  const targetIndexAfterRemoval = nextResumeIds.indexOf(targetResumeId);
+
+  if (targetIndexAfterRemoval < 0) {
+    return normalizedWorkspace;
+  }
+
+  const insertionIndex = placement === 'after'
+    ? targetIndexAfterRemoval + 1
+    : targetIndexAfterRemoval;
+
+  nextResumeIds.splice(insertionIndex, 0, sourceResumeId);
+
+  return normalizeWorkspaceIndex({
+    ...normalizedWorkspace,
+    resumeIds: nextResumeIds,
+  });
+}
+
 export function createEmptyWorkspaceIndex() {
   return {
     activeResumeId: '',

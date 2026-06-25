@@ -531,6 +531,19 @@ export async function syncLocalWorkspaceToCloud(
     hasChanges = true;
   }
 
+  const localOrderedResumeIds = normalizedLocalWorkspace.resumeIds.filter((resumeId) => (
+    nextWorkspace.resumeIds.includes(resumeId)
+  ));
+  const remainingCloudResumeIds = nextWorkspace.resumeIds.filter((resumeId) => (
+    !localOrderedResumeIds.includes(resumeId)
+  ));
+  const nextResumeIds = [...localOrderedResumeIds, ...remainingCloudResumeIds];
+
+  if (nextResumeIds.some((resumeId, index) => resumeId !== nextWorkspace.resumeIds[index])) {
+    nextWorkspace.resumeIds = nextResumeIds;
+    hasChanges = true;
+  }
+
   nextWorkspace.activeResumeId = nextWorkspace.resumeIds.includes(normalizedLocalWorkspace.activeResumeId)
     ? normalizedLocalWorkspace.activeResumeId
     : nextWorkspace.resumeIds.includes(normalizedCloudWorkspace.activeResumeId)

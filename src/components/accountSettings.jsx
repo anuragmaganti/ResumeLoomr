@@ -96,7 +96,7 @@ export default function AccountSettings({
               <div>
                 <h3>Keep resumes available after sign out</h3>
                 <p>
-                  Stores your 10 most recent resumes on this browser so you can edit without signing in. Turn off on shared computers.
+                  Stores the first 10 resumes in your resume rail on this browser so you can edit without signing in. Turn off on shared computers.
                 </p>
               </div>
               <label className="settingsCheckboxRow">

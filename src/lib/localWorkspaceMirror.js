@@ -43,32 +43,9 @@ function safeJsonParse(rawValue) {
   }
 }
 
-function getTimestamp(value) {
-  const timestamp = Date.parse(value || '');
-  return Number.isFinite(timestamp) ? timestamp : 0;
-}
-
-function getRecentResumeIds(workspace, limit) {
-  return workspace.resumeIds
-    .map((resumeId, index) => ({
-      resumeId,
-      index,
-      updatedAt: getTimestamp(workspace.meta[resumeId]?.updatedAt),
-    }))
-    .sort((left, right) => {
-      if (right.updatedAt !== left.updatedAt) {
-        return right.updatedAt - left.updatedAt;
-      }
-
-      return right.index - left.index;
-    })
-    .slice(0, limit)
-    .map(({ resumeId }) => resumeId);
-}
-
 export function createGuestMirrorWorkspace(workspace, limit = MAX_WORKSPACE_RESUMES) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
-  const resumeIds = getRecentResumeIds(normalizedWorkspace, limit);
+  const resumeIds = normalizedWorkspace.resumeIds.slice(0, limit);
   const activeResumeId = resumeIds.includes(normalizedWorkspace.activeResumeId)
     ? normalizedWorkspace.activeResumeId
     : resumeIds[0] || '';

@@ -37,6 +37,7 @@ import {
   removeResumeSectionBlock,
   reorderResumeSectionBlock,
   reorderSectionOrder,
+  reorderWorkspaceResumes,
   updatePersonalField,
   updateRoleBlockEntry,
   updateResumeSetting,
@@ -900,7 +901,41 @@ test('Gemini provider errors detect daily quota exhaustion details', () => {
   assert.equal(details.quotaViolations[0].quotaId, 'GenerateRequestsPerDayPerProjectPerModel-FreeTier');
 });
 
-test('cloud guest mirror keeps the ten most recently updated resumes', () => {
+test('workspace resume reorder moves ids before and after targets without changing active resume', () => {
+  const workspace = normalizeWorkspaceIndex({
+    activeResumeId: 'resume-3',
+    resumeIds: ['resume-1', 'resume-2', 'resume-3', 'resume-4'],
+    meta: {
+      'resume-1': { name: 'Resume 1', updatedAt: '' },
+      'resume-2': { name: 'Resume 2', updatedAt: '' },
+      'resume-3': { name: 'Resume 3', updatedAt: '' },
+      'resume-4': { name: 'Resume 4', updatedAt: '' },
+    },
+  });
+  const movedAfter = reorderWorkspaceResumes(workspace, 'resume-1', 'resume-3', 'after');
+  const movedBefore = reorderWorkspaceResumes(movedAfter, 'resume-4', 'resume-2', 'before');
+
+  assert.deepEqual(movedAfter.resumeIds, ['resume-2', 'resume-3', 'resume-1', 'resume-4']);
+  assert.equal(movedAfter.activeResumeId, 'resume-3');
+  assert.deepEqual(movedBefore.resumeIds, ['resume-4', 'resume-2', 'resume-3', 'resume-1']);
+  assert.equal(movedBefore.activeResumeId, 'resume-3');
+});
+
+test('workspace resume reorder ignores invalid ids and no-op drops', () => {
+  const workspace = normalizeWorkspaceIndex({
+    activeResumeId: 'resume-1',
+    resumeIds: ['resume-1', 'resume-2'],
+    meta: {
+      'resume-1': { name: 'Resume 1', updatedAt: '' },
+      'resume-2': { name: 'Resume 2', updatedAt: '' },
+    },
+  });
+
+  assert.deepEqual(reorderWorkspaceResumes(workspace, 'resume-1', 'missing', 'after'), workspace);
+  assert.deepEqual(reorderWorkspaceResumes(workspace, 'resume-1', 'resume-1', 'before'), workspace);
+});
+
+test('cloud guest mirror keeps the first ten resumes in rail order', () => {
   const resumeIds = Array.from({ length: MAX_WORKSPACE_RESUMES + 2 }, (_, index) => `resume-${index + 1}`);
   const workspace = normalizeWorkspaceIndex({
     activeResumeId: 'resume-12',
@@ -913,21 +948,26 @@ test('cloud guest mirror keeps the ten most recently updated resumes', () => {
   const mirror = createGuestMirrorWorkspace(workspace);
 
   assert.equal(mirror.resumeIds.length, MAX_WORKSPACE_RESUMES);
-  assert.deepEqual(mirror.resumeIds, resumeIds.slice(2).reverse());
-  assert.equal(mirror.activeResumeId, 'resume-12');
-  assert.equal(mirror.meta['resume-1'], undefined);
+  assert.deepEqual(mirror.resumeIds, resumeIds.slice(0, MAX_WORKSPACE_RESUMES));
+  assert.equal(mirror.activeResumeId, 'resume-1');
+  assert.equal(mirror.meta['resume-11'], undefined);
 });
 
-test('cloud guest mirror prioritizes recently edited resumes over recently made resumes', () => {
-  const resumeIds = Array.from({ length: MAX_WORKSPACE_RESUMES + 2 }, (_, index) => `resume-${index + 1}`);
+test('cloud guest mirror includes resumes moved into the first ten rail positions', () => {
+  const baseResumeIds = Array.from({ length: MAX_WORKSPACE_RESUMES + 4 }, (_, index) => `resume-${index + 1}`);
+  const resumeIds = [
+    ...baseResumeIds.slice(0, 7),
+    'resume-14',
+    ...baseResumeIds.slice(7, 13),
+  ];
   const workspace = normalizeWorkspaceIndex({
-    activeResumeId: 'resume-1',
+    activeResumeId: 'resume-14',
     resumeIds,
-    meta: Object.fromEntries(resumeIds.map((resumeId, index) => [
+    meta: Object.fromEntries(baseResumeIds.map((resumeId, index) => [
       resumeId,
       {
         name: `Resume ${index + 1}`,
-        updatedAt: resumeId === 'resume-1'
+        updatedAt: resumeId === 'resume-13'
           ? '2026-02-01T00:00:00.000Z'
           : `2026-01-${String(index + 1).padStart(2, '0')}T00:00:00.000Z`,
       },
@@ -935,9 +975,21 @@ test('cloud guest mirror prioritizes recently edited resumes over recently made 
   });
   const mirror = createGuestMirrorWorkspace(workspace);
 
-  assert.equal(mirror.resumeIds[0], 'resume-1');
   assert.equal(mirror.resumeIds.length, MAX_WORKSPACE_RESUMES);
-  assert.equal(mirror.meta['resume-2'], undefined);
+  assert.deepEqual(mirror.resumeIds, [
+    'resume-1',
+    'resume-2',
+    'resume-3',
+    'resume-4',
+    'resume-5',
+    'resume-6',
+    'resume-7',
+    'resume-14',
+    'resume-8',
+    'resume-9',
+  ]);
+  assert.equal(mirror.activeResumeId, 'resume-14');
+  assert.equal(mirror.meta['resume-13'], undefined);
 });
 
 test('cloud guest mirror backs up existing guest workspace without deleting non-recent draft keys', () => {
@@ -998,7 +1050,11 @@ test('cloud draft mirror writes visible mirrored drafts without deleting older l
   const storage = createMemoryStorage([
     [createResumeStorageKey('resume-2'), JSON.stringify({ savedAt: 'stale' })],
   ]);
-  const resumeIds = Array.from({ length: MAX_WORKSPACE_RESUMES + 1 }, (_, index) => `resume-${index + 1}`);
+  const resumeIds = [
+    'resume-1',
+    'resume-11',
+    ...Array.from({ length: MAX_WORKSPACE_RESUMES - 1 }, (_, index) => `resume-${index + 2}`),
+  ];
   const workspace = normalizeWorkspaceIndex({
     activeResumeId: 'resume-1',
     resumeIds,
@@ -1032,14 +1088,14 @@ test('cloud draft mirror writes visible mirrored drafts without deleting older l
   assert.deepEqual(JSON.parse(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY)).resumeIds, [
     'resume-1',
     'resume-11',
-    'resume-10',
-    'resume-9',
-    'resume-8',
-    'resume-7',
-    'resume-6',
-    'resume-5',
-    'resume-4',
+    'resume-2',
     'resume-3',
+    'resume-4',
+    'resume-5',
+    'resume-6',
+    'resume-7',
+    'resume-8',
+    'resume-9',
   ]);
 
   persistCloudDraftMirror({
@@ -1393,7 +1449,7 @@ test('resume rename is scoped by resume id and updates cloud metadata directly',
   assert.match(firebaseSource, /batch\.set\(\s*draftRef,/);
 });
 
-test('new resumes receive an immediate timestamp for recent local mirroring', () => {
+test('new resumes receive an immediate timestamp for workspace metadata', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const createStart = source.indexOf('async function createResume()');
   const createEnd = source.indexOf('async function duplicateActiveResume()', createStart);
@@ -1429,7 +1485,7 @@ test('builder exposes import placeholder and draft replacement actions', () => {
   assert.match(replaceSource, /flushCloudDraft\(resumeId, nextWorkspace, nextDraft,/);
 });
 
-test('builder reloads the local recent workspace when signing out of cloud mode', () => {
+test('builder reloads the local mirrored workspace when signing out of cloud mode', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const signOutBranchStart = source.indexOf('if (!user) {');
   const signOutBranchEnd = source.indexOf('return undefined;', signOutBranchStart);
@@ -1444,7 +1500,7 @@ test('builder reloads the local recent workspace when signing out of cloud mode'
   assert.match(signOutBranchSource, /wasCloudModeRef\.current = false/);
 });
 
-test('builder normalizes stale local workspaces to the recent ten without deleting hidden drafts', () => {
+test('builder normalizes stale local workspaces to the first ten without deleting hidden drafts', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const loadStart = source.indexOf('function loadStoredWorkspace()');
   const loadEnd = source.indexOf('function formatSavedAt(', loadStart);
