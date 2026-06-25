@@ -77,99 +77,6 @@ service cloud.firestore {
       return value is list && value.size() <= 100;
     }
 
-    function isValidSectionBlockKind(value) {
-      return value in [
-        'education',
-        'roles',
-        'skills',
-        'projects',
-        'certifications',
-        'languages',
-        'awards',
-        'publications',
-        'custom'
-      ];
-    }
-
-    function isValidSectionBlock(section) {
-      return section is map &&
-        section.keys().hasOnly([
-          'id',
-          'kind',
-          'title',
-          'legacySectionId',
-          'entries'
-        ]) &&
-        isString(section.id) &&
-        section.id.size() > 0 &&
-        section.id.size() <= 100 &&
-        section.id != 'personal' &&
-        isString(section.kind) &&
-        isValidSectionBlockKind(section.kind) &&
-        isString(section.title) &&
-        section.title.size() > 0 &&
-        section.title.size() <= 80 &&
-        (!section.keys().hasAny(['legacySectionId']) || (
-          isString(section.legacySectionId) &&
-          section.legacySectionId.size() <= 32
-        )) &&
-        section.entries is list &&
-        section.entries.size() <= 100;
-    }
-
-    function isValidSectionBlocks0To7(sections) {
-      return (sections.size() <= 0 || isValidSectionBlock(sections[0])) &&
-        (sections.size() <= 1 || isValidSectionBlock(sections[1])) &&
-        (sections.size() <= 2 || isValidSectionBlock(sections[2])) &&
-        (sections.size() <= 3 || isValidSectionBlock(sections[3])) &&
-        (sections.size() <= 4 || isValidSectionBlock(sections[4])) &&
-        (sections.size() <= 5 || isValidSectionBlock(sections[5])) &&
-        (sections.size() <= 6 || isValidSectionBlock(sections[6])) &&
-        (sections.size() <= 7 || isValidSectionBlock(sections[7]));
-    }
-
-    function isValidSectionBlocks8To15(sections) {
-      return (sections.size() <= 8 || isValidSectionBlock(sections[8])) &&
-        (sections.size() <= 9 || isValidSectionBlock(sections[9])) &&
-        (sections.size() <= 10 || isValidSectionBlock(sections[10])) &&
-        (sections.size() <= 11 || isValidSectionBlock(sections[11])) &&
-        (sections.size() <= 12 || isValidSectionBlock(sections[12])) &&
-        (sections.size() <= 13 || isValidSectionBlock(sections[13])) &&
-        (sections.size() <= 14 || isValidSectionBlock(sections[14])) &&
-        (sections.size() <= 15 || isValidSectionBlock(sections[15]));
-    }
-
-    function isValidSectionBlocks16To23(sections) {
-      return (sections.size() <= 16 || isValidSectionBlock(sections[16])) &&
-        (sections.size() <= 17 || isValidSectionBlock(sections[17])) &&
-        (sections.size() <= 18 || isValidSectionBlock(sections[18])) &&
-        (sections.size() <= 19 || isValidSectionBlock(sections[19])) &&
-        (sections.size() <= 20 || isValidSectionBlock(sections[20])) &&
-        (sections.size() <= 21 || isValidSectionBlock(sections[21])) &&
-        (sections.size() <= 22 || isValidSectionBlock(sections[22])) &&
-        (sections.size() <= 23 || isValidSectionBlock(sections[23]));
-    }
-
-    function isValidSectionBlocks24To31(sections) {
-      return (sections.size() <= 24 || isValidSectionBlock(sections[24])) &&
-        (sections.size() <= 25 || isValidSectionBlock(sections[25])) &&
-        (sections.size() <= 26 || isValidSectionBlock(sections[26])) &&
-        (sections.size() <= 27 || isValidSectionBlock(sections[27])) &&
-        (sections.size() <= 28 || isValidSectionBlock(sections[28])) &&
-        (sections.size() <= 29 || isValidSectionBlock(sections[29])) &&
-        (sections.size() <= 30 || isValidSectionBlock(sections[30])) &&
-        (sections.size() <= 31 || isValidSectionBlock(sections[31]));
-    }
-
-    function isValidResumeSections(sections) {
-      return sections is list &&
-        sections.size() <= 32 &&
-        isValidSectionBlocks0To7(sections) &&
-        (sections.size() <= 8 || isValidSectionBlocks8To15(sections)) &&
-        (sections.size() <= 16 || isValidSectionBlocks16To23(sections)) &&
-        (sections.size() <= 24 || isValidSectionBlocks24To31(sections));
-    }
-
     function isValidResumeShape(resume) {
       return resume is map &&
         resume.settings is map &&
@@ -183,8 +90,7 @@ service cloud.firestore {
         isValidResumeCollection(resume.leadership) &&
         isValidResumeCollection(resume.languages) &&
         isValidResumeCollection(resume.awards) &&
-        isValidResumeCollection(resume.publications) &&
-        (!resume.keys().hasAny(['sections']) || isValidResumeSections(resume.sections));
+        isValidResumeCollection(resume.publications);
     }
 
     function isValidWorkspace(data) {

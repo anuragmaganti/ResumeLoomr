@@ -6,9 +6,9 @@ import {
   getCloudDeviceId,
   getCloudSessionId,
   importWorkspaceToCloud,
-  readCloudWorkspaceBundle,
+  markGuestWorkspaceImported,
   readCloudDraft,
-  repairCloudWorkspaceFromDocs,
+  readCloudWorkspace,
   renameCloudResume,
   subscribeCloudDraft,
   subscribeCloudWorkspace,
@@ -17,8 +17,12 @@ import {
   writeCloudWorkspace,
 } from '../lib/firebaseWorkspace.js';
 import {
+  DRAFT_STORAGE_KEY,
+  DEFAULT_TEMPLATE,
   MAX_WORKSPACE_RESUMES,
+  SECTION_IDS,
   TEMPLATE_OPTIONS,
+  WORKSPACE_INDEX_STORAGE_KEY,
   addCollectionEntry,
   addCollectionTextListItem,
   addActivity,
@@ -27,7 +31,10 @@ import {
   addExperience,
   createDraftPayload,
   createDuplicateResumeName,
+  createEmptyResume,
+  createFreshWorkspaceDraft,
   createResumeStorageKey,
+  createWorkspaceFromLegacyDraft,
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
   createNextResumeName,
@@ -43,6 +50,7 @@ import {
   moveRoleBlockEntry,
   moveSectionOrder,
   normalizeDraftPayload,
+  normalizeSectionOrder,
   normalizeWorkspaceIndex,
   removeCollectionEntry,
   removeCollectionTextListItem,
@@ -95,21 +103,181 @@ import {
   createGuestMirrorWorkspace,
   persistCloudDraftMirror,
   persistCloudWorkspaceMirror,
+  readCloudMirrorManifest,
+  refreshCloudMirrorManifest,
 } from '../lib/localWorkspaceMirror.js';
-import {
-  createBlankDraftState,
-  getDraftEditorSectionIds,
-  loadStoredWorkspace,
-  persistExistingDraftState,
-  persistWorkspaceIndex,
-  readStoredResumeDraft,
-  readStoredResumeDraftOrNull,
-  readStoredWorkspaceSnapshot,
-} from '../lib/localDraftStore.js';
-import {
-  formatSaveLabel,
-  isBrowserOnline,
-} from '../lib/syncController.js';
+
+function createBlankDraftState() {
+  return {
+    resume: createEmptyResume(),
+    template: DEFAULT_TEMPLATE,
+    sectionOrder: SECTION_IDS,
+    savedAt: null,
+  };
+}
+
+function serializeDraftState(draft) {
+  return {
+    version: 2,
+    savedAt: draft.savedAt ?? null,
+    template: draft.template,
+    sectionOrder: normalizeSectionOrder(draft.sectionOrder),
+    resume: draft.resume,
+  };
+}
+
+function persistWorkspaceIndex(workspace) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(WORKSPACE_INDEX_STORAGE_KEY, JSON.stringify(workspace));
+}
+
+function persistExistingDraftState(resumeId, draft) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(createResumeStorageKey(resumeId), JSON.stringify(serializeDraftState(draft)));
+}
+
+function readStoredResumeDraft(resumeId) {
+  return readStoredResumeDraftOrNull(resumeId) || createBlankDraftState();
+}
+
+function readStoredResumeDraftOrNull(resumeId) {
+  if (typeof window === 'undefined' || !resumeId) {
+    return null;
+  }
+
+  try {
+    const rawDraft = window.localStorage.getItem(createResumeStorageKey(resumeId));
+
+    if (!rawDraft) {
+      return null;
+    }
+
+    const parsedDraft = JSON.parse(rawDraft);
+    const normalizedDraft = normalizeDraftPayload(parsedDraft);
+
+    return {
+      resume: normalizedDraft.resume,
+      template: normalizedDraft.template,
+      sectionOrder: normalizedDraft.sectionOrder,
+      savedAt: parsedDraft.savedAt || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function readStoredWorkspaceSnapshot() {
+  const storedWorkspace = loadStoredWorkspace();
+  const workspace = normalizeWorkspaceIndex(storedWorkspace.workspace);
+
+  return {
+    workspace,
+    activeResumeId: workspace.activeResumeId,
+    draft: storedWorkspace.draft,
+    readDraft(resumeId) {
+      return readStoredResumeDraft(resumeId);
+    },
+  };
+}
+
+function getDraftEditorSectionIds(draft) {
+  const blockIds = Array.isArray(draft?.resume?.sections)
+    ? draft.resume.sections.map((section) => section.id).filter(Boolean)
+    : SECTION_IDS.filter((sectionId) => sectionId !== 'personal');
+
+  return ['personal', ...blockIds];
+}
+
+function loadStoredWorkspace() {
+  if (typeof window === 'undefined') {
+    return {
+      ...createFreshWorkspaceDraft(),
+      needsInitialCommit: false,
+    };
+  }
+
+  try {
+    const rawWorkspace = window.localStorage.getItem(WORKSPACE_INDEX_STORAGE_KEY);
+
+    if (rawWorkspace) {
+      const normalizedWorkspace = normalizeWorkspaceIndex(JSON.parse(rawWorkspace));
+
+      if (normalizedWorkspace.resumeIds.length === 0) {
+        return {
+          ...createFreshWorkspaceDraft(),
+          needsInitialCommit: true,
+        };
+      }
+
+      const localWorkspace = createGuestMirrorWorkspace(normalizedWorkspace);
+      const activeResumeId = localWorkspace.activeResumeId || localWorkspace.resumeIds[0];
+
+      if (
+        localWorkspace.resumeIds.length !== normalizedWorkspace.resumeIds.length ||
+        localWorkspace.activeResumeId !== normalizedWorkspace.activeResumeId ||
+        localWorkspace.resumeIds.some((resumeId, index) => resumeId !== normalizedWorkspace.resumeIds[index])
+      ) {
+        persistWorkspaceIndex(localWorkspace);
+      }
+
+      refreshCloudMirrorManifest(localWorkspace);
+
+      return {
+        workspace: localWorkspace,
+        activeResumeId,
+        draft: readStoredResumeDraft(activeResumeId),
+        needsInitialCommit: false,
+      };
+    }
+
+    const rawLegacyDraft = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+
+    if (rawLegacyDraft) {
+      return {
+        ...createWorkspaceFromLegacyDraft(JSON.parse(rawLegacyDraft)),
+        needsInitialCommit: true,
+      };
+    }
+  } catch {
+    return {
+      ...createFreshWorkspaceDraft(),
+      needsInitialCommit: true,
+    };
+  }
+
+  return {
+    ...createFreshWorkspaceDraft(),
+    needsInitialCommit: true,
+  };
+}
+
+function formatSavedAt(savedAt, { cloudMode = false, syncState = 'idle', trustedDevice = false } = {}) {
+  if (cloudMode && syncState === 'syncing') {
+    return 'Syncing…';
+  }
+
+  if (cloudMode && syncState === 'offline') {
+    return trustedDevice ? 'Saved offline' : 'Unsynced in this tab';
+  }
+
+  if (!savedAt) {
+    return 'Autosave ready';
+  }
+
+  const date = new Date(savedAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Autosave ready';
+  }
+
+  return `Saved ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+}
 
 function withWorkspaceResumeMeta(workspace, resumeId, updates) {
   if (!workspace.meta[resumeId]) {
@@ -145,34 +313,12 @@ function shouldReadFirestoreCache(trustedDevice) {
 }
 
 function isOnline() {
-  return isBrowserOnline();
+  return typeof navigator === 'undefined' || navigator.onLine;
 }
 
-function createFallbackCloudImportDraft({ localWorkspace, currentDraft, fallbackResumeId }) {
-  const payload = createDraftPayload({
-    resume: currentDraft.resume,
-    template: currentDraft.template,
-    sectionOrder: currentDraft.sectionOrder,
-  });
-  const resumeId = fallbackResumeId || localWorkspace.activeResumeId || createWorkspaceResumeId();
-  const name = localWorkspace.meta[resumeId]?.name || 'Resume 1';
-  const draft = {
-    resume: payload.resume,
-    template: payload.template,
-    sectionOrder: payload.sectionOrder,
-    savedAt: payload.savedAt,
-  };
-
-  return {
-    workspace: normalizeWorkspaceIndex({
-      activeResumeId: resumeId,
-      resumeIds: [resumeId],
-      meta: {
-        [resumeId]: createWorkspaceResumeMeta(name, payload.savedAt),
-      },
-    }),
-    draft,
-  };
+function getSavedAtTimestamp(value) {
+  const timestamp = Date.parse(value || '');
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 async function resolveReadableCloudWorkspace({ uid, workspace, trustedDevice }) {
@@ -243,6 +389,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
   const hasMounted = useRef(false);
   const skipNextAutosaveRef = useRef(false);
   const skipNextCloudSnapshotRef = useRef(false);
+  const localDirtyRef = useRef(false);
   const localDirtyResumeIdsRef = useRef(new Set());
   const currentDraftRef = useRef(initialWorkspaceState.draft);
   const workspaceRef = useRef(initialWorkspaceState.workspace);
@@ -334,11 +481,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       try {
         persistActiveDraftImmediately({ localOnly: true });
         const localSnapshot = readStoredWorkspaceSnapshot();
-        const remoteBundle = await readCloudWorkspaceBundle(uid, trustedDevice, {
+        const localMirrorManifest = readCloudMirrorManifest(uid);
+        const remoteWorkspace = await readCloudWorkspace(uid, trustedDevice, {
           cacheOnly: shouldReadFirestoreCache(trustedDevice),
         });
-        let nextWorkspace = remoteBundle.workspace;
-        let cloudRepair = null;
+        let nextWorkspace = remoteWorkspace;
 
         if (!nextWorkspace) {
           nextWorkspace = await importWorkspaceToCloud(
@@ -348,26 +495,8 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
             trustedDevice,
             cloudIdentityRef.current,
           );
-
-          if (!nextWorkspace) {
-            const fallbackImport = createFallbackCloudImportDraft({
-              localWorkspace: localSnapshot.workspace,
-              currentDraft: currentDraftRef.current,
-              fallbackResumeId: localSnapshot.activeResumeId || activeResumeIdRef.current,
-            });
-
-            nextWorkspace = await importWorkspaceToCloud(
-              uid,
-              fallbackImport.workspace,
-              (resumeId) => (resumeId === fallbackImport.workspace.activeResumeId ? fallbackImport.draft : null),
-              trustedDevice,
-              cloudIdentityRef.current,
-            );
-          }
+          markGuestWorkspaceImported(uid);
         } else {
-          cloudRepair = repairCloudWorkspaceFromDocs(nextWorkspace, remoteBundle.resumeDocs);
-          nextWorkspace = cloudRepair.workspace;
-
           nextWorkspace = await syncLocalWorkspaceToCloud(
             uid,
             nextWorkspace,
@@ -375,15 +504,13 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
             localSnapshot.readDraft,
             trustedDevice,
             cloudIdentityRef.current,
+            { mirroredResumeIds: localMirrorManifest?.resumeIds || [] },
           );
-
-          if (cloudRepair.changed && nextWorkspace) {
-            await writeCloudWorkspace(uid, nextWorkspace, trustedDevice, cloudIdentityRef.current);
-          }
+          markGuestWorkspaceImported(uid);
         }
 
         if (cancelled || !nextWorkspace) {
-          throw new Error('Cloud workspace could not be created from local drafts.');
+          return;
         }
 
         const resolvedCloudWorkspace = await resolveReadableCloudWorkspace({
@@ -409,11 +536,6 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
             tone: 'success',
             message: 'Removed unavailable cloud resumes from this workspace.',
           });
-        } else if (cloudRepair?.recoveredCount > 0) {
-          setNotice({
-            tone: 'success',
-            message: 'Recovered cloud resumes that were missing from this workspace.',
-          });
         }
 
         if (cancelled) {
@@ -426,14 +548,10 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         clearLocalDirtyState();
         setCloudReady(true);
         setSyncState('saved');
-      } catch (error) {
+      } catch {
         if (!cancelled) {
-          console.error('Cloud workspace bootstrap failed', {
-            code: error?.code,
-            message: error?.message,
-          });
           setCloudReady(false);
-          setSaveState(savedAt ? 'saved' : 'idle');
+          setSaveState('error');
           setSyncState('error');
           setNotice({ tone: 'error', message: 'Cloud sync is unavailable. Your local draft is still editable.' });
         }
@@ -460,17 +578,17 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       return;
     }
 
+    if (isCloudMode && !cloudReady) {
+      return;
+    }
+
     const timeoutId = window.setTimeout(() => {
       try {
         const payload = createDraftPayload({ resume, template, sectionOrder });
-        const draft = {
-          resume,
-          template,
-          sectionOrder,
-          savedAt: payload.savedAt,
-        };
 
-        persistExistingDraftState(activeResumeId, draft);
+        if (!isCloudMode) {
+          window.localStorage.setItem(createResumeStorageKey(activeResumeId), JSON.stringify(payload));
+        }
 
         setSavedAt(payload.savedAt);
         setSaveState('saved');
@@ -480,7 +598,15 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
           if (!isCloudMode) {
             persistWorkspaceIndex(nextWorkspace);
           } else {
+            const draft = {
+              resume,
+              template,
+              sectionOrder,
+              savedAt: payload.savedAt,
+            };
+
             markResumeDirty(activeResumeId);
+            setSyncState(isOnline() ? 'syncing' : 'offline');
             mirrorCloudDraftLocally(activeResumeId, nextWorkspace, draft);
 
             if (!trustedDevice && !isOnline()) {
@@ -490,12 +616,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
               });
             }
 
-            if (cloudReady) {
-              setSyncState(isOnline() ? 'syncing' : 'offline');
-              scheduleCloudSave(activeResumeId, nextWorkspace, draft);
-            } else {
-              setSyncState(isOnline() ? 'error' : 'offline');
-            }
+            scheduleCloudSave(activeResumeId, nextWorkspace, draft);
           }
 
           return nextWorkspace;
@@ -665,19 +786,22 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
     try {
       const payload = createDraftPayload({ resume, template, sectionOrder });
-      const draft = {
-        resume,
-        template,
-        sectionOrder,
-        savedAt: payload.savedAt,
-      };
 
-      persistExistingDraftState(resumeId, draft);
+      if (!isCloudMode || localOnly) {
+        window.localStorage.setItem(createResumeStorageKey(resumeId), JSON.stringify(payload));
+      }
 
       setSavedAt(payload.savedAt);
       setSaveState('saved');
 
-      if (isCloudMode && cloudReady && !localOnly && flushCloud) {
+      if (isCloudMode && !localOnly && flushCloud) {
+        const draft = {
+          resume,
+          template,
+          sectionOrder,
+          savedAt: payload.savedAt,
+        };
+
         flushCloudDraft(resumeId, workspace, draft);
       }
 
@@ -728,20 +852,29 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     cloudSaveQueueRef.current.clear();
   }
 
+  function syncGlobalDirtyFlag() {
+    localDirtyRef.current = localDirtyResumeIdsRef.current.size > 0;
+  }
+
   function markResumeDirty(resumeId) {
     if (resumeId) {
       localDirtyResumeIdsRef.current.add(resumeId);
     }
+
+    syncGlobalDirtyFlag();
   }
 
   function clearResumeDirty(resumeId) {
     if (resumeId) {
       localDirtyResumeIdsRef.current.delete(resumeId);
     }
+
+    syncGlobalDirtyFlag();
   }
 
   function clearLocalDirtyState() {
     localDirtyResumeIdsRef.current.clear();
+    syncGlobalDirtyFlag();
   }
 
   function hasLocalDirty(resumeId) {
@@ -768,10 +901,12 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
   }
 
   function logCloudError(error) {
-    console.error('Cloud sync failed', {
-      code: error?.code,
-      message: error?.message,
-    });
+    if (import.meta.env.DEV) {
+      console.error('Cloud sync failed', {
+        code: error?.code,
+        message: error?.message,
+      });
+    }
   }
 
   function getCloudSyncErrorMessage(error) {
@@ -808,6 +943,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         .catch((error) => {
           logCloudError(error);
           setSyncState(isOnline() ? 'error' : 'offline');
+          setSaveState('error');
           setNotice({
             tone: 'error',
             message: getCloudSyncErrorMessage(error),
@@ -817,6 +953,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     } catch (error) {
       logCloudError(error);
       setSyncState(isOnline() ? 'error' : 'offline');
+      setSaveState('error');
       setNotice({
         tone: 'error',
         message: getCloudSyncErrorMessage(error),
@@ -957,6 +1094,45 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     return flushActiveCloudDraft({ reason: 'retry' });
   }
 
+  function getLatestKnownDraftForResume(resumeId) {
+    if (resumeId === activeResumeIdRef.current) {
+      return currentDraftRef.current;
+    }
+
+    return readStoredResumeDraft(resumeId);
+  }
+
+  function isStaleDraftSnapshot(resumeId, draft) {
+    const snapshotTimestamp = getSavedAtTimestamp(draft?.savedAt);
+
+    if (!snapshotTimestamp) {
+      return false;
+    }
+
+    const workspaceTimestamp = getSavedAtTimestamp(workspaceRef.current.meta[resumeId]?.updatedAt);
+    const latestDraftTimestamp = getSavedAtTimestamp(getLatestKnownDraftForResume(resumeId)?.savedAt);
+
+    return Math.max(workspaceTimestamp, latestDraftTimestamp) > snapshotTimestamp;
+  }
+
+  function repairStaleCloudWrite(resumeId) {
+    if (!isCloudMode || !cloudReady || !userRef.current?.uid || !resumeId) {
+      return;
+    }
+
+    const latestDraft = getLatestKnownDraftForResume(resumeId);
+
+    if (!latestDraft?.savedAt) {
+      return;
+    }
+
+    const nextWorkspace = withWorkspaceResumeMeta(workspaceRef.current, resumeId, {
+      updatedAt: latestDraft.savedAt,
+    });
+
+    scheduleCloudSave(resumeId, nextWorkspace, latestDraft, 'stale-write-repair');
+  }
+
   async function flushCloudDraft(
     resumeId = activeResumeIdRef.current,
     nextWorkspace = workspaceRef.current,
@@ -971,6 +1147,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     }
 
     clearCloudSaveTimers(resumeId);
+
+    if (isStaleDraftSnapshot(resumeId, draft)) {
+      settleCloudSyncState();
+      return null;
+    }
 
     setSyncState(isOnline() ? 'syncing' : 'offline');
 
@@ -989,6 +1170,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         savedAt: draftDoc?.savedAt || draft.savedAt || new Date().toISOString(),
       };
 
+      if (isStaleDraftSnapshot(resumeId, mirroredDraft)) {
+        repairStaleCloudWrite(resumeId);
+        return draftDoc;
+      }
+
       clearResumeDirty(resumeId);
       lastRemoteVersionByResumeRef.current.set(resumeId, draftDoc?.version || 0);
       mirrorCloudDraftLocally(resumeId, nextWorkspace, mirroredDraft);
@@ -1004,15 +1190,8 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     } catch (error) {
       logCloudError(error);
       mirrorCloudDraftLocally(resumeId, nextWorkspace, draft);
-      cloudSaveQueueRef.current.set(resumeId, {
-        resumeId,
-        workspace: nextWorkspace,
-        draft,
-        reason: 'retry-after-error',
-        debounceTimer: null,
-        forceTimer: null,
-      });
       setSyncState(isOnline() ? 'error' : 'offline');
+      setSaveState('error');
       setNotice({
         tone: 'error',
         message: getCloudSyncErrorMessage(error),
@@ -1906,13 +2085,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     retryCloudSync,
     flushActiveCloudDraft,
     saveState,
-    saveLabel: formatSaveLabel({
-      saveState,
-      savedAt,
-      cloudMode: isCloudMode,
-      syncState,
-      trustedDevice,
-    }),
+    saveLabel: saveState === 'saving'
+      ? 'Saving…'
+      : saveState === 'error'
+        ? isCloudMode && syncState === 'offline' ? formatSavedAt(savedAt, { cloudMode: isCloudMode, syncState, trustedDevice }) : 'Autosave unavailable'
+        : formatSavedAt(savedAt, { cloudMode: isCloudMode, syncState, trustedDevice }),
     syncState,
     isCloudMode,
     templateOptions: TEMPLATE_OPTIONS,

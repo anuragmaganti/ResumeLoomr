@@ -7,9 +7,6 @@ import { fileURLToPath } from 'node:url';
 import {
   DRAFT_STORAGE_KEY,
   MAX_WORKSPACE_RESUMES,
-  SECTION_BLOCK_ID_MAX_LENGTH,
-  SECTION_BLOCK_LEGACY_ID_MAX_LENGTH,
-  SECTION_BLOCK_TITLE_MAX_LENGTH,
   SECTION_IDS,
   WORKSPACE_INDEX_STORAGE_KEY,
   addEducationCustomSection,
@@ -60,10 +57,8 @@ import {
   CLOUD_SESSION_ID_KEY,
   CLOUD_TRUSTED_DEVICE_KEY,
   CLOUD_WORKSPACE_RESUME_LIMIT,
-  createCloudImportSnapshot,
   createCloudDraftDoc,
   getCloudSessionId,
-  repairCloudWorkspaceFromDocs,
   validateCloudDraftPayload,
 } from '../src/lib/firebaseWorkspace.js';
 import {
@@ -86,9 +81,6 @@ import {
   writeConnectedAccount,
   writeSignedOutEditingPreference,
 } from '../src/lib/browserConnection.js';
-import {
-  readStoredWorkspaceSnapshot,
-} from '../src/lib/localDraftStore.js';
 import {
   DEFAULT_GEMINI_MAX_OUTPUT_TOKENS,
   DEFAULT_GEMINI_IMPORT_MODEL,
@@ -750,38 +742,6 @@ test('normalization refreshes stale legacy fixed blocks into section blocks', ()
   assert.equal(getPreviewModel(draft.resume).sectionBlocks[0].entries[0].school, 'Fresh Legacy University');
 });
 
-test('normalizeDraftPayload caps section block metadata to Firestore-safe limits', () => {
-  const longId = `custom-${'very-long-section-id-'.repeat(10)}`;
-  const longTitle = `Long Imported Section ${'Details '.repeat(20)}`;
-  const draft = normalizeDraftPayload({
-    resume: {
-      sections: [
-        {
-          id: longId,
-          kind: 'custom',
-          title: longTitle,
-          legacySectionId: 'experience-extra-long-legacy-section-id',
-          entries: [{ id: 'custom-entry-1', title: 'Imported detail' }],
-        },
-        {
-          id: longId,
-          kind: 'custom',
-          title: longTitle,
-          entries: [{ id: 'custom-entry-2', title: 'Imported detail' }],
-        },
-      ],
-    },
-  });
-
-  assert.equal(draft.resume.sections.length, 2);
-  assert.equal(draft.resume.sections[0].id.length <= SECTION_BLOCK_ID_MAX_LENGTH, true);
-  assert.equal(draft.resume.sections[1].id.length <= SECTION_BLOCK_ID_MAX_LENGTH, true);
-  assert.notEqual(draft.resume.sections[0].id, draft.resume.sections[1].id);
-  assert.equal(draft.resume.sections[0].title.length <= SECTION_BLOCK_TITLE_MAX_LENGTH, true);
-  assert.equal(draft.resume.sections[0].legacySectionId.length <= SECTION_BLOCK_LEGACY_ID_MAX_LENGTH, true);
-  assert.equal(draft.resume.sections[1].legacySectionId, '');
-});
-
 test('removing a section block clears matching legacy mirror content', () => {
   const resume = createEmptyResume();
   resume.awards[0].title = 'Hidden Award';
@@ -1440,125 +1400,6 @@ test('cloud draft docs preserve the source draft timestamp for stale write order
   assert.equal(draftDoc.version, Date.parse(savedAt));
 });
 
-test('cloud import skips stale local workspace ids instead of failing first login sync', () => {
-  const savedAt = '2026-06-15T12:34:56.000Z';
-  const validDraft = {
-    resume: createEmptyResume(),
-    template: 'modern',
-    sectionOrder: SECTION_IDS,
-    savedAt,
-  };
-  const oversizedDraft = {
-    resume: {
-      ...createEmptyResume(),
-      education: Array.from({ length: 101 }, (_, index) => ({ id: `education-${index}` })),
-    },
-    template: 'modern',
-    sectionOrder: SECTION_IDS,
-    savedAt,
-  };
-  const workspace = {
-    activeResumeId: 'missing-resume',
-    resumeIds: ['missing-resume', 'valid-resume', 'oversized-resume'],
-    meta: {
-      'missing-resume': createWorkspaceResumeMeta('Missing resume', savedAt),
-      'valid-resume': createWorkspaceResumeMeta('Valid resume', savedAt),
-      'oversized-resume': createWorkspaceResumeMeta('Oversized resume', savedAt),
-    },
-  };
-  const originalConsoleError = console.error;
-
-  console.error = () => {};
-  try {
-    const snapshot = createCloudImportSnapshot(
-      workspace,
-      (resumeId) => {
-        if (resumeId === 'valid-resume') return validDraft;
-        if (resumeId === 'oversized-resume') return oversizedDraft;
-        return null;
-      },
-      { deviceId: 'device-1', sessionId: 'session-1' },
-    );
-
-    assert.deepEqual(snapshot.workspace.resumeIds, ['valid-resume']);
-    assert.equal(snapshot.workspace.activeResumeId, 'valid-resume');
-    assert.deepEqual(Object.keys(snapshot.workspace.meta), ['valid-resume']);
-    assert.equal(snapshot.draftDocsByResumeId.has('valid-resume'), true);
-    assert.equal(snapshot.draftDocsByResumeId.has('missing-resume'), false);
-    assert.equal(snapshot.draftDocsByResumeId.has('oversized-resume'), false);
-  } finally {
-    console.error = originalConsoleError;
-  }
-});
-
-test('local workspace snapshots do not invent blank drafts for missing cached resume ids', () => {
-  const originalWindow = global.window;
-  const workspace = normalizeWorkspaceIndex({
-    activeResumeId: 'missing-local',
-    resumeIds: ['missing-local', 'existing-local'],
-    meta: {
-      'missing-local': createWorkspaceResumeMeta('Missing Local'),
-      'existing-local': createWorkspaceResumeMeta('Existing Local'),
-    },
-  });
-  const existingDraft = createFreshWorkspaceDraft().draft;
-  const storage = createMemoryStorage([
-    [WORKSPACE_INDEX_STORAGE_KEY, JSON.stringify(workspace)],
-    [createResumeStorageKey('existing-local'), JSON.stringify({
-      version: 2,
-      savedAt: existingDraft.savedAt,
-      template: existingDraft.template,
-      sectionOrder: existingDraft.sectionOrder,
-      resume: existingDraft.resume,
-    })],
-  ]);
-
-  global.window = { localStorage: storage };
-
-  try {
-    const snapshot = readStoredWorkspaceSnapshot();
-
-    assert.equal(snapshot.readDraft('missing-local'), null);
-    assert.equal(snapshot.readDraft('existing-local')?.template, existingDraft.template);
-  } finally {
-    global.window = originalWindow;
-  }
-});
-
-test('cloud workspace repair recovers orphan docs and removes missing refs without deleting docs', () => {
-  const repaired = repairCloudWorkspaceFromDocs(
-    {
-      activeResumeId: 'missing-active',
-      resumeIds: ['missing-active', 'existing-older'],
-      meta: {
-        'missing-active': createWorkspaceResumeMeta('Missing', '2026-06-25T23:15:07.000Z'),
-        'existing-older': createWorkspaceResumeMeta('Existing Older', '2026-06-25T16:00:00.000Z'),
-      },
-    },
-    new Map([
-      ['existing-older', {
-        id: 'existing-older',
-        name: 'Existing Older',
-        updatedAt: '2026-06-25T16:00:00.000Z',
-        draft: createFreshWorkspaceDraft().draft,
-      }],
-      ['orphan-newer', {
-        id: 'orphan-newer',
-        name: 'Orphan Newer',
-        updatedAt: '2026-06-25T17:00:00.000Z',
-        draft: createFreshWorkspaceDraft().draft,
-      }],
-    ]),
-  );
-
-  assert.equal(repaired.changed, true);
-  assert.equal(repaired.removedCount, 1);
-  assert.equal(repaired.recoveredCount, 1);
-  assert.deepEqual(repaired.workspace.resumeIds, ['existing-older', 'orphan-newer']);
-  assert.equal(repaired.workspace.activeResumeId, 'existing-older');
-  assert.equal(repaired.draftsByResumeId.has('orphan-newer'), true);
-});
-
 test('cloud workspace writes replace the index document instead of merging stale meta keys', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'lib/firebaseWorkspace.js'), 'utf8');
   const workspaceWriteLines = source
@@ -1600,12 +1441,11 @@ test('builder conflict detection is scoped to the active resume dirty state', ()
 
 test('builder resets stale dynamic section tabs when loading a different resume', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
-  const localStoreSource = fs.readFileSync(path.resolve(SRC_DIR, 'lib/localDraftStore.js'), 'utf8');
   const loadDraftStart = source.indexOf('function loadDraftIntoEditor(');
   const loadDraftEnd = source.indexOf('function persistActiveDraftImmediately', loadDraftStart);
   const loadDraftSource = source.slice(loadDraftStart, loadDraftEnd);
 
-  assert.match(localStoreSource, /function getDraftEditorSectionIds\(draft\)/);
+  assert.match(source, /function getDraftEditorSectionIds\(draft\)/);
   assert.match(loadDraftSource, /const nextSectionIds = getDraftEditorSectionIds\(nextDraft\)/);
   assert.match(loadDraftSource, /!nextSectionIds\.includes\(activeTab\)/);
   assert.match(loadDraftSource, /setActiveTab\('personal'\)/);
@@ -1682,9 +1522,9 @@ test('builder reloads the local mirrored workspace when signing out of cloud mod
 });
 
 test('builder normalizes stale local workspaces to the first ten without deleting hidden drafts', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'lib/localDraftStore.js'), 'utf8');
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const loadStart = source.indexOf('function loadStoredWorkspace()');
-  const loadEnd = source.length;
+  const loadEnd = source.indexOf('function formatSavedAt(', loadStart);
   const loadSource = source.slice(loadStart, loadEnd);
 
   assert.ok(loadStart > -1);
@@ -1704,26 +1544,10 @@ test('builder reconciles signed-out local workspace changes on every sign-in', (
   const bootstrapSource = source.slice(bootstrapStart, bootstrapEnd);
 
   assert.ok(bootstrapStart > -1);
-  assert.match(bootstrapSource, /readCloudWorkspaceBundle\(uid/);
-  assert.match(bootstrapSource, /repairCloudWorkspaceFromDocs\(nextWorkspace, remoteBundle\.resumeDocs\)/);
+  assert.match(bootstrapSource, /readCloudMirrorManifest\(uid\)/);
   assert.match(bootstrapSource, /syncLocalWorkspaceToCloud\(/);
-  assert.doesNotMatch(bootstrapSource, /readCloudMirrorManifest\(uid\)/);
-  assert.doesNotMatch(bootstrapSource, /markGuestWorkspaceImported\(uid\)/);
   assert.doesNotMatch(bootstrapSource, /hasImportedGuestWorkspace/);
   assert.doesNotMatch(source, /export async function appendWorkspaceToCloud/);
-});
-
-test('builder falls back to the current draft when first cloud import has no readable local drafts', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
-  const bootstrapStart = source.indexOf('async function bootstrapCloudWorkspace()');
-  const bootstrapEnd = source.indexOf('const resolvedCloudWorkspace = await resolveReadableCloudWorkspace', bootstrapStart);
-  const bootstrapSource = source.slice(bootstrapStart, bootstrapEnd);
-
-  assert.match(source, /function createFallbackCloudImportDraft/);
-  assert.match(bootstrapSource, /if \(!nextWorkspace\) \{/);
-  assert.match(bootstrapSource, /createFallbackCloudImportDraft\(/);
-  assert.match(bootstrapSource, /currentDraftRef\.current/);
-  assert.match(source, /Cloud workspace could not be created from local drafts/);
 });
 
 test('builder delete waits for online cloud delete before local removal', () => {
