@@ -117,6 +117,11 @@ function App() {
     if (themeColor) {
       themeColor.setAttribute('content', theme === 'dark' ? '#0f1726' : '#3158d5');
     }
+
+    const favicon = document.querySelector('#app-favicon');
+    if (favicon) {
+      favicon.setAttribute('href', theme === 'dark' ? '/favicon-dark.png' : '/favicon-light.png');
+    }
   }, [theme]);
 
   useEffect(() => {

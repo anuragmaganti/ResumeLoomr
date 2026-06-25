@@ -96,7 +96,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-5);
   align-items: center;
-  padding: var(--space-6);
+  padding: 17.75px var(--space-6);
 }
 
 .brand {
@@ -107,8 +107,8 @@
 
 .brandLogo {
   display: block;
-  width: clamp(190px, 12vw, 230px);
-  height: auto;
+  width: auto;
+  height: 65px;
   object-fit: contain;
 }
 
@@ -1923,6 +1923,10 @@ html[data-theme="dark"] .brandLogo--dark {
   .editorStage,
   .previewPanel {
     padding: var(--space-4);
+  }
+
+  .topbar {
+    padding: 9.75px var(--space-4);
   }
 
   .topbarMeta {
