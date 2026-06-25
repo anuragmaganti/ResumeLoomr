@@ -53,6 +53,7 @@ import {
   CLOUD_SESSION_ID_KEY,
   CLOUD_TRUSTED_DEVICE_KEY,
   CLOUD_WORKSPACE_RESUME_LIMIT,
+  createCloudDraftDoc,
   getCloudSessionId,
   validateCloudDraftPayload,
 } from '../src/lib/firebaseWorkspace.js';
@@ -1298,6 +1299,28 @@ test('cloud draft payload guard rejects oversized documents before Firestore wri
     }),
     /too large/i,
   );
+});
+
+test('cloud draft docs preserve the source draft timestamp for stale write ordering', () => {
+  const savedAt = '2026-06-24T12:34:56.000Z';
+  const draftDoc = createCloudDraftDoc({
+    resumeId: 'resume-imported',
+    name: 'Imported Resume',
+    draft: {
+      resume: createEmptyResume(),
+      template: 'modern',
+      sectionOrder: SECTION_IDS,
+      savedAt,
+    },
+    identity: {
+      deviceId: 'device-1',
+      sessionId: 'session-1',
+    },
+  });
+
+  assert.equal(draftDoc.savedAt, savedAt);
+  assert.equal(draftDoc.updatedAt, savedAt);
+  assert.equal(draftDoc.version, Date.parse(savedAt));
 });
 
 test('cloud workspace writes replace the index document instead of merging stale meta keys', () => {

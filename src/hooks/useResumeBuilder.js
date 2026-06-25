@@ -308,6 +308,11 @@ function isOnline() {
   return typeof navigator === 'undefined' || navigator.onLine;
 }
 
+function getSavedAtTimestamp(value) {
+  const timestamp = Date.parse(value || '');
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 async function resolveReadableCloudWorkspace({ uid, workspace, trustedDevice }) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const orderedResumeIds = [
@@ -1041,6 +1046,45 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     return flushActiveCloudDraft({ reason: 'retry' });
   }
 
+  function getLatestKnownDraftForResume(resumeId) {
+    if (resumeId === activeResumeIdRef.current) {
+      return currentDraftRef.current;
+    }
+
+    return readStoredResumeDraft(resumeId);
+  }
+
+  function isStaleDraftSnapshot(resumeId, draft) {
+    const snapshotTimestamp = getSavedAtTimestamp(draft?.savedAt);
+
+    if (!snapshotTimestamp) {
+      return false;
+    }
+
+    const workspaceTimestamp = getSavedAtTimestamp(workspaceRef.current.meta[resumeId]?.updatedAt);
+    const latestDraftTimestamp = getSavedAtTimestamp(getLatestKnownDraftForResume(resumeId)?.savedAt);
+
+    return Math.max(workspaceTimestamp, latestDraftTimestamp) > snapshotTimestamp;
+  }
+
+  function repairStaleCloudWrite(resumeId) {
+    if (!isCloudMode || !cloudReady || !userRef.current?.uid || !resumeId) {
+      return;
+    }
+
+    const latestDraft = getLatestKnownDraftForResume(resumeId);
+
+    if (!latestDraft?.savedAt) {
+      return;
+    }
+
+    const nextWorkspace = withWorkspaceResumeMeta(workspaceRef.current, resumeId, {
+      updatedAt: latestDraft.savedAt,
+    });
+
+    scheduleCloudSave(resumeId, nextWorkspace, latestDraft, 'stale-write-repair');
+  }
+
   async function flushCloudDraft(
     resumeId = activeResumeIdRef.current,
     nextWorkspace = workspaceRef.current,
@@ -1055,6 +1099,12 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     }
 
     clearCloudSaveTimers(resumeId);
+
+    if (isStaleDraftSnapshot(resumeId, draft)) {
+      settleCloudSyncState();
+      return null;
+    }
+
     setSyncState(isOnline() ? 'syncing' : 'offline');
 
     try {
@@ -1071,6 +1121,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         ...draft,
         savedAt: draftDoc?.savedAt || draft.savedAt || new Date().toISOString(),
       };
+
+      if (isStaleDraftSnapshot(resumeId, mirroredDraft)) {
+        repairStaleCloudWrite(resumeId);
+        return draftDoc;
+      }
 
       clearResumeDirty(resumeId);
       lastRemoteVersionByResumeRef.current.set(resumeId, draftDoc?.version || 0);
