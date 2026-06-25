@@ -6,6 +6,9 @@ function formatAccountName(account, fallback = 'Unknown account') {
 
 export default function AccountSettings({
   isOpen,
+  saveState,
+  saveLabel,
+  theme,
   authUser,
   connectedAccount,
   firebaseEnabled,
@@ -14,11 +17,13 @@ export default function AccountSettings({
   busy,
   onOpen,
   onClose,
+  onToggleTheme,
   onOpenAuth,
   onDisconnectBrowser,
   onSignedOutEditingPreferenceChange,
 }) {
   const [isConfirmingDisconnect, setIsConfirmingDisconnect] = useState(false);
+  const [isThemeAnimating, setIsThemeAnimating] = useState(false);
   const activeAccount = authUser
     ? {
         uid: authUser.uid,
@@ -50,8 +55,45 @@ export default function AccountSettings({
     await onDisconnectBrowser();
   }
 
+  function handleThemeToggle() {
+    setIsThemeAnimating(true);
+    onToggleTheme();
+  }
+
   return (
     <>
+      <div className={`floatingSaveStatus statusBadge statusBadge--${saveState}`} role="status">
+        {saveLabel}
+      </div>
+
+      <button
+        type="button"
+        className={[
+          'floatingThemeToggle',
+          `is-${theme}`,
+          isThemeAnimating ? 'isAnimating' : '',
+        ].filter(Boolean).join(' ')}
+        onClick={handleThemeToggle}
+        onAnimationEnd={() => setIsThemeAnimating(false)}
+        aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+        aria-pressed={theme === 'dark'}
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+          <g className="themeSunRays">
+            <path d="M12 2.8v2" />
+            <path d="M12 19.2v2" />
+            <path d="m4.8 4.8 1.4 1.4" />
+            <path d="m17.8 17.8 1.4 1.4" />
+            <path d="M2.8 12h2" />
+            <path d="M19.2 12h2" />
+            <path d="m4.8 19.2 1.4-1.4" />
+            <path d="m17.8 6.2 1.4-1.4" />
+          </g>
+          <circle className="themeSunCore" cx="12" cy="12" r="4.1" />
+          <path className="themeMoon" d="M18.4 14.3A6.9 6.9 0 0 1 9.7 5.6 7 7 0 1 0 18.4 14.3Z" />
+        </svg>
+      </button>
+
       <button
         type="button"
         className="settingsLauncher"
@@ -60,7 +102,8 @@ export default function AccountSettings({
         aria-expanded={isOpen}
       >
         <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-          <path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Zm8.2 4.6-.1-1.6-2.1-.7a6.8 6.8 0 0 0-.6-1.5l1-2-1.2-1.1-2 .9a7.2 7.2 0 0 0-1.5-.6L13 4h-2l-.7 2.2c-.5.1-1 .3-1.5.6l-2-.9-1.2 1.1 1 2c-.3.5-.5 1-.6 1.5l-2.1.7-.1 1.6 2.2.8c.1.5.3 1 .6 1.5l-1 2 1.2 1.1 2-.9c.5.3 1 .5 1.5.6L11 20h2l.7-2.1c.5-.1 1-.3 1.5-.6l2 .9 1.2-1.1-1-2c.3-.5.5-1 .6-1.5l2.2-.8Z" />
+          <path d="M9.2 4.5 9.8 2h4.4l.6 2.5c.5.2.9.3 1.3.6l2.3-1.1 2.2 3.8-2 1.5c.1.5.2.9.2 1.4s-.1.9-.2 1.4l2 1.5-2.2 3.8-2.3-1.1c-.4.3-.8.5-1.3.6l-.6 2.5H9.8l-.6-2.5c-.5-.2-.9-.3-1.3-.6l-2.3 1.1-2.2-3.8 2-1.5c-.1-.5-.2-.9-.2-1.4s.1-.9.2-1.4l-2-1.5L5.6 4l2.3 1.1c.4-.3.8-.5 1.3-.6Z" />
+          <circle cx="12" cy="12" r="3.1" />
         </svg>
       </button>
 

@@ -17,7 +17,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { MAX_WORKSPACE_RESUME_NAME_LENGTH, sanitizeWorkspaceResumeName } from "../lib/resume.js";
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from "../lib/sortableSensors.js";
-import BrandMark from "./brandMark";
 import EntryActionMenu from "./forms/entryActionMenu";
 
 function getResumeIds(resumeList) {
@@ -166,10 +165,6 @@ function ResumePillOverlay({ resume, isActive, style }) {
 }
 
 export default function Header({
-  saveState,
-  saveLabel,
-  theme,
-  onToggleTheme,
   onPrint,
   onImportResume,
   isImportingResume,
@@ -187,9 +182,6 @@ export default function Header({
   authUser,
   authReady,
   firebaseEnabled,
-  trustedDevice,
-  isCloudMode,
-  syncState,
   onOpenAuth,
   onSignOut,
 }) {
@@ -374,48 +366,36 @@ export default function Header({
     <div className="headerStack">
       <header className="topbar panel">
         <div className="brand">
-          <div className="brandMark" aria-hidden="true">
-            <BrandMark />
-          </div>
-          <div className="brandCopy">
-            <h1>ResumeLoomr</h1>
-            <p className="brandSubcopy">The only resume tool you'll need for the rest of your career.</p>
-          </div>
+          <span className="visuallyHidden">ResumeLoomr</span>
+          <img
+            className="brandLogo brandLogo--light"
+            src="/loomr-logo-light.png"
+            alt=""
+            aria-hidden="true"
+          />
+          <img
+            className="brandLogo brandLogo--dark"
+            src="/loomr-logo-dark.png"
+            alt=""
+            aria-hidden="true"
+          />
         </div>
 
         <div className="topbarSide">
           <div className="topbarMeta">
-            <span className={`statusBadge statusBadge--${saveState}`}>
-              {saveLabel}
-            </span>
-            {isCloudMode ? (
-              <span className={`statusBadge statusBadge--${syncState === 'error' ? 'error' : 'info'}`}>
-                {trustedDevice ? 'Trusted device' : 'Cloud'}
-              </span>
-            ) : null}
             <button
               type="button"
-              className="button buttonSecondary themeToggle"
-              onClick={onToggleTheme}
-              aria-pressed={theme === 'dark'}
-              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            >
-              <span className={`themeToggleKnob themeToggleKnob--${theme}`} aria-hidden="true" />
-              <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
-            </button>
-            <button
-              type="button"
-              className="button buttonSecondary importResumeButton"
+              className="button buttonPrimary importResumeButton"
               onClick={onImportResume}
               disabled={isImportingResume}
             >
               {isImportingResume ? (
                 <span className="buttonSpinner" aria-hidden="true" />
               ) : null}
-              {isImportingResume ? 'Processing...' : 'Import Existing Resume'}
+              {isImportingResume ? 'Processing...' : 'Import your resume'}
             </button>
-            <button type="button" className="button buttonPrimary printButton" onClick={onPrint}>
-              Print resume
+            <button type="button" className="button buttonSecondary printButton" onClick={onPrint}>
+              Print/Save
             </button>
             {authUser ? (
               <button type="button" className="button buttonSecondary accountButton" onClick={onSignOut}>

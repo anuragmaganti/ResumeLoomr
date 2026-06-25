@@ -1,5 +1,5 @@
 .resumePage {
-  --resume-page-min-height: 940px;
+  --resume-page-min-height: 1090px;
   --resume-page-margin-inline: 0.5in;
   --resume-page-margin-top: 0.5in;
   --resume-page-margin-bottom: 0.5in;
@@ -20,9 +20,9 @@
   --resume-detail-gap: 4px;
   --resume-list-gap: 4px;
   --resume-print-min-height: 10in;
-  width: min(100%, 820px);
+  width: min(100%, 952px);
   min-height: var(--resume-page-min-height);
-  margin: 0 auto;
+  margin: 0 auto 0 0;
   padding:
     var(--resume-page-margin-top)
     var(--resume-page-margin-inline)
@@ -397,7 +397,7 @@
 }
 
 .resumePage--compact {
-  --resume-page-min-height: 880px;
+  --resume-page-min-height: 1021px;
   --resume-page-margin-inline: 0.4375in;
   --resume-page-margin-top: 0.4375in;
   --resume-page-margin-bottom: 0.4375in;

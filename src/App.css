@@ -1,5 +1,7 @@
 .app {
   --workspace-sticky-top: 24px;
+  --workspace-preview-max-width: 952px;
+  --workspace-content-max-width: 1648px;
   position: relative;
   isolation: isolate;
   min-height: 100vh;
@@ -82,6 +84,7 @@
   z-index: 40;
   display: grid;
   gap: var(--space-3);
+  width: min(100%, var(--workspace-content-max-width));
   margin-bottom: var(--space-5);
   min-width: 0;
 }
@@ -99,52 +102,26 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
   min-width: 0;
 }
 
-.brandMark {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  padding: 7px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 16px;
-  background: linear-gradient(
-    180deg,
-    var(--color-brand-surface-top),
-    var(--color-brand-surface-bottom)
-  );
-  box-shadow: var(--shadow-xs);
-  overflow: hidden;
-}
-
-.brandMark svg {
+.brandLogo {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: clamp(190px, 12vw, 230px);
+  height: auto;
+  object-fit: contain;
 }
 
-.brandCopy {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
+.brandLogo--dark {
+  display: none;
 }
 
-.brandCopy h1 {
-  margin: 0;
-  font-size: 1.75rem;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+html[data-theme="dark"] .brandLogo--light {
+  display: none;
 }
 
-.brandSubcopy {
-  max-width: 34rem;
-  margin: 0;
-  color: var(--color-text-subtle);
-  font-size: 0.95rem;
-  line-height: 1.5;
+html[data-theme="dark"] .brandLogo--dark {
+  display: block;
 }
 
 .resumeWorkspaceBar {
@@ -381,50 +358,6 @@
   background-repeat: no-repeat;
 }
 
-.button.themeToggle {
-  min-height: 32px;
-  padding: 0 12px;
-  gap: 7px;
-  justify-content: center;
-  border-color: var(--color-border);
-  background: var(--color-surface-muted);
-  color: var(--color-text-subtle);
-  border-radius: 999px;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  line-height: 1;
-  white-space: nowrap;
-  box-shadow: none;
-}
-
-.button.themeToggle:hover:not(:disabled) {
-  border-color: var(--color-border);
-  background: var(--color-surface-muted);
-  color: var(--color-text-subtle);
-  transform: none;
-}
-
-.button.themeToggle .themeToggleKnob {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--color-text-muted);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
-  transition:
-    background-color var(--transition-base),
-    transform var(--transition-fast),
-    box-shadow var(--transition-base);
-}
-
-.themeToggleKnob--light {
-  background: #f5b942;
-}
-
-.themeToggleKnob--dark {
-  background: #9db4ff;
-  transform: scale(0.92);
-}
-
 .button.accountButton {
   min-width: 104px;
   min-height: 34px;
@@ -623,6 +556,129 @@
     background-color var(--transition-base);
 }
 
+.floatingSaveStatus {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 80;
+  min-height: 42px;
+  padding: 0 14px;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}
+
+.floatingThemeToggle {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 80;
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-muted));
+  color: var(--color-text-subtle);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    background-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.floatingThemeToggle:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+
+.floatingThemeToggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  overflow: visible;
+}
+
+.themeSunRays,
+.themeSunCore,
+.themeMoon {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity 260ms ease,
+    transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.themeSunCore,
+.themeMoon {
+  fill: currentColor;
+}
+
+.floatingThemeToggle.is-light {
+  color: #d18a00;
+}
+
+.floatingThemeToggle.is-dark {
+  color: #9db4ff;
+}
+
+.floatingThemeToggle.is-light .themeSunRays,
+.floatingThemeToggle.is-light .themeSunCore {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+.floatingThemeToggle.is-light .themeMoon {
+  opacity: 0;
+  transform: scale(0.45) rotate(-42deg);
+}
+
+.floatingThemeToggle.is-dark .themeSunRays {
+  opacity: 0;
+  transform: scale(0.45) rotate(80deg);
+}
+
+.floatingThemeToggle.is-dark .themeSunCore {
+  opacity: 0;
+  transform: scale(0.55) rotate(80deg);
+}
+
+.floatingThemeToggle.is-dark .themeMoon {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+.floatingThemeToggle.isAnimating {
+  animation: themeIconPress 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes themeIconPress {
+  0% {
+    transform: scale(1);
+  }
+
+  42% {
+    transform: scale(0.88) rotate(-10deg);
+  }
+
+  76% {
+    transform: scale(1.08) rotate(6deg);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
 .settingsLauncher:hover {
   border-color: var(--color-border-strong);
   color: var(--color-text);
@@ -632,7 +688,11 @@
 .settingsLauncher svg {
   width: 18px;
   height: 18px;
-  fill: currentColor;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .accountSettingsOverlay {
@@ -1156,7 +1216,7 @@
   z-index: 1;
   display: grid;
   grid-template-columns: clamp(430px, 44vw, 680px) minmax(0, 1fr);
-  gap: var(--space-5);
+  gap: var(--space-4);
   align-items: start;
 }
 
@@ -1165,7 +1225,7 @@
 }
 
 .previewPanel {
-  padding: var(--space-6);
+  padding: 0;
 }
 
 .editorWorkspace {
@@ -1181,6 +1241,8 @@
   display: grid;
   gap: var(--space-3);
   align-self: start;
+  justify-self: stretch;
+  width: 100%;
   min-width: 0;
   max-height: calc(100dvh - var(--workspace-sticky-top) - 24px);
   overflow: auto;
@@ -1201,6 +1263,8 @@
 .editorRail {
   display: grid;
   align-self: start;
+  justify-self: stretch;
+  width: 100%;
   min-width: 0;
   overflow: hidden;
   padding: 12px;
@@ -1722,6 +1786,16 @@
 }
 
 @media (max-width: 1660px) and (min-width: 861px) {
+  .app {
+    --workspace-content-max-width: calc(
+      clamp(104px, 10.5vw, 140px) +
+      var(--space-4) +
+      341.5px +
+      var(--space-4) +
+      var(--workspace-preview-max-width)
+    );
+  }
+
   .workspace {
     grid-template-columns: max-content minmax(0, 1fr);
   }
@@ -1889,6 +1963,21 @@
     height: 38px;
   }
 
+  .floatingSaveStatus {
+    right: 12px;
+    bottom: 12px;
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 0.75rem;
+  }
+
+  .floatingThemeToggle {
+    top: 12px;
+    right: 12px;
+    width: 38px;
+    height: 38px;
+  }
+
   .accountSettingsPanel {
     left: 8px;
     right: 8px;
@@ -1920,6 +2009,8 @@
   .conflictBanner,
   .authOverlay,
   .settingsLauncher,
+  .floatingSaveStatus,
+  .floatingThemeToggle,
   .accountSettingsOverlay,
   .mobileWorkspaceToggle,
   .workspaceColumnEditor,

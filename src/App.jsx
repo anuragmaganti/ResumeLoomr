@@ -71,7 +71,6 @@ function App() {
     saveState,
     saveLabel,
     syncState,
-    isCloudMode,
     conflict,
     resolveConflictWithCloud,
     resolveConflictWithLocal,
@@ -350,10 +349,6 @@ function App() {
     <div className="app">
       <div className="appShell">
         <Header
-          saveState={saveState}
-          saveLabel={saveLabel}
-          theme={theme}
-          onToggleTheme={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
           onPrint={handlePrint}
           onImportResume={handleImportResumeClick}
           isImportingResume={isImportingResume}
@@ -371,9 +366,6 @@ function App() {
           authUser={auth.user}
           authReady={auth.authReady}
           firebaseEnabled={auth.firebaseEnabled}
-          trustedDevice={auth.trustedDevice}
-          isCloudMode={isCloudMode}
-          syncState={syncState}
           onOpenAuth={auth.openAuthModal}
           onSignOut={handleSignOut}
         />
@@ -407,6 +399,9 @@ function App() {
 
         <AccountSettings
           isOpen={isAccountSettingsOpen}
+          saveState={saveState}
+          saveLabel={saveLabel}
+          theme={theme}
           authUser={auth.user}
           connectedAccount={auth.connectedAccount}
           firebaseEnabled={auth.firebaseEnabled}
@@ -415,6 +410,7 @@ function App() {
           busy={auth.authBusy}
           onOpen={() => setIsAccountSettingsOpen(true)}
           onClose={() => setIsAccountSettingsOpen(false)}
+          onToggleTheme={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
           onOpenAuth={handleOpenAuthFromSettings}
           onDisconnectBrowser={handleDisconnectBrowser}
           onSignedOutEditingPreferenceChange={updateSignedOutEditingPreference}

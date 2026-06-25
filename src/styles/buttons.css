@@ -42,6 +42,7 @@
 .toolbarSelect:focus-visible,
 .mobileWorkspaceButton:focus-visible,
 .noticeDismiss:focus-visible,
+.floatingThemeToggle:focus-visible,
 .settingsLauncher:focus-visible,
 .accountSettingsBackdrop:focus-visible {
   outline: 3px solid var(--color-accent-soft);
@@ -351,7 +352,7 @@
   justify-content: center;
   font-size: 0.8125rem;
   border-radius: 10px;
-  box-shadow: 0 8px 18px rgba(49, 88, 213, 0.16);
+  box-shadow: var(--shadow-xs);
 }
 
 .importResumeButton {

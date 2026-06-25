@@ -515,7 +515,7 @@ export default function ResumePreview({ previewModel, template, settings, panelR
     return (
         <>
             <style media="print">{printPageRule}</style>
-            <section ref={panelRef} className="previewPanel panel">
+            <section ref={panelRef} className="previewPanel">
                 <div className="previewFrame">
                     <div
                         ref={resumeRef}

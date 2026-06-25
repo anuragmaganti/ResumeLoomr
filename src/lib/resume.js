@@ -68,7 +68,7 @@ const SECTION_SPACING_STEP = 4;
 const ENTRY_SPACING_STEP = 3;
 const RESUME_PRESENTATION_BASES = {
   modern: {
-    pageMinHeightPx: 940,
+    pageMinHeightPx: 1090,
     pageMarginInlineIn: 0.5,
     pageMarginTopIn: 0.5,
     pageMarginBottomIn: 0.5,
@@ -89,7 +89,7 @@ const RESUME_PRESENTATION_BASES = {
     listGapPx: 4
   },
   executive: {
-    pageMinHeightPx: 940,
+    pageMinHeightPx: 1090,
     pageMarginInlineIn: 0.5,
     pageMarginTopIn: 0.5,
     pageMarginBottomIn: 0.5,
@@ -110,7 +110,7 @@ const RESUME_PRESENTATION_BASES = {
     listGapPx: 4
   },
   compact: {
-    pageMinHeightPx: 880,
+    pageMinHeightPx: 1021,
     pageMarginInlineIn: 0.4375,
     pageMarginTopIn: 0.4375,
     pageMarginBottomIn: 0.4375,
