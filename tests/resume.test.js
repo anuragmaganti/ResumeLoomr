@@ -87,6 +87,9 @@ import {
   writeSignedOutEditingPreference,
 } from '../src/lib/browserConnection.js';
 import {
+  readStoredWorkspaceSnapshot,
+} from '../src/lib/localDraftStore.js';
+import {
   DEFAULT_GEMINI_MAX_OUTPUT_TOKENS,
   DEFAULT_GEMINI_IMPORT_MODEL,
   DEFAULT_GEMINI_THINKING_LEVEL,
@@ -1485,6 +1488,40 @@ test('cloud import skips stale local workspace ids instead of failing first logi
     assert.equal(snapshot.draftDocsByResumeId.has('oversized-resume'), false);
   } finally {
     console.error = originalConsoleError;
+  }
+});
+
+test('local workspace snapshots do not invent blank drafts for missing cached resume ids', () => {
+  const originalWindow = global.window;
+  const workspace = normalizeWorkspaceIndex({
+    activeResumeId: 'missing-local',
+    resumeIds: ['missing-local', 'existing-local'],
+    meta: {
+      'missing-local': createWorkspaceResumeMeta('Missing Local'),
+      'existing-local': createWorkspaceResumeMeta('Existing Local'),
+    },
+  });
+  const existingDraft = createFreshWorkspaceDraft().draft;
+  const storage = createMemoryStorage([
+    [WORKSPACE_INDEX_STORAGE_KEY, JSON.stringify(workspace)],
+    [createResumeStorageKey('existing-local'), JSON.stringify({
+      version: 2,
+      savedAt: existingDraft.savedAt,
+      template: existingDraft.template,
+      sectionOrder: existingDraft.sectionOrder,
+      resume: existingDraft.resume,
+    })],
+  ]);
+
+  global.window = { localStorage: storage };
+
+  try {
+    const snapshot = readStoredWorkspaceSnapshot();
+
+    assert.equal(snapshot.readDraft('missing-local'), null);
+    assert.equal(snapshot.readDraft('existing-local')?.template, existingDraft.template);
+  } finally {
+    global.window = originalWindow;
   }
 });
 

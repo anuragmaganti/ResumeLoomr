@@ -593,7 +593,6 @@ export async function syncLocalWorkspaceToCloud(
   const normalizedCloudWorkspace = normalizeWorkspaceIndex(cloudWorkspace);
   const normalizedLocalWorkspace = normalizeWorkspaceIndex(localWorkspace);
   const cloudIdentity = normalizeCloudIdentity(identity);
-  const batch = writeBatch(workspaceRef.firestore);
   const nextWorkspace = {
     ...normalizedCloudWorkspace,
     resumeIds: [...normalizedCloudWorkspace.resumeIds],
@@ -622,15 +621,22 @@ export async function syncLocalWorkspaceToCloud(
         continue;
       }
 
-      const draftDoc = createCloudDraftDoc({ resumeId, name: localName, draft, identity: cloudIdentity });
-      validateCloudDraftPayload(draftDoc);
-      batch.set(
-        doc(collection(workspaceRef.firestore, 'users', uid, 'resumes'), resumeId),
-        draftDoc,
-        { merge: true },
-      );
-      nextWorkspace.meta[resumeId] = createWorkspaceResumeMeta(localName, draftDoc.updatedAt);
-      hasChanges = true;
+      try {
+        const draftDoc = createCloudDraftDoc({ resumeId, name: localName, draft, identity: cloudIdentity });
+        validateCloudDraftPayload(draftDoc);
+        await setDoc(
+          doc(collection(workspaceRef.firestore, 'users', uid, 'resumes'), resumeId),
+          draftDoc,
+          { merge: true },
+        );
+        nextWorkspace.meta[resumeId] = createWorkspaceResumeMeta(localName, draftDoc.updatedAt);
+        hasChanges = true;
+      } catch (error) {
+        console.error('Skipped local resume during cloud reconciliation', {
+          code: error?.code,
+          resumeId,
+        });
+      }
       continue;
     }
 
@@ -641,18 +647,25 @@ export async function syncLocalWorkspaceToCloud(
     const nextName = existingNames.includes(localName)
       ? createDuplicateResumeName(localName, existingNames)
       : localName;
-    const draftDoc = createCloudDraftDoc({ resumeId, name: nextName, draft, identity: cloudIdentity });
 
-    validateCloudDraftPayload(draftDoc);
-    existingNames.push(nextName);
-    nextWorkspace.resumeIds.push(resumeId);
-    nextWorkspace.meta[resumeId] = createWorkspaceResumeMeta(nextName, draftDoc.updatedAt);
-    batch.set(
-      doc(collection(workspaceRef.firestore, 'users', uid, 'resumes'), resumeId),
-      draftDoc,
-      { merge: true },
-    );
-    hasChanges = true;
+    try {
+      const draftDoc = createCloudDraftDoc({ resumeId, name: nextName, draft, identity: cloudIdentity });
+      validateCloudDraftPayload(draftDoc);
+      await setDoc(
+        doc(collection(workspaceRef.firestore, 'users', uid, 'resumes'), resumeId),
+        draftDoc,
+        { merge: true },
+      );
+      existingNames.push(nextName);
+      nextWorkspace.resumeIds.push(resumeId);
+      nextWorkspace.meta[resumeId] = createWorkspaceResumeMeta(nextName, draftDoc.updatedAt);
+      hasChanges = true;
+    } catch (error) {
+      console.error('Skipped local resume during cloud reconciliation', {
+        code: error?.code,
+        resumeId,
+      });
+    }
   }
 
   const localOrderedResumeIds = normalizedLocalWorkspace.resumeIds.filter((resumeId) => (
@@ -680,9 +693,16 @@ export async function syncLocalWorkspaceToCloud(
     return normalizedCloudWorkspace;
   }
 
-  batch.set(workspaceRef, createCloudWorkspaceDoc(normalizedNextWorkspace, cloudIdentity));
-  await batch.commit();
-  return normalizedNextWorkspace;
+  try {
+    await setDoc(workspaceRef, createCloudWorkspaceDoc(normalizedNextWorkspace, cloudIdentity));
+    return normalizedNextWorkspace;
+  } catch (error) {
+    console.error('Skipped cloud workspace reconciliation write', {
+      code: error?.code,
+      message: error?.message,
+    });
+    return normalizedCloudWorkspace;
+  }
 }
 
 export function subscribeCloudWorkspace(uid, trustedDevice, onNext, onError) {

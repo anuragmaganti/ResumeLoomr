@@ -90,7 +90,7 @@ export function readStoredWorkspaceSnapshot() {
     activeResumeId: workspace.activeResumeId,
     draft: storedWorkspace.draft,
     readDraft(resumeId) {
-      return readStoredResumeDraft(resumeId);
+      return readStoredResumeDraftOrNull(resumeId);
     },
   };
 }
