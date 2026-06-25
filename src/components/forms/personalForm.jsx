@@ -1,5 +1,6 @@
 import AutoResizeTextarea from "../autoResizeTextarea";
 import FormFieldError from "./formFieldError";
+import { createEditorTargetAttributes, personalEditorPath } from "../../lib/editorTargets";
 
 export default function PersonalForm({ personal, actions, getFieldError, markTouched }) {
     return (
@@ -11,6 +12,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                         type="text"
                         id="name"
                         name="name"
+                        {...createEditorTargetAttributes(personalEditorPath('name'))}
                         value={personal.name}
                         onChange={(event) => actions.updatePersonalField('name', event.target.value)}
                         onBlur={() => markTouched('personal.name')}
@@ -26,6 +28,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             type="text"
                             id="headline"
                             name="headline"
+                            {...createEditorTargetAttributes(personalEditorPath('headline'))}
                             value={personal.headline}
                             onChange={(event) => actions.updatePersonalField('headline', event.target.value)}
                             onBlur={() => markTouched('personal.headline')}
@@ -39,6 +42,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             type="text"
                             id="location"
                             name="location"
+                            {...createEditorTargetAttributes(personalEditorPath('location'))}
                             value={personal.location}
                             onChange={(event) => actions.updatePersonalField('location', event.target.value)}
                             onBlur={() => markTouched('personal.location')}
@@ -54,6 +58,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             type="text"
                             id="phone"
                             name="phone"
+                            {...createEditorTargetAttributes(personalEditorPath('phone'))}
                             value={personal.phone}
                             onChange={(event) => actions.updatePersonalField('phone', event.target.value)}
                             onBlur={() => markTouched('personal.phone')}
@@ -68,6 +73,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             type="email"
                             id="email"
                             name="email"
+                            {...createEditorTargetAttributes(personalEditorPath('email'))}
                             value={personal.email}
                             onChange={(event) => actions.updatePersonalField('email', event.target.value)}
                             onBlur={() => markTouched('personal.email')}
@@ -84,6 +90,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             type="text"
                             id="linkedinUrl"
                             name="linkedinUrl"
+                            {...createEditorTargetAttributes(personalEditorPath('linkedinUrl'))}
                             value={personal.linkedinUrl}
                             onChange={(event) => actions.updatePersonalField('linkedinUrl', event.target.value)}
                             onBlur={() => markTouched('personal.linkedinUrl')}
@@ -98,6 +105,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             type="text"
                             id="githubUrl"
                             name="githubUrl"
+                            {...createEditorTargetAttributes(personalEditorPath('githubUrl'))}
                             value={personal.githubUrl}
                             onChange={(event) => actions.updatePersonalField('githubUrl', event.target.value)}
                             onBlur={() => markTouched('personal.githubUrl')}
@@ -114,6 +122,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             type="text"
                             id="portfolioUrl"
                             name="portfolioUrl"
+                            {...createEditorTargetAttributes(personalEditorPath('portfolioUrl'))}
                             value={personal.portfolioUrl}
                             onChange={(event) => actions.updatePersonalField('portfolioUrl', event.target.value)}
                             onBlur={() => markTouched('personal.portfolioUrl')}
@@ -128,6 +137,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             type="text"
                             id="customField"
                             name="customField"
+                            {...createEditorTargetAttributes(personalEditorPath('customField'))}
                             value={personal.customField}
                             onChange={(event) => actions.updatePersonalField('customField', event.target.value)}
                             onBlur={() => markTouched('personal.customField')}
@@ -141,6 +151,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                     <AutoResizeTextarea
                         id="aboutMe"
                         name="aboutMe"
+                        {...createEditorTargetAttributes(personalEditorPath('aboutMe'))}
                         value={personal.aboutMe}
                         onChange={(event) => actions.updatePersonalField('aboutMe', event.target.value)}
                         onBlur={() => markTouched('personal.aboutMe')}

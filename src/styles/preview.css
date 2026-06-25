@@ -61,6 +61,22 @@
   text-transform: uppercase;
 }
 
+.resumePage [data-edit-section-id] {
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    color var(--transition-fast);
+}
+
+@media (hover: hover) {
+  .resumePage [data-edit-section-id]:hover {
+    background: color-mix(in srgb, var(--color-accent-soft) 56%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
+  }
+}
+
 .personalSection,
 .educationDiv,
 .experienceDiv,
@@ -449,6 +465,12 @@
     overflow: visible !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .resumePage [data-edit-section-id] {
+    cursor: default;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   .resumePage--executive,

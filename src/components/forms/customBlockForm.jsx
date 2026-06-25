@@ -3,10 +3,12 @@ import CollapsibleEntryCard from "./collapsibleEntryCard";
 import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 import ReorderableTextList from "./reorderableTextList";
+import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function CustomBlockForm({ section, actions, getFieldError, markTouched }) {
+export default function CustomBlockForm({ section, actions, getFieldError, markTouched, editorTarget }) {
   const entries = section.entries || [];
   const pathFor = (entryId, field) => `sections.${section.id}.${entryId}.${field}`;
+  const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
 
   return (
     <div className="formStack">
@@ -29,6 +31,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
           disableUp={index === 0}
           disableDown={index === entries.length - 1}
           disableRemove={entries.length === 1}
+          expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
         >
           <form onSubmit={(event) => event.preventDefault()}>
             <div className="fieldGrid fieldGridTwo">
@@ -37,6 +40,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                 <input
                   type="text"
                   id={`custom-title-${section.id}-${entry.id}`}
+                  {...editorAttrs(entry.id, 'title')}
                   value={entry.title}
                   onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'title', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'title'))}
@@ -50,6 +54,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                 <input
                   type="text"
                   id={`custom-years-${section.id}-${entry.id}`}
+                  {...editorAttrs(entry.id, 'years')}
                   value={entry.years}
                   onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'years', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'years'))}
@@ -63,6 +68,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
               <input
                 type="text"
                 id={`custom-subtitle-${section.id}-${entry.id}`}
+                {...editorAttrs(entry.id, 'subtitle')}
                 value={entry.subtitle}
                 onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'subtitle', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'subtitle'))}
@@ -74,6 +80,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
               <label htmlFor={`custom-details-${section.id}-${entry.id}`}>Details</label>
               <AutoResizeTextarea
                 id={`custom-details-${section.id}-${entry.id}`}
+                {...editorAttrs(entry.id, 'details')}
                 value={entry.details}
                 onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'details', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'details'))}

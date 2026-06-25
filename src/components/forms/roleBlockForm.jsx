@@ -2,8 +2,9 @@ import CollapsibleEntryCard from "./collapsibleEntryCard";
 import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 import ReorderableTextList from "./reorderableTextList";
+import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function RoleBlockForm({ section, actions, getFieldError, markTouched }) {
+export default function RoleBlockForm({ section, actions, getFieldError, markTouched, editorTarget }) {
   const entries = section.entries || [];
 
   return (
@@ -30,6 +31,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
             disableUp={index === 0}
             disableDown={index === entries.length - 1}
             disableRemove={entries.length === 1}
+            expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
           >
             <form onSubmit={(event) => event.preventDefault()}>
               <div className="fieldGrid fieldGridTwo">
@@ -38,6 +40,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                   <input
                     type="text"
                     id={`role-company-${section.id}-${entry.id}`}
+                    {...createEditorTargetAttributes(`${pathPrefix}.company`, { entryId: entry.id })}
                     value={entry.company}
                     onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'company', event.target.value)}
                     onBlur={() => markTouched(`${pathPrefix}.company`)}
@@ -51,6 +54,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                   <input
                     type="text"
                     id={`role-years-${section.id}-${entry.id}`}
+                    {...createEditorTargetAttributes(`${pathPrefix}.yearsExp`, { entryId: entry.id })}
                     value={entry.yearsExp}
                     onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'yearsExp', event.target.value)}
                     onBlur={() => markTouched(`${pathPrefix}.yearsExp`)}
@@ -65,6 +69,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                 <input
                   type="text"
                   id={`role-title-${section.id}-${entry.id}`}
+                  {...createEditorTargetAttributes(`${pathPrefix}.role`, { entryId: entry.id })}
                   value={entry.role}
                   onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'role', event.target.value)}
                   onBlur={() => markTouched(`${pathPrefix}.role`)}

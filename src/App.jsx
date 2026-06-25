@@ -34,6 +34,8 @@ function App() {
   const [importState, setImportState] = useState({ status: 'idle' });
   const [isSignOutInProgress, setIsSignOutInProgress] = useState(false);
   const [signedOutEditingPreference, setSignedOutEditingPreference] = useState(() => readSignedOutEditingPreference());
+  const previewEditRequestIdRef = useRef(0);
+  const [previewEditTarget, setPreviewEditTarget] = useState(null);
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') {
       return 'light';
@@ -165,6 +167,20 @@ function App() {
   function handlePrint() {
     document.title = activeResumeName || 'Resume';
     printResume();
+  }
+
+  function handlePreviewEditTarget(target) {
+    if (!target?.sectionId || !target?.path) {
+      return;
+    }
+
+    previewEditRequestIdRef.current += 1;
+    setPreviewEditTarget({
+      ...target,
+      requestId: previewEditRequestIdRef.current,
+    });
+    setActiveTab(target.sectionId);
+    setMobileView('editor');
   }
 
   function handleImportResumeClick() {
@@ -462,6 +478,7 @@ function App() {
               getFieldError={getFieldError}
               markTouched={markTouched}
               maxHeight={editorStageMaxHeight}
+              previewEditTarget={previewEditTarget}
             />
           </div>
 
@@ -472,6 +489,7 @@ function App() {
               template={template}
               settings={resume.settings}
               panelRef={previewPanelRef}
+              onEditTarget={handlePreviewEditTarget}
             />
           </div>
         </main>

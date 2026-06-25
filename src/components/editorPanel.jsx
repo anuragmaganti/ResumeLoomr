@@ -1,9 +1,14 @@
+import { useEffect } from "react";
 import SectionTabs from "./sectionTabs";
 import PersonalForm from "./forms/personalForm";
 import SectionBlockForm from "./forms/sectionBlockForm";
 import EntryActionMenu from "./forms/entryActionMenu";
 import EditorSettingsRail from "./editorSettingsRail";
 import { resolveSectionTitle } from "../lib/resume";
+import {
+    createEditorTargetAttributes,
+    sectionTitleEditorPath
+} from "../lib/editorTargets";
 
 const sectionMeta = {
     personal: {
@@ -86,7 +91,8 @@ export default function EditorPanel({
     actions,
     getFieldError,
     markTouched,
-    maxHeight
+    maxHeight,
+    previewEditTarget
 }) {
     const resumeBlocks = Array.isArray(resume.sections) ? resume.sections : [];
     const activeBlock = resumeBlocks.find((section) => section.id === activeTab);
@@ -117,6 +123,60 @@ export default function EditorPanel({
             '--editor-stage-max-height': `${maxHeight}px`
         }
         : undefined;
+
+    useEffect(() => {
+        if (!previewEditTarget?.requestId || !previewEditTarget.path) {
+            return undefined;
+        }
+
+        if (previewEditTarget.sectionId && previewEditTarget.sectionId !== activeTab) {
+            setActiveTab(previewEditTarget.sectionId);
+        }
+
+        let isCancelled = false;
+        let frameId = 0;
+        let attempts = 0;
+
+        function findEditorTarget() {
+            return Array.from(document.querySelectorAll("[data-editor-path]"))
+                .find((element) => element.dataset.editorPath === previewEditTarget.path);
+        }
+
+        function focusAndHighlightTarget() {
+            if (isCancelled) {
+                return;
+            }
+
+            const fieldElement = findEditorTarget();
+
+            if (!fieldElement) {
+                attempts += 1;
+
+                if (attempts < 10) {
+                    frameId = window.requestAnimationFrame(focusAndHighlightTarget);
+                }
+
+                return;
+            }
+
+            const focusElement = fieldElement.matches("input, textarea")
+                ? fieldElement
+                : fieldElement.querySelector("input, textarea");
+
+            fieldElement.scrollIntoView({ block: "center", behavior: "smooth" });
+            focusElement?.focus({ preventScroll: true });
+        }
+
+        frameId = window.requestAnimationFrame(focusAndHighlightTarget);
+
+        return () => {
+            isCancelled = true;
+
+            if (frameId) {
+                window.cancelAnimationFrame(frameId);
+            }
+        };
+    }, [activeTab, previewEditTarget, setActiveTab]);
 
     return (
         <section className="editorPanel">
@@ -177,6 +237,7 @@ export default function EditorPanel({
                                 <label htmlFor={`section-title-${activeTab}`}>Section name</label>
                                 <input
                                     id={`section-title-${activeTab}`}
+                                    {...createEditorTargetAttributes(sectionTitleEditorPath(activeTab))}
                                     value={currentSectionLabel}
                                     onChange={(event) => actions.updateSectionTitle(activeTab, event.target.value)}
                                 />
@@ -197,6 +258,7 @@ export default function EditorPanel({
                                 actions={actions}
                                 getFieldError={getFieldError}
                                 markTouched={markTouched}
+                                editorTarget={previewEditTarget}
                             />
                         )}
                     </div>

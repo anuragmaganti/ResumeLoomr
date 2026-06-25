@@ -4,8 +4,9 @@ import CollapsibleEntryCard from "./collapsibleEntryCard";
 import { buildEntrySummary } from "./buildEntrySummary";
 import EntryActionMenu from "./entryActionMenu";
 import FormFieldError from "./formFieldError";
+import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function EducationForm({ education = [], section, actions, getFieldError, markTouched }) {
+export default function EducationForm({ education = [], section, actions, getFieldError, markTouched, editorTarget }) {
     const entries = section?.entries || education;
     const sectionId = section?.id || '';
     const isBlockEditor = Boolean(sectionId);
@@ -13,6 +14,7 @@ export default function EducationForm({ education = [], section, actions, getFie
     const pathFor = (entryId, field) => (
         isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `education.${entryId}.${field}`
     );
+    const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
     const updateField = (entryId, field, value) => (
         isBlockEditor
             ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
@@ -74,6 +76,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                     disableUp={index === 0}
                     disableDown={index === entries.length - 1}
                     disableRemove={entries.length === 1}
+                    expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
                 >
                     <form onSubmit={(event) => event.preventDefault()}>
                         <div className="field">
@@ -81,6 +84,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                             <input
                                 type="text"
                                 id={`school-${entry.id}`}
+                                {...editorAttrs(entry.id, 'school')}
                                 value={entry.school}
                                 onChange={(event) => updateField(entry.id, 'school', event.target.value)}
                                 onBlur={() => markTouched(pathFor(entry.id, 'school'))}
@@ -95,6 +99,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                                 <input
                                     type="text"
                                     id={`location-${entry.id}`}
+                                    {...editorAttrs(entry.id, 'location')}
                                     value={entry.location}
                                     onChange={(event) => updateField(entry.id, 'location', event.target.value)}
                                     onBlur={() => markTouched(pathFor(entry.id, 'location'))}
@@ -107,6 +112,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                                 <input
                                     type="text"
                                     id={`yearsEdu-${entry.id}`}
+                                    {...editorAttrs(entry.id, 'yearsEdu')}
                                     value={entry.yearsEdu}
                                     onChange={(event) => updateField(entry.id, 'yearsEdu', event.target.value)}
                                     onBlur={() => markTouched(pathFor(entry.id, 'yearsEdu'))}
@@ -130,6 +136,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                                                             <input
                                                                 type="text"
                                                                 id={`education-program-degree-${entry.id}-${program.id}`}
+                                                                {...editorAttrs(entry.id, `programs.${programIndex}.degree`)}
                                                                 value={program.degree}
                                                                 onChange={(event) => actions.updateSectionBlockEducationProgram(sectionId, entry.id, programIndex, 'degree', event.target.value)}
                                                                 onBlur={() => markTouched(pathFor(entry.id, `programs.${programIndex}.degree`))}
@@ -142,6 +149,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                                                             <input
                                                                 type="text"
                                                                 id={`education-program-years-${entry.id}-${program.id}`}
+                                                                {...editorAttrs(entry.id, `programs.${programIndex}.yearsEdu`)}
                                                                 value={program.yearsEdu}
                                                                 onChange={(event) => actions.updateSectionBlockEducationProgram(sectionId, entry.id, programIndex, 'yearsEdu', event.target.value)}
                                                                 onBlur={() => markTouched(pathFor(entry.id, `programs.${programIndex}.yearsEdu`))}
@@ -156,6 +164,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                                                             <input
                                                                 type="text"
                                                                 id={`education-program-gpa-${entry.id}-${program.id}`}
+                                                                {...editorAttrs(entry.id, `programs.${programIndex}.gpa`)}
                                                                 value={program.gpa}
                                                                 onChange={(event) => actions.updateSectionBlockEducationProgram(sectionId, entry.id, programIndex, 'gpa', event.target.value)}
                                                                 onBlur={() => markTouched(pathFor(entry.id, `programs.${programIndex}.gpa`))}
@@ -168,6 +177,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                                                             <input
                                                                 type="text"
                                                                 id={`education-program-honors-${entry.id}-${program.id}`}
+                                                                {...editorAttrs(entry.id, `programs.${programIndex}.honors`)}
                                                                 value={program.honors}
                                                                 onChange={(event) => actions.updateSectionBlockEducationProgram(sectionId, entry.id, programIndex, 'honors', event.target.value)}
                                                                 onBlur={() => markTouched(pathFor(entry.id, `programs.${programIndex}.honors`))}
@@ -208,6 +218,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                                         <input
                                             type="text"
                                             id={`degree-${entry.id}`}
+                                            {...editorAttrs(entry.id, 'degree')}
                                             value={entry.degree}
                                             onChange={(event) => updateField(entry.id, 'degree', event.target.value)}
                                             onBlur={() => markTouched(pathFor(entry.id, 'degree'))}
@@ -221,6 +232,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                                         <input
                                             type="text"
                                             id={`gpa-${entry.id}`}
+                                            {...editorAttrs(entry.id, 'gpa')}
                                             value={entry.gpa}
                                             onChange={(event) => updateField(entry.id, 'gpa', event.target.value)}
                                             onBlur={() => markTouched(pathFor(entry.id, 'gpa'))}
@@ -234,6 +246,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                                     <input
                                         type="text"
                                         id={`honors-${entry.id}`}
+                                        {...editorAttrs(entry.id, 'honors')}
                                         value={entry.honors}
                                         onChange={(event) => updateField(entry.id, 'honors', event.target.value)}
                                         onBlur={() => markTouched(pathFor(entry.id, 'honors'))}
@@ -247,6 +260,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                             <label htmlFor={`coursework-${entry.id}`}>Relevant coursework</label>
                             <AutoResizeTextarea
                                 id={`coursework-${entry.id}`}
+                                {...editorAttrs(entry.id, 'coursework')}
                                 value={entry.coursework}
                                 onChange={(event) => updateField(entry.id, 'coursework', event.target.value)}
                                 onBlur={() => markTouched(pathFor(entry.id, 'coursework'))}
@@ -259,6 +273,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                             <label htmlFor={`awards-${entry.id}`}>Awards</label>
                             <AutoResizeTextarea
                                 id={`awards-${entry.id}`}
+                                {...editorAttrs(entry.id, 'awards')}
                                 value={entry.awards}
                                 onChange={(event) => updateField(entry.id, 'awards', event.target.value)}
                                 onBlur={() => markTouched(pathFor(entry.id, 'awards'))}
@@ -280,6 +295,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                                                     <input
                                                         type="text"
                                                         id={`customSectionLabel-${entry.id}-${section.id}`}
+                                                        {...editorAttrs(entry.id, `customSections.${sectionIndex}.label`)}
                                                         value={section.label}
                                                         onChange={(event) => updateCustomSection(entry.id, sectionIndex, 'label', event.target.value)}
                                                         onBlur={() => markTouched(pathFor(entry.id, `customSections.${sectionIndex}.label`))}
@@ -291,6 +307,7 @@ export default function EducationForm({ education = [], section, actions, getFie
                                                     <label htmlFor={`customSection-${entry.id}-${section.id}`}>Section content</label>
                                                     <AutoResizeTextarea
                                                         id={`customSection-${entry.id}-${section.id}`}
+                                                        {...editorAttrs(entry.id, `customSections.${sectionIndex}.content`)}
                                                         value={section.content}
                                                         onChange={(event) => updateCustomSection(entry.id, sectionIndex, 'content', event.target.value)}
                                                         onBlur={() => markTouched(pathFor(entry.id, `customSections.${sectionIndex}.content`))}

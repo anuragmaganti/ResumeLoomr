@@ -15,20 +15,31 @@ export default function CollapsibleEntryCard({
   disableUp = false,
   disableDown = false,
   disableRemove = false,
+  expandSignal = 0,
   children,
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [collapseState, setCollapseState] = useState({
+    isCollapsed: false,
+    collapsedAfterExpandSignal: 0,
+  });
+  const isForceExpanded = Boolean(expandSignal && expandSignal !== collapseState.collapsedAfterExpandSignal);
+  const isVisiblyCollapsed = collapseState.isCollapsed && !isForceExpanded;
   const summaryText = summary || fallbackSummary;
 
   return (
-    <fieldset className={`formSection entryCard${isCollapsed ? " isCollapsed" : ""}`}>
+    <fieldset className={`formSection entryCard${isVisiblyCollapsed ? " isCollapsed" : ""}`}>
       <div className="entryHeader entryHeaderActionsOnly">
         <div className="entryActions">
-          {!isCollapsed ? (
+          {!isVisiblyCollapsed ? (
             <button
               type="button"
               className="button buttonGhost entryCollapseButton"
-              onClick={() => setIsCollapsed(true)}
+              onClick={() => {
+                setCollapseState({
+                  isCollapsed: true,
+                  collapsedAfterExpandSignal: expandSignal,
+                });
+              }}
               aria-label={`Collapse ${expandLabel}`}
             >
               Collapse
@@ -49,11 +60,16 @@ export default function CollapsibleEntryCard({
         </div>
       </div>
 
-      {isCollapsed ? (
+      {isVisiblyCollapsed ? (
         <button
           type="button"
           className="entrySummaryButton"
-          onClick={() => setIsCollapsed(false)}
+          onClick={() => {
+            setCollapseState({
+              isCollapsed: false,
+              collapsedAfterExpandSignal: 0,
+            });
+          }}
           aria-label={`Expand ${expandLabel}`}
         >
           <span className="entrySummaryText">{summaryText}</span>

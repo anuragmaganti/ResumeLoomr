@@ -1,14 +1,16 @@
 import CollapsibleEntryCard from "./collapsibleEntryCard";
 import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
+import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function LanguagesForm({ languages = [], section, actions, getFieldError, markTouched }) {
+export default function LanguagesForm({ languages = [], section, actions, getFieldError, markTouched, editorTarget }) {
   const entries = section?.entries || languages;
   const sectionId = section?.id || '';
   const isBlockEditor = Boolean(sectionId);
   const pathFor = (entryId, field) => (
     isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `languages.${entryId}.${field}`
   );
+  const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
   const updateEntry = (entryId, field, value) => (
     isBlockEditor
       ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
@@ -45,6 +47,7 @@ export default function LanguagesForm({ languages = [], section, actions, getFie
           disableUp={index === 0}
           disableDown={index === entries.length - 1}
           disableRemove={entries.length === 1}
+          expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
         >
           <form onSubmit={(event) => event.preventDefault()}>
             <div className="fieldGrid fieldGridTwo">
@@ -53,6 +56,7 @@ export default function LanguagesForm({ languages = [], section, actions, getFie
                 <input
                   type="text"
                   id={`language-name-${entry.id}`}
+                  {...editorAttrs(entry.id, 'language')}
                   value={entry.language}
                   onChange={(event) => updateEntry(entry.id, 'language', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'language'))}
@@ -66,6 +70,7 @@ export default function LanguagesForm({ languages = [], section, actions, getFie
                 <input
                   type="text"
                   id={`language-proficiency-${entry.id}`}
+                  {...editorAttrs(entry.id, 'proficiency')}
                   value={entry.proficiency}
                   onChange={(event) => updateEntry(entry.id, 'proficiency', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'proficiency'))}

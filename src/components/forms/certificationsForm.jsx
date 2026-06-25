@@ -2,14 +2,16 @@ import AutoResizeTextarea from "../autoResizeTextarea";
 import CollapsibleEntryCard from "./collapsibleEntryCard";
 import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
+import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function CertificationsForm({ certifications = [], section, actions, getFieldError, markTouched }) {
+export default function CertificationsForm({ certifications = [], section, actions, getFieldError, markTouched, editorTarget }) {
   const entries = section?.entries || certifications;
   const sectionId = section?.id || '';
   const isBlockEditor = Boolean(sectionId);
   const pathFor = (entryId, field) => (
     isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `certifications.${entryId}.${field}`
   );
+  const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
   const updateEntry = (entryId, field, value) => (
     isBlockEditor
       ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
@@ -46,6 +48,7 @@ export default function CertificationsForm({ certifications = [], section, actio
           disableUp={index === 0}
           disableDown={index === entries.length - 1}
           disableRemove={entries.length === 1}
+          expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
         >
           <form onSubmit={(event) => event.preventDefault()}>
             <div className="fieldGrid fieldGridTwo">
@@ -54,6 +57,7 @@ export default function CertificationsForm({ certifications = [], section, actio
                 <input
                   type="text"
                   id={`certification-name-${entry.id}`}
+                  {...editorAttrs(entry.id, 'name')}
                   value={entry.name}
                   onChange={(event) => updateEntry(entry.id, 'name', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'name'))}
@@ -67,6 +71,7 @@ export default function CertificationsForm({ certifications = [], section, actio
                 <input
                   type="text"
                   id={`certification-years-${entry.id}`}
+                  {...editorAttrs(entry.id, 'years')}
                   value={entry.years}
                   onChange={(event) => updateEntry(entry.id, 'years', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'years'))}
@@ -80,6 +85,7 @@ export default function CertificationsForm({ certifications = [], section, actio
               <input
                 type="text"
                 id={`certification-issuer-${entry.id}`}
+                {...editorAttrs(entry.id, 'issuer')}
                 value={entry.issuer}
                 onChange={(event) => updateEntry(entry.id, 'issuer', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'issuer'))}
@@ -91,6 +97,7 @@ export default function CertificationsForm({ certifications = [], section, actio
               <label htmlFor={`certification-details-${entry.id}`}>Details</label>
               <AutoResizeTextarea
                 id={`certification-details-${entry.id}`}
+                {...editorAttrs(entry.id, 'details')}
                 value={entry.details}
                 onChange={(event) => updateEntry(entry.id, 'details', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'details'))}

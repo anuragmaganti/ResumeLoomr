@@ -2,14 +2,16 @@ import AutoResizeTextarea from "../autoResizeTextarea";
 import CollapsibleEntryCard from "./collapsibleEntryCard";
 import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
+import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function AwardsForm({ awards = [], section, actions, getFieldError, markTouched }) {
+export default function AwardsForm({ awards = [], section, actions, getFieldError, markTouched, editorTarget }) {
   const entries = section?.entries || awards;
   const sectionId = section?.id || '';
   const isBlockEditor = Boolean(sectionId);
   const pathFor = (entryId, field) => (
     isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `awards.${entryId}.${field}`
   );
+  const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
   const updateEntry = (entryId, field, value) => (
     isBlockEditor
       ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
@@ -46,6 +48,7 @@ export default function AwardsForm({ awards = [], section, actions, getFieldErro
           disableUp={index === 0}
           disableDown={index === entries.length - 1}
           disableRemove={entries.length === 1}
+          expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
         >
           <form onSubmit={(event) => event.preventDefault()}>
             <div className="fieldGrid fieldGridTwo">
@@ -54,6 +57,7 @@ export default function AwardsForm({ awards = [], section, actions, getFieldErro
                 <input
                   type="text"
                   id={`award-title-${entry.id}`}
+                  {...editorAttrs(entry.id, 'title')}
                   value={entry.title}
                   onChange={(event) => updateEntry(entry.id, 'title', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'title'))}
@@ -67,6 +71,7 @@ export default function AwardsForm({ awards = [], section, actions, getFieldErro
                 <input
                   type="text"
                   id={`award-years-${entry.id}`}
+                  {...editorAttrs(entry.id, 'years')}
                   value={entry.years}
                   onChange={(event) => updateEntry(entry.id, 'years', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'years'))}
@@ -80,6 +85,7 @@ export default function AwardsForm({ awards = [], section, actions, getFieldErro
               <input
                 type="text"
                 id={`award-issuer-${entry.id}`}
+                {...editorAttrs(entry.id, 'issuer')}
                 value={entry.issuer}
                 onChange={(event) => updateEntry(entry.id, 'issuer', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'issuer'))}
@@ -91,6 +97,7 @@ export default function AwardsForm({ awards = [], section, actions, getFieldErro
               <label htmlFor={`award-details-${entry.id}`}>Details</label>
               <AutoResizeTextarea
                 id={`award-details-${entry.id}`}
+                {...editorAttrs(entry.id, 'details')}
                 value={entry.details}
                 onChange={(event) => updateEntry(entry.id, 'details', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'details'))}

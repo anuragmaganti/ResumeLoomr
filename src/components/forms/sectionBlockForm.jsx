@@ -8,42 +8,42 @@ import PublicationsForm from "./publicationsForm";
 import RoleBlockForm from "./roleBlockForm";
 import SkillsForm from "./skillsForm";
 
-export default function SectionBlockForm({ section, actions, getFieldError, markTouched }) {
+export default function SectionBlockForm({ section, actions, getFieldError, markTouched, editorTarget }) {
   if (!section) {
     return null;
   }
 
   if (section.kind === 'education') {
-    return <EducationForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} />;
+    return <EducationForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} editorTarget={editorTarget} />;
   }
 
   if (section.kind === 'roles') {
-    return <RoleBlockForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} />;
+    return <RoleBlockForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} editorTarget={editorTarget} />;
   }
 
   if (section.kind === 'skills') {
-    return <SkillsForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} />;
+    return <SkillsForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} editorTarget={editorTarget} />;
   }
 
   if (section.kind === 'projects') {
-    return <ProjectsForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} />;
+    return <ProjectsForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} editorTarget={editorTarget} />;
   }
 
   if (section.kind === 'certifications') {
-    return <CertificationsForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} />;
+    return <CertificationsForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} editorTarget={editorTarget} />;
   }
 
   if (section.kind === 'languages') {
-    return <LanguagesForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} />;
+    return <LanguagesForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} editorTarget={editorTarget} />;
   }
 
   if (section.kind === 'awards') {
-    return <AwardsForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} />;
+    return <AwardsForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} editorTarget={editorTarget} />;
   }
 
   if (section.kind === 'publications') {
-    return <PublicationsForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} />;
+    return <PublicationsForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} editorTarget={editorTarget} />;
   }
 
-  return <CustomBlockForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} />;
+  return <CustomBlockForm section={section} actions={actions} getFieldError={getFieldError} markTouched={markTouched} editorTarget={editorTarget} />;
 }

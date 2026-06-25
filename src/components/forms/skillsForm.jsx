@@ -2,14 +2,16 @@ import AutoResizeTextarea from "../autoResizeTextarea";
 import CollapsibleEntryCard from "./collapsibleEntryCard";
 import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
+import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function SkillsForm({ skills = [], section, actions, getFieldError, markTouched }) {
+export default function SkillsForm({ skills = [], section, actions, getFieldError, markTouched, editorTarget }) {
   const entries = section?.entries || skills;
   const sectionId = section?.id || '';
   const isBlockEditor = Boolean(sectionId);
   const pathFor = (entryId, field) => (
     isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `skills.${entryId}.${field}`
   );
+  const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
   const updateEntry = (entryId, field, value) => (
     isBlockEditor
       ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
@@ -46,6 +48,7 @@ export default function SkillsForm({ skills = [], section, actions, getFieldErro
           disableUp={index === 0}
           disableDown={index === entries.length - 1}
           disableRemove={entries.length === 1}
+          expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
         >
           <form onSubmit={(event) => event.preventDefault()}>
             <div className="field">
@@ -53,6 +56,7 @@ export default function SkillsForm({ skills = [], section, actions, getFieldErro
               <input
                 type="text"
                 id={`skills-category-${entry.id}`}
+                {...editorAttrs(entry.id, 'category')}
                 value={entry.category}
                 onChange={(event) => updateEntry(entry.id, 'category', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'category'))}
@@ -64,6 +68,7 @@ export default function SkillsForm({ skills = [], section, actions, getFieldErro
               <label htmlFor={`skills-items-${entry.id}`}>Skills</label>
               <AutoResizeTextarea
                 id={`skills-items-${entry.id}`}
+                {...editorAttrs(entry.id, 'items')}
                 value={entry.items}
                 onChange={(event) => updateEntry(entry.id, 'items', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'items'))}

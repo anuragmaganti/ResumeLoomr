@@ -1,6 +1,7 @@
 import AutoResizeTextarea from "../autoResizeTextarea";
 import EntryActionMenu from "./entryActionMenu";
 import FormFieldError from "./formFieldError";
+import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
 export default function ReorderableTextList({
   label,
@@ -25,6 +26,7 @@ export default function ReorderableTextList({
           <div className="activityInputWrap">
             <AutoResizeTextarea
               id={`${idPrefix}-${itemIndex}`}
+              {...createEditorTargetAttributes(`${pathPrefix}.${itemIndex}`)}
               value={item}
               onChange={(event) => onChangeItem(itemIndex, event.target.value)}
               onBlur={() => markTouched(`${pathPrefix}.${itemIndex}`)}

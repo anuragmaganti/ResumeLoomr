@@ -3,14 +3,16 @@ import CollapsibleEntryCard from "./collapsibleEntryCard";
 import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 import ReorderableTextList from "./reorderableTextList";
+import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function ProjectsForm({ projects = [], section, actions, getFieldError, markTouched }) {
+export default function ProjectsForm({ projects = [], section, actions, getFieldError, markTouched, editorTarget }) {
   const entries = section?.entries || projects;
   const sectionId = section?.id || '';
   const isBlockEditor = Boolean(sectionId);
   const pathFor = (entryId, field) => (
     isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `projects.${entryId}.${field}`
   );
+  const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
   const updateEntry = (entryId, field, value) => (
     isBlockEditor
       ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
@@ -67,6 +69,7 @@ export default function ProjectsForm({ projects = [], section, actions, getField
           disableUp={index === 0}
           disableDown={index === entries.length - 1}
           disableRemove={entries.length === 1}
+          expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
         >
           <form onSubmit={(event) => event.preventDefault()}>
             <div className="fieldGrid fieldGridTwo">
@@ -75,6 +78,7 @@ export default function ProjectsForm({ projects = [], section, actions, getField
                 <input
                   type="text"
                   id={`project-name-${entry.id}`}
+                  {...editorAttrs(entry.id, 'name')}
                   value={entry.name}
                   onChange={(event) => updateEntry(entry.id, 'name', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'name'))}
@@ -88,6 +92,7 @@ export default function ProjectsForm({ projects = [], section, actions, getField
                 <input
                   type="text"
                   id={`project-years-${entry.id}`}
+                  {...editorAttrs(entry.id, 'years')}
                   value={entry.years}
                   onChange={(event) => updateEntry(entry.id, 'years', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'years'))}
@@ -101,6 +106,7 @@ export default function ProjectsForm({ projects = [], section, actions, getField
               <input
                 type="text"
                 id={`project-subtitle-${entry.id}`}
+                {...editorAttrs(entry.id, 'subtitle')}
                 value={entry.subtitle}
                 onChange={(event) => updateEntry(entry.id, 'subtitle', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'subtitle'))}
@@ -112,6 +118,7 @@ export default function ProjectsForm({ projects = [], section, actions, getField
               <label htmlFor={`project-summary-${entry.id}`}>Summary</label>
               <AutoResizeTextarea
                 id={`project-summary-${entry.id}`}
+                {...editorAttrs(entry.id, 'summary')}
                 value={entry.summary}
                 onChange={(event) => updateEntry(entry.id, 'summary', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'summary'))}
