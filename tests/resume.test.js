@@ -63,6 +63,7 @@ import {
   createCloudImportSnapshot,
   createCloudDraftDoc,
   getCloudSessionId,
+  repairCloudWorkspaceFromDocs,
   validateCloudDraftPayload,
 } from '../src/lib/firebaseWorkspace.js';
 import {
@@ -1487,6 +1488,40 @@ test('cloud import skips stale local workspace ids instead of failing first logi
   }
 });
 
+test('cloud workspace repair recovers orphan docs and removes missing refs without deleting docs', () => {
+  const repaired = repairCloudWorkspaceFromDocs(
+    {
+      activeResumeId: 'missing-active',
+      resumeIds: ['missing-active', 'existing-older'],
+      meta: {
+        'missing-active': createWorkspaceResumeMeta('Missing', '2026-06-25T23:15:07.000Z'),
+        'existing-older': createWorkspaceResumeMeta('Existing Older', '2026-06-25T16:00:00.000Z'),
+      },
+    },
+    new Map([
+      ['existing-older', {
+        id: 'existing-older',
+        name: 'Existing Older',
+        updatedAt: '2026-06-25T16:00:00.000Z',
+        draft: createFreshWorkspaceDraft().draft,
+      }],
+      ['orphan-newer', {
+        id: 'orphan-newer',
+        name: 'Orphan Newer',
+        updatedAt: '2026-06-25T17:00:00.000Z',
+        draft: createFreshWorkspaceDraft().draft,
+      }],
+    ]),
+  );
+
+  assert.equal(repaired.changed, true);
+  assert.equal(repaired.removedCount, 1);
+  assert.equal(repaired.recoveredCount, 1);
+  assert.deepEqual(repaired.workspace.resumeIds, ['existing-older', 'orphan-newer']);
+  assert.equal(repaired.workspace.activeResumeId, 'existing-older');
+  assert.equal(repaired.draftsByResumeId.has('orphan-newer'), true);
+});
+
 test('cloud workspace writes replace the index document instead of merging stale meta keys', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'lib/firebaseWorkspace.js'), 'utf8');
   const workspaceWriteLines = source
@@ -1528,11 +1563,12 @@ test('builder conflict detection is scoped to the active resume dirty state', ()
 
 test('builder resets stale dynamic section tabs when loading a different resume', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const localStoreSource = fs.readFileSync(path.resolve(SRC_DIR, 'lib/localDraftStore.js'), 'utf8');
   const loadDraftStart = source.indexOf('function loadDraftIntoEditor(');
   const loadDraftEnd = source.indexOf('function persistActiveDraftImmediately', loadDraftStart);
   const loadDraftSource = source.slice(loadDraftStart, loadDraftEnd);
 
-  assert.match(source, /function getDraftEditorSectionIds\(draft\)/);
+  assert.match(localStoreSource, /function getDraftEditorSectionIds\(draft\)/);
   assert.match(loadDraftSource, /const nextSectionIds = getDraftEditorSectionIds\(nextDraft\)/);
   assert.match(loadDraftSource, /!nextSectionIds\.includes\(activeTab\)/);
   assert.match(loadDraftSource, /setActiveTab\('personal'\)/);
@@ -1609,9 +1645,9 @@ test('builder reloads the local mirrored workspace when signing out of cloud mod
 });
 
 test('builder normalizes stale local workspaces to the first ten without deleting hidden drafts', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'lib/localDraftStore.js'), 'utf8');
   const loadStart = source.indexOf('function loadStoredWorkspace()');
-  const loadEnd = source.indexOf('function formatSavedAt(', loadStart);
+  const loadEnd = source.length;
   const loadSource = source.slice(loadStart, loadEnd);
 
   assert.ok(loadStart > -1);
@@ -1631,8 +1667,11 @@ test('builder reconciles signed-out local workspace changes on every sign-in', (
   const bootstrapSource = source.slice(bootstrapStart, bootstrapEnd);
 
   assert.ok(bootstrapStart > -1);
-  assert.match(bootstrapSource, /readCloudMirrorManifest\(uid\)/);
+  assert.match(bootstrapSource, /readCloudWorkspaceBundle\(uid/);
+  assert.match(bootstrapSource, /repairCloudWorkspaceFromDocs\(nextWorkspace, remoteBundle\.resumeDocs\)/);
   assert.match(bootstrapSource, /syncLocalWorkspaceToCloud\(/);
+  assert.doesNotMatch(bootstrapSource, /readCloudMirrorManifest\(uid\)/);
+  assert.doesNotMatch(bootstrapSource, /markGuestWorkspaceImported\(uid\)/);
   assert.doesNotMatch(bootstrapSource, /hasImportedGuestWorkspace/);
   assert.doesNotMatch(source, /export async function appendWorkspaceToCloud/);
 });

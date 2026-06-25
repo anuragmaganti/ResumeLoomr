@@ -4,6 +4,8 @@ import {
   doc,
   getDoc,
   getDocFromCache,
+  getDocs,
+  getDocsFromCache,
   onSnapshot,
   setDoc,
   writeBatch,
@@ -155,16 +157,6 @@ export function setTrustedDevicePreference(value) {
   window.localStorage.setItem(CLOUD_TRUSTED_DEVICE_KEY, value ? 'true' : 'false');
 }
 
-export function getCloudImportKey(uid) {
-  return `${CLOUD_IMPORT_PREFIX}${uid}`;
-}
-
-export function markGuestWorkspaceImported(uid) {
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(getCloudImportKey(uid), 'true');
-  }
-}
-
 function getDb(trustedDevice) {
   return getFirebaseDb({ trustedDevice });
 }
@@ -291,6 +283,113 @@ export async function readCloudDraft(uid, resumeId, trustedDevice, options = {})
   }
 
   return cloudDocToDraft(snapshot.data());
+}
+
+async function readCollectionSnapshot(ref, { cacheOnly = false } = {}) {
+  return cacheOnly ? getDocsFromCache(ref) : getDocs(ref);
+}
+
+export async function readCloudResumeDocuments(uid, trustedDevice, options = {}) {
+  const workspaceRef = getWorkspaceDocRef(uid, trustedDevice);
+
+  if (!workspaceRef) {
+    return new Map();
+  }
+
+  const snapshot = await readCollectionSnapshot(
+    collection(workspaceRef.firestore, 'users', uid, 'resumes'),
+    options,
+  );
+  const resumeDocs = new Map();
+
+  snapshot.forEach((resumeSnapshot) => {
+    const data = resumeSnapshot.data();
+
+    if (!data || data.deletedAt) {
+      return;
+    }
+
+    try {
+      resumeDocs.set(resumeSnapshot.id, {
+        id: resumeSnapshot.id,
+        raw: data,
+        draft: cloudDocToDraft(data),
+        name: typeof data.name === 'string' && data.name.trim() ? data.name : 'Resume',
+        updatedAt: data.updatedAt || data.savedAt || '',
+        version: data.version || 0,
+      });
+    } catch (error) {
+      console.error('Skipped unreadable cloud resume document', {
+        code: error?.code,
+        resumeId: resumeSnapshot.id,
+      });
+    }
+  });
+
+  return resumeDocs;
+}
+
+export async function readCloudWorkspaceBundle(uid, trustedDevice, options = {}) {
+  const [workspace, resumeDocs] = await Promise.all([
+    readCloudWorkspace(uid, trustedDevice, options),
+    readCloudResumeDocuments(uid, trustedDevice, options),
+  ]);
+
+  return {
+    workspace,
+    resumeDocs,
+  };
+}
+
+export function repairCloudWorkspaceFromDocs(workspace, resumeDocs, { limit = CLOUD_WORKSPACE_RESUME_LIMIT } = {}) {
+  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+  const cloudDocs = resumeDocs instanceof Map ? resumeDocs : new Map();
+  const knownDocIds = new Set(cloudDocs.keys());
+  const existingResumeIds = normalizedWorkspace.resumeIds.filter((resumeId) => knownDocIds.has(resumeId));
+  const workspaceResumeIds = new Set(normalizedWorkspace.resumeIds);
+  const orphanResumeIds = Array.from(cloudDocs.values())
+    .filter((resumeDoc) => !workspaceResumeIds.has(resumeDoc.id))
+    .sort((left, right) => getTimestamp(right.updatedAt) - getTimestamp(left.updatedAt))
+    .map((resumeDoc) => resumeDoc.id);
+  const nextResumeIds = [...existingResumeIds, ...orphanResumeIds].slice(0, limit);
+  const nextMeta = Object.fromEntries(
+    nextResumeIds.map((resumeId) => {
+      const resumeDoc = cloudDocs.get(resumeId);
+      const workspaceMeta = normalizedWorkspace.meta[resumeId];
+      const name = resumeDoc?.name || workspaceMeta?.name || 'Resume';
+      const updatedAt = resumeDoc?.updatedAt || workspaceMeta?.updatedAt || new Date().toISOString();
+
+      return [resumeId, createWorkspaceResumeMeta(name, updatedAt)];
+    }),
+  );
+  const repairedWorkspace = normalizeWorkspaceIndex({
+    activeResumeId: nextResumeIds.includes(normalizedWorkspace.activeResumeId)
+      ? normalizedWorkspace.activeResumeId
+      : nextResumeIds[0] || '',
+    resumeIds: nextResumeIds,
+    meta: nextMeta,
+  });
+  const removedCount = normalizedWorkspace.resumeIds.length - existingResumeIds.length;
+  const recoveredCount = Math.min(orphanResumeIds.length, Math.max(0, limit - existingResumeIds.length));
+  const changed = (
+    removedCount > 0 ||
+    recoveredCount > 0 ||
+    repairedWorkspace.activeResumeId !== normalizedWorkspace.activeResumeId ||
+    repairedWorkspace.resumeIds.some((resumeId, index) => resumeId !== normalizedWorkspace.resumeIds[index]) ||
+    repairedWorkspace.resumeIds.length !== normalizedWorkspace.resumeIds.length
+  );
+
+  return {
+    workspace: repairedWorkspace,
+    draftsByResumeId: new Map(
+      repairedWorkspace.resumeIds
+        .map((resumeId) => [resumeId, cloudDocs.get(resumeId)?.draft])
+        .filter(([, draft]) => Boolean(draft)),
+    ),
+    removedCount,
+    recoveredCount,
+    changed,
+  };
 }
 
 export async function writeCloudWorkspace(uid, workspace, trustedDevice, identity) {
@@ -484,7 +583,6 @@ export async function syncLocalWorkspaceToCloud(
   readDraft,
   trustedDevice,
   identity,
-  { mirroredResumeIds = [] } = {},
 ) {
   const workspaceRef = getWorkspaceDocRef(uid, trustedDevice);
 
@@ -495,23 +593,13 @@ export async function syncLocalWorkspaceToCloud(
   const normalizedCloudWorkspace = normalizeWorkspaceIndex(cloudWorkspace);
   const normalizedLocalWorkspace = normalizeWorkspaceIndex(localWorkspace);
   const cloudIdentity = normalizeCloudIdentity(identity);
-  const localResumeIds = new Set(normalizedLocalWorkspace.resumeIds);
-  const safeDeletedIds = mirroredResumeIds.filter((resumeId) => (
-    normalizedCloudWorkspace.resumeIds.includes(resumeId) && !localResumeIds.has(resumeId)
-  ));
   const batch = writeBatch(workspaceRef.firestore);
   const nextWorkspace = {
     ...normalizedCloudWorkspace,
-    resumeIds: normalizedCloudWorkspace.resumeIds.filter((resumeId) => !safeDeletedIds.includes(resumeId)),
+    resumeIds: [...normalizedCloudWorkspace.resumeIds],
     meta: { ...normalizedCloudWorkspace.meta },
   };
   let hasChanges = false;
-
-  safeDeletedIds.forEach((resumeId) => {
-    delete nextWorkspace.meta[resumeId];
-    batch.delete(doc(collection(workspaceRef.firestore, 'users', uid, 'resumes'), resumeId));
-    hasChanges = true;
-  });
 
   const existingNames = nextWorkspace.resumeIds.map((resumeId) => nextWorkspace.meta[resumeId]?.name || '');
 
