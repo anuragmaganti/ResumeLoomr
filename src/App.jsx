@@ -383,7 +383,6 @@ function App() {
           firebaseEnabled={auth.firebaseEnabled}
           trustedDevice={auth.trustedDevice}
           signedOutEditingPreference={signedOutEditingPreference}
-          syncState={syncState}
           busy={auth.authBusy}
           onOpen={() => setIsAccountSettingsOpen(true)}
           onClose={() => setIsAccountSettingsOpen(false)}

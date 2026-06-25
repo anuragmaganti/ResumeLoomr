@@ -4,21 +4,6 @@ function formatAccountName(account, fallback = 'Unknown account') {
   return account?.email || account?.displayName || fallback;
 }
 
-function formatConnectionDate(value) {
-  const date = new Date(value);
-
-  if (!value || Number.isNaN(date.getTime())) {
-    return 'Not recorded';
-  }
-
-  return date.toLocaleString([], {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
 export default function AccountSettings({
   isOpen,
   authUser,
@@ -26,7 +11,6 @@ export default function AccountSettings({
   firebaseEnabled,
   trustedDevice,
   signedOutEditingPreference,
-  syncState,
   busy,
   onOpen,
   onClose,
@@ -107,21 +91,6 @@ export default function AccountSettings({
                 </p>
               </div>
             </div>
-
-            <dl className="connectionDetails">
-              <div>
-                <dt>Cloud sync</dt>
-                <dd>{isSignedIn ? syncState || 'ready' : 'Off'}</dd>
-              </div>
-              <div>
-                <dt>Offline storage</dt>
-                <dd>{trustedDevice ? 'Trusted browser cache' : 'This browser only'}</dd>
-              </div>
-              <div>
-                <dt>Last connected</dt>
-                <dd>{formatConnectionDate(connectedAccount?.lastConnectedAt)}</dd>
-              </div>
-            </dl>
 
             <div className="signedOutEditingSettings">
               <div>
