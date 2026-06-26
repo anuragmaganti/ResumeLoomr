@@ -108,7 +108,7 @@ service cloud.firestore {
       isString(data.activeResumeId) &&
       data.resumeIds is list &&
       data.resumeIds.size() > 0 &&
-      data.resumeIds.size() <= 50 &&
+      data.resumeIds.size() <= 100 &&
       data.activeResumeId in data.resumeIds &&
       isValidMeta(data.meta, data.resumeIds) &&
       isString(data.updatedAt) &&

@@ -24,6 +24,10 @@ import {
   getTrustedDevicePreference,
   setTrustedDevicePreference,
 } from '../lib/firebaseWorkspace.js';
+import {
+  clearResumeSyncSession,
+  createResumeSyncSession,
+} from '../lib/backgroundSync.js';
 
 function getFriendlyAuthError(error) {
   switch (error?.code) {
@@ -75,6 +79,13 @@ export function useFirebaseAuth() {
           cacheMode: getFirebaseDbCacheMode(),
         });
         setConnectedAccount(account);
+        nextUser.getIdToken()
+          .then((idToken) => createResumeSyncSession(idToken))
+          .catch((error) => {
+            if (import.meta.env.DEV) {
+              console.warn('Could not start resume sync session', error);
+            }
+          });
       } else {
         setConnectedAccount(readConnectedAccount());
       }
@@ -181,6 +192,7 @@ export function useFirebaseAuth() {
           await signOut(auth);
         }
 
+        await clearResumeSyncSession();
         await clearFirebaseBrowserCache();
         clearConnectedAccount();
         setTrustedDevice(false);

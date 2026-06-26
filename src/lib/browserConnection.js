@@ -9,12 +9,14 @@ import {
   WORKSPACE_INDEX_STORAGE_KEY,
 } from './resume.js';
 import {
-  GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY,
-  GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY,
-} from './localWorkspaceMirror.js';
+  LOCAL_WORKSPACE_DB_NAME,
+  LOCAL_WORKSPACE_PRESENT_KEY,
+} from './localWorkspaceDb.js';
 
 export const CONNECTED_ACCOUNT_STORAGE_KEY = 'resumeloomr:connected-account:v1';
 export const SIGNED_OUT_EDITING_PREFERENCE_KEY = 'resumeloomr:signed-out-editing-preference:v1';
+export const GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY = 'resumeloomr:guest-backup-before-cloud-mirror:v1';
+export const GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY = 'resumeloomr:cloud-mirror-manifest:v1';
 const LEGACY_CLOUD_IMPORT_PREFIX = 'resumeloomr:firebase-imported:';
 export const DEFAULT_SIGNED_OUT_EDITING_PREFERENCE = {
   allow: true,
@@ -158,6 +160,7 @@ export function hasLocalResumeWorkspaceData(storage) {
     const key = targetStorage.key(index);
 
     if (
+      key === LOCAL_WORKSPACE_PRESENT_KEY ||
       key === WORKSPACE_INDEX_STORAGE_KEY ||
       key === DRAFT_STORAGE_KEY ||
       key?.startsWith(RESUME_STORAGE_KEY_PREFIX)
@@ -184,6 +187,7 @@ export function clearLocalResumeWorkspaceData(storage) {
     if (
       key === WORKSPACE_INDEX_STORAGE_KEY ||
       key === DRAFT_STORAGE_KEY ||
+      key === LOCAL_WORKSPACE_PRESENT_KEY ||
       key === GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY ||
       key === GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY ||
       key?.startsWith(RESUME_STORAGE_KEY_PREFIX) ||
@@ -194,6 +198,10 @@ export function clearLocalResumeWorkspaceData(storage) {
   }
 
   keysToRemove.forEach((key) => targetStorage.removeItem(key));
+
+  if (typeof indexedDB !== 'undefined') {
+    indexedDB.deleteDatabase(LOCAL_WORKSPACE_DB_NAME);
+  }
 }
 
 export function clearBrowserResumeConnectionData({ storage, sessionStorage } = {}) {
