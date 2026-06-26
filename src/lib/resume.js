@@ -557,7 +557,7 @@ export function formatUrlForDisplay(value) {
 }
 
 export function normalizeBulletText(value) {
-  return trimText(value).replace(/^[\s\-*•]+/, '');
+  return trimText(value).replace(/^[\s\-*•●▪◦‣∙➢➤▸►→◆◇■□▫–—]+/, '');
 }
 
 function createEducationCustomSection(overrides = {}) {

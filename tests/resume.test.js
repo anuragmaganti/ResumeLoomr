@@ -423,6 +423,120 @@ test('source document segmentation handles generic section headings', () => {
   assert.equal(sourceDocument.sections[0].lines.length, 2);
 });
 
+test('source-first import discards contact link labels while preserving personal URLs', () => {
+  const sourceDocument = createSourceDocumentFromText(`
+    CASEY EXAMPLE
+    Product Engineer | Denver, CO | casey@example.com | (303) 555-1212
+    LINKS
+    caseyexample.com
+    linkedin.com/in/caseyexample
+    github.com/caseyexample
+    EDUCATION
+    State University
+    B.S. Computer Science
+  `);
+  const imported = compileSourceDocumentToImportedDraft(sourceDocument, null, {
+    sourceFileName: 'contact-links.pdf',
+  });
+
+  assert.equal(sourceDocument.personalLines.includes('LINKS'), false);
+  assert.equal(imported.draft.resume.personal.portfolioUrl, 'caseyexample.com');
+  assert.equal(imported.draft.resume.personal.linkedinUrl, 'linkedin.com/in/caseyexample');
+  assert.equal(imported.draft.resume.personal.githubUrl, 'github.com/caseyexample');
+  assert.equal(imported.draft.resume.personal.aboutMe, '');
+  assert.deepEqual(imported.draft.resume.sections.map((section) => section.title), ['EDUCATION']);
+});
+
+test('source-first import groups split role/date lines and strips uploaded bullet glyphs', () => {
+  const sourceDocument = createSourceDocumentFromText(`
+    CASEY EXAMPLE
+    EXPERIENCE
+    Acme Labs | Senior Software Engineer
+    01/2022 - 05/2024
+    ➢ Built onboarding workflows for 20 teams
+    ▸ Improved API latency by 35%
+    Clinic Group | Data Assistant
+    06/2020 - 12/2021
+    → Processed transfer requests in Excel,
+    ensuring accurate data for night-shift teams
+  `);
+  const imported = compileSourceDocumentToImportedDraft(sourceDocument, null, {
+    sourceFileName: 'roles.pdf',
+  });
+  const rolesBlock = imported.draft.resume.sections.find((section) => section.title === 'EXPERIENCE');
+
+  assert.equal(rolesBlock.entries.length, 2);
+  assert.equal(rolesBlock.entries[0].company, 'Acme Labs');
+  assert.equal(rolesBlock.entries[0].role, 'Senior Software Engineer');
+  assert.equal(rolesBlock.entries[0].yearsExp, '01/2022 - 05/2024');
+  assert.deepEqual(rolesBlock.entries[0].activities, [
+    'Built onboarding workflows for 20 teams',
+    'Improved API latency by 35%',
+  ]);
+  assert.equal(rolesBlock.entries[1].company, 'Clinic Group');
+  assert.equal(rolesBlock.entries[1].role, 'Data Assistant');
+  assert.equal(rolesBlock.entries[1].yearsExp, '06/2020 - 12/2021');
+  assert.deepEqual(rolesBlock.entries[1].activities, [
+    'Processed transfer requests in Excel, ensuring accurate data for night-shift teams',
+  ]);
+});
+
+test('source-first import handles bootcamp education, degree language text, and named skill groups', () => {
+  const sourceDocument = createSourceDocumentFromText(`
+    CASEY EXAMPLE
+    EDUCATION
+    Code Academy
+    Advanced Software
+    Engineering Certificate
+    State Tech
+    B.S. Biochemistry &
+    B.A. Applied Language
+    SKILLS
+    Front-End
+    JavaScript, React,
+    Next.js, CSS
+    Back-End
+    Node.js, SQL, AWS
+  `);
+  const imported = compileSourceDocumentToImportedDraft(sourceDocument, null, {
+    sourceFileName: 'education-skills.pdf',
+  });
+  const educationBlock = imported.draft.resume.sections.find((section) => section.title === 'EDUCATION');
+  const skillsBlock = imported.draft.resume.sections.find((section) => section.title === 'SKILLS');
+
+  assert.deepEqual(imported.draft.resume.sections.map((section) => section.title), ['EDUCATION', 'SKILLS']);
+  assert.equal(educationBlock.entries.length, 2);
+  assert.equal(educationBlock.entries[0].school, 'Code Academy');
+  assert.equal(educationBlock.entries[0].degree, 'Advanced Software Engineering Certificate');
+  assert.equal(educationBlock.entries[1].school, 'State Tech');
+  assert.equal(educationBlock.entries[1].degree, 'B.S. Biochemistry & B.A. Applied Language');
+  assert.deepEqual(
+    skillsBlock.entries.map((entry) => [entry.category, entry.items]),
+    [
+      ['Front-End', 'JavaScript, React, Next.js, CSS'],
+      ['Back-End', 'Node.js, SQL, AWS'],
+    ],
+  );
+});
+
+test('source-first import splits pipe-delimited project names from summaries', () => {
+  const sourceDocument = createSourceDocumentFromText(`
+    CASEY EXAMPLE
+    PROJECTS
+    Inkloom | Tool for artists to generate templates
+    Lumka | Minigame powered by a shuffle algorithm
+  `);
+  const imported = compileSourceDocumentToImportedDraft(sourceDocument, null, {
+    sourceFileName: 'projects.pdf',
+  });
+  const projectsBlock = imported.draft.resume.sections.find((section) => section.title === 'PROJECTS');
+
+  assert.equal(projectsBlock.entries[0].name, 'Inkloom');
+  assert.equal(projectsBlock.entries[0].summary, 'Tool for artists to generate templates');
+  assert.equal(projectsBlock.entries[1].name, 'Lumka');
+  assert.equal(projectsBlock.entries[1].summary, 'Minigame powered by a shuffle algorithm');
+});
+
 test('source-first compiler preserves ordered role bullets, education details, and awards', () => {
   const sourceText = `
     WALTER WASHINGTON

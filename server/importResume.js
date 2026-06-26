@@ -36,12 +36,17 @@ const serverRequire = createRequire(import.meta.url);
 const RESUME_SIGNAL_PATTERNS = [
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
   /(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}/,
-  /\b(?:https?:\/\/|www\.|linkedin\.com|github\.com|portfolio|behance\.net)\S*/i,
+  /(?<!@)\b(?:https?:\/\/|www\.|linkedin\.com|github\.com|portfolio|behance\.net|[a-z0-9](?:[a-z0-9-]*\.)+[a-z]{2,}(?:\/\S*)?)\S*/i,
   /\b(?:19|20)\d{2}\b|\b(?:present|current)\b/i,
   /\b(?:education|university|college|bachelor|master|degree|gpa|coursework|honors|certificate)\b/i,
   /\b(?:experience|employment|work|company|engineer|manager|developer|analyst|intern|consultant|led|built|managed|designed|implemented|improved)\b/i,
   /\b(?:skills|javascript|typescript|react|python|sql|excel|figma|aws|node|project management|communication|leadership)\b/i,
 ];
+const BULLET_MARKER_PATTERN = /(?:[•●▪◦‣∙*➢➤▸►→◆◇■□▪▫]|\d+[.)]|[-–—])/;
+const DATE_TOKEN_SOURCE = '(?:(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+)?(?:19|20)\\d{2}|(?:0?[1-9]|1[0-2])[/.-](?:19|20)\\d{2}|(?:present|current))';
+const DATE_RANGE_SOURCE = `${DATE_TOKEN_SOURCE}\\s*(?:[-–—]|to)\\s*${DATE_TOKEN_SOURCE}`;
+const DATE_TEXT_PATTERN = new RegExp(`(?:${DATE_RANGE_SOURCE}|${DATE_TOKEN_SOURCE})`, 'i');
+const DATE_TEXT_PATTERN_GLOBAL = new RegExp(`(?:${DATE_RANGE_SOURCE}|${DATE_TOKEN_SOURCE})`, 'gi');
 
 const importStringJsonSchema = { type: 'string' };
 const importStringArrayJsonSchema = {
@@ -396,7 +401,35 @@ export function assessExtractedResumeText(text) {
 }
 
 function isLikelySourceBullet(line) {
-  return /^(?:[•●▪◦‣∙*]|\d+[.)]|[-–—])\s+\S/.test(trimText(line));
+  return new RegExp(`^${BULLET_MARKER_PATTERN.source}\\s+\\S`, 'u').test(trimText(line));
+}
+
+function isLikelyUrlText(value) {
+  return /(?<!@)\b(?:https?:\/\/|www\.|linkedin\.com|github\.com|[a-z0-9](?:[a-z0-9-]*\.)+[a-z]{2,}(?:\/\S*)?)\S*/i.test(trimText(value));
+}
+
+function isLikelyPersonalContactLine(line) {
+  const text = trimText(line);
+
+  return (
+    isResumeContactLine(text) ||
+    isLikelyUrlText(text) ||
+    /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(text)
+  );
+}
+
+function isContactLinkGroupingLabel(line) {
+  return /^(?:links?|contact|contacts?|online|web|profiles?)$/i.test(trimText(line));
+}
+
+function shouldTreatAsContactGroupingLabel(line, nextLine = '') {
+  const text = trimText(line);
+
+  if (/^(?:links?|online|web)$/i.test(text)) {
+    return true;
+  }
+
+  return isContactLinkGroupingLabel(text) && isLikelyPersonalContactLine(nextLine);
 }
 
 function isKnownSourceSectionHeader(line) {
@@ -477,14 +510,13 @@ function getSourceSectionHeaderInfo(line) {
 
 function isLikelyRoleEntryLine(line) {
   const text = trimText(line);
-  const hasDateSignal = /\b(?:19|20)\d{2}\b|\b(?:present|current)\b/i.test(text);
-  const hasRoleTitleSignal = /\b(?:intern|assistant|associate|manager|engineer|analyst|director|counselor|consultant|developer|coordinator|specialist|sales|student|resident|head|officer|president|lead|volunteer)\b/i.test(text);
 
   return (
     text.length > 2 &&
     !isLikelySourceBullet(text) &&
     !isKnownSourceSectionHeader(text) &&
-    (hasDateSignal || (hasRoleTitleSignal && /,\s*\S/.test(text)))
+    !isDateOnlyLine(text) &&
+    (hasDateSignal(text) || (hasRoleTitleSignal(text) && /(?:,\s*\S|\s+\|\s+|\s[-–—]\s)/.test(text)))
   );
 }
 
@@ -789,7 +821,7 @@ function isResumeContactLine(line) {
 }
 
 function hasDateSignal(line) {
-  return /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)?\s*(?:19|20)\d{2}\b|\b(?:present|current)\b/i.test(line);
+  return DATE_TEXT_PATTERN.test(line);
 }
 
 function getLetterCaseRatio(line) {
@@ -842,7 +874,7 @@ function classifySourceSectionKind(title, lines) {
     return 'certifications';
   }
 
-  if (/\blanguages?\b/i.test(titleText)) {
+  if (/^(?:languages?|language skills|language proficiency)$/i.test(titleText)) {
     return 'languages';
   }
 
@@ -858,9 +890,11 @@ function isLikelyGenericSourceSectionHeader(line, { index = 0, seenContact = fal
 
   if (
     !text ||
+    isContactLinkGroupingLabel(text) ||
     isLikelySourceBullet(text) ||
     isResumeContactLine(text) ||
     hasDateSignal(text) ||
+    isLikelyDegreeLine(text) ||
     text.length > 70
   ) {
     return false;
@@ -905,7 +939,16 @@ function isLikelyWrappedSourceContinuation(previousLine, line) {
   const previous = trimText(previousLine);
   const text = trimText(line);
 
-  if (!previous || !text || isLikelySourceBullet(text) || isResumeContactLine(text) || isKnownSourceSectionHeader(text)) {
+  if (
+    !previous ||
+    !text ||
+    isContactLinkGroupingLabel(previous) ||
+    isContactLinkGroupingLabel(text) ||
+    isLikelySourceBullet(text) ||
+    isResumeContactLine(text) ||
+    isLikelyUrlText(text) ||
+    isKnownSourceSectionHeader(text)
+  ) {
     return false;
   }
 
@@ -919,7 +962,7 @@ function isLikelyWrappedSourceContinuation(previousLine, line) {
 
   return (
     isLikelySourceBullet(previous) ||
-    /[,;:]$/.test(previous) ||
+    /[,;:&]$/.test(previous) ||
     (/^[a-z(]/.test(text) && !/[.!?]$/.test(previous))
   );
 }
@@ -997,8 +1040,22 @@ export function createSourceDocumentFromText(text) {
   const sections = [];
   let currentSection = null;
   let seenContact = false;
+  let contactGroupActive = false;
 
   lines.forEach((line, index) => {
+    const nextLine = lines[index + 1] || '';
+
+    if (shouldTreatAsContactGroupingLabel(line, nextLine)) {
+      contactGroupActive = true;
+      return;
+    }
+
+    if (contactGroupActive && isLikelyPersonalContactLine(line)) {
+      personalLines.push(line);
+      seenContact = true;
+      return;
+    }
+
     if (isResumeContactLine(line)) {
       seenContact = true;
     }
@@ -1006,6 +1063,7 @@ export function createSourceDocumentFromText(text) {
     const headerInfo = getSourceDocumentHeaderInfo(line, { index, seenContact });
 
     if (headerInfo) {
+      contactGroupActive = false;
       const id = `source-${slugifyImportId(headerInfo.title)}-${sections.length + 1}`;
       currentSection = {
         id,
@@ -1017,6 +1075,7 @@ export function createSourceDocumentFromText(text) {
     }
 
     if (currentSection) {
+      contactGroupActive = false;
       currentSection.lines.push(line);
     } else {
       personalLines.push(line);
@@ -1280,12 +1339,18 @@ function mergeMappedPersonal(detectedPersonal, mappedPersonal = {}) {
   );
 }
 
+function extractResumeUrls(value) {
+  return Array.from(trimText(value).matchAll(/(?<!@)\b(?:https?:\/\/|www\.|linkedin\.com|github\.com|[a-z0-9](?:[a-z0-9-]*\.)+[a-z]{2,}(?:\/\S*)?)\S*/gi))
+    .map((match) => trimText(match[0]).replace(/[),.;]+$/g, ''))
+    .filter((url) => url && !/@/.test(url));
+}
+
 function detectPersonalFromSourceLines(lines) {
   const personalLines = Array.isArray(lines) ? lines.map(trimText).filter(Boolean) : [];
   const combinedText = personalLines.join('\n');
   const email = combinedText.match(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i)?.[0] || '';
   const phone = combinedText.match(/(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}/)?.[0] || '';
-  const urls = combinedText.match(/(?:https?:\/\/|www\.|linkedin\.com|github\.com|[a-z0-9.-]+\.[a-z]{2,}\/\S*)\S*/gi) || [];
+  const urls = extractResumeUrls(combinedText);
   const linkedinUrl = urls.find((url) => /linkedin\.com/i.test(url)) || '';
   const githubUrl = urls.find((url) => /github\.com/i.test(url)) || '';
   const portfolioUrl = urls.find((url) => !/linkedin\.com|github\.com/i.test(url)) || '';
@@ -1321,23 +1386,40 @@ function detectPersonalFromSourceLines(lines) {
 }
 
 function cleanSourceBullet(line) {
-  return trimText(line).replace(/^(?:[•●▪◦‣∙*]|\d+[.)]|[-–—])\s*/, '').trim();
+  return trimText(line).replace(new RegExp(`^${BULLET_MARKER_PATTERN.source}\\s*`, 'u'), '').trim();
 }
 
 function extractTrailingDateText(line) {
   const text = trimText(line);
-  const datePattern = /((?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+)?(?:19|20)\d{2}\s*(?:[-–—]\s*(?:(?:present|current)|(?:(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+)?(?:19|20)\d{2}))?)/i;
-  const matches = Array.from(text.matchAll(new RegExp(datePattern.source, 'gi')));
+  DATE_TEXT_PATTERN_GLOBAL.lastIndex = 0;
+  const matches = Array.from(text.matchAll(DATE_TEXT_PATTERN_GLOBAL));
   const match = matches[matches.length - 1];
 
   if (!match) {
     return { beforeDate: text, dateText: '' };
   }
 
-  const dateText = trimText(match[1]);
+  const dateText = trimText(match[0]);
   const beforeDate = trimText(`${text.slice(0, match.index)} ${text.slice((match.index || 0) + match[0].length)}`);
 
   return { beforeDate, dateText };
+}
+
+function isDateOnlyLine(line) {
+  return new RegExp(`^\\s*(?:${DATE_RANGE_SOURCE}|${DATE_TOKEN_SOURCE})\\s*$`, 'i').test(trimText(line));
+}
+
+function hasRoleTitleSignal(line) {
+  return /\b(?:intern|assistant|associate|manager|engineer|analyst|director|counselor|consultant|developer|coordinator|specialist|sales|student|resident|head|officer|president|lead|volunteer|technician|designer|architect|administrator|supervisor|scrub|full[-\s]?stack)\b/i.test(trimText(line));
+}
+
+function isLikelyLocationText(value) {
+  const text = trimText(value);
+
+  return (
+    /^(?:remote|virtual|hybrid)$/i.test(text) ||
+    /^[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)*,\s*(?:[A-Z]{2}|[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)*)$/.test(text)
+  );
 }
 
 function splitLocationFromTitleLine(line) {
@@ -1356,10 +1438,53 @@ function splitLocationFromTitleLine(line) {
 
 function parseRoleEntryLine(line) {
   const { beforeDate, dateText } = extractTrailingDateText(line);
-  const { titleText, location } = splitLocationFromTitleLine(beforeDate);
+  const pipeParts = beforeDate.split('|').map(trimText).filter(Boolean);
+  let titleText = beforeDate;
+  let location = '';
+  let pipeRole = '';
+
+  if (pipeParts.length >= 3) {
+    titleText = pipeParts[0];
+    pipeRole = pipeParts[1];
+    location = pipeParts.slice(2).join(' | ');
+  } else if (pipeParts.length === 2) {
+    const [left, right] = pipeParts;
+
+    if (isLikelyLocationText(right)) {
+      titleText = left;
+      location = right;
+    } else {
+      titleText = left;
+      pipeRole = right;
+    }
+  } else {
+    const splitTitle = splitLocationFromTitleLine(beforeDate);
+    titleText = splitTitle.titleText;
+    location = splitTitle.location;
+  }
+
   const commaParts = titleText.split(',').map(trimText).filter(Boolean);
-  const role = commaParts.length > 1 ? commaParts[commaParts.length - 1] : '';
-  const company = commaParts.length > 1 ? commaParts.slice(0, -1).join(', ') : titleText;
+  let role = pipeRole || (commaParts.length > 1 ? commaParts[commaParts.length - 1] : '');
+  let company = commaParts.length > 1 ? commaParts.slice(0, -1).join(', ') : titleText;
+
+  if (!role) {
+    const atMatch = titleText.match(/^(.+?)\s+at\s+(.+)$/i);
+
+    if (atMatch && hasRoleTitleSignal(atMatch[1])) {
+      role = trimText(atMatch[1]);
+      company = trimText(atMatch[2]);
+    }
+  }
+
+  if (!role) {
+    const dashParts = titleText.split(/\s[-–—]\s/).map(trimText).filter(Boolean);
+
+    if (dashParts.length === 2 && hasRoleTitleSignal(dashParts[1])) {
+      company = dashParts[0];
+      role = dashParts[1];
+    }
+  }
+
   const yearsExp = [location, dateText].filter(Boolean).join(' | ');
 
   return {
@@ -1384,6 +1509,7 @@ function buildSourceRoleEntries(lines) {
       if (!currentEntry) {
         currentEntry = {
           titleLine: '',
+          dateLine: '',
           bullets: [],
         };
         entries.push(currentEntry);
@@ -1393,8 +1519,14 @@ function buildSourceRoleEntries(lines) {
       return;
     }
 
+    if (isDateOnlyLine(text) && currentEntry && !currentEntry.dateLine) {
+      currentEntry.dateLine = text;
+      return;
+    }
+
     currentEntry = {
       titleLine: text,
+      dateLine: '',
       bullets: [],
     };
     entries.push(currentEntry);
@@ -1408,7 +1540,7 @@ function compileRoleEntries(section) {
 
   return sourceEntries
     .map((entry, index) => {
-      const parsedTitle = parseRoleEntryLine(entry.titleLine);
+      const parsedTitle = parseRoleEntryLine([entry.titleLine, entry.dateLine].filter(Boolean).join(' '));
       const fallbackTitle = trimText(entry.titleLine);
       const activities = entry.bullets.filter(Boolean);
 
@@ -1468,18 +1600,60 @@ function isLikelyInstitutionLine(line) {
   );
 }
 
+function isLikelyDegreeLine(line) {
+  return /(?:\b(?:bachelor|master|doctor|ph\.?d|associate|degree|major|minor|diploma|certificate|certification|bootcamp|ba|bs)\b|(?:^|\s)(?:b\.a\.|b\.s\.|m\.a\.|m\.s\.))/i.test(line);
+}
+
+function isLikelyEducationInstitutionStart(line, nextLine = '', followingLine = '') {
+  const text = trimText(line);
+
+  if (
+    !text ||
+    isLikelySourceBullet(text) ||
+    isLikelyDegreeLine(text) ||
+    isDateOnlyLine(text) ||
+    /:/.test(text)
+  ) {
+    return false;
+  }
+
+  if (isLikelyInstitutionLine(text)) {
+    return true;
+  }
+
+  const words = text.split(/\s+/g).filter(Boolean);
+  const isShortTitle = words.length > 0 && words.length <= 6 && /^[A-Z0-9]/.test(text) && !/[.,;|]/.test(text);
+  const nextCredentialText = [nextLine, followingLine].map(trimText).filter(Boolean).join(' ');
+
+  return isShortTitle && isLikelyDegreeLine(nextCredentialText);
+}
+
 function splitEducationGroups(lines) {
   const groups = [];
   let currentGroup = null;
 
-  lines.forEach((line) => {
+  lines.forEach((line, index) => {
     const text = trimText(line);
+    const nextLine = lines[index + 1] || '';
+    const followingLine = lines[index + 2] || '';
 
     if (!text) {
       return;
     }
 
-    if (!currentGroup || (!isLikelySourceBullet(text) && isLikelyInstitutionLine(text) && currentGroup.lines.length > 0)) {
+    const currentGroupHasCredential = currentGroup?.lines?.some((groupLine, groupIndex, groupLines) => (
+      isLikelyDegreeLine(groupLine) ||
+      isLikelyDegreeLine(`${groupLine} ${groupLines[groupIndex + 1] || ''}`)
+    ));
+
+    if (
+      !currentGroup ||
+      (
+        currentGroup.lines.length > 0 &&
+        currentGroupHasCredential &&
+        isLikelyEducationInstitutionStart(text, nextLine, followingLine)
+      )
+    ) {
       currentGroup = { lines: [] };
       groups.push(currentGroup);
     }
@@ -1498,8 +1672,32 @@ function stripGpa(text) {
   return trimText(text).replace(/\bGPA\b\s*:?\s*[0-9.]+(?:\s*\/\s*[0-9.]+)?/ig, '').trim();
 }
 
-function isLikelyDegreeLine(line) {
-  return /\b(?:bachelor|master|doctor|ph\.?d|associate|degree|major|minor|diploma|ba\b|bs\b|b\.a\.|b\.s\.|m\.a\.|m\.s\.)\b/i.test(line);
+function mergeEducationDetailLines(lines) {
+  const mergedLines = [];
+
+  lines.forEach((line) => {
+    const text = trimText(line);
+
+    if (!text) {
+      return;
+    }
+
+    const previousIndex = mergedLines.length - 1;
+    const previousLine = mergedLines[previousIndex];
+
+    if (
+      previousLine &&
+      !isLikelyDegreeLine(previousLine) &&
+      isLikelyDegreeLine(`${previousLine} ${text}`)
+    ) {
+      mergedLines[previousIndex] = `${previousLine} ${text}`;
+      return;
+    }
+
+    mergedLines.push(text);
+  });
+
+  return mergedLines;
 }
 
 function compileEducationEntryFromGroup(group, section, groupIndex, attachedCourseworkLines) {
@@ -1507,7 +1705,8 @@ function compileEducationEntryFromGroup(group, section, groupIndex, attachedCour
   const firstLine = lines.find((line) => !isLikelySourceBullet(line)) || '';
   const institution = parseInstitutionLine(firstLine);
   const gpa = extractGpa(lines);
-  const degreeLines = lines.filter((line) => !isLikelySourceBullet(line) && line !== firstLine && isLikelyDegreeLine(line));
+  const detailLines = mergeEducationDetailLines(lines.filter((line) => !isLikelySourceBullet(line) && line !== firstLine));
+  const degreeLines = detailLines.filter((line) => isLikelyDegreeLine(line));
   const programs = degreeLines.map((line, index) => {
     const { beforeDate, dateText } = extractTrailingDateText(stripGpa(line));
 
@@ -1521,28 +1720,7 @@ function compileEducationEntryFromGroup(group, section, groupIndex, attachedCour
   });
   const customSections = [];
   let activeCustomSection = null;
-
-  lines.forEach((line) => {
-    if (line === firstLine || degreeLines.includes(line)) {
-      return;
-    }
-
-    if (isLikelySourceBullet(line)) {
-      const bullet = cleanSourceBullet(line);
-
-      if (!activeCustomSection) {
-        activeCustomSection = {
-          id: `${section.id}-education-detail-${groupIndex + 1}-${customSections.length + 1}`,
-          label: 'Details',
-          content: '',
-        };
-        customSections.push(activeCustomSection);
-      }
-
-      activeCustomSection.content = mergeUniqueText([activeCustomSection.content, bullet]);
-      return;
-    }
-
+  const addEducationDetail = (line) => {
     const labelMatch = line.match(/^([^:]{3,40}):\s*(.+)$/);
     activeCustomSection = {
       id: `${section.id}-education-detail-${groupIndex + 1}-${customSections.length + 1}`,
@@ -1550,6 +1728,29 @@ function compileEducationEntryFromGroup(group, section, groupIndex, attachedCour
       content: labelMatch ? trimText(labelMatch[2]) : line,
     };
     customSections.push(activeCustomSection);
+  };
+
+  detailLines.forEach((line) => {
+    if (degreeLines.includes(line)) {
+      return;
+    }
+
+    addEducationDetail(line);
+  });
+
+  lines.filter(isLikelySourceBullet).forEach((line) => {
+    const bullet = cleanSourceBullet(line);
+
+    if (!activeCustomSection) {
+      activeCustomSection = {
+        id: `${section.id}-education-detail-${groupIndex + 1}-${customSections.length + 1}`,
+        label: 'Details',
+        content: '',
+      };
+      customSections.push(activeCustomSection);
+    }
+
+    activeCustomSection.content = mergeUniqueText([activeCustomSection.content, bullet]);
   });
 
   return {
@@ -1581,6 +1782,10 @@ function compileEducationEntries(section, attachedCourseworkSections = []) {
 
 function compileSkillsEntries(section) {
   const lines = section.lines.map(trimText).filter(Boolean);
+  const joinSkillItems = (items) => items
+    .map((item) => trimText(item).replace(/,+$/g, ''))
+    .filter(Boolean)
+    .join(', ');
   const colonEntries = lines
     .map((line, index) => {
       const match = line.match(/^([^:]{2,40}):\s*(.+)$/);
@@ -1592,7 +1797,7 @@ function compileSkillsEntries(section) {
       return {
         id: `${section.id}-entry-${index + 1}`,
         category: trimText(match[1]),
-        items: trimText(match[2]),
+        items: joinSkillItems([match[2]]),
       };
     })
     .filter(Boolean);
@@ -1601,10 +1806,51 @@ function compileSkillsEntries(section) {
     return colonEntries;
   }
 
+  const groupedEntries = [];
+  let activeEntry = null;
+  const pushActiveEntry = () => {
+    if (activeEntry && (activeEntry.category || activeEntry.items.length > 0)) {
+      groupedEntries.push({
+        id: `${section.id}-entry-${groupedEntries.length + 1}`,
+        category: activeEntry.category,
+        items: joinSkillItems(activeEntry.items),
+      });
+    }
+  };
+
+  lines.forEach((line, index) => {
+    const nextLine = lines[index + 1] || '';
+    const isCategoryLine = (
+      line.length <= 40 &&
+      !/[,:;|]/.test(line) &&
+      /^[A-Z0-9]/.test(line) &&
+      nextLine &&
+      /,|\b(?:javascript|typescript|react|python|ruby|kotlin|sql|aws|docker|kubernetes|graphql|node|next\.js|html|css|git|jira|agile|scrum|excel)\b/i.test(nextLine)
+    );
+
+    if (isCategoryLine) {
+      pushActiveEntry();
+      activeEntry = { category: line, items: [] };
+      return;
+    }
+
+    if (!activeEntry) {
+      activeEntry = { category: '', items: [] };
+    }
+
+    activeEntry.items.push(line);
+  });
+
+  pushActiveEntry();
+
+  if (groupedEntries.length > 1 || trimText(groupedEntries[0]?.category) !== '') {
+    return groupedEntries;
+  }
+
   return [{
     id: `${section.id}-entry-1`,
     category: '',
-    items: lines.join(', '),
+    items: joinSkillItems(lines),
   }];
 }
 
@@ -1631,13 +1877,16 @@ function compileProjectLikeEntries(section) {
   return sourceEntries
     .map((entry, index) => {
       const { beforeDate, dateText } = extractTrailingDateText(entry.titleLine);
+      const pipeParts = beforeDate.split('|').map(trimText).filter(Boolean);
+      const name = pipeParts.length > 1 ? pipeParts[0] : beforeDate || entry.titleLine || section.title;
+      const summary = pipeParts.length > 1 ? pipeParts.slice(1).join(' | ') : '';
 
       return {
         id: `${section.id}-entry-${index + 1}`,
-        name: beforeDate || entry.titleLine || section.title,
+        name,
         subtitle: '',
         years: dateText,
-        summary: '',
+        summary,
         highlights: entry.bullets.length > 0 ? entry.bullets : [''],
       };
     })
