@@ -258,12 +258,13 @@ export default function SectionTabs({
                     <button
                         className="button buttonSecondary sectionAddButton"
                         type="button"
+                        aria-label={canAddMoreSections ? "Add section" : "Section limit reached"}
                         aria-expanded={isAddMenuOpen}
                         aria-controls="section-add-menu"
                         disabled={!canAddMoreSections}
                         onClick={() => setIsAddMenuOpen((isOpen) => !isOpen)}
                     >
-                        {canAddMoreSections ? "+ Add section" : "Section limit reached"}
+                        +
                     </button>
 
                     {isAddMenuOpen && canAddMoreSections ? (
