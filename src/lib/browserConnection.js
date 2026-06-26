@@ -1,6 +1,5 @@
 import {
   CLOUD_DEVICE_ID_KEY,
-  CLOUD_IMPORT_PREFIX,
   CLOUD_SESSION_ID_KEY,
   CLOUD_TRUSTED_DEVICE_KEY,
 } from './firebaseWorkspace.js';
@@ -16,6 +15,7 @@ import {
 
 export const CONNECTED_ACCOUNT_STORAGE_KEY = 'resumeloomr:connected-account:v1';
 export const SIGNED_OUT_EDITING_PREFERENCE_KEY = 'resumeloomr:signed-out-editing-preference:v1';
+const LEGACY_CLOUD_IMPORT_PREFIX = 'resumeloomr:firebase-imported:';
 export const DEFAULT_SIGNED_OUT_EDITING_PREFERENCE = {
   allow: true,
   skipPrompt: false,
@@ -147,6 +147,28 @@ export function writeSignedOutEditingPreference(preference, storage) {
   return nextPreference;
 }
 
+export function hasLocalResumeWorkspaceData(storage) {
+  const targetStorage = getStorage(storage);
+
+  if (!targetStorage) {
+    return false;
+  }
+
+  for (let index = 0; index < targetStorage.length; index += 1) {
+    const key = targetStorage.key(index);
+
+    if (
+      key === WORKSPACE_INDEX_STORAGE_KEY ||
+      key === DRAFT_STORAGE_KEY ||
+      key?.startsWith(RESUME_STORAGE_KEY_PREFIX)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function clearLocalResumeWorkspaceData(storage) {
   const targetStorage = getStorage(storage);
 
@@ -165,7 +187,7 @@ export function clearLocalResumeWorkspaceData(storage) {
       key === GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY ||
       key === GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY ||
       key?.startsWith(RESUME_STORAGE_KEY_PREFIX) ||
-      key?.startsWith(CLOUD_IMPORT_PREFIX)
+      key?.startsWith(LEGACY_CLOUD_IMPORT_PREFIX)
     ) {
       keysToRemove.push(key);
     }

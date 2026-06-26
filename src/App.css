@@ -949,6 +949,24 @@ html[data-theme="dark"] .brandLogo--dark {
   font-size: 0.78rem;
 }
 
+.accountSwitchPrompt {
+  width: min(520px, 100%);
+}
+
+.accountSwitchActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: var(--space-4);
+}
+
+.accountSwitchActions .button {
+  min-height: 38px;
+  padding-inline: 14px;
+  font-size: 0.78rem;
+}
+
 @keyframes settingsPanelIn {
   from {
     opacity: 0;

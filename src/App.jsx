@@ -8,6 +8,7 @@ import AuthModal from './components/authModal';
 import ImportResumeModal from './components/importResumeModal';
 import AccountSettings from './components/accountSettings';
 import SignedOutEditingPrompt from './components/signedOutEditingPrompt';
+import AccountSwitchPrompt from './components/accountSwitchPrompt';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/editorPanel';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
@@ -16,6 +17,8 @@ import { importResumeFile } from './lib/importResume.js';
 import {
   clearBrowserResumeConnectionData,
   clearLocalResumeWorkspaceData,
+  hasLocalResumeWorkspaceData,
+  readConnectedAccount,
   readSignedOutEditingPreference,
   writeSignedOutEditingPreference,
 } from './lib/browserConnection.js';
@@ -26,6 +29,7 @@ function App() {
   const previewPanelRef = useRef(null);
   const documentTitleRef = useRef('ResumeLoomr | Professional Resume Builder');
   const authUserRef = useRef(null);
+  const preSignInConnectedAccountRef = useRef(readConnectedAccount());
   const [editorStageMaxHeight, setEditorStageMaxHeight] = useState(null);
   const auth = useFirebaseAuth();
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
@@ -33,6 +37,7 @@ function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importState, setImportState] = useState({ status: 'idle' });
   const [isSignOutInProgress, setIsSignOutInProgress] = useState(false);
+  const [accountSwitchResolutionUid, setAccountSwitchResolutionUid] = useState('');
   const [signedOutEditingPreference, setSignedOutEditingPreference] = useState(() => readSignedOutEditingPreference());
   const previewEditRequestIdRef = useRef(0);
   const [previewEditTarget, setPreviewEditTarget] = useState(null);
@@ -48,6 +53,16 @@ function App() {
 
     return 'light';
   });
+  const pendingAccountSwitchAccount = auth.user && preSignInConnectedAccountRef.current?.uid !== auth.user.uid
+    ? preSignInConnectedAccountRef.current
+    : null;
+  const isAccountSwitchPending = Boolean(
+    auth.user &&
+    pendingAccountSwitchAccount?.uid &&
+    accountSwitchResolutionUid !== auth.user.uid &&
+    hasLocalResumeWorkspaceData()
+  );
+  const builderUser = isAccountSwitchPending ? null : auth.user;
   const {
     resume,
     template,
@@ -92,7 +107,7 @@ function App() {
     reorderResumes,
     deleteActiveResume,
   } = useResumeBuilder({
-    user: auth.user,
+    user: builderUser,
     authReady: auth.authReady,
     trustedDevice: auth.trustedDevice,
   });
@@ -107,6 +122,13 @@ function App() {
   useEffect(() => {
     authUserRef.current = auth.user;
   }, [auth.user]);
+
+  useEffect(() => {
+    if (!auth.user) {
+      preSignInConnectedAccountRef.current = auth.connectedAccount;
+      setAccountSwitchResolutionUid('');
+    }
+  }, [auth.connectedAccount, auth.user]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -290,7 +312,20 @@ function App() {
     setIsSignOutInProgress(true);
 
     try {
-      await flushActiveCloudDraft({ reason: 'signout' });
+      if (!allowSignedOutEditing) {
+        const flushedDraft = await flushActiveCloudDraft({ reason: 'signout' });
+
+        if (auth.user && !flushedDraft) {
+          showNotice({
+            tone: 'error',
+            message: 'Cloud sync did not finish, so this browser was not cleared. Reconnect and try again.',
+          });
+          return;
+        }
+      } else {
+        await flushActiveCloudDraft({ reason: 'signout' });
+      }
+
       const signedOut = await auth.signOut();
 
       if (!signedOut) {
@@ -338,10 +373,52 @@ function App() {
   }
 
   async function handleDisconnectBrowser() {
-    await flushActiveCloudDraft({ reason: 'signout' });
+    if (auth.user) {
+      const flushedDraft = await flushActiveCloudDraft({ reason: 'disconnect-browser' });
+
+      if (!flushedDraft) {
+        showNotice({
+          tone: 'error',
+          message: 'Cloud sync did not finish, so this browser was not cleared. Reconnect and try again.',
+        });
+        return;
+      }
+    }
 
     await auth.clearBrowserConnection();
     clearBrowserResumeConnectionData();
+    window.location.reload();
+  }
+
+  function handleAccountSwitchImport() {
+    if (!auth.user) {
+      return;
+    }
+
+    preSignInConnectedAccountRef.current = {
+      uid: auth.user.uid,
+      email: auth.user.email || '',
+      displayName: auth.user.displayName || '',
+    };
+    setAccountSwitchResolutionUid(auth.user.uid);
+    showNotice({
+      tone: 'warning',
+      message: 'Browser resumes will be imported into this signed-in account.',
+    });
+  }
+
+  function handleAccountSwitchClear() {
+    if (!auth.user) {
+      return;
+    }
+
+    clearLocalResumeWorkspaceData();
+    preSignInConnectedAccountRef.current = {
+      uid: auth.user.uid,
+      email: auth.user.email || '',
+      displayName: auth.user.displayName || '',
+    };
+    setAccountSwitchResolutionUid(auth.user.uid);
     window.location.reload();
   }
 
@@ -400,6 +477,15 @@ function App() {
           busy={auth.authBusy || isSignOutInProgress}
           onCancel={handleSignOutPromptCancel}
           onChoose={handleSignedOutPromptChoice}
+        />
+
+        <AccountSwitchPrompt
+          isOpen={isAccountSwitchPending}
+          previousAccount={pendingAccountSwitchAccount}
+          nextAccount={auth.user}
+          busy={auth.authBusy}
+          onImportLocalData={handleAccountSwitchImport}
+          onClearLocalData={handleAccountSwitchClear}
         />
 
         <AccountSettings

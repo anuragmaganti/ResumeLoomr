@@ -6,7 +6,6 @@ import {
   getCloudDeviceId,
   getCloudSessionId,
   importWorkspaceToCloud,
-  markGuestWorkspaceImported,
   readCloudDraft,
   readCloudWorkspace,
   renameCloudResume,
@@ -388,13 +387,13 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
   const [conflict, setConflict] = useState(null);
   const hasMounted = useRef(false);
   const skipNextAutosaveRef = useRef(false);
-  const skipNextCloudSnapshotRef = useRef(false);
-  const localDirtyRef = useRef(false);
   const localDirtyResumeIdsRef = useRef(new Set());
   const currentDraftRef = useRef(initialWorkspaceState.draft);
+  const editorDraftResumeIdRef = useRef(initialWorkspaceState.workspace.activeResumeId);
   const workspaceRef = useRef(initialWorkspaceState.workspace);
   const activeResumeIdRef = useRef(initialWorkspaceState.workspace.activeResumeId);
   const cloudSaveQueueRef = useRef(new Map());
+  const resumeSwitchRequestRef = useRef(0);
   const userRef = useRef(user);
   const printViewRef = useRef(null);
   const wasCloudModeRef = useRef(false);
@@ -405,6 +404,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     sessionId: cloudSessionIdRef.current,
   });
   const lastRemoteVersionByResumeRef = useRef(new Map());
+  const skipNextCloudSnapshotResumeIdsRef = useRef(new Set());
   const isCloudMode = Boolean(authReady && user);
   const activeResumeId = workspace.activeResumeId;
   const errors = useMemo(() => validateResume(resume), [resume]);
@@ -458,8 +458,8 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       if (wasCloudModeRef.current) {
         const storedWorkspace = loadStoredWorkspace();
 
-        setWorkspace(storedWorkspace.workspace);
-        loadDraftIntoEditor(storedWorkspace.draft);
+        commitWorkspace(storedWorkspace.workspace);
+        loadDraftIntoEditor(storedWorkspace.draft, { resumeId: storedWorkspace.activeResumeId });
       }
 
       wasCloudModeRef.current = false;
@@ -495,7 +495,6 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
             trustedDevice,
             cloudIdentityRef.current,
           );
-          markGuestWorkspaceImported(uid);
         } else {
           nextWorkspace = await syncLocalWorkspaceToCloud(
             uid,
@@ -506,7 +505,6 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
             cloudIdentityRef.current,
             { mirroredResumeIds: localMirrorManifest?.resumeIds || [] },
           );
-          markGuestWorkspaceImported(uid);
         }
 
         if (cancelled || !nextWorkspace) {
@@ -543,8 +541,8 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         }
 
         skipNextAutosaveRef.current = true;
-        setWorkspace(normalizedWorkspace);
-        loadDraftIntoEditor(nextDraft);
+        commitWorkspace(normalizedWorkspace);
+        loadDraftIntoEditor(nextDraft, { resumeId: normalizedWorkspace.activeResumeId });
         clearLocalDirtyState();
         setCloudReady(true);
         setSyncState('saved');
@@ -578,7 +576,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       return;
     }
 
-    if (isCloudMode && !cloudReady) {
+    if (!activeResumeId || editorDraftResumeIdRef.current !== activeResumeId) {
       return;
     }
 
@@ -606,7 +604,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
             };
 
             markResumeDirty(activeResumeId);
-            setSyncState(isOnline() ? 'syncing' : 'offline');
+            setSyncState(cloudReady ? (isOnline() ? 'syncing' : 'offline') : 'error');
             mirrorCloudDraftLocally(activeResumeId, nextWorkspace, draft);
 
             if (!trustedDevice && !isOnline()) {
@@ -616,7 +614,9 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
               });
             }
 
-            scheduleCloudSave(activeResumeId, nextWorkspace, draft);
+            if (cloudReady) {
+              scheduleCloudSave(activeResumeId, nextWorkspace, draft);
+            }
           }
 
           return nextWorkspace;
@@ -675,42 +675,48 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       return undefined;
     }
 
+    const subscribedResumeId = activeResumeId;
+
     return subscribeCloudDraft(
       user.uid,
-      activeResumeId,
+      subscribedResumeId,
       trustedDevice,
       (remoteDraft, rawDraft) => {
-        if (skipNextCloudSnapshotRef.current) {
-          skipNextCloudSnapshotRef.current = false;
+        if (activeResumeIdRef.current !== subscribedResumeId) {
+          return;
+        }
+
+        if (skipNextCloudSnapshotResumeIdsRef.current.has(subscribedResumeId)) {
+          skipNextCloudSnapshotResumeIdsRef.current.delete(subscribedResumeId);
           return;
         }
 
         if (rawDraft?.sessionId === cloudSessionIdRef.current) {
-          lastRemoteVersionByResumeRef.current.set(activeResumeId, rawDraft?.version || 0);
+          lastRemoteVersionByResumeRef.current.set(subscribedResumeId, rawDraft?.version || 0);
           return;
         }
 
-        const lastRemoteVersion = lastRemoteVersionByResumeRef.current.get(activeResumeId) || 0;
+        const lastRemoteVersion = lastRemoteVersionByResumeRef.current.get(subscribedResumeId) || 0;
         const nextRemoteVersion = rawDraft?.version || 0;
 
         if (nextRemoteVersion && nextRemoteVersion <= lastRemoteVersion) {
           return;
         }
 
-        if (hasLocalDirty(activeResumeId)) {
+        if (hasLocalDirty(subscribedResumeId)) {
           setConflict({
             remoteDraft,
             rawDraft,
-            resumeId: activeResumeId,
+            resumeId: subscribedResumeId,
           });
           return;
         }
 
         skipNextAutosaveRef.current = true;
-        mirrorCloudDraftLocally(activeResumeId, workspaceRef.current, remoteDraft);
-        loadDraftIntoEditor(remoteDraft);
+        mirrorCloudDraftLocally(subscribedResumeId, workspaceRef.current, remoteDraft);
+        loadDraftIntoEditor(remoteDraft, { resumeId: subscribedResumeId });
         setSavedAt(remoteDraft.savedAt);
-        lastRemoteVersionByResumeRef.current.set(activeResumeId, nextRemoteVersion);
+        lastRemoteVersionByResumeRef.current.set(subscribedResumeId, nextRemoteVersion);
         setSyncState('saved');
       },
       () => {
@@ -762,11 +768,12 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     setShowAllErrors(false);
   }
 
-  function loadDraftIntoEditor(nextDraft, { focusPersonal = false } = {}) {
+  function loadDraftIntoEditor(nextDraft, { focusPersonal = false, resumeId = activeResumeIdRef.current } = {}) {
     const nextSectionIds = getDraftEditorSectionIds(nextDraft);
 
     skipNextAutosaveRef.current = true;
     currentDraftRef.current = nextDraft;
+    editorDraftResumeIdRef.current = resumeId;
     setResume(nextDraft.resume);
     setTemplate(nextDraft.template);
     setSectionOrder(nextDraft.sectionOrder);
@@ -781,6 +788,10 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
   function persistActiveDraftImmediately({ localOnly = false, flushCloud = true, resumeId = activeResumeIdRef.current } = {}) {
     if (!resumeId || typeof window === 'undefined') {
+      return null;
+    }
+
+    if (editorDraftResumeIdRef.current !== resumeId) {
       return null;
     }
 
@@ -802,7 +813,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
           savedAt: payload.savedAt,
         };
 
-        flushCloudDraft(resumeId, workspace, draft);
+        flushCloudDraft(resumeId, workspaceRef.current, draft);
       }
 
       return payload;
@@ -852,29 +863,20 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     cloudSaveQueueRef.current.clear();
   }
 
-  function syncGlobalDirtyFlag() {
-    localDirtyRef.current = localDirtyResumeIdsRef.current.size > 0;
-  }
-
   function markResumeDirty(resumeId) {
     if (resumeId) {
       localDirtyResumeIdsRef.current.add(resumeId);
     }
-
-    syncGlobalDirtyFlag();
   }
 
   function clearResumeDirty(resumeId) {
     if (resumeId) {
       localDirtyResumeIdsRef.current.delete(resumeId);
     }
-
-    syncGlobalDirtyFlag();
   }
 
   function clearLocalDirtyState() {
     localDirtyResumeIdsRef.current.clear();
-    syncGlobalDirtyFlag();
   }
 
   function hasLocalDirty(resumeId) {
@@ -996,7 +998,10 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       }
 
       if (resumeId === activeResumeIdRef.current) {
-        draftsByResumeId.set(resumeId, currentDraftRef.current);
+        draftsByResumeId.set(
+          resumeId,
+          editorDraftResumeIdRef.current === resumeId ? currentDraftRef.current : readStoredResumeDraftOrNull(resumeId),
+        );
         return;
       }
 
@@ -1082,7 +1087,9 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       updatedAt: payload.savedAt,
     });
     const draft = {
-      ...currentDraftRef.current,
+      resume: payload.resume,
+      template: payload.template,
+      sectionOrder: payload.sectionOrder,
       savedAt: payload.savedAt,
     };
 
@@ -1095,11 +1102,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
   }
 
   function getLatestKnownDraftForResume(resumeId) {
-    if (resumeId === activeResumeIdRef.current) {
+    if (resumeId === activeResumeIdRef.current && editorDraftResumeIdRef.current === resumeId) {
       return currentDraftRef.current;
     }
 
-    return readStoredResumeDraft(resumeId);
+    return readStoredResumeDraftOrNull(resumeId);
   }
 
   function isStaleDraftSnapshot(resumeId, draft) {
@@ -1115,28 +1122,10 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     return Math.max(workspaceTimestamp, latestDraftTimestamp) > snapshotTimestamp;
   }
 
-  function repairStaleCloudWrite(resumeId) {
-    if (!isCloudMode || !cloudReady || !userRef.current?.uid || !resumeId) {
-      return;
-    }
-
-    const latestDraft = getLatestKnownDraftForResume(resumeId);
-
-    if (!latestDraft?.savedAt) {
-      return;
-    }
-
-    const nextWorkspace = withWorkspaceResumeMeta(workspaceRef.current, resumeId, {
-      updatedAt: latestDraft.savedAt,
-    });
-
-    scheduleCloudSave(resumeId, nextWorkspace, latestDraft, 'stale-write-repair');
-  }
-
   async function flushCloudDraft(
     resumeId = activeResumeIdRef.current,
     nextWorkspace = workspaceRef.current,
-    draft = currentDraftRef.current,
+    draft = null,
     { reason = 'manual' } = {},
   ) {
     const currentUser = userRef.current;
@@ -1147,8 +1136,13 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     }
 
     clearCloudSaveTimers(resumeId);
+    const draftToSave = draft || getLatestKnownDraftForResume(resumeId);
 
-    if (isStaleDraftSnapshot(resumeId, draft)) {
+    if (!draftToSave) {
+      return null;
+    }
+
+    if (isStaleDraftSnapshot(resumeId, draftToSave)) {
       settleCloudSyncState();
       return null;
     }
@@ -1156,12 +1150,12 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     setSyncState(isOnline() ? 'syncing' : 'offline');
 
     try {
-      skipNextCloudSnapshotRef.current = true;
+      skipNextCloudSnapshotResumeIdsRef.current.add(resumeId);
       const draftDoc = await writeCloudDraft(
         currentUser.uid,
         resumeId,
         nextWorkspace,
-        draft,
+        draftToSave,
         trustedDevice,
         cloudIdentityRef.current,
       );
@@ -1172,20 +1166,22 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       }
 
       const mirroredDraft = {
-        ...draft,
-        savedAt: draftDoc?.savedAt || draft.savedAt || new Date().toISOString(),
+        ...draftToSave,
+        savedAt: draftDoc?.savedAt || draftToSave.savedAt || new Date().toISOString(),
       };
 
       if (isStaleDraftSnapshot(resumeId, mirroredDraft)) {
-        repairStaleCloudWrite(resumeId);
+        settleCloudSyncState();
         return draftDoc;
       }
 
       clearResumeDirty(resumeId);
       lastRemoteVersionByResumeRef.current.set(resumeId, draftDoc?.version || 0);
       mirrorCloudDraftLocally(resumeId, nextWorkspace, mirroredDraft);
-      setSavedAt(mirroredDraft.savedAt);
-      setSaveState('saved');
+      if (activeResumeIdRef.current === resumeId && editorDraftResumeIdRef.current === resumeId) {
+        setSavedAt(mirroredDraft.savedAt);
+        setSaveState('saved');
+      }
       setSyncState(isOnline() ? 'saved' : 'offline');
       setNotice((currentNotice) => (
         currentNotice?.tone === 'error' && shouldClearErrorNotice
@@ -1195,9 +1191,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       return draftDoc;
     } catch (error) {
       logCloudError(error);
-      mirrorCloudDraftLocally(resumeId, nextWorkspace, draft);
+      mirrorCloudDraftLocally(resumeId, nextWorkspace, draftToSave);
       setSyncState(isOnline() ? 'error' : 'offline');
-      setSaveState('error');
+      if (activeResumeIdRef.current === resumeId && editorDraftResumeIdRef.current === resumeId) {
+        setSaveState('error');
+      }
       setNotice({
         tone: 'error',
         message: getCloudSyncErrorMessage(error),
@@ -1206,18 +1204,29 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     }
   }
 
+  function markActiveDraftDirty() {
+    const currentResumeId = activeResumeIdRef.current;
+
+    if (isCloudMode && currentResumeId && editorDraftResumeIdRef.current === currentResumeId) {
+      markResumeDirty(currentResumeId);
+    }
+  }
+
   function updateResume(transform) {
     setSaveState('saving');
+    markActiveDraftDirty();
     setResume((currentResume) => transform(currentResume));
   }
 
   function changeTemplate(nextTemplate) {
     setSaveState('saving');
+    markActiveDraftDirty();
     setTemplate(nextTemplate);
   }
 
   function moveSection(sectionId, direction) {
     setSaveState('saving');
+    markActiveDraftDirty();
     if (resume.sections?.some((section) => section.id === sectionId)) {
       updateResume((currentResume) => moveResumeSectionBlock(currentResume, sectionId, direction));
       return;
@@ -1228,6 +1237,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
   function reorderSection(sectionId, targetSectionId, placement) {
     setSaveState('saving');
+    markActiveDraftDirty();
     if (
       resume.sections?.some((section) => section.id === sectionId) &&
       resume.sections?.some((section) => section.id === targetSectionId)
@@ -1241,6 +1251,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
   function reorderSections(nextSectionIds) {
     setSaveState('saving');
+    markActiveDraftDirty();
     const blockSectionIds = Array.isArray(resume.sections)
       ? resume.sections.map((section) => section.id)
       : [];
@@ -1297,6 +1308,8 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       return;
     }
 
+    const switchRequestId = resumeSwitchRequestRef.current + 1;
+    resumeSwitchRequestRef.current = switchRequestId;
     const previousResumeId = activeResumeId;
     const persistedPayload = persistActiveDraftImmediately({ flushCloud: false, resumeId: previousResumeId });
 
@@ -1311,15 +1324,19 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       ...nextWorkspaceBase,
       activeResumeId: nextResumeId,
     };
+    const localNextDraft = readStoredResumeDraft(nextResumeId);
 
     commitWorkspace(nextWorkspace);
+    loadDraftIntoEditor(localNextDraft, { resumeId: nextResumeId });
 
     if (isCloudMode && user?.uid) {
-      mirrorCloudWorkspaceLocally(nextWorkspace);
+      mirrorCloudWorkspaceLocally(nextWorkspace, (resumeId) => (
+        resumeId === nextResumeId ? localNextDraft : readStoredResumeDraftOrNull(resumeId)
+      ));
       await flushCloudDraft(previousResumeId, nextWorkspaceBase, {
-        resume,
-        template,
-        sectionOrder,
+        resume: persistedPayload.resume,
+        template: persistedPayload.template,
+        sectionOrder: persistedPayload.sectionOrder,
         savedAt: persistedPayload.savedAt,
       });
       await runCloudMutation(() => (
@@ -1328,13 +1345,20 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       const cloudDraft = await readCloudDraft(user.uid, nextResumeId, trustedDevice, {
         cacheOnly: shouldReadFirestoreCache(trustedDevice),
       }).catch(() => null);
-      const nextDraft = cloudDraft || readStoredResumeDraft(nextResumeId);
+
+      if (
+        resumeSwitchRequestRef.current !== switchRequestId ||
+        activeResumeIdRef.current !== nextResumeId ||
+        hasLocalDirty(nextResumeId)
+      ) {
+        return;
+      }
+
+      const nextDraft = cloudDraft || localNextDraft;
       mirrorCloudDraftLocally(nextResumeId, nextWorkspace, nextDraft);
-      loadDraftIntoEditor(nextDraft);
+      loadDraftIntoEditor(nextDraft, { resumeId: nextResumeId });
       return;
     }
-
-    loadDraftIntoEditor(readStoredResumeDraft(nextResumeId));
   }
 
   async function createResume() {
@@ -1381,15 +1405,17 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     };
 
     commitWorkspace(nextWorkspace);
+    resumeSwitchRequestRef.current += 1;
+    loadDraftIntoEditor(nextPersistedDraft, { focusPersonal: true, resumeId: nextResumeId });
 
     if (isCloudMode && user?.uid) {
       mirrorCloudDraftLocally(nextResumeId, nextWorkspace, nextPersistedDraft);
 
       if (previousResumeId) {
         await flushCloudDraft(previousResumeId, nextWorkspace, {
-          resume,
-          template,
-          sectionOrder,
+          resume: persistedPayload.resume,
+          template: persistedPayload.template,
+          sectionOrder: persistedPayload.sectionOrder,
           savedAt: persistedPayload.savedAt,
         });
       }
@@ -1398,8 +1424,6 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         writeCloudDraft(user.uid, nextResumeId, nextWorkspace, nextPersistedDraft, trustedDevice, cloudIdentityRef.current)
       ));
     }
-
-    loadDraftIntoEditor(nextPersistedDraft, { focusPersonal: true });
   }
 
   function createImportPlaceholderResume({ sourceFileName = '' } = {}) {
@@ -1452,6 +1476,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     }
 
     commitWorkspace(nextWorkspace);
+    resumeSwitchRequestRef.current += 1;
 
     if (isCloudMode && user?.uid) {
       mirrorCloudDraftLocally(nextResumeId, nextWorkspace, nextPersistedDraft);
@@ -1461,11 +1486,11 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
           writeCloudDraft(
             user.uid,
             previousResumeId,
-            previousWorkspace,
+            nextWorkspace,
             {
-              resume,
-              template,
-              sectionOrder,
+              resume: persistedPayload.resume,
+              template: persistedPayload.template,
+              sectionOrder: persistedPayload.sectionOrder,
               savedAt: persistedPayload.savedAt,
             },
             trustedDevice,
@@ -1475,7 +1500,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       }
     }
 
-    loadDraftIntoEditor(nextPersistedDraft, { focusPersonal: true });
+    loadDraftIntoEditor(nextPersistedDraft, { focusPersonal: true, resumeId: nextResumeId });
     return nextResumeId;
   }
 
@@ -1526,7 +1551,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       setSyncState(isOnline() ? 'syncing' : 'offline');
     }
 
-    loadDraftIntoEditor(nextDraft, { focusPersonal: true });
+    loadDraftIntoEditor(nextDraft, { focusPersonal: true, resumeId });
 
     if (isCloudMode && userRef.current?.uid) {
       const savedDraft = await flushCloudDraft(resumeId, nextWorkspace, nextDraft, { reason: 'import-replace' });
@@ -1584,6 +1609,13 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     };
 
     commitWorkspace(nextWorkspace);
+    resumeSwitchRequestRef.current += 1;
+    loadDraftIntoEditor({
+      resume: duplicatedDraft.resume,
+      template: duplicatedDraft.template,
+      sectionOrder: duplicatedDraft.sectionOrder,
+      savedAt: duplicatePayload.savedAt,
+    }, { resumeId: nextResumeId });
 
     if (isCloudMode && user?.uid) {
       mirrorCloudDraftLocally(nextResumeId, nextWorkspace, {
@@ -1595,9 +1627,9 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
       if (previousResumeId) {
         await flushCloudDraft(previousResumeId, nextWorkspace, {
-          resume,
-          template,
-          sectionOrder,
+          resume: persistedPayload.resume,
+          template: persistedPayload.template,
+          sectionOrder: persistedPayload.sectionOrder,
           savedAt: persistedPayload.savedAt,
         });
       }
@@ -1618,13 +1650,6 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         )
       ));
     }
-
-    loadDraftIntoEditor({
-      resume: duplicatedDraft.resume,
-      template: duplicatedDraft.template,
-      sectionOrder: duplicatedDraft.sectionOrder,
-      savedAt: duplicatePayload.savedAt,
-    });
   }
 
   function renameResume(resumeId, nextName) {
@@ -1647,7 +1672,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       mirrorCloudWorkspaceLocally(nextWorkspace);
 
       if (targetResumeId === activeResumeId) {
-        mirrorCloudDraftLocally(targetResumeId, nextWorkspace, currentDraftRef.current);
+        mirrorCloudDraftLocally(targetResumeId, nextWorkspace, getLatestKnownDraftForResume(targetResumeId));
       }
 
       runCloudMutation(() => (
@@ -1687,7 +1712,9 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     if (isCloudMode && userRef.current?.uid) {
       const activeDraft = persistedPayload && currentActiveResumeId
         ? {
-            ...currentDraftRef.current,
+            resume: persistedPayload.resume,
+            template: persistedPayload.template,
+            sectionOrder: persistedPayload.sectionOrder,
             savedAt: persistedPayload.savedAt,
           }
         : null;
@@ -1727,7 +1754,9 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     if (isCloudMode && userRef.current?.uid) {
       const activeDraft = persistedPayload && currentActiveResumeId
         ? {
-            ...currentDraftRef.current,
+            resume: persistedPayload.resume,
+            template: persistedPayload.template,
+            sectionOrder: persistedPayload.sectionOrder,
             savedAt: persistedPayload.savedAt,
           }
         : null;
@@ -1798,12 +1827,14 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     ));
     window.localStorage.removeItem(createResumeStorageKey(deletedResumeId));
     commitWorkspace(nextWorkspace);
+    const switchRequestId = resumeSwitchRequestRef.current + 1;
+    resumeSwitchRequestRef.current = switchRequestId;
 
     if (isCloudMode && user?.uid) {
       mirrorCloudWorkspaceLocally(nextWorkspace);
     }
 
-    loadDraftIntoEditor(readStoredResumeDraft(nextResumeId));
+    loadDraftIntoEditor(readStoredResumeDraft(nextResumeId), { resumeId: nextResumeId });
     settleCloudSyncState();
 
     if (isCloudMode && user?.uid) {
@@ -1811,8 +1842,17 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         cacheOnly: shouldReadFirestoreCache(trustedDevice),
       }).catch(() => null);
       const nextDraft = cloudDraft || readStoredResumeDraft(nextResumeId);
+
+      if (
+        resumeSwitchRequestRef.current !== switchRequestId ||
+        activeResumeIdRef.current !== nextResumeId ||
+        hasLocalDirty(nextResumeId)
+      ) {
+        return;
+      }
+
       mirrorCloudDraftLocally(nextResumeId, nextWorkspace, nextDraft);
-      loadDraftIntoEditor(nextDraft);
+      loadDraftIntoEditor(nextDraft, { resumeId: nextResumeId });
       settleCloudSyncState();
     }
   }
@@ -1824,7 +1864,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
     skipNextAutosaveRef.current = true;
     mirrorCloudDraftLocally(conflict.resumeId || activeResumeId, workspace, conflict.remoteDraft);
-    loadDraftIntoEditor(conflict.remoteDraft);
+    loadDraftIntoEditor(conflict.remoteDraft, { resumeId: conflict.resumeId || activeResumeId });
     clearResumeDirty(conflict.resumeId || activeResumeId);
     setConflict(null);
     setSyncState('saved');
@@ -1845,7 +1885,14 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     const existingNames = workspace.resumeIds.map((resumeId) => workspace.meta[resumeId]?.name || '');
     const sourceName = workspace.meta[activeResumeId]?.name || '';
     const duplicateName = createDuplicateResumeName(sourceName, existingNames);
-    const localDraft = currentDraftRef.current;
+    const localDraft = editorDraftResumeIdRef.current === activeResumeId
+      ? currentDraftRef.current
+      : readStoredResumeDraftOrNull(activeResumeId);
+
+    if (!localDraft) {
+      setNotice({ tone: 'error', message: 'Could not find this device’s version to save as a copy.' });
+      return;
+    }
     const duplicatePayload = createDraftPayload({
       resume: localDraft.resume,
       template: localDraft.template,
@@ -1894,7 +1941,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
     }
 
     skipNextAutosaveRef.current = true;
-    loadDraftIntoEditor(conflict.remoteDraft);
+    loadDraftIntoEditor(conflict.remoteDraft, { resumeId: originalResumeId });
     clearResumeDirty(originalResumeId);
     setConflict(null);
     setNotice({ tone: 'success', message: 'Saved this device’s version as a copy.' });

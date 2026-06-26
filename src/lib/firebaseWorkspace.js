@@ -1,6 +1,5 @@
 import {
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocFromCache,
@@ -20,7 +19,6 @@ import { getFirebaseDb } from './firebaseClient.js';
 
 export const CLOUD_WORKSPACE_RESUME_LIMIT = 50;
 export const CLOUD_WORKSPACE_SCHEMA_VERSION = 1;
-export const CLOUD_IMPORT_PREFIX = 'resumeloomr:firebase-imported:';
 export const CLOUD_TRUSTED_DEVICE_KEY = 'resumeloomr:firebase-trusted-device';
 export const CLOUD_DEVICE_ID_KEY = 'resumeloomr:firebase-device-id';
 export const CLOUD_SESSION_ID_KEY = 'resumeloomr:firebase-session-id';
@@ -154,16 +152,6 @@ export function setTrustedDevicePreference(value) {
   }
 
   window.localStorage.setItem(CLOUD_TRUSTED_DEVICE_KEY, value ? 'true' : 'false');
-}
-
-export function getCloudImportKey(uid) {
-  return `${CLOUD_IMPORT_PREFIX}${uid}`;
-}
-
-export function markGuestWorkspaceImported(uid) {
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(getCloudImportKey(uid), 'true');
-  }
 }
 
 function getDb(trustedDevice) {
@@ -619,12 +607,4 @@ export function subscribeCloudDraft(uid, resumeId, trustedDevice, onNext, onErro
     },
     onError,
   );
-}
-
-export async function removeCloudDraft(uid, resumeId, trustedDevice) {
-  const draftRef = getResumeDocRef(uid, resumeId, trustedDevice);
-
-  if (draftRef) {
-    await deleteDoc(draftRef);
-  }
 }

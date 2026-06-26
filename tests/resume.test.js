@@ -53,7 +53,6 @@ import {
 import {
   CLOUD_DEVICE_ID_KEY,
   CLOUD_DRAFT_MAX_BYTES,
-  CLOUD_IMPORT_PREFIX,
   CLOUD_SESSION_ID_KEY,
   CLOUD_TRUSTED_DEVICE_KEY,
   CLOUD_WORKSPACE_RESUME_LIMIT,
@@ -76,6 +75,7 @@ import {
   SIGNED_OUT_EDITING_PREFERENCE_KEY,
   clearBrowserResumeConnectionData,
   clearLocalResumeWorkspaceData,
+  hasLocalResumeWorkspaceData,
   readConnectedAccount,
   readSignedOutEditingPreference,
   writeConnectedAccount,
@@ -100,6 +100,7 @@ import {
 const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = path.resolve(TEST_FILE_DIR, '../src');
 const SERVER_IMPORT_PATH = path.resolve(TEST_FILE_DIR, '../server/importResume.js');
+const LEGACY_CLOUD_IMPORT_PREFIX = 'resumeloomr:firebase-imported:';
 
 function createMemoryStorage(initialEntries = []) {
   const values = new Map(initialEntries);
@@ -1300,6 +1301,23 @@ test('signed-out editing preference defaults safely and persists choices', () =>
   assert.deepEqual(readSignedOutEditingPreference(storage), preference);
 });
 
+test('local resume workspace detector sees draft data but ignores account-only settings', () => {
+  const emptyStorage = createMemoryStorage([
+    [CONNECTED_ACCOUNT_STORAGE_KEY, '{"uid":"user-1"}'],
+    ['resumeloomr:theme', 'dark'],
+  ]);
+  const workspaceStorage = createMemoryStorage([
+    [WORKSPACE_INDEX_STORAGE_KEY, '{}'],
+  ]);
+  const draftStorage = createMemoryStorage([
+    [createResumeStorageKey('resume-1'), '{}'],
+  ]);
+
+  assert.equal(hasLocalResumeWorkspaceData(emptyStorage), false);
+  assert.equal(hasLocalResumeWorkspaceData(workspaceStorage), true);
+  assert.equal(hasLocalResumeWorkspaceData(draftStorage), true);
+});
+
 test('clearing local resume workspace data preserves account and preference settings', () => {
   const storage = createMemoryStorage([
     [WORKSPACE_INDEX_STORAGE_KEY, '{}'],
@@ -1309,7 +1327,7 @@ test('clearing local resume workspace data preserves account and preference sett
     [GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY, '{}'],
     [CONNECTED_ACCOUNT_STORAGE_KEY, '{"uid":"user-1"}'],
     [SIGNED_OUT_EDITING_PREFERENCE_KEY, JSON.stringify({ allow: false, skipPrompt: true })],
-    [`${CLOUD_IMPORT_PREFIX}user-1`, 'true'],
+    [`${LEGACY_CLOUD_IMPORT_PREFIX}user-1`, 'true'],
     [CLOUD_DEVICE_ID_KEY, 'device-1'],
     [CLOUD_TRUSTED_DEVICE_KEY, 'true'],
     ['resumeloomr:theme', 'dark'],
@@ -1321,7 +1339,7 @@ test('clearing local resume workspace data preserves account and preference sett
   assert.equal(storage.getItem(DRAFT_STORAGE_KEY), null);
   assert.equal(storage.getItem(createResumeStorageKey('resume-1')), null);
   assert.equal(storage.getItem(GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY), null);
-  assert.equal(storage.getItem(`${CLOUD_IMPORT_PREFIX}user-1`), null);
+  assert.equal(storage.getItem(`${LEGACY_CLOUD_IMPORT_PREFIX}user-1`), null);
   assert.equal(storage.getItem(CONNECTED_ACCOUNT_STORAGE_KEY), '{"uid":"user-1"}');
   assert.equal(storage.getItem(SIGNED_OUT_EDITING_PREFERENCE_KEY), JSON.stringify({ allow: false, skipPrompt: true }));
   assert.equal(storage.getItem(CLOUD_DEVICE_ID_KEY), 'device-1');
@@ -1338,7 +1356,7 @@ test('clearing browser connection data removes resume and account keys only', ()
     [GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY, '{}'],
     [CONNECTED_ACCOUNT_STORAGE_KEY, '{}'],
     [SIGNED_OUT_EDITING_PREFERENCE_KEY, '{}'],
-    [`${CLOUD_IMPORT_PREFIX}user-1`, 'true'],
+    [`${LEGACY_CLOUD_IMPORT_PREFIX}user-1`, 'true'],
     [CLOUD_DEVICE_ID_KEY, 'device-1'],
     [CLOUD_TRUSTED_DEVICE_KEY, 'true'],
     ['resumeloomr:theme', 'dark'],
@@ -1551,6 +1569,55 @@ test('builder source uses a per-resume cloud save queue instead of one global sa
   assert.equal(/cloudSaveTimeoutRef|cloudForceSaveRef/.test(source), false);
 });
 
+test('builder prevents active resume id and editor draft body mismatches from autosaving', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const autosaveStart = source.indexOf('if (!hasMounted.current)');
+  const autosaveEnd = source.indexOf('}, [activeResumeId', autosaveStart);
+  const autosaveSource = source.slice(autosaveStart, autosaveEnd);
+  const loadDraftStart = source.indexOf('function loadDraftIntoEditor(');
+  const loadDraftEnd = source.indexOf('function persistActiveDraftImmediately', loadDraftStart);
+  const loadDraftSource = source.slice(loadDraftStart, loadDraftEnd);
+  const persistStart = source.indexOf('function persistActiveDraftImmediately(');
+  const persistEnd = source.indexOf('function commitWorkspace(', persistStart);
+  const persistSource = source.slice(persistStart, persistEnd);
+
+  assert.match(source, /editorDraftResumeIdRef\s*=\s*useRef\(initialWorkspaceState\.workspace\.activeResumeId\)/);
+  assert.match(loadDraftSource, /editorDraftResumeIdRef\.current = resumeId/);
+  assert.match(autosaveSource, /editorDraftResumeIdRef\.current !== activeResumeId/);
+  assert.match(persistSource, /editorDraftResumeIdRef\.current !== resumeId/);
+});
+
+test('builder switches resumes by loading the target local draft before awaiting cloud work', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const switchStart = source.indexOf('async function setActiveResume(');
+  const switchEnd = source.indexOf('async function createResume()', switchStart);
+  const switchSource = source.slice(switchStart, switchEnd);
+  const localLoadIndex = switchSource.indexOf('loadDraftIntoEditor(localNextDraft, { resumeId: nextResumeId })');
+  const previousFlushIndex = switchSource.indexOf('await flushCloudDraft(previousResumeId');
+
+  assert.ok(switchStart > -1);
+  assert.match(switchSource, /const switchRequestId = resumeSwitchRequestRef\.current \+ 1/);
+  assert.ok(localLoadIndex > -1);
+  assert.ok(previousFlushIndex > -1);
+  assert.ok(localLoadIndex < previousFlushIndex);
+  assert.match(switchSource, /activeResumeIdRef\.current !== nextResumeId/);
+  assert.match(switchSource, /hasLocalDirty\(nextResumeId\)/);
+  assert.match(switchSource, /resume: persistedPayload\.resume/);
+});
+
+test('builder cloud saves only update editor save state for the loaded resume', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const flushStart = source.indexOf('async function flushCloudDraft(');
+  const flushEnd = source.indexOf('function markActiveDraftDirty()', flushStart);
+  const flushSource = source.slice(flushStart, flushEnd);
+
+  assert.ok(flushStart > -1);
+  assert.match(flushSource, /draft = null/);
+  assert.match(flushSource, /const draftToSave = draft \|\| getLatestKnownDraftForResume\(resumeId\)/);
+  assert.match(flushSource, /if \(!draftToSave\)/);
+  assert.match(flushSource, /activeResumeIdRef\.current === resumeId && editorDraftResumeIdRef\.current === resumeId/);
+});
+
 test('builder conflict detection is scoped to the active resume dirty state', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const listenerStart = source.indexOf('return subscribeCloudDraft(');
@@ -1562,8 +1629,10 @@ test('builder conflict detection is scoped to the active resume dirty state', ()
 
   assert.ok(listenerStart > -1);
   assert.match(source, /localDirtyResumeIdsRef\s*=\s*useRef\(new Set\(\)\)/);
-  assert.match(listenerSource, /hasLocalDirty\(activeResumeId\)/);
-  assert.doesNotMatch(listenerSource, /if \(localDirtyRef\.current\)/);
+  assert.doesNotMatch(source, /localDirtyRef/);
+  assert.match(source, /const subscribedResumeId = activeResumeId/);
+  assert.match(listenerSource, /activeResumeIdRef\.current !== subscribedResumeId/);
+  assert.match(listenerSource, /hasLocalDirty\(subscribedResumeId\)/);
   assert.match(deleteSource, /clearResumeDirty\(deletedResumeId\)/);
 });
 
@@ -1628,7 +1697,7 @@ test('builder exposes import placeholder and draft replacement actions', () => {
   assert.match(placeholderSource, /mirrorCloudDraftLocally\(nextResumeId, nextWorkspace, nextPersistedDraft\)/);
   assert.doesNotMatch(placeholderSource, /flushCloudDraft\(nextResumeId/);
   assert.doesNotMatch(placeholderSource, /writeCloudDraft\(\s*user\.uid,\s*nextResumeId/);
-  assert.match(placeholderSource, /writeCloudDraft\(\s*user\.uid,\s*previousResumeId,\s*previousWorkspace/);
+  assert.match(placeholderSource, /writeCloudDraft\(\s*user\.uid,\s*previousResumeId,\s*nextWorkspace/);
   assert.match(placeholderSource, /return nextResumeId/);
   assert.match(replaceSource, /normalizeDraftPayload\(importedDraft\)/);
   assert.match(replaceSource, /createDraftPayload\(/);
@@ -1648,8 +1717,8 @@ test('builder reloads the local mirrored workspace when signing out of cloud mod
   assert.match(source, /wasCloudModeRef\s*=\s*useRef\(false\)/);
   assert.match(signOutBranchSource, /if \(wasCloudModeRef\.current\)/);
   assert.match(signOutBranchSource, /const storedWorkspace = loadStoredWorkspace\(\)/);
-  assert.match(signOutBranchSource, /setWorkspace\(storedWorkspace\.workspace\)/);
-  assert.match(signOutBranchSource, /loadDraftIntoEditor\(storedWorkspace\.draft\)/);
+  assert.match(signOutBranchSource, /commitWorkspace\(storedWorkspace\.workspace\)/);
+  assert.match(signOutBranchSource, /loadDraftIntoEditor\(storedWorkspace\.draft, \{ resumeId: storedWorkspace\.activeResumeId \}\)/);
   assert.match(signOutBranchSource, /wasCloudModeRef\.current = false/);
 });
 
@@ -1719,6 +1788,33 @@ test('conflict copy keeps the conflicted resume active instead of activating the
   assert.match(conflictCopySource, /const originalResumeId = conflict\.resumeId \|\| activeResumeId;/);
   assert.match(conflictCopySource, /activeResumeId: originalResumeId,/);
   assert.doesNotMatch(conflictCopySource, /activeResumeId: nextResumeId,/);
+});
+
+test('app gates account switching before cloud bootstrap can import browser resumes', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, '../src/App.jsx'), 'utf8');
+
+  assert.match(source, /preSignInConnectedAccountRef\s*=\s*useRef\(readConnectedAccount\(\)\)/);
+  assert.match(source, /const isAccountSwitchPending = Boolean\(/);
+  assert.match(source, /hasLocalResumeWorkspaceData\(\)/);
+  assert.match(source, /const builderUser = isAccountSwitchPending \? null : auth\.user/);
+  assert.match(source, /user: builderUser,/);
+  assert.match(source, /<AccountSwitchPrompt/);
+});
+
+test('sign out and disconnect do not clear browser resumes when cloud flush fails', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, '../src/App.jsx'), 'utf8');
+  const signOutStart = source.indexOf('async function completeSignOut(');
+  const signOutEnd = source.indexOf('async function handleSignOut()', signOutStart);
+  const signOutSource = source.slice(signOutStart, signOutEnd);
+  const disconnectStart = source.indexOf('async function handleDisconnectBrowser()');
+  const disconnectEnd = source.indexOf('function handleOpenAuthFromSettings()', disconnectStart);
+  const disconnectSource = source.slice(disconnectStart, disconnectEnd);
+
+  assert.ok(signOutStart > -1);
+  assert.match(signOutSource, /const flushedDraft = await flushActiveCloudDraft\(\{ reason: 'signout' \}\)/);
+  assert.ok(signOutSource.indexOf('if (auth.user && !flushedDraft)') < signOutSource.indexOf('clearLocalResumeWorkspaceData()'));
+  assert.match(disconnectSource, /const flushedDraft = await flushActiveCloudDraft\(\{ reason: 'disconnect-browser' \}\)/);
+  assert.ok(disconnectSource.indexOf('if (!flushedDraft)') < disconnectSource.indexOf('clearBrowserResumeConnectionData()'));
 });
 
 test('removeEducation and removeExperience preserve at least one editable entry', () => {
