@@ -328,36 +328,6 @@ html[data-theme="dark"] .brandLogo--dark {
   gap: var(--space-2);
 }
 
-.topbarTemplateSelect {
-  width: 112px;
-  min-width: 112px;
-  max-width: 112px;
-  min-height: 32px;
-  padding: 0 18px 0 8px;
-  font-size: 0.75rem;
-  letter-spacing: -0.01em;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
-    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%),
-    linear-gradient(
-      180deg,
-      var(--color-surface-elevated),
-      var(--color-surface-muted)
-    );
-  background-position:
-    calc(100% - 11px) calc(50% - 1px),
-    calc(100% - 7px) calc(50% - 1px),
-    0 0;
-  background-size:
-    4px 4px,
-    4px 4px,
-    100% 100%;
-  background-repeat: no-repeat;
-}
-
 .button.accountButton {
   min-width: 104px;
   min-height: 34px;
@@ -367,25 +337,6 @@ html[data-theme="dark"] .brandLogo--dark {
   font-size: 0.8125rem;
   font-weight: 800;
   white-space: nowrap;
-}
-
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  align-items: center;
-  justify-content: flex-end;
-}
-
-.toolbarField {
-  display: grid;
-  gap: 4px;
-}
-
-.toolbarLabel {
-  color: var(--color-text-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
 }
 
 .toolbarSelect {
@@ -413,13 +364,6 @@ html[data-theme="dark"] .brandLogo--dark {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: 0 0 0 4px var(--color-accent-soft);
-}
-
-.toolbarActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  justify-content: flex-end;
 }
 
 .noticeBanner {
@@ -733,15 +677,6 @@ html[data-theme="dark"] .brandLogo--dark {
   gap: var(--space-4);
 }
 
-.accountSettingsEyebrow {
-  margin: 0 0 5px;
-  color: var(--color-text-muted);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 .accountSettingsHeader h2 {
   margin: 0;
   font-size: 1.25rem;
@@ -797,27 +732,6 @@ html[data-theme="dark"] .brandLogo--dark {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.accountSettingsNote {
-  padding: var(--space-3);
-  border: 1px solid var(--color-info-border);
-  border-radius: 16px;
-  background: var(--color-info-soft);
-  color: var(--color-text);
-}
-
-.accountSettingsNote strong {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 0.78rem;
-}
-
-.accountSettingsNote p {
-  margin: 0;
-  color: var(--color-text-subtle);
-  font-size: 0.82rem;
-  line-height: 1.4;
 }
 
 .signedOutEditingSettings {
@@ -1298,8 +1212,7 @@ html[data-theme="dark"] .brandLogo--dark {
   gap: var(--space-2);
 }
 
-.settingsRailHeader,
-.editorRailHeader {
+.settingsRailHeader {
   display: grid;
   gap: 0;
   justify-items: center;
@@ -1308,7 +1221,6 @@ html[data-theme="dark"] .brandLogo--dark {
 }
 
 .settingsRailHeader h2,
-.editorRailHeader h2,
 .editorPanelHeader h3 {
   margin: 0;
   font-size: 1rem;
@@ -1600,10 +1512,6 @@ html[data-theme="dark"] .brandLogo--dark {
   }
 }
 
-.editorRailDescription {
-  max-width: 18rem;
-}
-
 .editorStage {
   position: sticky;
   top: var(--workspace-sticky-top);
@@ -1631,14 +1539,12 @@ html[data-theme="dark"] .brandLogo--dark {
     padding: 16px;
   }
 
-  .settingsRailHeader,
-  .editorRailHeader {
+  .settingsRailHeader {
     gap: 0;
     padding: 2px 0 2px;
   }
 
   .settingsRailHeader h2,
-  .editorRailHeader h2,
   .editorPanelHeader h3 {
     font-size: 0.875rem;
     letter-spacing: -0.02em;
@@ -1752,10 +1658,12 @@ html[data-theme="dark"] .brandLogo--dark {
 
 .sectionAddButton {
   width: 100%;
-  min-height: 34px;
-  padding: 0 10px;
+  min-height: 72px;
+  padding: 14px 16px;
   border-radius: calc(var(--radius-lg) - var(--tabs-inset, 4px));
-  font-size: 0.75rem;
+  justify-content: center;
+  font-size: 1.25rem;
+  line-height: 1;
 }
 
 .sectionAddMenu {
@@ -2030,7 +1938,6 @@ html[data-theme="dark"] .brandLogo--dark {
     justify-content: stretch;
   }
 
-  .topbarMeta > .toolbarSelect,
   .topbarMeta > .button {
     flex: 1 1 calc(50% - 8px);
   }

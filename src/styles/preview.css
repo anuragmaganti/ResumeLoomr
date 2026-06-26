@@ -83,15 +83,12 @@
 .skillsDiv,
 .projectsDiv,
 .certificationsDiv,
-.volunteeringDiv,
-.leadershipDiv,
 .languagesDiv,
 .awardsDiv,
 .publicationsDiv,
 .educationSection,
 .experienceSection,
 .previewEntry,
-.previewEntryGroupLabel,
 .skillGroup {
   break-inside: avoid;
   page-break-inside: avoid;
@@ -155,25 +152,9 @@
   margin-top: var(--resume-entry-gap);
 }
 
-.previewEntryGroupLabel {
-  margin-top: var(--resume-entry-gap);
-  color: var(--resume-page-muted);
-  font-size: var(--resume-meta-size);
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  line-height: var(--resume-detail-line-height);
-  text-transform: uppercase;
-}
-
-.previewEntryGroupLabel + .experienceSection {
-  margin-top: max(0px, calc(var(--resume-detail-gap) - 1px));
-}
-
 .educationDiv > .educationSection + .educationSection,
 .experienceDiv > .experienceSection + .experienceSection,
-.projectsDiv > .previewEntry + .previewEntry,
-.volunteeringDiv > .previewEntry + .previewEntry,
-.leadershipDiv > .previewEntry + .previewEntry {
+.projectsDiv > .previewEntry + .previewEntry {
   margin-top: var(--resume-repeated-entry-gap);
 }
 

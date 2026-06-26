@@ -160,13 +160,6 @@ form {
   font-size: 0.6875rem;
 }
 
-.entryDescription {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
 .entryActions {
   display: flex;
   flex-wrap: nowrap;

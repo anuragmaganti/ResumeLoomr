@@ -256,7 +256,7 @@ export default function SectionTabs({
             {canAddSections ? (
                 <div className="sectionAddControl" ref={addControlRef}>
                     <button
-                        className="button buttonSecondary sectionAddButton"
+                        className="tabButton sectionAddButton isLocked"
                         type="button"
                         aria-label={canAddMoreSections ? "Add section" : "Section limit reached"}
                         aria-expanded={isAddMenuOpen}
