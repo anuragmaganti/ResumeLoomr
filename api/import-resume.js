@@ -1,7 +1,6 @@
 import {
   ImportResumeError,
   createImportResponseBody,
-  enforceDailyImportLimit,
   normalizeImportFilePayload,
   parseImportRequestBody,
   parseResumeWithGemini,
@@ -46,11 +45,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const decodedToken = await verifyFirebaseIdToken(req.headers.authorization || '');
+    await verifyFirebaseIdToken(req.headers.authorization || '');
     const body = await parseImportRequestBody(req);
     const file = normalizeImportFilePayload(body);
-
-    await enforceDailyImportLimit(decodedToken.uid);
 
     const parsedImport = await parseResumeWithGemini(file);
     console.info(JSON.stringify({

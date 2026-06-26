@@ -59,7 +59,6 @@ import {
   reorderWorkspaceResumes,
   reorderWorkspaceResumesToMatch,
   sanitizeWorkspaceResumeName,
-  trimText,
   updateActivity,
   updateCollectionEntry,
   updateCollectionTextList,
@@ -79,16 +78,15 @@ import {
 } from '../lib/resume.js';
 import {
   createSavedDraftState,
-  enqueueFullWorkspaceSync,
   initializeLocalWorkspace,
+  mergeLocalAndCloudWorkspaces,
   persistLocalDraftSnapshot,
   persistLocalResumeDelete,
   persistLocalWorkspaceSnapshot,
+  persistLoginMergedWorkspace,
+  readLocalWorkspaceBundle,
   readLocalDraft,
-  readLocalWorkspaceSnapshot,
   readLegacyWorkspaceSnapshot,
-  replaceLocalWorkspaceFromCloud,
-  writeAccountBinding,
 } from '../lib/localWorkspaceDb.js';
 import {
   createResumeSyncSession,
@@ -177,48 +175,6 @@ function withoutWorkspaceResume(workspace, resumeId) {
     resumeIds: nextResumeIds,
     meta: nextMeta,
   });
-}
-
-function draftHasVisibleText(draft) {
-  const normalizedDraft = normalizeDraftPayload(draft);
-  const personal = normalizedDraft.resume.personal || {};
-
-  if (Object.values(personal).some((value) => trimText(value) !== '')) {
-    return true;
-  }
-
-  function valueHasText(value, key = '') {
-    if (key === 'id') {
-      return false;
-    }
-
-    if (typeof value === 'string') {
-      return trimText(value) !== '';
-    }
-
-    if (Array.isArray(value)) {
-      return value.some((item) => valueHasText(item));
-    }
-
-    if (value && typeof value === 'object') {
-      return Object.entries(value).some(([entryKey, entryValue]) => valueHasText(entryValue, entryKey));
-    }
-
-    return false;
-  }
-
-  return Array.isArray(normalizedDraft.resume.sections)
-    && normalizedDraft.resume.sections.some((section) => (
-      trimText(section.title) !== '' &&
-      Array.isArray(section.entries) &&
-      section.entries.some((entry) => valueHasText(entry))
-    ));
-}
-
-function isFreshLocalWorkspace(snapshot) {
-  const workspace = normalizeWorkspaceIndex(snapshot?.workspace);
-
-  return workspace.resumeIds.length <= 1 && !snapshot?.draft?.savedAt && !draftHasVisibleText(snapshot?.draft);
 }
 
 function normalizeCloudSnapshot(payload) {
@@ -391,34 +347,51 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         setSyncState(isOnline() ? 'syncing' : 'offline');
         const idToken = await user.getIdToken();
         await createResumeSyncSession(idToken);
-        await writeAccountBinding(user);
-        const localSnapshot = await readLocalWorkspaceSnapshot();
+        const localBundle = await readLocalWorkspaceBundle();
+        const cloudSnapshot = normalizeCloudSnapshot(await pullCloudWorkspaceSnapshot(idToken));
 
         if (bootstrapRunIdRef.current !== runId) {
           return;
         }
 
-        if (isFreshLocalWorkspace(localSnapshot)) {
-          const cloudSnapshot = normalizeCloudSnapshot(await pullCloudWorkspaceSnapshot(idToken).catch(() => null));
+        const mergeResult = mergeLocalAndCloudWorkspaces({
+          localWorkspace: localBundle.workspace,
+          localDraftsByResumeId: localBundle.draftsByResumeId,
+          cloudWorkspace: cloudSnapshot?.workspace,
+          cloudDraftsByResumeId: cloudSnapshot?.draftsByResumeId,
+          tombstones: localBundle.tombstones,
+          pendingOutbox: localBundle.pendingOutbox,
+        });
 
-          if (cloudSnapshot && bootstrapRunIdRef.current === runId) {
-            await replaceLocalWorkspaceFromCloud({
-              workspace: cloudSnapshot.workspace,
-              draftsByResumeId: cloudSnapshot.draftsByResumeId,
-              accountUid: user.uid,
-            });
-            const nextDraft = cloudSnapshot.draftsByResumeId.get(cloudSnapshot.activeResumeId);
+        await persistLoginMergedWorkspace({
+          mergeResult,
+          account: user,
+          accountUid: user.uid,
+          reason: 'login-merge',
+        });
 
-            if (nextDraft) {
-              skipNextAutosaveRef.current = true;
-              commitWorkspace(cloudSnapshot.workspace, { persist: false });
-              loadDraftIntoEditor(nextDraft, { resumeId: cloudSnapshot.activeResumeId });
-            }
-          }
+        if (bootstrapRunIdRef.current !== runId) {
+          return;
         }
 
-        await enqueueFullWorkspaceSync({ accountUid: user.uid, reason: 'login' });
+        const nextDraft = mergeResult.draftsByResumeId.get(mergeResult.activeResumeId);
+
+        if (nextDraft) {
+          skipNextAutosaveRef.current = true;
+          commitWorkspace(mergeResult.workspace, { persist: false });
+          loadDraftIntoEditor(nextDraft, { resumeId: mergeResult.activeResumeId });
+        }
+
+        const mergeWarning = mergeResult.warnings[0] || '';
+
         await flushCloudQueue({ reason: 'login', immediate: true });
+
+        if (mergeWarning && bootstrapRunIdRef.current === runId) {
+          setNotice({
+            tone: 'warning',
+            message: mergeWarning,
+          });
+        }
       } catch {
         if (bootstrapRunIdRef.current === runId) {
           setSyncState(isOnline() ? 'error' : 'offline');

@@ -1,14 +1,19 @@
 import { openDB } from 'idb';
 import {
   DRAFT_STORAGE_KEY,
+  MAX_WORKSPACE_RESUMES,
   WORKSPACE_INDEX_STORAGE_KEY,
+  createDuplicateResumeName,
   createDraftPayload,
   createFreshWorkspaceDraft,
   createResumeStorageKey,
+  createWorkspaceResumeId,
+  createWorkspaceResumeMeta,
   createWorkspaceFromLegacyDraft,
   normalizeDraftPayload,
   normalizeSectionOrder,
   normalizeWorkspaceIndex,
+  trimText,
 } from './resume.js';
 
 export const LOCAL_WORKSPACE_DB_NAME = 'resumeloomr-local-workspace';
@@ -159,6 +164,145 @@ function normalizeDraftState(draft) {
 function createBlankDraftState() {
   const fresh = createFreshWorkspaceDraft();
   return fresh.draft;
+}
+
+function stableValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(stableValue);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, stableValue(value[key])]),
+    );
+  }
+
+  return value;
+}
+
+function stableJson(value) {
+  return JSON.stringify(stableValue(value));
+}
+
+export function createDraftContentHash(draft) {
+  const normalizedDraft = normalizeDraftState(draft);
+  const content = {
+    resume: normalizedDraft.resume,
+    template: normalizedDraft.template,
+    sectionOrder: normalizedDraft.sectionOrder,
+  };
+  const serialized = stableJson(content);
+  let hash = 2166136261;
+
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
+function draftHasVisibleText(draft) {
+  const normalizedDraft = normalizeDraftPayload(draft);
+  const personal = normalizedDraft.resume.personal || {};
+
+  if (Object.values(personal).some((value) => trimText(value) !== '')) {
+    return true;
+  }
+
+  function valueHasText(value, key = '') {
+    if (key === 'id' || key === 'groupLabel') {
+      return false;
+    }
+
+    if (typeof value === 'string') {
+      return trimText(value) !== '';
+    }
+
+    if (Array.isArray(value)) {
+      return value.some((item) => valueHasText(item));
+    }
+
+    if (value && typeof value === 'object') {
+      return Object.entries(value).some(([entryKey, entryValue]) => valueHasText(entryValue, entryKey));
+    }
+
+    return false;
+  }
+
+  return Array.isArray(normalizedDraft.resume.sections)
+    && normalizedDraft.resume.sections.some((section) => (
+      trimText(section.title) !== ''
+      && Array.isArray(section.entries)
+      && section.entries.some((entry) => valueHasText(entry))
+    ));
+}
+
+function normalizeDraftMap(candidate) {
+  if (candidate instanceof Map) {
+    return new Map(Array.from(candidate.entries()).map(([resumeId, draft]) => [
+      resumeId,
+      normalizeDraftState(draft),
+    ]));
+  }
+
+  if (candidate && typeof candidate === 'object') {
+    return new Map(Object.entries(candidate).map(([resumeId, draft]) => [
+      resumeId,
+      normalizeDraftState(draft),
+    ]));
+  }
+
+  return new Map();
+}
+
+function getDraftTimestamp(draft, meta = {}) {
+  const timestamp = Date.parse(draft?.savedAt || meta?.updatedAt || '');
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function workspaceHasVisibleDrafts(workspace, draftsByResumeId, tombstonedResumeIds = new Set()) {
+  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+
+  return normalizedWorkspace.resumeIds.some((resumeId) => (
+    !tombstonedResumeIds.has(resumeId) && draftHasVisibleText(draftsByResumeId.get(resumeId))
+  ));
+}
+
+function createUniqueResumeId(existingIds) {
+  let resumeId = createWorkspaceResumeId();
+
+  while (existingIds.has(resumeId)) {
+    resumeId = createWorkspaceResumeId();
+  }
+
+  existingIds.add(resumeId);
+  return resumeId;
+}
+
+function createConflictCopyName(baseName, existingNames) {
+  const fallbackName = trimText(baseName) || 'Resume';
+  return createDuplicateResumeName(fallbackName, existingNames);
+}
+
+function normalizeTombstoneList(tombstones, pendingOutbox = []) {
+  const records = [
+    ...(Array.isArray(tombstones) ? tombstones : []),
+    ...(Array.isArray(pendingOutbox) ? pendingOutbox.map((record) => record?.tombstone).filter(Boolean) : []),
+  ];
+
+  return records
+    .filter((record) => trimText(record?.resumeId) !== '')
+    .map((record) => ({
+      ...record,
+      resumeId: trimText(record.resumeId),
+    }));
+}
+
+function workspacesMatch(firstWorkspace, secondWorkspace) {
+  return stableJson(normalizeWorkspaceIndex(firstWorkspace)) === stableJson(normalizeWorkspaceIndex(secondWorkspace));
 }
 
 function writeLocalStorageWorkspace(workspace) {
@@ -506,6 +650,243 @@ export async function readAllLocalDrafts(workspace) {
   return drafts;
 }
 
+export async function readLocalTombstones() {
+  const db = await getLocalWorkspaceDb();
+
+  if (!db) {
+    return [];
+  }
+
+  return db.getAll(TOMBSTONES_STORE);
+}
+
+export async function readLocalWorkspaceBundle() {
+  const snapshot = await readLocalWorkspaceSnapshot();
+  const [
+    draftsByResumeId,
+    tombstones,
+    pendingOutbox,
+  ] = await Promise.all([
+    readAllLocalDrafts(snapshot.workspace),
+    readLocalTombstones(),
+    readPendingOutbox({ limit: 1000 }),
+  ]);
+
+  return {
+    ...snapshot,
+    draftsByResumeId,
+    tombstones,
+    pendingOutbox,
+  };
+}
+
+export function mergeLocalAndCloudWorkspaces({
+  localWorkspace,
+  localDraftsByResumeId,
+  cloudWorkspace = null,
+  cloudDraftsByResumeId = null,
+  tombstones = [],
+  pendingOutbox = [],
+  maxResumes = MAX_WORKSPACE_RESUMES,
+} = {}) {
+  const normalizedLocalWorkspace = normalizeWorkspaceIndex(localWorkspace);
+  const normalizedCloudWorkspace = normalizeWorkspaceIndex(cloudWorkspace);
+  const localDrafts = normalizeDraftMap(localDraftsByResumeId);
+  const cloudDrafts = normalizeDraftMap(cloudDraftsByResumeId);
+  const tombstoneRecords = normalizeTombstoneList(tombstones, pendingOutbox);
+  const tombstonedResumeIds = new Set(tombstoneRecords.map((record) => record.resumeId));
+  const localHasContent = workspaceHasVisibleDrafts(normalizedLocalWorkspace, localDrafts, tombstonedResumeIds);
+  const cloudHasContent = workspaceHasVisibleDrafts(normalizedCloudWorkspace, cloudDrafts, tombstonedResumeIds);
+  const mergedDrafts = new Map();
+  const mergedResumeIds = [];
+  const mergedMeta = {};
+  const existingIds = new Set([...normalizedLocalWorkspace.resumeIds, ...normalizedCloudWorkspace.resumeIds]);
+  const existingNames = [];
+  const upsertResumeIds = new Set();
+  const warnings = [];
+
+  function addResume({ resumeId, draft, meta = {}, origin = 'cloud', forceUpsert = false }) {
+    if (!resumeId || mergedDrafts.has(resumeId) || tombstonedResumeIds.has(resumeId)) {
+      return;
+    }
+
+    const normalizedDraft = normalizeDraftState(draft);
+    const name = trimText(meta.name) || `Resume ${mergedResumeIds.length + 1}`;
+    const updatedAt = normalizedDraft.savedAt || meta.updatedAt || '';
+
+    mergedResumeIds.push(resumeId);
+    mergedDrafts.set(resumeId, normalizedDraft);
+    mergedMeta[resumeId] = createWorkspaceResumeMeta(name, updatedAt);
+    existingNames.push(name);
+
+    if (forceUpsert || origin === 'local' || origin === 'copy') {
+      upsertResumeIds.add(resumeId);
+    }
+  }
+
+  function addConflictCopy({ draft, meta = {} }) {
+    const copyId = createUniqueResumeId(existingIds);
+    const copyName = createConflictCopyName(meta.name || 'Resume', existingNames);
+
+    addResume({
+      resumeId: copyId,
+      draft,
+      meta: {
+        ...meta,
+        name: copyName,
+      },
+      origin: 'copy',
+      forceUpsert: true,
+    });
+  }
+
+  if (!localHasContent && cloudHasContent) {
+    normalizedCloudWorkspace.resumeIds.forEach((resumeId) => {
+      addResume({
+        resumeId,
+        draft: cloudDrafts.get(resumeId),
+        meta: normalizedCloudWorkspace.meta[resumeId],
+        origin: 'cloud',
+      });
+    });
+  } else {
+    normalizedLocalWorkspace.resumeIds.forEach((resumeId) => {
+      if (tombstonedResumeIds.has(resumeId)) {
+        return;
+      }
+
+      const localDraft = localDrafts.get(resumeId);
+      const cloudDraft = cloudDrafts.get(resumeId);
+
+      if (!localDraft) {
+        return;
+      }
+
+      if (!cloudDraft) {
+        addResume({
+          resumeId,
+          draft: localDraft,
+          meta: normalizedLocalWorkspace.meta[resumeId],
+          origin: localHasContent ? 'local' : 'blank-local',
+          forceUpsert: localHasContent,
+        });
+        return;
+      }
+
+      const localHash = createDraftContentHash(localDraft);
+      const cloudHash = createDraftContentHash(cloudDraft);
+
+      if (localHash === cloudHash) {
+        addResume({
+          resumeId,
+          draft: getDraftTimestamp(localDraft, normalizedLocalWorkspace.meta[resumeId]) >= getDraftTimestamp(cloudDraft, normalizedCloudWorkspace.meta[resumeId])
+            ? localDraft
+            : cloudDraft,
+          meta: localHasContent ? normalizedLocalWorkspace.meta[resumeId] : normalizedCloudWorkspace.meta[resumeId],
+          origin: 'cloud',
+        });
+        return;
+      }
+
+      const localIsNewer = getDraftTimestamp(localDraft, normalizedLocalWorkspace.meta[resumeId]) >= getDraftTimestamp(cloudDraft, normalizedCloudWorkspace.meta[resumeId]);
+
+      if (localIsNewer) {
+        addResume({
+          resumeId,
+          draft: localDraft,
+          meta: normalizedLocalWorkspace.meta[resumeId],
+          origin: 'local',
+          forceUpsert: true,
+        });
+        addConflictCopy({
+          draft: cloudDraft,
+          meta: normalizedCloudWorkspace.meta[resumeId],
+        });
+      } else {
+        addResume({
+          resumeId,
+          draft: cloudDraft,
+          meta: normalizedCloudWorkspace.meta[resumeId],
+          origin: 'cloud',
+        });
+        addConflictCopy({
+          draft: localDraft,
+          meta: normalizedLocalWorkspace.meta[resumeId],
+        });
+      }
+    });
+
+    normalizedCloudWorkspace.resumeIds.forEach((resumeId) => {
+      if (mergedDrafts.has(resumeId) || tombstonedResumeIds.has(resumeId)) {
+        return;
+      }
+
+      const cloudDraft = cloudDrafts.get(resumeId);
+
+      if (cloudDraft) {
+        addResume({
+          resumeId,
+          draft: cloudDraft,
+          meta: normalizedCloudWorkspace.meta[resumeId],
+          origin: 'cloud',
+        });
+      }
+    });
+  }
+
+  let nextResumeIds = mergedResumeIds;
+
+  if (nextResumeIds.length > maxResumes) {
+    warnings.push(`Only the first ${maxResumes} resumes were kept in this browser.`);
+    nextResumeIds = nextResumeIds.slice(0, maxResumes);
+  }
+
+  const nextResumeIdSet = new Set(nextResumeIds);
+
+  Array.from(mergedDrafts.keys()).forEach((resumeId) => {
+    if (!nextResumeIdSet.has(resumeId)) {
+      mergedDrafts.delete(resumeId);
+      delete mergedMeta[resumeId];
+      upsertResumeIds.delete(resumeId);
+    }
+  });
+
+  const preferredActiveResumeId = localHasContent
+    ? normalizedLocalWorkspace.activeResumeId
+    : normalizedCloudWorkspace.activeResumeId;
+  const activeResumeId = nextResumeIdSet.has(preferredActiveResumeId)
+    ? preferredActiveResumeId
+    : (nextResumeIds[0] || normalizedLocalWorkspace.activeResumeId || normalizedCloudWorkspace.activeResumeId || '');
+  const workspace = normalizeWorkspaceIndex({
+    activeResumeId,
+    resumeIds: nextResumeIds,
+    meta: mergedMeta,
+  });
+  const cloudHasWorkspace = normalizedCloudWorkspace.resumeIds.length > 0 && cloudDrafts.size > 0;
+  const deleteResumeIds = Array.from(tombstonedResumeIds).filter((resumeId) => (
+    cloudDrafts.has(resumeId) || normalizedCloudWorkspace.resumeIds.includes(resumeId)
+  ));
+  const workspaceNeedsSync = (
+    upsertResumeIds.size > 0
+    || deleteResumeIds.length > 0
+    || (localHasContent && !workspacesMatch(workspace, normalizedCloudWorkspace))
+  ) && (localHasContent || cloudHasWorkspace || upsertResumeIds.size > 0 || deleteResumeIds.length > 0);
+
+  return {
+    workspace,
+    draftsByResumeId: mergedDrafts,
+    activeResumeId: workspace.activeResumeId,
+    syncPlan: {
+      workspaceNeedsSync,
+      upsertResumeIds: Array.from(upsertResumeIds).filter((resumeId) => mergedDrafts.has(resumeId)),
+      deleteResumeIds,
+    },
+    warnings,
+    localHasContent,
+    cloudHasContent,
+  };
+}
+
 export async function persistLocalDraftSnapshot({
   resumeId,
   workspace,
@@ -642,19 +1023,32 @@ export async function persistLocalResumeDelete({
   });
 }
 
-export async function replaceLocalWorkspaceFromCloud({ workspace, draftsByResumeId, accountUid = '' }) {
+export async function persistLoginMergedWorkspace({
+  mergeResult,
+  account = null,
+  accountUid = '',
+  reason = 'login-merge',
+} = {}) {
   return runLocalMutation(async () => {
     const db = await getLocalWorkspaceDb();
-    const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+    const normalizedWorkspace = normalizeWorkspaceIndex(mergeResult?.workspace);
+    const draftsByResumeId = normalizeDraftMap(mergeResult?.draftsByResumeId);
+    const syncPlan = mergeResult?.syncPlan || {};
+    const upsertResumeIds = Array.isArray(syncPlan.upsertResumeIds) ? syncPlan.upsertResumeIds : [];
+    const deleteResumeIds = Array.isArray(syncPlan.deleteResumeIds) ? syncPlan.deleteResumeIds : [];
 
     writeLocalStorageWorkspace(normalizedWorkspace);
-
     draftsByResumeId.forEach((draft, resumeId) => {
-      writeLocalStorageDraft(resumeId, normalizeDraftState(draft));
+      if (normalizedWorkspace.resumeIds.includes(resumeId)) {
+        writeLocalStorageDraft(resumeId, draft);
+      }
     });
 
     if (!db) {
-      return;
+      return {
+        workspace: normalizedWorkspace,
+        draftsByResumeId,
+      };
     }
 
     const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE, ACCOUNT_BINDING_STORE], 'readwrite');
@@ -668,41 +1062,42 @@ export async function replaceLocalWorkspaceFromCloud({ workspace, draftsByResume
       const draft = draftsByResumeId.get(resumeId);
 
       if (draft) {
-        await writeDraftRecord(tx, resumeId, normalizeDraftState(draft));
+        await writeDraftRecord(tx, resumeId, draft, { localRevision: getDraftStateRevision(draft) });
       }
     }
 
-    if (accountUid) {
+    if (syncPlan.workspaceNeedsSync) {
+      await queueWorkspaceSyncInTx(tx, normalizedWorkspace, { accountUid, reason });
+    }
+
+    for (const resumeId of upsertResumeIds) {
+      const draft = draftsByResumeId.get(resumeId);
+
+      if (draft && normalizedWorkspace.resumeIds.includes(resumeId)) {
+        await queueDraftSyncInTx(tx, resumeId, normalizedWorkspace, draft, { accountUid, reason });
+      }
+    }
+
+    for (const resumeId of deleteResumeIds) {
+      await queueDeleteSyncInTx(tx, resumeId, normalizedWorkspace, { accountUid, reason });
+    }
+
+    if (accountUid || account?.uid) {
       await tx.objectStore(ACCOUNT_BINDING_STORE).put({
         id: LOCAL_ACCOUNT_BINDING_ID,
-        uid: accountUid,
+        uid: accountUid || account.uid,
+        email: account?.email || '',
+        displayName: account?.displayName || '',
         updatedAt: new Date().toISOString(),
       });
     }
 
     await tx.done;
-  });
-}
 
-export async function enqueueFullWorkspaceSync({ accountUid = '', reason = 'full-sync' } = {}) {
-  return runLocalMutation(async () => {
-    const snapshot = await readLocalWorkspaceSnapshot();
-    const drafts = await readAllLocalDrafts(snapshot.workspace);
-    const db = await getLocalWorkspaceDb();
-
-    if (!db) {
-      return [];
-    }
-
-    const tx = db.transaction([OUTBOX_STORE], 'readwrite');
-    await queueWorkspaceSyncInTx(tx, snapshot.workspace, { accountUid, reason });
-
-    for (const [resumeId, draft] of drafts) {
-      await queueDraftSyncInTx(tx, resumeId, snapshot.workspace, draft, { accountUid, reason });
-    }
-
-    await tx.done;
-    return Array.from(drafts.keys());
+    return {
+      workspace: normalizedWorkspace,
+      draftsByResumeId,
+    };
   });
 }
 
@@ -802,35 +1197,6 @@ export async function markOutboxStale(operationIds, errorMessage = 'Skipped stal
 
 export async function hasPendingOutbox() {
   return (await readPendingOutbox({ limit: 1 })).length > 0;
-}
-
-export async function readAccountBinding() {
-  const db = await getLocalWorkspaceDb();
-
-  if (!db) {
-    return null;
-  }
-
-  return db.get(ACCOUNT_BINDING_STORE, LOCAL_ACCOUNT_BINDING_ID);
-}
-
-export async function writeAccountBinding(account) {
-  const db = await getLocalWorkspaceDb();
-
-  if (!db || !account?.uid) {
-    return null;
-  }
-
-  const binding = {
-    id: LOCAL_ACCOUNT_BINDING_ID,
-    uid: account.uid,
-    email: account.email || '',
-    displayName: account.displayName || '',
-    updatedAt: new Date().toISOString(),
-  };
-
-  await db.put(ACCOUNT_BINDING_STORE, binding);
-  return binding;
 }
 
 export async function clearLocalWorkspaceDb() {

@@ -1,12 +1,10 @@
 import { GoogleGenAI } from '@google/genai';
 import { createRequire } from 'node:module';
-import { FieldValue } from 'firebase-admin/firestore';
 import mammoth from 'mammoth';
 import { z } from 'zod';
 
 import {
   FirebaseAdminError,
-  getAdminDb,
   verifyFirebaseIdTokenHeader,
 } from './firebaseAdmin.js';
 import {
@@ -17,7 +15,6 @@ import {
 } from '../src/lib/resume.js';
 
 export const IMPORT_FILE_MAX_BYTES = 3 * 1024 * 1024;
-export const DEFAULT_AI_IMPORT_DAILY_LIMIT = 30;
 export const DEFAULT_GEMINI_IMPORT_MODEL = 'gemini-3.1-flash-lite';
 export const DEFAULT_GEMINI_THINKING_LEVEL = 'medium';
 export const DEFAULT_GEMINI_MAX_OUTPUT_TOKENS = 20000;
@@ -264,43 +261,6 @@ export async function verifyFirebaseIdToken(authorizationHeader) {
       code: error instanceof FirebaseAdminError ? error.code : 'import/invalid-token',
     });
   }
-}
-
-function getDailyLimit() {
-  const configuredLimit = Number(process.env.AI_IMPORT_DAILY_LIMIT);
-  return Number.isFinite(configuredLimit) && configuredLimit > 0
-    ? Math.floor(configuredLimit)
-    : DEFAULT_AI_IMPORT_DAILY_LIMIT;
-}
-
-export async function enforceDailyImportLimit(uid, now = new Date()) {
-  const limit = getDailyLimit();
-  const dateKey = now.toISOString().slice(0, 10);
-  const db = getAdminDb();
-  const usageRef = db.doc(`users/${uid}/usage/ai-import-${dateKey}`);
-
-  await db.runTransaction(async (transaction) => {
-    const snapshot = await transaction.get(usageRef);
-    const currentCount = snapshot.exists ? Number(snapshot.data().count || 0) : 0;
-
-    if (currentCount >= limit) {
-      throw new ImportResumeError('You have reached today’s resume import limit. Try again tomorrow.', {
-        statusCode: 429,
-        code: 'import/rate-limited',
-      });
-    }
-
-    transaction.set(
-      usageRef,
-      {
-        count: currentCount + 1,
-        date: dateKey,
-        limit,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
-  });
 }
 
 async function extractDocxText(file) {

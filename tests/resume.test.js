@@ -59,6 +59,8 @@ import {
 } from '../src/lib/firebaseWorkspace.js';
 import {
   LOCAL_WORKSPACE_PRESENT_KEY,
+  createDraftContentHash,
+  mergeLocalAndCloudWorkspaces,
 } from '../src/lib/localWorkspaceDb.js';
 import {
   CONNECTED_ACCOUNT_STORAGE_KEY,
@@ -116,6 +118,30 @@ function createMemoryStorage(initialEntries = []) {
     },
     values,
   };
+}
+
+function createTestDraft(name = '', savedAt = '2026-01-01T00:00:00.000Z') {
+  const resume = createEmptyResume();
+
+  resume.personal.name = name;
+
+  return {
+    resume,
+    template: 'modern',
+    sectionOrder: SECTION_IDS,
+    savedAt,
+  };
+}
+
+function createTestWorkspace(resumeIds, { activeResumeId = resumeIds[0], names = {}, updatedAt = '2026-01-01T00:00:00.000Z' } = {}) {
+  return normalizeWorkspaceIndex({
+    activeResumeId,
+    resumeIds,
+    meta: Object.fromEntries(resumeIds.map((resumeId, index) => [
+      resumeId,
+      createWorkspaceResumeMeta(names[resumeId] || `Resume ${index + 1}`, updatedAt),
+    ])),
+  });
 }
 
 function collectSourceFiles(directory) {
@@ -1142,6 +1168,121 @@ test('workspace resume exact-order reorder preserves active resume and rejects i
   assert.deepEqual(reorderWorkspaceResumesToMatch(workspace, ['resume-3', 'resume-1', 'missing']), workspace);
 });
 
+test('login merge restores cloud when local workspace is blank', () => {
+  const localWorkspace = createTestWorkspace(['local-blank']);
+  const cloudWorkspace = createTestWorkspace(['cloud-1', 'cloud-2'], {
+    activeResumeId: 'cloud-2',
+    names: {
+      'cloud-1': 'Cloud One',
+      'cloud-2': 'Cloud Two',
+    },
+  });
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace,
+    localDraftsByResumeId: new Map([['local-blank', createTestDraft('', null)]]),
+    cloudWorkspace,
+    cloudDraftsByResumeId: new Map([
+      ['cloud-1', createTestDraft('Cloud One', '2026-01-02T00:00:00.000Z')],
+      ['cloud-2', createTestDraft('Cloud Two', '2026-01-03T00:00:00.000Z')],
+    ]),
+  });
+
+  assert.deepEqual(result.workspace.resumeIds, ['cloud-1', 'cloud-2']);
+  assert.equal(result.workspace.activeResumeId, 'cloud-2');
+  assert.deepEqual(result.syncPlan.upsertResumeIds, []);
+  assert.equal(result.syncPlan.workspaceNeedsSync, false);
+});
+
+test('login merge preserves local resume and cloud resumes together', () => {
+  const localWorkspace = createTestWorkspace(['local-1'], {
+    names: { 'local-1': 'Local Scratch' },
+  });
+  const cloudWorkspace = createTestWorkspace(['cloud-1'], {
+    names: { 'cloud-1': 'Cloud Existing' },
+  });
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace,
+    localDraftsByResumeId: new Map([['local-1', createTestDraft('Local Person', '2026-01-04T00:00:00.000Z')]]),
+    cloudWorkspace,
+    cloudDraftsByResumeId: new Map([['cloud-1', createTestDraft('Cloud Person', '2026-01-03T00:00:00.000Z')]]),
+  });
+
+  assert.deepEqual(result.workspace.resumeIds, ['local-1', 'cloud-1']);
+  assert.equal(result.workspace.activeResumeId, 'local-1');
+  assert.deepEqual(result.syncPlan.upsertResumeIds, ['local-1']);
+  assert.equal(result.syncPlan.workspaceNeedsSync, true);
+});
+
+test('login merge uploads local workspace when cloud is empty', () => {
+  const localWorkspace = createTestWorkspace(['local-1']);
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace,
+    localDraftsByResumeId: new Map([['local-1', createTestDraft('Local Person', '2026-01-04T00:00:00.000Z')]]),
+    cloudWorkspace: null,
+    cloudDraftsByResumeId: null,
+  });
+
+  assert.deepEqual(result.workspace.resumeIds, ['local-1']);
+  assert.deepEqual(result.syncPlan.upsertResumeIds, ['local-1']);
+  assert.equal(result.syncPlan.workspaceNeedsSync, true);
+});
+
+test('login merge dedupes matching resume ids with identical content', () => {
+  const matchingDraft = createTestDraft('Same Person', '2026-01-04T00:00:00.000Z');
+  const localWorkspace = createTestWorkspace(['resume-1']);
+  const cloudWorkspace = createTestWorkspace(['resume-1']);
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace,
+    localDraftsByResumeId: new Map([['resume-1', matchingDraft]]),
+    cloudWorkspace,
+    cloudDraftsByResumeId: new Map([['resume-1', { ...matchingDraft, savedAt: '2026-01-03T00:00:00.000Z' }]]),
+  });
+
+  assert.equal(createDraftContentHash(matchingDraft), createDraftContentHash({ ...matchingDraft, savedAt: '2026-01-03T00:00:00.000Z' }));
+  assert.deepEqual(result.workspace.resumeIds, ['resume-1']);
+  assert.deepEqual(result.syncPlan.upsertResumeIds, []);
+});
+
+test('login merge preserves conflicting same-id drafts by creating a copy', () => {
+  const localWorkspace = createTestWorkspace(['resume-1'], {
+    names: { 'resume-1': 'Primary Resume' },
+  });
+  const cloudWorkspace = createTestWorkspace(['resume-1'], {
+    names: { 'resume-1': 'Primary Resume' },
+  });
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace,
+    localDraftsByResumeId: new Map([['resume-1', createTestDraft('Newer Local', '2026-01-04T00:00:00.000Z')]]),
+    cloudWorkspace,
+    cloudDraftsByResumeId: new Map([['resume-1', createTestDraft('Older Cloud', '2026-01-03T00:00:00.000Z')]]),
+  });
+
+  assert.equal(result.workspace.resumeIds.length, 2);
+  assert.equal(result.draftsByResumeId.get('resume-1').resume.personal.name, 'Newer Local');
+  assert.ok(result.workspace.resumeIds.some((resumeId) => resumeId !== 'resume-1'));
+  assert.equal(Array.from(result.draftsByResumeId.values()).some((draft) => draft.resume.personal.name === 'Older Cloud'), true);
+  assert.equal(result.syncPlan.upsertResumeIds.length, 2);
+});
+
+test('login merge tombstones prevent cloud resume resurrection', () => {
+  const localWorkspace = createTestWorkspace(['local-1']);
+  const cloudWorkspace = createTestWorkspace(['cloud-deleted', 'cloud-kept']);
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace,
+    localDraftsByResumeId: new Map([['local-1', createTestDraft('Local Person', '2026-01-04T00:00:00.000Z')]]),
+    cloudWorkspace,
+    cloudDraftsByResumeId: new Map([
+      ['cloud-deleted', createTestDraft('Deleted Person', '2026-01-03T00:00:00.000Z')],
+      ['cloud-kept', createTestDraft('Kept Person', '2026-01-03T00:00:00.000Z')],
+    ]),
+    tombstones: [{ resumeId: 'cloud-deleted', deletedAt: '2026-01-05T00:00:00.000Z' }],
+  });
+
+  assert.deepEqual(result.workspace.resumeIds, ['local-1', 'cloud-kept']);
+  assert.deepEqual(result.syncPlan.deleteResumeIds, ['cloud-deleted']);
+  assert.equal(result.syncPlan.workspaceNeedsSync, true);
+});
+
 test('connected account helpers persist user-facing account context', () => {
   const storage = createMemoryStorage();
   const account = writeConnectedAccount({
@@ -1336,7 +1477,8 @@ test('signed-in resume storage uses the app-owned IndexedDB workspace as local s
   assert.match(localDbSource, /const OUTBOX_STORE = 'outbox'/);
   assert.match(localDbSource, /const DRAFTS_STORE = 'drafts'/);
   assert.match(builderSource, /persistLocalDraftSnapshot/);
-  assert.match(builderSource, /enqueueFullWorkspaceSync/);
+  assert.match(builderSource, /mergeLocalAndCloudWorkspaces/);
+  assert.match(builderSource, /persistLoginMergedWorkspace/);
 });
 
 test('cloud session id is stored in sessionStorage, not shared localStorage', () => {
@@ -1567,6 +1709,21 @@ test('app gates account switching before cloud bootstrap can import browser resu
   assert.match(source, /const builderUser = isAccountSwitchPending \? null : auth\.user/);
   assert.match(source, /user: builderUser,/);
   assert.match(source, /<AccountSwitchPrompt/);
+});
+
+test('signed-in bootstrap always pulls cloud before merge and does not blindly full-sync local', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const bootstrapStart = source.indexOf('async function bootstrapSignedInSync()');
+  const bootstrapEnd = source.indexOf('bootstrapSignedInSync();', bootstrapStart);
+  const bootstrapSource = source.slice(bootstrapStart, bootstrapEnd);
+
+  assert.doesNotMatch(source, /function isFreshLocalWorkspace/);
+  assert.match(bootstrapSource, /const localBundle = await readLocalWorkspaceBundle\(\)/);
+  assert.match(bootstrapSource, /normalizeCloudSnapshot\(await pullCloudWorkspaceSnapshot\(idToken\)\)/);
+  assert.match(bootstrapSource, /mergeLocalAndCloudWorkspaces\(\{/);
+  assert.match(bootstrapSource, /persistLoginMergedWorkspace\(\{/);
+  assert.doesNotMatch(bootstrapSource, /enqueueFullWorkspaceSync/);
+  assert.doesNotMatch(bootstrapSource, /pullCloudWorkspaceSnapshot\(idToken\)\.catch/);
 });
 
 test('sign out and disconnect do not clear browser resumes when cloud flush fails', () => {
