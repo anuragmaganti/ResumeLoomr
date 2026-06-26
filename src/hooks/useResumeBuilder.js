@@ -320,6 +320,21 @@ function getSavedAtTimestamp(value) {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function chooseLatestDraft(localDraft, cloudDraft) {
+  if (!cloudDraft) {
+    return localDraft;
+  }
+
+  if (!localDraft) {
+    return cloudDraft;
+  }
+
+  const localTimestamp = getSavedAtTimestamp(localDraft.savedAt);
+  const cloudTimestamp = getSavedAtTimestamp(cloudDraft.savedAt);
+
+  return localTimestamp >= cloudTimestamp ? localDraft : cloudDraft;
+}
+
 async function resolveReadableCloudWorkspace({ uid, workspace, trustedDevice }) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const orderedResumeIds = [
@@ -661,8 +676,12 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
           return;
         }
 
-        mirrorCloudWorkspaceLocally(remoteWorkspace);
-        setWorkspace(remoteWorkspace);
+        const nextWorkspace = mergeRemoteWorkspaceForCurrentSelection(remoteWorkspace);
+
+        mirrorCloudWorkspaceLocally(nextWorkspace);
+        workspaceRef.current = nextWorkspace;
+        activeResumeIdRef.current = nextWorkspace.activeResumeId;
+        setWorkspace(nextWorkspace);
       },
       () => {
         setSyncState('error');
@@ -978,6 +997,18 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       resumeId,
       workspace: nextWorkspace,
       draft,
+    });
+  }
+
+  function mergeRemoteWorkspaceForCurrentSelection(remoteWorkspace) {
+    const currentActiveResumeId = activeResumeIdRef.current;
+    const nextActiveResumeId = remoteWorkspace.resumeIds.includes(currentActiveResumeId)
+      ? currentActiveResumeId
+      : remoteWorkspace.activeResumeId || remoteWorkspace.resumeIds[0] || '';
+
+    return normalizeWorkspaceIndex({
+      ...remoteWorkspace,
+      activeResumeId: nextActiveResumeId,
     });
   }
 
@@ -1333,12 +1364,20 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       mirrorCloudWorkspaceLocally(nextWorkspace, (resumeId) => (
         resumeId === nextResumeId ? localNextDraft : readStoredResumeDraftOrNull(resumeId)
       ));
-      await flushCloudDraft(previousResumeId, nextWorkspaceBase, {
+      await flushCloudDraft(previousResumeId, nextWorkspace, {
         resume: persistedPayload.resume,
         template: persistedPayload.template,
         sectionOrder: persistedPayload.sectionOrder,
         savedAt: persistedPayload.savedAt,
       });
+
+      if (
+        resumeSwitchRequestRef.current !== switchRequestId ||
+        activeResumeIdRef.current !== nextResumeId
+      ) {
+        return;
+      }
+
       await runCloudMutation(() => (
         writeCloudWorkspace(user.uid, nextWorkspace, trustedDevice, cloudIdentityRef.current)
       ));
@@ -1354,7 +1393,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         return;
       }
 
-      const nextDraft = cloudDraft || localNextDraft;
+      const nextDraft = chooseLatestDraft(localNextDraft, cloudDraft);
       mirrorCloudDraftLocally(nextResumeId, nextWorkspace, nextDraft);
       loadDraftIntoEditor(nextDraft, { resumeId: nextResumeId });
       return;

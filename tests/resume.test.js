@@ -1600,9 +1600,31 @@ test('builder switches resumes by loading the target local draft before awaiting
   assert.ok(localLoadIndex > -1);
   assert.ok(previousFlushIndex > -1);
   assert.ok(localLoadIndex < previousFlushIndex);
+  assert.match(switchSource, /await flushCloudDraft\(previousResumeId, nextWorkspace,/);
   assert.match(switchSource, /activeResumeIdRef\.current !== nextResumeId/);
   assert.match(switchSource, /hasLocalDirty\(nextResumeId\)/);
+  assert.match(switchSource, /writeCloudWorkspace\(user\.uid, nextWorkspace/);
+  assert.match(switchSource, /chooseLatestDraft\(localNextDraft, cloudDraft\)/);
   assert.match(switchSource, /resume: persistedPayload\.resume/);
+});
+
+test('builder preserves local active resume when remote workspace metadata changes', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const mergeStart = source.indexOf('function mergeRemoteWorkspaceForCurrentSelection(');
+  const mergeEnd = source.indexOf('async function mirrorCloudWorkspaceLocallyWithTopDrafts', mergeStart);
+  const mergeSource = source.slice(mergeStart, mergeEnd);
+  const workspaceListenerStart = source.indexOf('return subscribeCloudWorkspace(');
+  const workspaceListenerEnd = source.indexOf('}, [cloudReady, isCloudMode, trustedDevice, user]);', workspaceListenerStart);
+  const workspaceListenerSource = source.slice(workspaceListenerStart, workspaceListenerEnd);
+
+  assert.ok(mergeStart > -1);
+  assert.match(mergeSource, /const currentActiveResumeId = activeResumeIdRef\.current/);
+  assert.match(mergeSource, /remoteWorkspace\.resumeIds\.includes\(currentActiveResumeId\)/);
+  assert.match(mergeSource, /activeResumeId: nextActiveResumeId/);
+  assert.match(workspaceListenerSource, /mergeRemoteWorkspaceForCurrentSelection\(remoteWorkspace\)/);
+  assert.match(workspaceListenerSource, /activeResumeIdRef\.current = nextWorkspace\.activeResumeId/);
+  assert.match(workspaceListenerSource, /setWorkspace\(nextWorkspace\)/);
+  assert.doesNotMatch(workspaceListenerSource, /setWorkspace\(remoteWorkspace\)/);
 });
 
 test('builder cloud saves only update editor save state for the loaded resume', () => {
