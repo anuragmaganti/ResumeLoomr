@@ -120,7 +120,8 @@ function createDraftDoc({ resumeId, workspace, draft, deviceId = 'browser', sess
   const payload = createDraftPayload({
     resume: normalizedDraft.resume,
     template: normalizedDraft.template,
-    sectionOrder: normalizedDraft.sectionOrder,
+    savedAt,
+    localRevision: normalizedDraft.localRevision,
   });
   const name = normalizedWorkspace.meta[resumeId]?.name || 'Resume';
   const doc = {
@@ -128,7 +129,6 @@ function createDraftDoc({ resumeId, workspace, draft, deviceId = 'browser', sess
     resumeId,
     name,
     template: payload.template,
-    sectionOrder: payload.sectionOrder,
     resume: payload.resume,
     savedAt,
     updatedAt: savedAt,
@@ -151,14 +151,13 @@ function createDraftDoc({ resumeId, workspace, draft, deviceId = 'browser', sess
 function cloudDocToDraft(data) {
   const normalizedDraft = normalizeDraftPayload({
     template: data?.template,
-    sectionOrder: data?.sectionOrder,
     resume: data?.resume,
+    savedAt: data?.savedAt || data?.updatedAt || null,
   });
 
   return {
     resume: normalizedDraft.resume,
     template: normalizedDraft.template,
-    sectionOrder: normalizedDraft.sectionOrder,
     savedAt: data?.savedAt || data?.updatedAt || null,
   };
 }

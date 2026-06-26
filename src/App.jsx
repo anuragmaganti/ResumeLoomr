@@ -70,7 +70,6 @@ function App() {
     setTemplate,
     activeTab,
     setActiveTab,
-    sectionOrder,
     moveSection,
     reorderSection,
     reorderSections,
@@ -569,7 +568,6 @@ function App() {
             <EditorPanel
               activeTab={activeTab}
               setActiveTab={setActiveTab}
-              sectionOrder={sectionOrder}
               onMoveSection={moveSection}
               onReorderSection={reorderSection}
               onReorderSections={reorderSections}
@@ -589,7 +587,6 @@ function App() {
           <div className={`workspaceColumn workspaceColumnPreview ${mobileView === 'editor' ? 'isMobileHidden' : ''}`}>
             <ResumePreview
               previewModel={previewModel}
-              sectionOrder={sectionOrder}
               template={template}
               settings={resume.settings}
               panelRef={previewPanelRef}

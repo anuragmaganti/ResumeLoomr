@@ -3,14 +3,7 @@ import { flushSync } from 'react-dom';
 import {
   DEFAULT_TEMPLATE,
   MAX_WORKSPACE_RESUMES,
-  SECTION_IDS,
   TEMPLATE_OPTIONS,
-  addActivity,
-  addCollectionEntry,
-  addCollectionTextListItem,
-  addEducation,
-  addEducationCustomSection,
-  addExperience,
   addRoleBlockActivity,
   addRoleBlockEntry,
   addSectionBlockEducationCustomSection,
@@ -23,12 +16,6 @@ import {
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
   getPreviewModel,
-  moveActivity,
-  moveCollectionEntry,
-  moveCollectionTextListItem,
-  moveEducation,
-  moveEducationCustomSection,
-  moveExperience,
   moveResumeSectionBlock,
   moveRoleBlockActivity,
   moveRoleBlockEntry,
@@ -36,15 +23,8 @@ import {
   moveSectionBlockEducationProgram,
   moveSectionBlockEntry,
   moveSectionBlockTextListItem,
-  moveSectionOrder,
   normalizeDraftPayload,
   normalizeWorkspaceIndex,
-  removeActivity,
-  removeCollectionEntry,
-  removeCollectionTextListItem,
-  removeEducation,
-  removeEducationCustomSection,
-  removeExperience,
   removeResumeSectionBlock,
   removeRoleBlockActivity,
   removeRoleBlockEntry,
@@ -54,17 +34,9 @@ import {
   removeSectionBlockTextListItem,
   reorderResumeSectionBlock,
   reorderResumeSectionBlocksToMatch,
-  reorderSectionOrder,
-  reorderSectionOrderToMatch,
   reorderWorkspaceResumes,
   reorderWorkspaceResumesToMatch,
   sanitizeWorkspaceResumeName,
-  updateActivity,
-  updateCollectionEntry,
-  updateCollectionTextList,
-  updateEducationCustomSection,
-  updateEducationField,
-  updateExperienceField,
   updatePersonalField,
   updateResumeSetting as updateResumeSettingValue,
   updateRoleBlockActivity,
@@ -100,7 +72,6 @@ function createBlankDraftState() {
   return {
     resume: createEmptyResume(),
     template: DEFAULT_TEMPLATE,
-    sectionOrder: SECTION_IDS,
     savedAt: null,
   };
 }
@@ -108,7 +79,7 @@ function createBlankDraftState() {
 function getDraftEditorSectionIds(draft) {
   const blockIds = Array.isArray(draft?.resume?.sections)
     ? draft.resume.sections.map((section) => section.id).filter(Boolean)
-    : SECTION_IDS.filter((sectionId) => sectionId !== 'personal');
+    : [];
 
   return ['personal', ...blockIds];
 }
@@ -193,7 +164,6 @@ function normalizeCloudSnapshot(payload) {
       draftsByResumeId.set(resumeId, {
         resume: normalizedDraft.resume,
         template: normalizedDraft.template,
-        sectionOrder: normalizedDraft.sectionOrder,
         savedAt: draft.savedAt || null,
       });
     }
@@ -215,7 +185,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   const [workspace, setWorkspace] = useState(initialWorkspaceState.workspace);
   const [resume, setResume] = useState(initialWorkspaceState.draft.resume);
   const [template, setTemplate] = useState(initialWorkspaceState.draft.template);
-  const [sectionOrder, setSectionOrder] = useState(initialWorkspaceState.draft.sectionOrder);
   const [activeTab, setActiveTab] = useState('personal');
   const [mobileView, setMobileView] = useState('editor');
   const [touched, setTouched] = useState({});
@@ -255,11 +224,10 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     currentDraftRef.current = {
       resume,
       template,
-      sectionOrder,
       savedAt,
       localRevision,
     };
-  }, [resume, savedAt, sectionOrder, template]);
+  }, [resume, savedAt, template]);
 
   useEffect(() => {
     workspaceRef.current = workspace;
@@ -327,7 +295,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     return () => window.clearTimeout(timeoutId);
   // Autosave should track editor content only; persistence helpers read current refs.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeResumeId, localReady, resume, sectionOrder, template]);
+  }, [activeResumeId, localReady, resume, template]);
 
   useEffect(() => {
     if (!authReady || !localReady) {
@@ -467,7 +435,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const draftState = {
       resume: normalizedDraft.resume,
       template: normalizedDraft.template,
-      sectionOrder: normalizedDraft.sectionOrder,
       savedAt: nextDraft?.savedAt || null,
       localRevision: nextDraft?.localRevision || normalizedDraft.localRevision || '',
     };
@@ -479,7 +446,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     editorDraftRevisionRef.current = draftState.localRevision || '';
     setResume(draftState.resume);
     setTemplate(draftState.template);
-    setSectionOrder(draftState.sectionOrder);
     setSavedAt(draftState.savedAt);
     setSaveState(draftState.savedAt ? 'saved' : 'idle');
     resetValidationState();
@@ -687,66 +653,17 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
 
   function moveSection(sectionId, direction) {
     setSaveState('saving');
-    if (resume.sections?.some((section) => section.id === sectionId)) {
-      updateResume((currentResume) => moveResumeSectionBlock(currentResume, sectionId, direction));
-      return;
-    }
-
-    setSectionOrder((currentOrder) => {
-      const nextOrder = moveSectionOrder(currentOrder, sectionId, direction);
-
-      currentDraftRef.current = {
-        ...currentDraftRef.current,
-        sectionOrder: nextOrder,
-      };
-
-      return nextOrder;
-    });
+    updateResume((currentResume) => moveResumeSectionBlock(currentResume, sectionId, direction));
   }
 
   function reorderSection(sectionId, targetSectionId, placement) {
     setSaveState('saving');
-    if (
-      resume.sections?.some((section) => section.id === sectionId) &&
-      resume.sections?.some((section) => section.id === targetSectionId)
-    ) {
-      updateResume((currentResume) => reorderResumeSectionBlock(currentResume, sectionId, targetSectionId, placement));
-      return;
-    }
-
-    setSectionOrder((currentOrder) => {
-      const nextOrder = reorderSectionOrder(currentOrder, sectionId, targetSectionId, placement);
-
-      currentDraftRef.current = {
-        ...currentDraftRef.current,
-        sectionOrder: nextOrder,
-      };
-
-      return nextOrder;
-    });
+    updateResume((currentResume) => reorderResumeSectionBlock(currentResume, sectionId, targetSectionId, placement));
   }
 
   function reorderSections(nextSectionIds) {
     setSaveState('saving');
-    const blockSectionIds = Array.isArray(resume.sections)
-      ? resume.sections.map((section) => section.id)
-      : [];
-
-    if (blockSectionIds.length > 0) {
-      updateResume((currentResume) => reorderResumeSectionBlocksToMatch(currentResume, nextSectionIds));
-      return;
-    }
-
-    setSectionOrder((currentOrder) => {
-      const nextOrder = reorderSectionOrderToMatch(currentOrder, nextSectionIds);
-
-      currentDraftRef.current = {
-        ...currentDraftRef.current,
-        sectionOrder: nextOrder,
-      };
-
-      return nextOrder;
-    });
+    updateResume((currentResume) => reorderResumeSectionBlocksToMatch(currentResume, nextSectionIds));
   }
 
   function markTouched(path) {
@@ -892,7 +809,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const nextDraft = createSavedDraftState({
       resume: normalizedDraft.resume,
       template: normalizedDraft.template,
-      sectionOrder: normalizedDraft.sectionOrder,
     });
     const existingName = currentWorkspace.meta[resumeId]?.name || 'Imported resume';
     const nextName = sanitizeWorkspaceResumeName(name, existingName);
@@ -1061,54 +977,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     removeResumeSection(sectionId) {
       updateResume((currentResume) => removeResumeSectionBlock(currentResume, sectionId));
     },
-    updateEducationField(entryId, field, value) {
-      updateResume((currentResume) => updateEducationField(currentResume, entryId, field, value));
-    },
-    addEducation() {
-      updateResume((currentResume) => addEducation(currentResume));
-    },
-    moveEducation(entryId, direction) {
-      updateResume((currentResume) => moveEducation(currentResume, entryId, direction));
-    },
-    removeEducation(entryId) {
-      updateResume((currentResume) => removeEducation(currentResume, entryId));
-    },
-    updateEducationCustomSection(entryId, sectionIndex, field, value) {
-      updateResume((currentResume) => updateEducationCustomSection(currentResume, entryId, sectionIndex, field, value));
-    },
-    addEducationCustomSection(entryId) {
-      updateResume((currentResume) => addEducationCustomSection(currentResume, entryId));
-    },
-    moveEducationCustomSection(entryId, sectionIndex, direction) {
-      updateResume((currentResume) => moveEducationCustomSection(currentResume, entryId, sectionIndex, direction));
-    },
-    removeEducationCustomSection(entryId, sectionIndex) {
-      updateResume((currentResume) => removeEducationCustomSection(currentResume, entryId, sectionIndex));
-    },
-    updateExperienceField(entryId, field, value) {
-      updateResume((currentResume) => updateExperienceField(currentResume, entryId, field, value));
-    },
-    addExperience() {
-      updateResume((currentResume) => addExperience(currentResume));
-    },
-    moveExperience(entryId, direction) {
-      updateResume((currentResume) => moveExperience(currentResume, entryId, direction));
-    },
-    removeExperience(entryId) {
-      updateResume((currentResume) => removeExperience(currentResume, entryId));
-    },
-    updateActivity(entryId, activityIndex, value) {
-      updateResume((currentResume) => updateActivity(currentResume, entryId, activityIndex, value));
-    },
-    addActivity(entryId) {
-      updateResume((currentResume) => addActivity(currentResume, entryId));
-    },
-    moveActivity(entryId, activityIndex, direction) {
-      updateResume((currentResume) => moveActivity(currentResume, entryId, activityIndex, direction));
-    },
-    removeActivity(entryId, activityIndex) {
-      updateResume((currentResume) => removeActivity(currentResume, entryId, activityIndex));
-    },
     updateRoleBlockEntry(sectionId, entryId, field, value) {
       updateResume((currentResume) => updateRoleBlockEntry(currentResume, sectionId, entryId, field, value));
     },
@@ -1181,30 +1049,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     removeSectionBlockEducationProgram(sectionId, entryId, programIndex) {
       updateResume((currentResume) => removeSectionBlockEducationProgram(currentResume, sectionId, entryId, programIndex));
     },
-    updateCollectionEntry(sectionKey, entryId, field, value) {
-      updateResume((currentResume) => updateCollectionEntry(currentResume, sectionKey, entryId, field, value));
-    },
-    addCollectionEntry(sectionKey) {
-      updateResume((currentResume) => addCollectionEntry(currentResume, sectionKey));
-    },
-    moveCollectionEntry(sectionKey, entryId, direction) {
-      updateResume((currentResume) => moveCollectionEntry(currentResume, sectionKey, entryId, direction));
-    },
-    removeCollectionEntry(sectionKey, entryId) {
-      updateResume((currentResume) => removeCollectionEntry(currentResume, sectionKey, entryId));
-    },
-    updateCollectionTextList(sectionKey, entryId, field, itemIndex, value) {
-      updateResume((currentResume) => updateCollectionTextList(currentResume, sectionKey, entryId, field, itemIndex, value));
-    },
-    addCollectionTextListItem(sectionKey, entryId, field) {
-      updateResume((currentResume) => addCollectionTextListItem(currentResume, sectionKey, entryId, field));
-    },
-    moveCollectionTextListItem(sectionKey, entryId, field, itemIndex, direction) {
-      updateResume((currentResume) => moveCollectionTextListItem(currentResume, sectionKey, entryId, field, itemIndex, direction));
-    },
-    removeCollectionTextListItem(sectionKey, entryId, field, itemIndex) {
-      updateResume((currentResume) => removeCollectionTextListItem(currentResume, sectionKey, entryId, field, itemIndex));
-    },
   };
 
   return {
@@ -1213,7 +1057,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     setTemplate: changeTemplate,
     activeTab,
     setActiveTab,
-    sectionOrder,
     moveSection,
     reorderSection,
     reorderSections,

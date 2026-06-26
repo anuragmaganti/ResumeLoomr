@@ -34,7 +34,7 @@ export default function SignedOutEditingPrompt({
         </div>
 
         <p className="authIntro">
-          Choose Yes to keep local copies of the first 10 resumes in your resume rail on this browser so you can keep editing without signing in.
+          Choose Yes to keep local copies of your resumes on this browser so you can keep editing without signing in.
         </p>
 
         <div className="signedOutPromptNote">

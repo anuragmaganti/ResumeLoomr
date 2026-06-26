@@ -1,6 +1,5 @@
 import { openDB } from 'idb';
 import {
-  DRAFT_STORAGE_KEY,
   MAX_WORKSPACE_RESUMES,
   WORKSPACE_INDEX_STORAGE_KEY,
   createDuplicateResumeName,
@@ -9,9 +8,7 @@ import {
   createResumeStorageKey,
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
-  createWorkspaceFromLegacyDraft,
   normalizeDraftPayload,
-  normalizeSectionOrder,
   normalizeWorkspaceIndex,
   trimText,
 } from './resume.js';
@@ -140,10 +137,9 @@ function clearLocalWorkspacePresent() {
 
 function serializeDraftState(draft) {
   return {
-    version: 2,
+    version: 3,
     savedAt: draft?.savedAt ?? null,
     template: draft?.template,
-    sectionOrder: normalizeSectionOrder(draft?.sectionOrder),
     resume: draft?.resume,
     localRevision: draft?.localRevision || '',
   };
@@ -155,7 +151,6 @@ function normalizeDraftState(draft) {
   return {
     resume: normalizedDraft.resume,
     template: normalizedDraft.template,
-    sectionOrder: normalizedDraft.sectionOrder,
     savedAt: draft?.savedAt || null,
     localRevision: draft?.localRevision || '',
   };
@@ -191,7 +186,6 @@ export function createDraftContentHash(draft) {
   const content = {
     resume: normalizedDraft.resume,
     template: normalizedDraft.template,
-    sectionOrder: normalizedDraft.sectionOrder,
   };
   const serialized = stableJson(content);
   let hash = 2166136261;
@@ -343,12 +337,13 @@ function readLegacyDraftFromLocalStorage(resumeId) {
 
 function readLegacyWorkspaceFromLocalStorage() {
   const storage = getStorage();
+  const fresh = {
+    ...createFreshWorkspaceDraft(),
+    source: 'fresh',
+  };
 
   if (!storage) {
-    return {
-      ...createFreshWorkspaceDraft(),
-      source: 'fresh',
-    };
+    return fresh;
   }
 
   const rawWorkspace = safeJsonParse(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY));
@@ -369,19 +364,7 @@ function readLegacyWorkspaceFromLocalStorage() {
     }
   }
 
-  const rawLegacyDraft = safeJsonParse(storage.getItem(DRAFT_STORAGE_KEY));
-
-  if (rawLegacyDraft) {
-    return {
-      ...createWorkspaceFromLegacyDraft(rawLegacyDraft),
-      source: 'legacy-draft',
-    };
-  }
-
-  return {
-    ...createFreshWorkspaceDraft(),
-    source: 'fresh',
-  };
+  return fresh;
 }
 
 export function readLegacyWorkspaceSnapshot() {
@@ -1214,13 +1197,13 @@ export async function clearLocalWorkspaceDb() {
   clearLocalWorkspacePresent();
 }
 
-export function createSavedDraftState({ resume, template, sectionOrder }) {
-  const payload = createDraftPayload({ resume, template, sectionOrder });
+export function createSavedDraftState({ resume, template, savedAt = new Date().toISOString(), localRevision = '' }) {
+  const payload = createDraftPayload({ resume, template, savedAt, localRevision });
 
   return {
     resume: payload.resume,
     template: payload.template,
-    sectionOrder: payload.sectionOrder,
     savedAt: payload.savedAt,
+    localRevision: payload.localRevision,
   };
 }

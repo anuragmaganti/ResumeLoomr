@@ -37,14 +37,24 @@ function createWorkspaceDoc(overrides = {}) {
 
 function createResumeDoc(overrides = {}) {
   const resumeId = overrides.resumeId || 'resume-1';
-
-  return {
+  const baseDoc = {
     schemaVersion: 1,
     resumeId,
-    name: overrides.name || 'Resume 1',
+    name: 'Resume 1',
     template: 'modern',
-    sectionOrder: ['personal', 'education', 'experience'],
     resume: {
+      personal: {
+        name: 'Ada Lovelace',
+        headline: '',
+        location: '',
+        phone: '',
+        email: '',
+        linkedinUrl: '',
+        portfolioUrl: '',
+        githubUrl: '',
+        customField: '',
+        aboutMe: '',
+      },
       settings: {
         textSize: 0,
         horizontalMargins: 0,
@@ -55,19 +65,14 @@ function createResumeDoc(overrides = {}) {
         headingSize: 0,
         nameSize: 0,
       },
-      personal: {
-        name: 'Ada Lovelace',
-      },
-      education: [],
-      experience: [],
-      skills: [],
-      projects: [],
-      certifications: [],
-      volunteering: [],
-      leadership: [],
-      languages: [],
-      awards: [],
-      publications: [],
+      sections: [
+        {
+          id: 'experience',
+          kind: 'roles',
+          title: 'Experience',
+          entries: [],
+        },
+      ],
     },
     savedAt: '2026-06-23T12:00:00.000Z',
     updatedAt: '2026-06-23T12:00:00.000Z',
@@ -75,7 +80,13 @@ function createResumeDoc(overrides = {}) {
     deviceId: 'device-1',
     sessionId: 'session-1',
     deletedAt: null,
+  };
+
+  return {
+    ...baseDoc,
     ...overrides,
+    name: overrides.name || baseDoc.name,
+    resume: overrides.resume || baseDoc.resume,
   };
 }
 
@@ -136,7 +147,22 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
     await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
       resume: {
         ...createResumeDoc().resume,
-        projects: Array.from({ length: 101 }, () => ({})),
+        sections: [],
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set({
+      ...createResumeDoc(),
+      ['section' + 'Order']: ['personal', 'experience'],
+    }));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        sections: Array.from({ length: 33 }, (_, index) => ({
+          id: `section-${index}`,
+          kind: 'custom',
+          title: `Section ${index}`,
+          entries: [],
+        })),
       },
     })));
   } finally {

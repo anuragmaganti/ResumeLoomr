@@ -5,47 +5,24 @@ import FormFieldError from "./formFieldError";
 import ReorderableTextList from "./reorderableTextList";
 import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function ProjectsForm({ projects = [], section, actions, getFieldError, markTouched, editorTarget }) {
-  const entries = section?.entries || projects;
-  const sectionId = section?.id || '';
-  const isBlockEditor = Boolean(sectionId);
-  const pathFor = (entryId, field) => (
-    isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `projects.${entryId}.${field}`
-  );
+export default function ProjectsForm({ section, actions, getFieldError, markTouched, editorTarget }) {
+  const entries = section.entries || [];
+  const sectionId = section.id;
+  const pathFor = (entryId, field) => `sections.${sectionId}.${entryId}.${field}`;
   const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
-  const updateEntry = (entryId, field, value) => (
-    isBlockEditor
-      ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
-      : actions.updateCollectionEntry('projects', entryId, field, value)
-  );
-  const addEntry = () => (
-    isBlockEditor ? actions.addSectionBlockEntry(sectionId) : actions.addCollectionEntry('projects')
-  );
-  const moveEntry = (entryId, direction) => (
-    isBlockEditor ? actions.moveSectionBlockEntry(sectionId, entryId, direction) : actions.moveCollectionEntry('projects', entryId, direction)
-  );
-  const removeEntry = (entryId) => (
-    isBlockEditor ? actions.removeSectionBlockEntry(sectionId, entryId) : actions.removeCollectionEntry('projects', entryId)
-  );
+  const updateEntry = (entryId, field, value) => actions.updateSectionBlockEntry(sectionId, entryId, field, value);
+  const addEntry = () => actions.addSectionBlockEntry(sectionId);
+  const moveEntry = (entryId, direction) => actions.moveSectionBlockEntry(sectionId, entryId, direction);
+  const removeEntry = (entryId) => actions.removeSectionBlockEntry(sectionId, entryId);
   const updateTextList = (entryId, field, itemIndex, value) => (
-    isBlockEditor
-      ? actions.updateSectionBlockTextList(sectionId, entryId, field, itemIndex, value)
-      : actions.updateCollectionTextList('projects', entryId, field, itemIndex, value)
+    actions.updateSectionBlockTextList(sectionId, entryId, field, itemIndex, value)
   );
-  const addTextListItem = (entryId, field) => (
-    isBlockEditor
-      ? actions.addSectionBlockTextListItem(sectionId, entryId, field)
-      : actions.addCollectionTextListItem('projects', entryId, field)
-  );
+  const addTextListItem = (entryId, field) => actions.addSectionBlockTextListItem(sectionId, entryId, field);
   const moveTextListItem = (entryId, field, itemIndex, direction) => (
-    isBlockEditor
-      ? actions.moveSectionBlockTextListItem(sectionId, entryId, field, itemIndex, direction)
-      : actions.moveCollectionTextListItem('projects', entryId, field, itemIndex, direction)
+    actions.moveSectionBlockTextListItem(sectionId, entryId, field, itemIndex, direction)
   );
   const removeTextListItem = (entryId, field, itemIndex) => (
-    isBlockEditor
-      ? actions.removeSectionBlockTextListItem(sectionId, entryId, field, itemIndex)
-      : actions.removeCollectionTextListItem('projects', entryId, field, itemIndex)
+    actions.removeSectionBlockTextListItem(sectionId, entryId, field, itemIndex)
   );
 
   return (

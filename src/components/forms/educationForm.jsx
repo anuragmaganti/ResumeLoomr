@@ -6,48 +6,25 @@ import EntryActionMenu from "./entryActionMenu";
 import FormFieldError from "./formFieldError";
 import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function EducationForm({ education = [], section, actions, getFieldError, markTouched, editorTarget }) {
-    const entries = section?.entries || education;
-    const sectionId = section?.id || '';
-    const isBlockEditor = Boolean(sectionId);
+export default function EducationForm({ section, actions, getFieldError, markTouched, editorTarget }) {
+    const entries = section.entries || [];
+    const sectionId = section.id;
 
-    const pathFor = (entryId, field) => (
-        isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `education.${entryId}.${field}`
-    );
+    const pathFor = (entryId, field) => `sections.${sectionId}.${entryId}.${field}`;
     const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
-    const updateField = (entryId, field, value) => (
-        isBlockEditor
-            ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
-            : actions.updateEducationField(entryId, field, value)
-    );
-    const addEntry = () => (
-        isBlockEditor ? actions.addSectionBlockEntry(sectionId) : actions.addEducation()
-    );
-    const moveEntry = (entryId, direction) => (
-        isBlockEditor ? actions.moveSectionBlockEntry(sectionId, entryId, direction) : actions.moveEducation(entryId, direction)
-    );
-    const removeEntry = (entryId) => (
-        isBlockEditor ? actions.removeSectionBlockEntry(sectionId, entryId) : actions.removeEducation(entryId)
-    );
+    const updateField = (entryId, field, value) => actions.updateSectionBlockEntry(sectionId, entryId, field, value);
+    const addEntry = () => actions.addSectionBlockEntry(sectionId);
+    const moveEntry = (entryId, direction) => actions.moveSectionBlockEntry(sectionId, entryId, direction);
+    const removeEntry = (entryId) => actions.removeSectionBlockEntry(sectionId, entryId);
     const updateCustomSection = (entryId, sectionIndex, field, value) => (
-        isBlockEditor
-            ? actions.updateSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, field, value)
-            : actions.updateEducationCustomSection(entryId, sectionIndex, field, value)
+        actions.updateSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, field, value)
     );
-    const addCustomSection = (entryId) => (
-        isBlockEditor
-            ? actions.addSectionBlockEducationCustomSection(sectionId, entryId)
-            : actions.addEducationCustomSection(entryId)
-    );
+    const addCustomSection = (entryId) => actions.addSectionBlockEducationCustomSection(sectionId, entryId);
     const moveCustomSection = (entryId, sectionIndex, direction) => (
-        isBlockEditor
-            ? actions.moveSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, direction)
-            : actions.moveEducationCustomSection(entryId, sectionIndex, direction)
+        actions.moveSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, direction)
     );
     const removeCustomSection = (entryId, sectionIndex) => (
-        isBlockEditor
-            ? actions.removeSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex)
-            : actions.removeEducationCustomSection(entryId, sectionIndex)
+        actions.removeSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex)
     );
 
     return (
@@ -55,7 +32,7 @@ export default function EducationForm({ education = [], section, actions, getFie
             {entries.map((entry, index) => {
                 const customSections = ensureEducationCustomSections(entry.customSections);
                 const programs = Array.isArray(entry.programs) ? entry.programs : [];
-                const usesPrograms = isBlockEditor && programs.length > 0;
+                const usesPrograms = programs.length > 0;
 
                 return (
                 <CollapsibleEntryCard

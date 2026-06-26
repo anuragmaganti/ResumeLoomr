@@ -4,7 +4,6 @@ import PersonalForm from "./forms/personalForm";
 import SectionBlockForm from "./forms/sectionBlockForm";
 import EntryActionMenu from "./forms/entryActionMenu";
 import EditorSettingsRail from "./editorSettingsRail";
-import { resolveSectionTitle } from "../lib/resume";
 import {
     createEditorTargetAttributes,
     sectionTitleEditorPath
@@ -101,7 +100,7 @@ export default function EditorPanel({
     const activeBlock = resumeBlocks.find((section) => section.id === activeTab);
     const currentSectionLabel = activeTab === "personal"
         ? sectionMeta.personal.label
-        : activeBlock?.title || resolveSectionTitle(resume.sectionTitles, activeTab);
+        : activeBlock?.title || "Section";
     const sections = [
         {
             id: "personal",
@@ -111,7 +110,7 @@ export default function EditorPanel({
         ...resumeBlocks.map((section) => ({
             id: section.id,
             navLabel: section.title,
-            navHint: sectionMeta[section.legacySectionId]?.navHint || sectionMeta[section.kind]?.navHint || (
+            navHint: sectionMeta[section.id]?.navHint || sectionMeta[section.kind]?.navHint || (
                 section.kind === "roles" ? "Roles and highlights" : "Section details"
             )
         }))
@@ -223,8 +222,8 @@ export default function EditorPanel({
                         </div>
 
                         <div className="editorPanelMeta">
-                            <div className="sectionOrderControl">
-                                <span className="sectionOrderLabel">Section order</span>
+                            <div className="sectionPlacementControl">
+                                <span className="sectionPlacementLabel">Section order</span>
                                 <EntryActionMenu
                                     menuLabel={`${currentSectionLabel} section order actions`}
                                     moveUpLabel={`Move ${currentSectionLabel} up in the resume order`}

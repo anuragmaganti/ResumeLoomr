@@ -22,25 +22,6 @@ service cloud.firestore {
       return value in ['modern', 'executive', 'compact'];
     }
 
-    function isValidSectionOrder(sectionOrder) {
-      return sectionOrder is list &&
-        sectionOrder.size() >= 1 &&
-        sectionOrder.size() <= 11 &&
-        sectionOrder.hasOnly([
-          'personal',
-          'education',
-          'experience',
-          'skills',
-          'projects',
-          'certifications',
-          'volunteering',
-          'leadership',
-          'languages',
-          'awards',
-          'publications'
-        ]);
-    }
-
     function isValidSetting(value) {
       return value is int && value >= -5 && value <= 5;
     }
@@ -73,24 +54,44 @@ service cloud.firestore {
         meta.keys().hasOnly(resumeIds);
     }
 
-    function isValidResumeCollection(value) {
-      return value is list && value.size() <= 100;
+    function isValidPersonal(personal) {
+      return personal is map &&
+        personal.keys().hasOnly([
+          'name',
+          'headline',
+          'location',
+          'phone',
+          'email',
+          'linkedinUrl',
+          'portfolioUrl',
+          'githubUrl',
+          'customField',
+          'aboutMe'
+        ]) &&
+        isString(personal.name) &&
+        isString(personal.headline) &&
+        isString(personal.location) &&
+        isString(personal.phone) &&
+        isString(personal.email) &&
+        isString(personal.linkedinUrl) &&
+        isString(personal.portfolioUrl) &&
+        isString(personal.githubUrl) &&
+        isString(personal.customField) &&
+        isString(personal.aboutMe);
+    }
+
+    function isValidSections(sections) {
+      return sections is list &&
+        sections.size() > 0 &&
+        sections.size() <= 32;
     }
 
     function isValidResumeShape(resume) {
       return resume is map &&
-        resume.settings is map &&
+        resume.keys().hasOnly(['personal', 'settings', 'sections']) &&
+        isValidPersonal(resume.personal) &&
         isValidSettings(resume.settings) &&
-        isValidResumeCollection(resume.education) &&
-        isValidResumeCollection(resume.experience) &&
-        isValidResumeCollection(resume.skills) &&
-        isValidResumeCollection(resume.projects) &&
-        isValidResumeCollection(resume.certifications) &&
-        isValidResumeCollection(resume.volunteering) &&
-        isValidResumeCollection(resume.leadership) &&
-        isValidResumeCollection(resume.languages) &&
-        isValidResumeCollection(resume.awards) &&
-        isValidResumeCollection(resume.publications);
+        isValidSections(resume.sections);
     }
 
     function isValidWorkspace(data) {
@@ -123,7 +124,6 @@ service cloud.firestore {
         'resumeId',
         'name',
         'template',
-        'sectionOrder',
         'resume',
         'savedAt',
         'updatedAt',
@@ -138,7 +138,6 @@ service cloud.firestore {
       data.name.size() > 0 &&
       data.name.size() <= 25 &&
       isValidTemplate(data.template) &&
-      isValidSectionOrder(data.sectionOrder) &&
       isValidResumeShape(data.resume) &&
       isString(data.savedAt) &&
       isString(data.updatedAt) &&

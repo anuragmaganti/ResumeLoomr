@@ -4,28 +4,15 @@ import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function AwardsForm({ awards = [], section, actions, getFieldError, markTouched, editorTarget }) {
-  const entries = section?.entries || awards;
-  const sectionId = section?.id || '';
-  const isBlockEditor = Boolean(sectionId);
-  const pathFor = (entryId, field) => (
-    isBlockEditor ? `sections.${sectionId}.${entryId}.${field}` : `awards.${entryId}.${field}`
-  );
+export default function AwardsForm({ section, actions, getFieldError, markTouched, editorTarget }) {
+  const entries = section.entries || [];
+  const sectionId = section.id;
+  const pathFor = (entryId, field) => `sections.${sectionId}.${entryId}.${field}`;
   const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
-  const updateEntry = (entryId, field, value) => (
-    isBlockEditor
-      ? actions.updateSectionBlockEntry(sectionId, entryId, field, value)
-      : actions.updateCollectionEntry('awards', entryId, field, value)
-  );
-  const addEntry = () => (
-    isBlockEditor ? actions.addSectionBlockEntry(sectionId) : actions.addCollectionEntry('awards')
-  );
-  const moveEntry = (entryId, direction) => (
-    isBlockEditor ? actions.moveSectionBlockEntry(sectionId, entryId, direction) : actions.moveCollectionEntry('awards', entryId, direction)
-  );
-  const removeEntry = (entryId) => (
-    isBlockEditor ? actions.removeSectionBlockEntry(sectionId, entryId) : actions.removeCollectionEntry('awards', entryId)
-  );
+  const updateEntry = (entryId, field, value) => actions.updateSectionBlockEntry(sectionId, entryId, field, value);
+  const addEntry = () => actions.addSectionBlockEntry(sectionId);
+  const moveEntry = (entryId, direction) => actions.moveSectionBlockEntry(sectionId, entryId, direction);
+  const removeEntry = (entryId) => actions.removeSectionBlockEntry(sectionId, entryId);
 
   return (
     <div className="formStack">
