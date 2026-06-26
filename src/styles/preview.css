@@ -197,6 +197,12 @@
   min-width: 0;
 }
 
+.skillGroup {
+  color: var(--resume-page-muted);
+  font-size: var(--resume-detail-size);
+  line-height: var(--resume-detail-line-height);
+}
+
 .educationDegreeRow {
   display: flex;
   flex-wrap: wrap;
@@ -279,6 +285,11 @@
   line-height: var(--resume-detail-line-height);
 }
 
+.skillGroupItems {
+  display: inline;
+  margin-top: 0;
+}
+
 .eduLocation {
   white-space: nowrap;
 }
@@ -296,8 +307,7 @@
 
 .educationDetail,
 .educationDescription,
-.previewEntryDetail,
-.skillGroupItems {
+.previewEntryDetail {
   margin-top: var(--resume-detail-gap);
 }
 

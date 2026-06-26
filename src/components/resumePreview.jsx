@@ -356,11 +356,16 @@ export default function ResumePreview({ previewModel, template, settings, panelR
                 {block.entries.map((entry) => (
                     <div className="skillGroup" key={entry.id}>
                         {entry.category && (
-                            <div className="skillGroupTitle" {...entryTarget(block.id, entry.id, 'category')}>
-                                {entry.category}
-                            </div>
+                            <>
+                                <span className="skillGroupTitle" {...entryTarget(block.id, entry.id, 'category')}>
+                                    {entry.category}
+                                </span>
+                                {entry.items && <span className="skillGroupSeparator">: </span>}
+                            </>
                         )}
-                        <div className="skillGroupItems" {...entryTarget(block.id, entry.id, 'items')}>{entry.items}</div>
+                        {entry.items && (
+                            <span className="skillGroupItems" {...entryTarget(block.id, entry.id, 'items')}>{entry.items}</span>
+                        )}
                     </div>
                 ))}
             </div>
