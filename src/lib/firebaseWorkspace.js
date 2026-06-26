@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocFromCache,
   onSnapshot,
+  runTransaction,
   setDoc,
   writeBatch,
 } from 'firebase/firestore';
@@ -361,22 +362,41 @@ export async function writeCloudDraft(uid, resumeId, workspace, draft, trustedDe
   const draftDoc = createCloudDraftDoc({ resumeId, name, draft, identity: cloudIdentity });
 
   validateCloudDraftPayload(draftDoc);
+  const workspaceDoc = createCloudWorkspaceDoc({
+    ...normalizedWorkspace,
+    meta: {
+      ...normalizedWorkspace.meta,
+      [resumeId]: createWorkspaceResumeMeta(name, draftDoc.updatedAt),
+    },
+  }, cloudIdentity, draftDoc.updatedAt, draftDoc.version);
 
-  const batch = writeBatch(workspaceRef.firestore);
-  batch.set(draftRef, draftDoc, { merge: true });
-  batch.set(
-    workspaceRef,
-    createCloudWorkspaceDoc({
-      ...normalizedWorkspace,
-      meta: {
-        ...normalizedWorkspace.meta,
-        [resumeId]: createWorkspaceResumeMeta(name, draftDoc.updatedAt),
-      },
-    }, cloudIdentity, draftDoc.updatedAt, draftDoc.version),
-  );
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    const batch = writeBatch(workspaceRef.firestore);
 
-  await batch.commit();
-  return draftDoc;
+    batch.set(draftRef, draftDoc, { merge: true });
+    batch.set(workspaceRef, workspaceDoc);
+
+    await batch.commit();
+    return draftDoc;
+  }
+
+  return runTransaction(workspaceRef.firestore, async (transaction) => {
+    const currentDraftSnapshot = await transaction.get(draftRef);
+    const currentDraft = currentDraftSnapshot.exists() ? currentDraftSnapshot.data() : null;
+    const currentVersion = Number(currentDraft?.version || 0);
+
+    if (currentVersion > draftDoc.version) {
+      return {
+        ...currentDraft,
+        staleWriteSkipped: true,
+      };
+    }
+
+    transaction.set(draftRef, draftDoc, { merge: true });
+    transaction.set(workspaceRef, workspaceDoc);
+
+    return draftDoc;
+  });
 }
 
 export async function deleteCloudResume(uid, resumeId, workspace, trustedDevice, identity) {

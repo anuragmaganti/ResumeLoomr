@@ -1165,6 +1165,12 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
         trustedDevice,
         cloudIdentityRef.current,
       );
+
+      if (draftDoc?.staleWriteSkipped) {
+        settleCloudSyncState();
+        return draftDoc;
+      }
+
       const mirroredDraft = {
         ...draft,
         savedAt: draftDoc?.savedAt || draft.savedAt || new Date().toISOString(),
@@ -1361,14 +1367,15 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       persistExistingDraftState(nextResumeId, nextPersistedDraft);
     }
 
+    const previousWorkspace = persistedPayload
+      ? withWorkspaceResumeMeta(workspace, activeResumeId, { updatedAt: persistedPayload.savedAt })
+      : workspace;
     const nextWorkspace = {
-      ...(persistedPayload
-        ? withWorkspaceResumeMeta(workspace, activeResumeId, { updatedAt: persistedPayload.savedAt })
-        : workspace),
+      ...previousWorkspace,
       activeResumeId: nextResumeId,
       resumeIds: [...workspace.resumeIds, nextResumeId],
       meta: {
-        ...workspace.meta,
+        ...previousWorkspace.meta,
         [nextResumeId]: createWorkspaceResumeMeta(nextResumeName, nextPayload.savedAt),
       },
     };
@@ -1427,14 +1434,15 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
       ...nextDraft,
       savedAt: nextPayload.savedAt,
     };
+    const previousWorkspace = persistedPayload
+      ? withWorkspaceResumeMeta(workspace, activeResumeId, { updatedAt: persistedPayload.savedAt })
+      : workspace;
     const nextWorkspace = {
-      ...(persistedPayload
-        ? withWorkspaceResumeMeta(workspace, activeResumeId, { updatedAt: persistedPayload.savedAt })
-        : workspace),
+      ...previousWorkspace,
       activeResumeId: nextResumeId,
       resumeIds: [...workspace.resumeIds, nextResumeId],
       meta: {
-        ...workspace.meta,
+        ...previousWorkspace.meta,
         [nextResumeId]: createWorkspaceResumeMeta(nextResumeName, nextPayload.savedAt),
       },
     };
@@ -1453,7 +1461,7 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
           writeCloudDraft(
             user.uid,
             previousResumeId,
-            nextWorkspace,
+            previousWorkspace,
             {
               resume,
               template,
@@ -1465,8 +1473,6 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
           )
         ));
       }
-
-      flushCloudDraft(nextResumeId, nextWorkspace, nextPersistedDraft, { reason: 'import-placeholder' });
     }
 
     loadDraftIntoEditor(nextPersistedDraft, { focusPersonal: true });
@@ -1516,6 +1522,8 @@ export function useResumeBuilder({ user = null, authReady = true, trustedDevice 
 
     if (isCloudMode && userRef.current?.uid) {
       mirrorCloudDraftLocally(resumeId, nextWorkspace, nextDraft);
+      markResumeDirty(resumeId);
+      setSyncState(isOnline() ? 'syncing' : 'offline');
     }
 
     loadDraftIntoEditor(nextDraft, { focusPersonal: true });

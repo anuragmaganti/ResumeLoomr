@@ -1514,6 +1514,20 @@ test('cloud draft docs preserve the source draft timestamp for stale write order
   assert.equal(draftDoc.version, Date.parse(savedAt));
 });
 
+test('cloud draft writes guard against older in-flight saves overwriting newer drafts', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'lib/firebaseWorkspace.js'), 'utf8');
+  const writeStart = source.indexOf('export async function writeCloudDraft(');
+  const writeEnd = source.indexOf('export async function deleteCloudResume(', writeStart);
+  const writeSource = source.slice(writeStart, writeEnd);
+
+  assert.ok(writeStart > -1);
+  assert.match(writeSource, /runTransaction\(/);
+  assert.match(writeSource, /currentVersion\s*>\s*draftDoc\.version/);
+  assert.match(writeSource, /staleWriteSkipped:\s*true/);
+  assert.match(writeSource, /navigator\.onLine\s*===\s*false/);
+  assert.match(writeSource, /writeBatch\(/);
+});
+
 test('cloud workspace writes replace the index document instead of merging stale meta keys', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'lib/firebaseWorkspace.js'), 'utf8');
   const workspaceWriteLines = source
@@ -1612,11 +1626,15 @@ test('builder exposes import placeholder and draft replacement actions', () => {
   assert.match(placeholderSource, /createDraftPayload\(/);
   assert.match(placeholderSource, /createWorkspaceResumeMeta\(nextResumeName, nextPayload\.savedAt\)/);
   assert.match(placeholderSource, /mirrorCloudDraftLocally\(nextResumeId, nextWorkspace, nextPersistedDraft\)/);
+  assert.doesNotMatch(placeholderSource, /flushCloudDraft\(nextResumeId/);
+  assert.doesNotMatch(placeholderSource, /writeCloudDraft\(\s*user\.uid,\s*nextResumeId/);
+  assert.match(placeholderSource, /writeCloudDraft\(\s*user\.uid,\s*previousResumeId,\s*previousWorkspace/);
   assert.match(placeholderSource, /return nextResumeId/);
   assert.match(replaceSource, /normalizeDraftPayload\(importedDraft\)/);
   assert.match(replaceSource, /createDraftPayload\(/);
   assert.match(replaceSource, /persistExistingDraftState\(resumeId, nextDraft\)/);
   assert.match(replaceSource, /mirrorCloudDraftLocally\(resumeId, nextWorkspace, nextDraft\)/);
+  assert.match(replaceSource, /markResumeDirty\(resumeId\)/);
   assert.match(replaceSource, /flushCloudDraft\(resumeId, nextWorkspace, nextDraft,/);
 });
 
