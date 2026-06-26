@@ -14,6 +14,7 @@ import EditorPanel from './components/editorPanel';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
 import { importResumeFile } from './lib/importResume.js';
+import { clearResumeSyncSession } from './lib/backgroundSync.js';
 import {
   clearBrowserResumeConnectionData,
   clearLocalResumeWorkspaceData,
@@ -333,6 +334,7 @@ function App() {
       }
 
       if (!allowSignedOutEditing) {
+        await clearResumeSyncSession();
         clearLocalResumeWorkspaceData();
         window.location.reload();
       }

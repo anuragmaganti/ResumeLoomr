@@ -110,12 +110,12 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
       resumeIds: ['resume-2'],
     })));
     await assertSucceeds(ownerDb.doc('users/user-a/workspace/main').set(createWorkspaceDoc({
-      activeResumeId: 'resume-50',
-      resumeIds: Array.from({ length: 50 }, (_, index) => `resume-${index + 1}`),
+      activeResumeId: 'resume-100',
+      resumeIds: Array.from({ length: 100 }, (_, index) => `resume-${index + 1}`),
     })));
     await assertFails(ownerDb.doc('users/user-a/workspace/main').set(createWorkspaceDoc({
-      activeResumeId: 'resume-51',
-      resumeIds: Array.from({ length: 51 }, (_, index) => `resume-${index + 1}`),
+      activeResumeId: 'resume-101',
+      resumeIds: Array.from({ length: 101 }, (_, index) => `resume-${index + 1}`),
     })));
     await assertFails(ownerDb.doc('users/user-a/workspace/main').set(createWorkspaceDoc({
       activeResumeId: 'resume-1',

@@ -52,26 +52,19 @@ import {
 } from '../src/lib/resume.js';
 import {
   CLOUD_DEVICE_ID_KEY,
-  CLOUD_DRAFT_MAX_BYTES,
   CLOUD_SESSION_ID_KEY,
   CLOUD_TRUSTED_DEVICE_KEY,
   CLOUD_WORKSPACE_RESUME_LIMIT,
-  createCloudDraftDoc,
   getCloudSessionId,
-  validateCloudDraftPayload,
 } from '../src/lib/firebaseWorkspace.js';
 import {
-  GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY,
-  GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY,
-  createGuestMirrorWorkspace,
-  persistCloudDraftMirror,
-  persistCloudWorkspaceMirror,
-  readCloudMirrorManifest,
-  refreshCloudMirrorManifest,
-} from '../src/lib/localWorkspaceMirror.js';
+  LOCAL_WORKSPACE_PRESENT_KEY,
+} from '../src/lib/localWorkspaceDb.js';
 import {
   CONNECTED_ACCOUNT_STORAGE_KEY,
   DEFAULT_SIGNED_OUT_EDITING_PREFERENCE,
+  GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY,
+  GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY,
   SIGNED_OUT_EDITING_PREFERENCE_KEY,
   clearBrowserResumeConnectionData,
   clearLocalResumeWorkspaceData,
@@ -173,8 +166,8 @@ test('workspace helpers build stable storage keys and metadata', () => {
   const workspace = createFreshWorkspaceDraft();
 
   assert.match(resumeId, /^id-|^[0-9a-f-]{8,}$/i);
-  assert.equal(MAX_WORKSPACE_RESUMES, 10);
-  assert.equal(CLOUD_WORKSPACE_RESUME_LIMIT, 50);
+  assert.equal(MAX_WORKSPACE_RESUMES, 100);
+  assert.equal(CLOUD_WORKSPACE_RESUME_LIMIT, 100);
   assert.equal(createResumeStorageKey('abc123'), 'resumeloomr:resume:abc123');
   assert.deepEqual(createWorkspaceResumeMeta('Resume 4', '2026-03-26T12:00:00.000Z'), {
     name: 'Resume 4',
@@ -1071,204 +1064,6 @@ test('workspace resume exact-order reorder preserves active resume and rejects i
   assert.deepEqual(reorderWorkspaceResumesToMatch(workspace, ['resume-3', 'resume-1', 'missing']), workspace);
 });
 
-test('cloud guest mirror keeps the first ten resumes in rail order', () => {
-  const resumeIds = Array.from({ length: MAX_WORKSPACE_RESUMES + 2 }, (_, index) => `resume-${index + 1}`);
-  const workspace = normalizeWorkspaceIndex({
-    activeResumeId: 'resume-12',
-    resumeIds,
-    meta: Object.fromEntries(resumeIds.map((resumeId, index) => [
-      resumeId,
-      { name: `Resume ${index + 1}`, updatedAt: `2026-01-${String(index + 1).padStart(2, '0')}T00:00:00.000Z` },
-    ])),
-  });
-  const mirror = createGuestMirrorWorkspace(workspace);
-
-  assert.equal(mirror.resumeIds.length, MAX_WORKSPACE_RESUMES);
-  assert.deepEqual(mirror.resumeIds, resumeIds.slice(0, MAX_WORKSPACE_RESUMES));
-  assert.equal(mirror.activeResumeId, 'resume-1');
-  assert.equal(mirror.meta['resume-11'], undefined);
-});
-
-test('cloud guest mirror includes resumes moved into the first ten rail positions', () => {
-  const baseResumeIds = Array.from({ length: MAX_WORKSPACE_RESUMES + 4 }, (_, index) => `resume-${index + 1}`);
-  const resumeIds = [
-    ...baseResumeIds.slice(0, 7),
-    'resume-14',
-    ...baseResumeIds.slice(7, 13),
-  ];
-  const workspace = normalizeWorkspaceIndex({
-    activeResumeId: 'resume-14',
-    resumeIds,
-    meta: Object.fromEntries(baseResumeIds.map((resumeId, index) => [
-      resumeId,
-      {
-        name: `Resume ${index + 1}`,
-        updatedAt: resumeId === 'resume-13'
-          ? '2026-02-01T00:00:00.000Z'
-          : `2026-01-${String(index + 1).padStart(2, '0')}T00:00:00.000Z`,
-      },
-    ])),
-  });
-  const mirror = createGuestMirrorWorkspace(workspace);
-
-  assert.equal(mirror.resumeIds.length, MAX_WORKSPACE_RESUMES);
-  assert.deepEqual(mirror.resumeIds, [
-    'resume-1',
-    'resume-2',
-    'resume-3',
-    'resume-4',
-    'resume-5',
-    'resume-6',
-    'resume-7',
-    'resume-14',
-    'resume-8',
-    'resume-9',
-  ]);
-  assert.equal(mirror.activeResumeId, 'resume-14');
-  assert.equal(mirror.meta['resume-13'], undefined);
-});
-
-test('cloud guest mirror backs up existing guest workspace without deleting non-recent draft keys', () => {
-  const existingWorkspace = normalizeWorkspaceIndex({
-    activeResumeId: 'guest-1',
-    resumeIds: ['guest-1'],
-    meta: {
-      'guest-1': { name: 'Guest Resume', updatedAt: '2026-01-01T00:00:00.000Z' },
-    },
-  });
-  const storage = createMemoryStorage([
-    [WORKSPACE_INDEX_STORAGE_KEY, JSON.stringify(existingWorkspace)],
-    [createResumeStorageKey('guest-1'), JSON.stringify({ savedAt: 'guest' })],
-    [createResumeStorageKey('unrelated'), JSON.stringify({ savedAt: 'keep-me' })],
-  ]);
-  const cloudWorkspace = normalizeWorkspaceIndex({
-    activeResumeId: 'cloud-1',
-    resumeIds: ['cloud-1'],
-    meta: {
-      'cloud-1': { name: 'Cloud Resume', updatedAt: '2026-01-02T00:00:00.000Z' },
-    },
-  });
-  const cloudDraft = {
-    resume: createEmptyResume(),
-    template: 'modern',
-    sectionOrder: SECTION_IDS,
-    savedAt: '2026-01-02T00:00:00.000Z',
-  };
-
-  persistCloudWorkspaceMirror({
-    uid: 'user-1',
-    workspace: cloudWorkspace,
-    readDraft: (resumeId) => (resumeId === 'cloud-1' ? cloudDraft : null),
-    storage,
-  });
-  persistCloudWorkspaceMirror({
-    workspace: cloudWorkspace,
-    readDraft: () => null,
-    storage,
-  });
-
-  const backup = JSON.parse(storage.getItem(GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY));
-  const mirroredWorkspace = JSON.parse(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY));
-  const mirroredDraft = JSON.parse(storage.getItem(createResumeStorageKey('cloud-1')));
-  const manifest = JSON.parse(storage.getItem(GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY));
-
-  assert.equal(JSON.parse(backup.workspaceRaw).meta['guest-1'].name, 'Guest Resume');
-  assert.equal(JSON.parse(backup.drafts['guest-1']).savedAt, 'guest');
-  assert.equal(JSON.parse(storage.getItem(createResumeStorageKey('unrelated'))).savedAt, 'keep-me');
-  assert.deepEqual(mirroredWorkspace.resumeIds, ['cloud-1']);
-  assert.equal(mirroredDraft.savedAt, '2026-01-02T00:00:00.000Z');
-  assert.deepEqual(manifest.resumeIds, ['cloud-1']);
-  assert.equal(readCloudMirrorManifest('user-1', storage).activeResumeId, 'cloud-1');
-  assert.equal(readCloudMirrorManifest('other-user', storage), null);
-});
-
-test('cloud draft mirror writes visible mirrored drafts without deleting older local drafts', () => {
-  const storage = createMemoryStorage([
-    [createResumeStorageKey('resume-2'), JSON.stringify({ savedAt: 'stale' })],
-  ]);
-  const resumeIds = [
-    'resume-1',
-    'resume-11',
-    ...Array.from({ length: MAX_WORKSPACE_RESUMES - 1 }, (_, index) => `resume-${index + 2}`),
-  ];
-  const workspace = normalizeWorkspaceIndex({
-    activeResumeId: 'resume-1',
-    resumeIds,
-    meta: Object.fromEntries(resumeIds.map((resumeId, index) => [
-      resumeId,
-      {
-        name: `Resume ${index + 1}`,
-        updatedAt: resumeId === 'resume-1'
-          ? '2026-02-01T00:00:00.000Z'
-          : `2026-01-${String(index + 1).padStart(2, '0')}T00:00:00.000Z`,
-      },
-    ])),
-  });
-  const draft = {
-    resume: createEmptyResume(),
-    template: 'compact',
-    sectionOrder: SECTION_IDS,
-    savedAt: '2026-01-03T00:00:00.000Z',
-  };
-
-  persistCloudDraftMirror({
-    uid: 'user-1',
-    resumeId: 'resume-11',
-    workspace,
-    draft,
-    storage,
-  });
-
-  assert.equal(JSON.parse(storage.getItem(createResumeStorageKey('resume-11'))).template, 'compact');
-  assert.equal(JSON.parse(storage.getItem(createResumeStorageKey('resume-2'))).savedAt, 'stale');
-  assert.deepEqual(JSON.parse(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY)).resumeIds, [
-    'resume-1',
-    'resume-11',
-    'resume-2',
-    'resume-3',
-    'resume-4',
-    'resume-5',
-    'resume-6',
-    'resume-7',
-    'resume-8',
-    'resume-9',
-  ]);
-
-  persistCloudDraftMirror({
-    uid: 'user-1',
-    resumeId: 'resume-1',
-    workspace,
-    draft,
-    storage,
-  });
-
-  assert.equal(JSON.parse(storage.getItem(createResumeStorageKey('resume-1'))).template, 'compact');
-});
-
-test('cloud mirror manifest refreshes after stale local workspace normalization', () => {
-  const storage = createMemoryStorage([
-    [GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY, JSON.stringify({
-      uid: 'user-1',
-      activeResumeId: 'resume-1',
-      resumeIds: ['resume-1', 'resume-2'],
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    })],
-  ]);
-  const workspace = normalizeWorkspaceIndex({
-    activeResumeId: 'resume-11',
-    resumeIds: ['resume-11', 'resume-10'],
-    meta: {
-      'resume-11': { name: 'Resume 11', updatedAt: '2026-02-01T00:00:00.000Z' },
-      'resume-10': { name: 'Resume 10', updatedAt: '2026-01-31T00:00:00.000Z' },
-    },
-  });
-
-  refreshCloudMirrorManifest(workspace, storage);
-
-  assert.deepEqual(readCloudMirrorManifest('user-1', storage).resumeIds, ['resume-11', 'resume-10']);
-  assert.equal(readCloudMirrorManifest('user-1', storage).activeResumeId, 'resume-11');
-});
-
 test('connected account helpers persist user-facing account context', () => {
   const storage = createMemoryStorage();
   const account = writeConnectedAccount({
@@ -1312,15 +1107,20 @@ test('local resume workspace detector sees draft data but ignores account-only s
   const draftStorage = createMemoryStorage([
     [createResumeStorageKey('resume-1'), '{}'],
   ]);
+  const indexedDbSentinelStorage = createMemoryStorage([
+    [LOCAL_WORKSPACE_PRESENT_KEY, 'true'],
+  ]);
 
   assert.equal(hasLocalResumeWorkspaceData(emptyStorage), false);
   assert.equal(hasLocalResumeWorkspaceData(workspaceStorage), true);
   assert.equal(hasLocalResumeWorkspaceData(draftStorage), true);
+  assert.equal(hasLocalResumeWorkspaceData(indexedDbSentinelStorage), true);
 });
 
 test('clearing local resume workspace data preserves account and preference settings', () => {
   const storage = createMemoryStorage([
     [WORKSPACE_INDEX_STORAGE_KEY, '{}'],
+    [LOCAL_WORKSPACE_PRESENT_KEY, 'true'],
     [DRAFT_STORAGE_KEY, '{}'],
     [createResumeStorageKey('resume-1'), '{}'],
     [GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY, '{}'],
@@ -1336,6 +1136,7 @@ test('clearing local resume workspace data preserves account and preference sett
   clearLocalResumeWorkspaceData(storage);
 
   assert.equal(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY), null);
+  assert.equal(storage.getItem(LOCAL_WORKSPACE_PRESENT_KEY), null);
   assert.equal(storage.getItem(DRAFT_STORAGE_KEY), null);
   assert.equal(storage.getItem(createResumeStorageKey('resume-1')), null);
   assert.equal(storage.getItem(GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY), null);
@@ -1449,18 +1250,15 @@ test('app source does not use raw HTML execution sinks in src files', () => {
   }
 });
 
-test('signed-in resume storage relies on Firebase cache instead of an app-owned IndexedDB cache', () => {
-  const libFiles = collectSourceFiles(path.resolve(SRC_DIR, 'lib'));
+test('signed-in resume storage uses the app-owned IndexedDB workspace as local source of truth', () => {
+  const localDbSource = fs.readFileSync(path.resolve(SRC_DIR, 'lib/localWorkspaceDb.js'), 'utf8');
+  const builderSource = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
 
-  for (const filePath of libFiles) {
-    const source = fs.readFileSync(filePath, 'utf8');
-
-    assert.equal(
-      /window\.indexedDB|indexedDB\.open/.test(source),
-      false,
-      `Found app-owned IndexedDB usage in ${path.relative(TEST_FILE_DIR, filePath)}`
-    );
-  }
+  assert.match(localDbSource, /openDB\(LOCAL_WORKSPACE_DB_NAME/);
+  assert.match(localDbSource, /const OUTBOX_STORE = 'outbox'/);
+  assert.match(localDbSource, /const DRAFTS_STORE = 'drafts'/);
+  assert.match(builderSource, /persistLocalDraftSnapshot/);
+  assert.match(builderSource, /enqueueFullWorkspaceSync/);
 });
 
 test('cloud session id is stored in sessionStorage, not shared localStorage', () => {
@@ -1498,75 +1296,19 @@ test('cloud session id is stored in sessionStorage, not shared localStorage', ()
   }
 });
 
-test('cloud draft payload guard rejects oversized documents before Firestore writes', () => {
-  assert.throws(
-    () => validateCloudDraftPayload({
-      resume: {
-        settings: {},
-        projects: [{ summary: 'x'.repeat(CLOUD_DRAFT_MAX_BYTES) }],
-      },
-    }),
-    /too large/i,
-  );
-});
-
-test('cloud draft docs preserve the source draft timestamp for stale write ordering', () => {
-  const savedAt = '2026-06-24T12:34:56.000Z';
-  const draftDoc = createCloudDraftDoc({
-    resumeId: 'resume-imported',
-    name: 'Imported Resume',
-    draft: {
-      resume: createEmptyResume(),
-      template: 'modern',
-      sectionOrder: SECTION_IDS,
-      savedAt,
-    },
-    identity: {
-      deviceId: 'device-1',
-      sessionId: 'session-1',
-    },
-  });
-
-  assert.equal(draftDoc.savedAt, savedAt);
-  assert.equal(draftDoc.updatedAt, savedAt);
-  assert.equal(draftDoc.version, Date.parse(savedAt));
-});
-
-test('cloud draft writes guard against older in-flight saves overwriting newer drafts', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'lib/firebaseWorkspace.js'), 'utf8');
-  const writeStart = source.indexOf('export async function writeCloudDraft(');
-  const writeEnd = source.indexOf('export async function deleteCloudResume(', writeStart);
-  const writeSource = source.slice(writeStart, writeEnd);
-
-  assert.ok(writeStart > -1);
-  assert.match(writeSource, /runTransaction\(/);
-  assert.match(writeSource, /currentVersion\s*>\s*draftDoc\.version/);
-  assert.match(writeSource, /staleWriteSkipped:\s*true/);
-  assert.match(writeSource, /navigator\.onLine\s*===\s*false/);
-  assert.match(writeSource, /writeBatch\(/);
-});
-
-test('cloud workspace writes replace the index document instead of merging stale meta keys', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'lib/firebaseWorkspace.js'), 'utf8');
-  const workspaceWriteLines = source
-    .split('\n')
-    .filter((line) => /(?:setDoc|batch\.set)\(\s*workspaceRef/.test(line));
-
-  assert.ok(workspaceWriteLines.length > 0);
-  workspaceWriteLines.forEach((line) => {
-    assert.equal(
-      /\{\s*merge:\s*true\s*\}/.test(line),
-      false,
-      'workspace/main writes must not use merge:true because stale meta keys break deletes',
-    );
-  });
-});
-
-test('builder source uses a per-resume cloud save queue instead of one global save timer', () => {
+test('builder uses IndexedDB local storage and an outbox instead of Firestore listeners in the editor path', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
 
-  assert.match(source, /cloudSaveQueueRef\s*=\s*useRef\(new Map\(\)\)/);
-  assert.equal(/cloudSaveTimeoutRef|cloudForceSaveRef/.test(source), false);
+  assert.match(source, /initializeLocalWorkspace/);
+  assert.match(source, /persistLocalDraftSnapshot/);
+  assert.match(source, /persistLocalResumeDelete/);
+  assert.match(source, /syncLocalOutbox/);
+  assert.match(source, /requestResumeBackgroundSync/);
+  assert.doesNotMatch(source, /subscribeCloudWorkspace/);
+  assert.doesNotMatch(source, /subscribeCloudDraft/);
+  assert.doesNotMatch(source, /readCloudDraft/);
+  assert.doesNotMatch(source, /writeCloudDraft/);
+  assert.doesNotMatch(source, /deleteCloudResume/);
 });
 
 test('builder prevents active resume id and editor draft body mismatches from autosaving', () => {
@@ -1575,10 +1317,10 @@ test('builder prevents active resume id and editor draft body mismatches from au
   const autosaveEnd = source.indexOf('}, [activeResumeId', autosaveStart);
   const autosaveSource = source.slice(autosaveStart, autosaveEnd);
   const loadDraftStart = source.indexOf('function loadDraftIntoEditor(');
-  const loadDraftEnd = source.indexOf('function persistActiveDraftImmediately', loadDraftStart);
+  const loadDraftEnd = source.indexOf('function commitWorkspace(', loadDraftStart);
   const loadDraftSource = source.slice(loadDraftStart, loadDraftEnd);
-  const persistStart = source.indexOf('function persistActiveDraftImmediately(');
-  const persistEnd = source.indexOf('function commitWorkspace(', persistStart);
+  const persistStart = source.indexOf('function persistCurrentEditorDraft(');
+  const persistEnd = source.indexOf('function updateResume(', persistStart);
   const persistSource = source.slice(persistStart, persistEnd);
 
   assert.match(source, /editorDraftResumeIdRef\s*=\s*useRef\(initialWorkspaceState\.workspace\.activeResumeId\)/);
@@ -1587,229 +1329,117 @@ test('builder prevents active resume id and editor draft body mismatches from au
   assert.match(persistSource, /editorDraftResumeIdRef\.current !== resumeId/);
 });
 
-test('builder switches resumes by loading the target local draft before awaiting cloud work', () => {
+test('builder switches resumes from local IndexedDB without cloud reads', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const switchStart = source.indexOf('async function setActiveResume(');
-  const switchEnd = source.indexOf('async function createResume()', switchStart);
+  const switchEnd = source.indexOf('function createResume()', switchStart);
   const switchSource = source.slice(switchStart, switchEnd);
-  const localLoadIndex = switchSource.indexOf('loadDraftIntoEditor(localNextDraft, { resumeId: nextResumeId })');
-  const previousFlushIndex = switchSource.indexOf('await flushCloudDraft(previousResumeId');
 
   assert.ok(switchStart > -1);
-  assert.match(switchSource, /const switchRequestId = resumeSwitchRequestRef\.current \+ 1/);
-  assert.ok(localLoadIndex > -1);
-  assert.ok(previousFlushIndex > -1);
-  assert.ok(localLoadIndex < previousFlushIndex);
-  assert.match(switchSource, /await flushCloudDraft\(previousResumeId, nextWorkspace,/);
-  assert.match(switchSource, /activeResumeIdRef\.current !== nextResumeId/);
-  assert.match(switchSource, /hasLocalDirty\(nextResumeId\)/);
-  assert.match(switchSource, /writeCloudWorkspace\(user\.uid, nextWorkspace/);
-  assert.match(switchSource, /chooseLatestDraft\(localNextDraft, cloudDraft\)/);
-  assert.match(switchSource, /resume: persistedPayload\.resume/);
+  assert.match(switchSource, /persistCurrentEditorDraft\(\{ reason: 'switch-resume', persistWorkspace: false \}\)/);
+  assert.match(switchSource, /commitWorkspace\(nextWorkspace, \{ reason: 'switch-resume' \}\)/);
+  assert.match(switchSource, /const nextDraft = await readLocalDraft\(nextResumeId\)/);
+  assert.match(switchSource, /loadDraftIntoEditor\(nextDraft, \{ resumeId: nextResumeId \}\)/);
+  assert.doesNotMatch(switchSource, /readCloudDraft|writeCloudWorkspace|chooseLatestDraft/);
 });
 
-test('builder preserves local active resume when remote workspace metadata changes', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
-  const mergeStart = source.indexOf('function mergeRemoteWorkspaceForCurrentSelection(');
-  const mergeEnd = source.indexOf('async function mirrorCloudWorkspaceLocallyWithTopDrafts', mergeStart);
-  const mergeSource = source.slice(mergeStart, mergeEnd);
-  const workspaceListenerStart = source.indexOf('return subscribeCloudWorkspace(');
-  const workspaceListenerEnd = source.indexOf('}, [cloudReady, isCloudMode, trustedDevice, user]);', workspaceListenerStart);
-  const workspaceListenerSource = source.slice(workspaceListenerStart, workspaceListenerEnd);
+test('workspace-changing actions save the current draft without rewriting the old active workspace', () => {
+  const builderSource = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const localDbSource = fs.readFileSync(path.resolve(SRC_DIR, 'lib/localWorkspaceDb.js'), 'utf8');
 
-  assert.ok(mergeStart > -1);
-  assert.match(mergeSource, /const currentActiveResumeId = activeResumeIdRef\.current/);
-  assert.match(mergeSource, /remoteWorkspace\.resumeIds\.includes\(currentActiveResumeId\)/);
-  assert.match(mergeSource, /activeResumeId: nextActiveResumeId/);
-  assert.match(workspaceListenerSource, /mergeRemoteWorkspaceForCurrentSelection\(remoteWorkspace\)/);
-  assert.match(workspaceListenerSource, /activeResumeIdRef\.current = nextWorkspace\.activeResumeId/);
-  assert.match(workspaceListenerSource, /setWorkspace\(nextWorkspace\)/);
-  assert.doesNotMatch(workspaceListenerSource, /setWorkspace\(remoteWorkspace\)/);
-});
-
-test('builder cloud saves only update editor save state for the loaded resume', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
-  const flushStart = source.indexOf('async function flushCloudDraft(');
-  const flushEnd = source.indexOf('function markActiveDraftDirty()', flushStart);
-  const flushSource = source.slice(flushStart, flushEnd);
-
-  assert.ok(flushStart > -1);
-  assert.match(flushSource, /draft = null/);
-  assert.match(flushSource, /const draftToSave = draft \|\| getLatestKnownDraftForResume\(resumeId\)/);
-  assert.match(flushSource, /if \(!draftToSave\)/);
-  assert.match(flushSource, /activeResumeIdRef\.current === resumeId && editorDraftResumeIdRef\.current === resumeId/);
-});
-
-test('builder conflict detection is scoped to the active resume dirty state', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
-  const listenerStart = source.indexOf('return subscribeCloudDraft(');
-  const listenerEnd = source.indexOf('// The active resume listener should restart', listenerStart);
-  const listenerSource = source.slice(listenerStart, listenerEnd);
-  const deleteStart = source.indexOf('async function deleteActiveResume()');
-  const deleteEnd = source.indexOf('function useCloudConflictVersion()', deleteStart);
-  const deleteSource = source.slice(deleteStart, deleteEnd);
-
-  assert.ok(listenerStart > -1);
-  assert.match(source, /localDirtyResumeIdsRef\s*=\s*useRef\(new Set\(\)\)/);
-  assert.doesNotMatch(source, /localDirtyRef/);
-  assert.match(source, /const subscribedResumeId = activeResumeId/);
-  assert.match(listenerSource, /activeResumeIdRef\.current !== subscribedResumeId/);
-  assert.match(listenerSource, /hasLocalDirty\(subscribedResumeId\)/);
-  assert.match(deleteSource, /clearResumeDirty\(deletedResumeId\)/);
+  assert.match(localDbSource, /persistWorkspace = true/);
+  assert.match(localDbSource, /if \(persistWorkspace\) \{\n {4}writeLocalStorageWorkspace/);
+  assert.match(builderSource, /reason: 'create-resume', persistWorkspace: false/);
+  assert.match(builderSource, /reason: 'import-placeholder', persistWorkspace: false/);
+  assert.match(builderSource, /reason: 'duplicate-resume', persistWorkspace: false/);
+  assert.match(builderSource, /reason: 'resume-reorder', persistWorkspace: false/);
 });
 
 test('builder resets stale dynamic section tabs when loading a different resume', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const loadDraftStart = source.indexOf('function loadDraftIntoEditor(');
-  const loadDraftEnd = source.indexOf('function persistActiveDraftImmediately', loadDraftStart);
+  const loadDraftEnd = source.indexOf('function commitWorkspace(', loadDraftStart);
   const loadDraftSource = source.slice(loadDraftStart, loadDraftEnd);
 
   assert.match(source, /function getDraftEditorSectionIds\(draft\)/);
-  assert.match(loadDraftSource, /const nextSectionIds = getDraftEditorSectionIds\(nextDraft\)/);
+  assert.match(loadDraftSource, /const nextSectionIds = getDraftEditorSectionIds\(draftState\)/);
   assert.match(loadDraftSource, /!nextSectionIds\.includes\(activeTab\)/);
   assert.match(loadDraftSource, /setActiveTab\('personal'\)/);
 });
 
-test('resume rename is scoped by resume id and updates cloud metadata directly', () => {
+test('resume rename is local-first and queues the renamed draft for sync', () => {
   const builderSource = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const headerSource = fs.readFileSync(path.resolve(SRC_DIR, 'components/header.jsx'), 'utf8');
-  const firebaseSource = fs.readFileSync(path.resolve(SRC_DIR, 'lib/firebaseWorkspace.js'), 'utf8');
-  const renameStart = builderSource.indexOf('function renameResume(');
-  const renameEnd = builderSource.indexOf('async function deleteActiveResume()', renameStart);
+  const renameStart = builderSource.indexOf('async function renameResume(');
+  const renameEnd = builderSource.indexOf('async function reorderResume(', renameStart);
   const renameSource = builderSource.slice(renameStart, renameEnd);
 
   assert.ok(renameStart > -1);
   assert.match(headerSource, /onRenameResume\(renamingId, trimmedValue\)/);
-  assert.match(renameSource, /const targetResumeId = resumeId \|\| activeResumeId;/);
-  assert.match(renameSource, /withWorkspaceResumeMeta\(workspace, targetResumeId,/);
-  assert.match(renameSource, /updatedAt: renamedAt,/);
-  assert.match(renameSource, /renameCloudResume\(user\.uid, targetResumeId,/);
-  assert.match(firebaseSource, /export async function renameCloudResume/);
-  assert.match(firebaseSource, /batch\.set\(\s*workspaceRef,/);
-  assert.match(firebaseSource, /batch\.set\(\s*draftRef,/);
+  assert.match(renameSource, /const targetResumeId = resumeId \|\| activeResumeIdRef\.current/);
+  assert.match(renameSource, /withWorkspaceResumeMeta\(currentWorkspace, targetResumeId,/);
+  assert.match(renameSource, /persistLocalDraftSnapshot\(/);
+  assert.match(renameSource, /scheduleCloudSync\('rename-resume'/);
+  assert.doesNotMatch(renameSource, /renameCloudResume|writeCloudWorkspace/);
 });
 
-test('new resumes receive an immediate timestamp for workspace metadata', () => {
+test('new and imported resumes receive immediate local timestamps and outbox sync', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
-  const createStart = source.indexOf('async function createResume()');
-  const createEnd = source.indexOf('async function duplicateActiveResume()', createStart);
+  const createStart = source.indexOf('function createResume()');
+  const createEnd = source.indexOf('function createImportPlaceholderResume(', createStart);
   const createSource = source.slice(createStart, createEnd);
-
-  assert.ok(createStart > -1);
-  assert.match(createSource, /const nextPayload = createDraftPayload\(/);
-  assert.match(createSource, /const nextPersistedDraft = \{/);
-  assert.match(createSource, /savedAt: nextPayload\.savedAt,/);
-  assert.match(createSource, /createWorkspaceResumeMeta\(nextResumeName, nextPayload\.savedAt\)/);
-  assert.match(createSource, /loadDraftIntoEditor\(nextPersistedDraft,/);
-});
-
-test('builder exposes import placeholder and draft replacement actions', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const placeholderStart = source.indexOf('function createImportPlaceholderResume(');
   const placeholderEnd = source.indexOf('async function replaceResumeDraft(', placeholderStart);
-  const replaceStart = source.indexOf('async function replaceResumeDraft(');
-  const replaceEnd = source.indexOf('async function duplicateActiveResume()', replaceStart);
   const placeholderSource = source.slice(placeholderStart, placeholderEnd);
+  const replaceStart = source.indexOf('async function replaceResumeDraft(');
+  const replaceEnd = source.indexOf('function duplicateActiveResume()', replaceStart);
   const replaceSource = source.slice(replaceStart, replaceEnd);
 
-  assert.ok(placeholderStart > -1);
-  assert.ok(replaceStart > -1);
-  assert.match(placeholderSource, /createDraftPayload\(/);
-  assert.match(placeholderSource, /createWorkspaceResumeMeta\(nextResumeName, nextPayload\.savedAt\)/);
-  assert.match(placeholderSource, /mirrorCloudDraftLocally\(nextResumeId, nextWorkspace, nextPersistedDraft\)/);
-  assert.doesNotMatch(placeholderSource, /flushCloudDraft\(nextResumeId/);
-  assert.doesNotMatch(placeholderSource, /writeCloudDraft\(\s*user\.uid,\s*nextResumeId/);
-  assert.match(placeholderSource, /writeCloudDraft\(\s*user\.uid,\s*previousResumeId,\s*nextWorkspace/);
+  assert.ok(createStart > -1);
+  assert.match(createSource, /const nextDraft = createSavedDraftState\(createBlankDraftState\(\)\)/);
+  assert.match(createSource, /createWorkspaceResumeMeta\(nextResumeName, nextDraft\.savedAt\)/);
+  assert.match(createSource, /persistLocalDraftSnapshot\(/);
+  assert.match(placeholderSource, /createWorkspaceResumeMeta\(nextResumeName, nextDraft\.savedAt\)/);
   assert.match(placeholderSource, /return nextResumeId/);
   assert.match(replaceSource, /normalizeDraftPayload\(importedDraft\)/);
-  assert.match(replaceSource, /createDraftPayload\(/);
-  assert.match(replaceSource, /persistExistingDraftState\(resumeId, nextDraft\)/);
-  assert.match(replaceSource, /mirrorCloudDraftLocally\(resumeId, nextWorkspace, nextDraft\)/);
-  assert.match(replaceSource, /markResumeDirty\(resumeId\)/);
-  assert.match(replaceSource, /flushCloudDraft\(resumeId, nextWorkspace, nextDraft,/);
+  assert.match(replaceSource, /persistLocalDraftSnapshot\(/);
+  assert.match(replaceSource, /scheduleCloudSync\('import-replace'/);
+  assert.doesNotMatch(replaceSource, /flushCloudDraft|writeCloudDraft/);
 });
 
-test('builder reloads the local mirrored workspace when signing out of cloud mode', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
-  const signOutBranchStart = source.indexOf('if (!user) {');
-  const signOutBranchEnd = source.indexOf('return undefined;', signOutBranchStart);
-  const signOutBranchSource = source.slice(signOutBranchStart, signOutBranchEnd);
-
-  assert.ok(signOutBranchStart > -1);
-  assert.match(source, /wasCloudModeRef\s*=\s*useRef\(false\)/);
-  assert.match(signOutBranchSource, /if \(wasCloudModeRef\.current\)/);
-  assert.match(signOutBranchSource, /const storedWorkspace = loadStoredWorkspace\(\)/);
-  assert.match(signOutBranchSource, /commitWorkspace\(storedWorkspace\.workspace\)/);
-  assert.match(signOutBranchSource, /loadDraftIntoEditor\(storedWorkspace\.draft, \{ resumeId: storedWorkspace\.activeResumeId \}\)/);
-  assert.match(signOutBranchSource, /wasCloudModeRef\.current = false/);
-});
-
-test('builder normalizes stale local workspaces to the first ten without deleting hidden drafts', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
-  const loadStart = source.indexOf('function loadStoredWorkspace()');
-  const loadEnd = source.indexOf('function formatSavedAt(', loadStart);
-  const loadSource = source.slice(loadStart, loadEnd);
-
-  assert.ok(loadStart > -1);
-  assert.match(source, /createGuestMirrorWorkspace,/);
-  assert.doesNotMatch(source, /function pruneStoredResumeDraftsToWorkspace\(workspace\)/);
-  assert.match(loadSource, /const localWorkspace = createGuestMirrorWorkspace\(normalizedWorkspace\)/);
-  assert.match(loadSource, /persistWorkspaceIndex\(localWorkspace\)/);
-  assert.match(loadSource, /refreshCloudMirrorManifest\(localWorkspace\)/);
-  assert.doesNotMatch(loadSource, /removeItem\(createResumeStorageKey/);
-  assert.match(loadSource, /workspace: localWorkspace,/);
-});
-
-test('builder reconciles signed-out local workspace changes on every sign-in', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
-  const bootstrapStart = source.indexOf('async function bootstrapCloudWorkspace()');
-  const bootstrapEnd = source.indexOf('if (cancelled || !nextWorkspace)', bootstrapStart);
-  const bootstrapSource = source.slice(bootstrapStart, bootstrapEnd);
-
-  assert.ok(bootstrapStart > -1);
-  assert.match(bootstrapSource, /readCloudMirrorManifest\(uid\)/);
-  assert.match(bootstrapSource, /syncLocalWorkspaceToCloud\(/);
-  assert.doesNotMatch(bootstrapSource, /hasImportedGuestWorkspace/);
-  assert.doesNotMatch(source, /export async function appendWorkspaceToCloud/);
-});
-
-test('builder delete waits for online cloud delete before local removal', () => {
+test('builder delete is immediate locally and queues a tombstone for cloud sync', () => {
   const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
   const deleteStart = source.indexOf('async function deleteActiveResume()');
-  const deleteEnd = source.indexOf('function useCloudConflictVersion()', deleteStart);
+  const deleteEnd = source.indexOf('async function retryCloudSync()', deleteStart);
   const deleteSource = source.slice(deleteStart, deleteEnd);
 
   assert.ok(deleteStart > -1);
-  assert.ok(deleteSource.indexOf('deleteCloudResume(') < deleteSource.indexOf('window.localStorage.removeItem'));
-  assert.ok(deleteSource.includes('if (!cloudDeleteSucceeded && isOnline())'));
+  assert.match(deleteSource, /commitWorkspace\(nextWorkspace, \{ persist: false \}\)/);
+  assert.match(deleteSource, /persistLocalResumeDelete\(/);
+  assert.match(deleteSource, /scheduleCloudSync\('delete-resume'/);
+  assert.match(deleteSource, /const nextDraft = await readLocalDraft\(nextResumeId\)/);
+  assert.doesNotMatch(deleteSource, /deleteCloudResume|cloudDeleteSucceeded|isOnline\(\)\)/);
 });
 
-test('successful cloud mutations settle the syncing status', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
-  const mutationStart = source.indexOf('function runCloudMutation(');
-  const mutationEnd = source.indexOf('function mirrorCloudWorkspaceLocally', mutationStart);
-  const mutationSource = source.slice(mutationStart, mutationEnd);
-  const deleteStart = source.indexOf('async function deleteActiveResume()');
-  const deleteEnd = source.indexOf('function useCloudConflictVersion()', deleteStart);
-  const deleteSource = source.slice(deleteStart, deleteEnd);
+test('local-first sync API and service worker are wired for queued background sync', () => {
+  const hookSource = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const syncClientSource = fs.readFileSync(path.resolve(SRC_DIR, 'lib/backgroundSync.js'), 'utf8');
+  const localDbSource = fs.readFileSync(path.resolve(SRC_DIR, 'lib/localWorkspaceDb.js'), 'utf8');
+  const syncApiSource = fs.readFileSync(path.resolve(SRC_DIR, '../api/sync-workspace.js'), 'utf8');
+  const sessionApiSource = fs.readFileSync(path.resolve(SRC_DIR, '../api/sync-session.js'), 'utf8');
+  const workerSource = fs.readFileSync(path.resolve(SRC_DIR, '../public/sync-worker.js'), 'utf8');
 
-  assert.ok(mutationStart > -1);
-  assert.match(source, /function settleCloudSyncState\(\)/);
-  assert.match(mutationSource, /setSyncState\('syncing'\)/);
-  assert.match(mutationSource, /settleCloudSyncState\(\)/);
-  assert.ok(deleteSource.indexOf('clearResumeDirty(deletedResumeId)') < deleteSource.indexOf('settleCloudSyncState()'));
-});
-
-test('conflict copy keeps the conflicted resume active instead of activating the copy', () => {
-  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
-  const conflictCopyStart = source.indexOf('async function saveConflictAsCopy()');
-  const conflictCopyEnd = source.indexOf('const actions = {', conflictCopyStart);
-  const conflictCopySource = source.slice(conflictCopyStart, conflictCopyEnd);
-
-  assert.ok(conflictCopyStart > -1);
-  assert.match(conflictCopySource, /const originalResumeId = conflict\.resumeId \|\| activeResumeId;/);
-  assert.match(conflictCopySource, /activeResumeId: originalResumeId,/);
-  assert.doesNotMatch(conflictCopySource, /activeResumeId: nextResumeId,/);
+  assert.match(hookSource, /registerResumeSyncWorker\(\)/);
+  assert.match(syncClientSource, /navigator\.serviceWorker\.register\('\/sync-worker\.js'\)/);
+  assert.match(syncClientSource, /fetch\('\/api\/sync-workspace'/);
+  assert.match(localDbSource, /const OUTBOX_STORE = 'outbox'/);
+  assert.match(localDbSource, /const TOMBSTONES_STORE = 'tombstones'/);
+  assert.match(syncApiSource, /verifyRequestUser\(req\)/);
+  assert.match(syncApiSource, /CLOUD_WORKSPACE_RESUME_LIMIT = 100/);
+  assert.match(syncApiSource, /transaction\.delete\(write\.ref\)/);
+  assert.match(sessionApiSource, /createSessionCookie/);
+  assert.match(workerSource, /self\.addEventListener\('sync'/);
+  assert.match(workerSource, /credentials: 'include'/);
 });
 
 test('app gates account switching before cloud bootstrap can import browser resumes', () => {

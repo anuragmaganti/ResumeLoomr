@@ -1,11 +1,14 @@
 import { GoogleGenAI } from '@google/genai';
 import { createRequire } from 'node:module';
-import { cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import mammoth from 'mammoth';
 import { z } from 'zod';
 
+import {
+  FirebaseAdminError,
+  getAdminDb,
+  verifyFirebaseIdTokenHeader,
+} from './firebaseAdmin.js';
 import {
   getPreviewModel,
   normalizeDraftPayload,
@@ -252,55 +255,13 @@ export function normalizeImportFilePayload(payload) {
   };
 }
 
-function parseServiceAccount() {
-  const rawValue = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-
-  if (!rawValue) {
-    throw new ImportResumeError('Firebase Admin is not configured.', {
-      statusCode: 500,
-      code: 'import/firebase-admin-missing',
-    });
-  }
-
-  const trimmedValue = rawValue.trim();
-  const jsonValue = trimmedValue.startsWith('{')
-    ? trimmedValue
-    : Buffer.from(trimmedValue, 'base64').toString('utf8');
-  const serviceAccount = JSON.parse(jsonValue);
-
-  if (typeof serviceAccount.private_key === 'string') {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-  }
-
-  return serviceAccount;
-}
-
-function getAdminApp() {
-  if (getApps().length > 0) {
-    return getApps()[0];
-  }
-
-  return initializeApp({
-    credential: cert(parseServiceAccount()),
-  });
-}
-
 export async function verifyFirebaseIdToken(authorizationHeader) {
-  const token = trimText(authorizationHeader).replace(/^Bearer\s+/i, '');
-
-  if (!token) {
-    throw new ImportResumeError('Sign in to import a resume.', {
-      statusCode: 401,
-      code: 'import/unauthorized',
-    });
-  }
-
   try {
-    return await getAuth(getAdminApp()).verifyIdToken(token);
-  } catch {
-    throw new ImportResumeError('Your sign-in expired. Sign in again to import a resume.', {
-      statusCode: 401,
-      code: 'import/invalid-token',
+    return await verifyFirebaseIdTokenHeader(authorizationHeader);
+  } catch (error) {
+    throw new ImportResumeError(error?.message || 'Your sign-in expired. Sign in again to import a resume.', {
+      statusCode: error instanceof FirebaseAdminError ? error.statusCode : 401,
+      code: error instanceof FirebaseAdminError ? error.code : 'import/invalid-token',
     });
   }
 }
@@ -315,7 +276,7 @@ function getDailyLimit() {
 export async function enforceDailyImportLimit(uid, now = new Date()) {
   const limit = getDailyLimit();
   const dateKey = now.toISOString().slice(0, 10);
-  const db = getFirestore(getAdminApp());
+  const db = getAdminDb();
   const usageRef = db.doc(`users/${uid}/usage/ai-import-${dateKey}`);
 
   await db.runTransaction(async (transaction) => {
