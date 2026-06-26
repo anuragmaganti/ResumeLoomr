@@ -1,5 +1,6 @@
 import {
   markOutboxFailed,
+  markOutboxStale,
   markOutboxSynced,
   readPendingOutbox,
 } from './localWorkspaceDb.js';
@@ -150,12 +151,17 @@ export async function syncLocalOutbox({ idToken = '', useCookie = false } = {}) 
     const syncedOperationIds = Array.isArray(payload.syncedOperationIds)
       ? payload.syncedOperationIds
       : operations.map((operation) => operation.id);
+    const staleOperationIds = Array.isArray(payload.staleOperationIds)
+      ? payload.staleOperationIds
+      : [];
 
     await markOutboxSynced(syncedOperationIds);
+    await markOutboxStale(staleOperationIds);
 
     return {
-      status: 'synced',
+      status: staleOperationIds.length > 0 ? 'stale' : 'synced',
       syncedCount: syncedOperationIds.length,
+      staleCount: staleOperationIds.length,
       pendingCount: Math.max(0, operations.length - syncedOperationIds.length),
     };
   } catch (error) {

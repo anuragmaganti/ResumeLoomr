@@ -17,7 +17,6 @@ import {
   addSectionBlockEducationProgram,
   addSectionBlockEntry,
   addSectionBlockTextListItem,
-  createDraftPayload,
   createDuplicateResumeName,
   createEmptyResume,
   createNextResumeName,
@@ -127,6 +126,10 @@ function formatSavedAt(savedAt, { cloudMode = false, syncState = 'idle' } = {}) 
 
   if (cloudMode && syncState === 'error') {
     return 'Saved locally • cloud unavailable';
+  }
+
+  if (cloudMode && syncState === 'stale') {
+    return 'Saved locally • review sync';
   }
 
   if (!savedAt) {
@@ -270,6 +273,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   const skipNextAutosaveRef = useRef(false);
   const currentDraftRef = useRef(initialWorkspaceState.draft);
   const editorDraftResumeIdRef = useRef(initialWorkspaceState.workspace.activeResumeId);
+  const editorDraftRevisionRef = useRef(initialWorkspaceState.draft.localRevision || '');
   const workspaceRef = useRef(initialWorkspaceState.workspace);
   const activeResumeIdRef = useRef(initialWorkspaceState.workspace.activeResumeId);
   const userRef = useRef(user);
@@ -290,11 +294,14 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   const canAddResume = workspace.resumeIds.length < MAX_WORKSPACE_RESUMES;
 
   useEffect(() => {
+    const localRevision = editorDraftRevisionRef.current || currentDraftRef.current.localRevision || '';
+
     currentDraftRef.current = {
       resume,
       template,
       sectionOrder,
       savedAt,
+      localRevision,
     };
   }, [resume, savedAt, sectionOrder, template]);
 
@@ -358,7 +365,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     }
 
     const timeoutId = window.setTimeout(() => {
-      persistCurrentEditorDraft({ reason: 'autosave' });
+      saveEditorDraftFromRefs({ reason: 'autosave' });
     }, 180);
 
     return () => window.clearTimeout(timeoutId);
@@ -447,13 +454,13 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     }
 
     function handlePageExit() {
-      persistCurrentEditorDraft({ reason: 'pagehide', scheduleSync: false });
+      saveEditorDraftFromRefs({ reason: 'pagehide', scheduleSync: false });
       requestResumeBackgroundSync();
     }
 
     function handleVisibilityChange() {
       if (document.visibilityState === 'hidden') {
-        persistCurrentEditorDraft({ reason: 'visibilitychange', scheduleSync: false });
+        saveEditorDraftFromRefs({ reason: 'visibilitychange', scheduleSync: false });
         requestResumeBackgroundSync();
       }
     }
@@ -489,12 +496,14 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       template: normalizedDraft.template,
       sectionOrder: normalizedDraft.sectionOrder,
       savedAt: nextDraft?.savedAt || null,
+      localRevision: nextDraft?.localRevision || normalizedDraft.localRevision || '',
     };
     const nextSectionIds = getDraftEditorSectionIds(draftState);
 
     skipNextAutosaveRef.current = true;
     currentDraftRef.current = draftState;
     editorDraftResumeIdRef.current = resumeId;
+    editorDraftRevisionRef.current = draftState.localRevision || '';
     setResume(draftState.resume);
     setTemplate(draftState.template);
     setSectionOrder(draftState.sectionOrder);
@@ -570,8 +579,17 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       await createResumeSyncSession(idToken);
       const result = await syncLocalOutbox({ idToken });
 
+      if (result.staleCount > 0 || result.status === 'stale') {
+        setSyncState('stale');
+        setNotice({
+          tone: 'warning',
+          message: 'Some cloud changes were skipped because a newer version already exists. Your local draft is still saved.',
+        });
+        return false;
+      }
+
       setSyncState(result.pendingCount > 0 ? 'syncing' : 'saved');
-      setNotice((currentNotice) => (currentNotice?.tone === 'error' ? null : currentNotice));
+      setNotice((currentNotice) => (currentNotice?.tone === 'error' || currentNotice?.tone === 'warning' ? null : currentNotice));
       return true;
     } catch {
       setSyncState(isOnline() ? 'error' : 'offline');
@@ -587,26 +605,34 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     }
   }
 
-  function persistCurrentEditorDraft({ reason = 'manual', scheduleSync = true, persistWorkspace = true } = {}) {
-    const resumeId = activeResumeIdRef.current;
+  function saveEditorDraftFromRefs({ reason = 'manual', scheduleSync = true, persistWorkspace = true, allowStaleOverwrite = false } = {}) {
+    const resumeId = editorDraftResumeIdRef.current;
+    const draftSnapshot = currentDraftRef.current;
 
-    if (!resumeId || editorDraftResumeIdRef.current !== resumeId) {
+    if (!resumeId || !draftSnapshot) {
       return null;
     }
 
     try {
-      const nextDraft = createSavedDraftState({ resume, template, sectionOrder });
+      const expectedRevision = editorDraftRevisionRef.current || draftSnapshot.localRevision || '';
+      const nextDraft = createSavedDraftState(draftSnapshot);
+      const pendingDraftRef = {
+        ...nextDraft,
+        localRevision: expectedRevision,
+      };
       const nextWorkspace = withWorkspaceResumeMeta(workspaceRef.current, resumeId, {
         updatedAt: nextDraft.savedAt,
       });
 
-      workspaceRef.current = nextWorkspace;
-      setWorkspace(nextWorkspace);
+      if (persistWorkspace) {
+        workspaceRef.current = nextWorkspace;
+        setWorkspace(nextWorkspace);
+      }
       setSavedAt(nextDraft.savedAt);
       setSaveState('saved');
-      currentDraftRef.current = nextDraft;
+      currentDraftRef.current = pendingDraftRef;
 
-      persistLocalDraftSnapshot({
+      return persistLocalDraftSnapshot({
         resumeId,
         workspace: nextWorkspace,
         draft: nextDraft,
@@ -614,16 +640,44 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         enqueueSync: true,
         persistWorkspace,
         reason,
-      }).then(() => {
+        expectedRevision,
+        allowStaleOverwrite,
+      }).then((result) => {
+        if (result?.conflict) {
+          if (editorDraftResumeIdRef.current === resumeId) {
+            setNotice({
+              tone: 'warning',
+              message: 'This resume changed in another tab, so an older save was not applied.',
+            });
+          }
+
+          return result;
+        }
+
+        if (result?.draft?.localRevision && editorDraftResumeIdRef.current === resumeId) {
+          editorDraftRevisionRef.current = result.draft.localRevision;
+
+          if (currentDraftRef.current === pendingDraftRef) {
+            currentDraftRef.current = result.draft;
+          } else {
+            currentDraftRef.current = {
+              ...currentDraftRef.current,
+              localRevision: result.draft.localRevision,
+            };
+          }
+
+          setSavedAt(result.draft.savedAt);
+        }
+
         if (scheduleSync) {
           scheduleCloudSync(reason);
         }
+
+        return result;
       }).catch(() => {
         setSaveState('error');
         setNotice({ tone: 'error', message: 'Local autosave failed in this browser.' });
       });
-
-      return createDraftPayload({ resume: nextDraft.resume, template: nextDraft.template, sectionOrder: nextDraft.sectionOrder });
     } catch {
       setSaveState('error');
       setNotice({ tone: 'error', message: 'Autosave failed in this browser session.' });
@@ -631,13 +685,30 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     }
   }
 
+  function persistCurrentEditorDraft(options = {}) {
+    return saveEditorDraftFromRefs(options);
+  }
+
   function updateResume(transform) {
     setSaveState('saving');
-    setResume((currentResume) => transform(currentResume));
+    setResume((currentResume) => {
+      const nextResume = transform(currentResume);
+
+      currentDraftRef.current = {
+        ...currentDraftRef.current,
+        resume: nextResume,
+      };
+
+      return nextResume;
+    });
   }
 
   function changeTemplate(nextTemplate) {
     setSaveState('saving');
+    currentDraftRef.current = {
+      ...currentDraftRef.current,
+      template: nextTemplate,
+    };
     setTemplate(nextTemplate);
   }
 
@@ -648,7 +719,16 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return;
     }
 
-    setSectionOrder((currentOrder) => moveSectionOrder(currentOrder, sectionId, direction));
+    setSectionOrder((currentOrder) => {
+      const nextOrder = moveSectionOrder(currentOrder, sectionId, direction);
+
+      currentDraftRef.current = {
+        ...currentDraftRef.current,
+        sectionOrder: nextOrder,
+      };
+
+      return nextOrder;
+    });
   }
 
   function reorderSection(sectionId, targetSectionId, placement) {
@@ -661,7 +741,16 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return;
     }
 
-    setSectionOrder((currentOrder) => reorderSectionOrder(currentOrder, sectionId, targetSectionId, placement));
+    setSectionOrder((currentOrder) => {
+      const nextOrder = reorderSectionOrder(currentOrder, sectionId, targetSectionId, placement);
+
+      currentDraftRef.current = {
+        ...currentDraftRef.current,
+        sectionOrder: nextOrder,
+      };
+
+      return nextOrder;
+    });
   }
 
   function reorderSections(nextSectionIds) {
@@ -675,7 +764,16 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return;
     }
 
-    setSectionOrder((currentOrder) => reorderSectionOrderToMatch(currentOrder, nextSectionIds));
+    setSectionOrder((currentOrder) => {
+      const nextOrder = reorderSectionOrderToMatch(currentOrder, nextSectionIds);
+
+      currentDraftRef.current = {
+        ...currentDraftRef.current,
+        sectionOrder: nextOrder,
+      };
+
+      return nextOrder;
+    });
   }
 
   function markTouched(path) {

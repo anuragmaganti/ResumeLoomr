@@ -475,6 +475,84 @@ test('source-first import groups split role/date lines and strips uploaded bulle
   ]);
 });
 
+test('source-first import groups browser PDF text without bullet markers or spacing', () => {
+  const sourceDocument = createSourceDocumentFromText(`
+    JORDAN EXAMPLE
+    Full-Stack Software Engineer
+    New York, NY(555) 123-4567jordan@example.comjordan.dev
+    Full-stack engineer focused on AI-native product development and production infrastructure.
+    EXPERIENCE
+    Hearsix.com2026-present
+    Founder / Software Engineer
+    Building a platform for natural sounding podcast generation from arbitrary user prompts
+    Improved audio-processing throughput by parallelizing TTS generation with controlled concurrency
+    Designed a multi-stage AI pipeline orchestration layer across script generation, voice synthesis, storage, workflows, and playback
+    NuoPact.com2023-2026
+    Software Engineer
+    Conceived, built, and launched a private peer-to-peer escrow platform
+    Prioritized user security by architecting a hybrid on-chain / off-chain architecture
+    Developed operational systems for reliability and automation
+    RECENT PROJECTS
+    Tower-base.vercel.app
+    Architected an AI research pipeline for private equity professionals
+    Added a page-aware assistant that answers questions using current page context
+    WebcamSign.com
+    Built a browser-based tool that lets users draw and export signatures with hand gestures
+    EDUCATION
+    Hackensack Meridian School of MedicineNutley, NJ2019-2022
+    Initiated and led a longevity research project
+    Rutgers UniversityNew Brunswick, NJ2014-2018
+    B.A Cell Biology and NeuroscienceGPA: 3.8
+    SKILLS
+    TypeScript, Python, JavaScript, SQL, HTML/CSS, React, Next.js, Tailwind CSS
+  `);
+  const imported = compileSourceDocumentToImportedDraft(sourceDocument, null, {
+    sourceFileName: 'browser-exported-resume.pdf',
+  });
+  const personal = imported.draft.resume.personal;
+  const experienceBlock = imported.draft.resume.sections.find((section) => section.title === 'EXPERIENCE');
+  const projectsBlock = imported.draft.resume.sections.find((section) => section.title === 'RECENT PROJECTS');
+  const educationBlock = imported.draft.resume.sections.find((section) => section.title === 'EDUCATION');
+
+  assert.equal(personal.name, 'JORDAN EXAMPLE');
+  assert.equal(personal.headline, 'Full-Stack Software Engineer');
+  assert.equal(personal.location, 'New York, NY');
+  assert.equal(personal.phone, '(555) 123-4567');
+  assert.equal(personal.email, 'jordan@example.com');
+  assert.equal(personal.portfolioUrl, 'jordan.dev');
+  assert.deepEqual(
+    imported.draft.resume.sections.map((section) => [section.title, section.kind]),
+    [
+      ['EXPERIENCE', 'roles'],
+      ['RECENT PROJECTS', 'projects'],
+      ['EDUCATION', 'education'],
+      ['SKILLS', 'skills'],
+    ],
+  );
+  assert.equal(experienceBlock.entries.length, 2);
+  assert.equal(experienceBlock.entries[0].company, 'Hearsix.com');
+  assert.equal(experienceBlock.entries[0].role, 'Founder / Software Engineer');
+  assert.equal(experienceBlock.entries[0].yearsExp, '2026-present');
+  assert.equal(experienceBlock.entries[0].activities.length, 3);
+  assert.equal(experienceBlock.entries[1].company, 'NuoPact.com');
+  assert.equal(experienceBlock.entries[1].role, 'Software Engineer');
+  assert.equal(experienceBlock.entries[1].activities.length, 3);
+  assert.equal(projectsBlock.entries.length, 2);
+  assert.equal(projectsBlock.entries[0].name, 'Tower-base.vercel.app');
+  assert.match(projectsBlock.entries[0].summary, /AI research pipeline/);
+  assert.deepEqual(projectsBlock.entries[0].highlights, [
+    'Added a page-aware assistant that answers questions using current page context',
+  ]);
+  assert.equal(educationBlock.entries.length, 2);
+  assert.equal(educationBlock.entries[0].school, 'Hackensack Meridian School of Medicine');
+  assert.equal(educationBlock.entries[0].location, 'Nutley, NJ');
+  assert.equal(educationBlock.entries[0].yearsEdu, '2019-2022');
+  assert.equal(educationBlock.entries[1].school, 'Rutgers University');
+  assert.equal(educationBlock.entries[1].location, 'New Brunswick, NJ');
+  assert.equal(educationBlock.entries[1].degree, 'B.A Cell Biology and Neuroscience');
+  assert.equal(educationBlock.entries[1].gpa, '3.8');
+});
+
 test('source-first import handles bootcamp education, degree language text, and named skill groups', () => {
   const sourceDocument = createSourceDocumentFromText(`
     CASEY EXAMPLE
@@ -1319,14 +1397,43 @@ test('builder prevents active resume id and editor draft body mismatches from au
   const loadDraftStart = source.indexOf('function loadDraftIntoEditor(');
   const loadDraftEnd = source.indexOf('function commitWorkspace(', loadDraftStart);
   const loadDraftSource = source.slice(loadDraftStart, loadDraftEnd);
-  const persistStart = source.indexOf('function persistCurrentEditorDraft(');
+  const persistStart = source.indexOf('function saveEditorDraftFromRefs(');
   const persistEnd = source.indexOf('function updateResume(', persistStart);
   const persistSource = source.slice(persistStart, persistEnd);
 
   assert.match(source, /editorDraftResumeIdRef\s*=\s*useRef\(initialWorkspaceState\.workspace\.activeResumeId\)/);
+  assert.match(source, /editorDraftRevisionRef\s*=\s*useRef\(initialWorkspaceState\.draft\.localRevision/);
   assert.match(loadDraftSource, /editorDraftResumeIdRef\.current = resumeId/);
+  assert.match(loadDraftSource, /editorDraftRevisionRef\.current = draftState\.localRevision/);
   assert.match(autosaveSource, /editorDraftResumeIdRef\.current !== activeResumeId/);
-  assert.match(persistSource, /editorDraftResumeIdRef\.current !== resumeId/);
+  assert.match(persistSource, /const resumeId = editorDraftResumeIdRef\.current/);
+  assert.match(persistSource, /const draftSnapshot = currentDraftRef\.current/);
+  assert.match(persistSource, /expectedRevision/);
+  assert.doesNotMatch(persistSource, /const resumeId = activeResumeIdRef\.current/);
+});
+
+test('visibility and page-exit saves use ref-based editor snapshots', () => {
+  const source = fs.readFileSync(path.resolve(SRC_DIR, 'hooks/useResumeBuilder.js'), 'utf8');
+  const handlerStart = source.indexOf('function handleOnline()');
+  const handlerEnd = source.indexOf('window.addEventListener', handlerStart);
+  const handlerSource = source.slice(handlerStart, handlerEnd);
+
+  assert.match(handlerSource, /saveEditorDraftFromRefs\(\{ reason: 'pagehide', scheduleSync: false \}\)/);
+  assert.match(handlerSource, /saveEditorDraftFromRefs\(\{ reason: 'visibilitychange', scheduleSync: false \}\)/);
+  assert.doesNotMatch(handlerSource, /persistCurrentEditorDraft\(\{ reason: 'pagehide'/);
+  assert.doesNotMatch(handlerSource, /persistCurrentEditorDraft\(\{ reason: 'visibilitychange'/);
+});
+
+test('local draft writes use revision guards and browser-wide mutation serialization', () => {
+  const localDbSource = fs.readFileSync(path.resolve(SRC_DIR, 'lib/localWorkspaceDb.js'), 'utf8');
+
+  assert.match(localDbSource, /LOCAL_WORKSPACE_LOCK_NAME/);
+  assert.match(localDbSource, /navigator\.locks/);
+  assert.match(localDbSource, /localMutationQueue/);
+  assert.match(localDbSource, /expectedRevision/);
+  assert.match(localDbSource, /currentRevision !== expectedRevision/);
+  assert.match(localDbSource, /conflict: true/);
+  assert.match(localDbSource, /localRevision/);
 });
 
 test('builder switches resumes from local IndexedDB without cloud reads', () => {
@@ -1348,7 +1455,8 @@ test('workspace-changing actions save the current draft without rewriting the ol
   const localDbSource = fs.readFileSync(path.resolve(SRC_DIR, 'lib/localWorkspaceDb.js'), 'utf8');
 
   assert.match(localDbSource, /persistWorkspace = true/);
-  assert.match(localDbSource, /if \(persistWorkspace\) \{\n {4}writeLocalStorageWorkspace/);
+  assert.match(localDbSource, /if \(persistWorkspace\) \{\n\s+writeLocalStorageWorkspace/);
+  assert.match(localDbSource, /if \(enqueueSync && persistWorkspace\) \{/);
   assert.match(builderSource, /reason: 'create-resume', persistWorkspace: false/);
   assert.match(builderSource, /reason: 'import-placeholder', persistWorkspace: false/);
   assert.match(builderSource, /reason: 'duplicate-resume', persistWorkspace: false/);
@@ -1432,10 +1540,18 @@ test('local-first sync API and service worker are wired for queued background sy
   assert.match(hookSource, /registerResumeSyncWorker\(\)/);
   assert.match(syncClientSource, /navigator\.serviceWorker\.register\('\/sync-worker\.js'\)/);
   assert.match(syncClientSource, /fetch\('\/api\/sync-workspace'/);
+  assert.match(syncClientSource, /markOutboxStale/);
+  assert.match(syncClientSource, /staleOperationIds/);
+  assert.match(syncClientSource, /status: staleOperationIds\.length > 0 \? 'stale' : 'synced'/);
   assert.match(localDbSource, /const OUTBOX_STORE = 'outbox'/);
   assert.match(localDbSource, /const TOMBSTONES_STORE = 'tombstones'/);
+  assert.match(localDbSource, /status: 'stale'/);
+  assert.match(hookSource, /setSyncState\('stale'\)/);
   assert.match(syncApiSource, /verifyRequestUser\(req\)/);
   assert.match(syncApiSource, /CLOUD_WORKSPACE_RESUME_LIMIT = 100/);
+  assert.match(syncApiSource, /operation\.type === 'workspace' && operation\.workspace/);
+  assert.match(syncApiSource, /staleOperationIds\.push/);
+  assert.match(syncApiSource, /currentVersion <= write\.doc\.version/);
   assert.match(syncApiSource, /transaction\.delete\(write\.ref\)/);
   assert.match(sessionApiSource, /createSessionCookie/);
   assert.match(workerSource, /self\.addEventListener\('sync'/);

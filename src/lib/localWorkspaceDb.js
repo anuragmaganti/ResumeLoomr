@@ -25,6 +25,7 @@ const OUTBOX_STORE = 'outbox';
 const TOMBSTONES_STORE = 'tombstones';
 const SYNC_META_STORE = 'syncMeta';
 const ACCOUNT_BINDING_STORE = 'accountBinding';
+const LOCAL_WORKSPACE_LOCK_NAME = 'resumeloomr-local-workspace-mutation';
 
 const STORE_NAMES = [
   WORKSPACE_STORE,
@@ -36,6 +37,65 @@ const STORE_NAMES = [
 ];
 
 let dbPromise = null;
+let localMutationQueue = Promise.resolve();
+let localMutationDepth = 0;
+
+function createLocalRevision() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getDraftRecordRevision(record) {
+  if (record?.localRevision) {
+    return record.localRevision;
+  }
+
+  if (record?.draft?.localRevision) {
+    return record.draft.localRevision;
+  }
+
+  return `legacy:${record?.updatedAt || record?.draft?.savedAt || 'unknown'}`;
+}
+
+function getDraftStateRevision(draft) {
+  return draft?.localRevision || '';
+}
+
+function normalizeDraftWithRevision(draft, localRevision = '') {
+  return {
+    ...normalizeDraftState(draft),
+    localRevision: localRevision || getDraftStateRevision(draft),
+  };
+}
+
+async function withLocalWorkspaceLock(callback) {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : null;
+
+  if (!locks?.request) {
+    return callback();
+  }
+
+  return locks.request(LOCAL_WORKSPACE_LOCK_NAME, { mode: 'exclusive' }, callback);
+}
+
+function runLocalMutation(callback) {
+  if (localMutationDepth > 0) {
+    return callback();
+  }
+
+  const run = async () => {
+    localMutationDepth += 1;
+
+    try {
+      return await withLocalWorkspaceLock(callback);
+    } finally {
+      localMutationDepth -= 1;
+    }
+  };
+  const resultPromise = localMutationQueue.then(run, run);
+
+  localMutationQueue = resultPromise.catch(() => null);
+  return resultPromise;
+}
 
 function getStorage() {
   if (typeof window === 'undefined') {
@@ -80,6 +140,7 @@ function serializeDraftState(draft) {
     template: draft?.template,
     sectionOrder: normalizeSectionOrder(draft?.sectionOrder),
     resume: draft?.resume,
+    localRevision: draft?.localRevision || '',
   };
 }
 
@@ -91,6 +152,7 @@ function normalizeDraftState(draft) {
     template: normalizedDraft.template,
     sectionOrder: normalizedDraft.sectionOrder,
     savedAt: draft?.savedAt || null,
+    localRevision: draft?.localRevision || '',
   };
 }
 
@@ -242,12 +304,17 @@ async function writeWorkspaceRecord(tx, workspace) {
   });
 }
 
-async function writeDraftRecord(tx, resumeId, draft) {
+async function writeDraftRecord(tx, resumeId, draft, { localRevision = '' } = {}) {
+  const revision = localRevision || getDraftStateRevision(draft) || createLocalRevision();
+
   await tx.objectStore(DRAFTS_STORE).put({
     resumeId,
-    draft: normalizeDraftState(draft),
+    draft: normalizeDraftWithRevision(draft, revision),
+    localRevision: revision,
     updatedAt: draft?.savedAt || new Date().toISOString(),
   });
+
+  return revision;
 }
 
 function createOutboxRecord({ type, resumeId = '', workspace = null, draft = null, tombstone = null, accountUid = '', reason = '' }) {
@@ -262,6 +329,8 @@ function createOutboxRecord({ type, resumeId = '', workspace = null, draft = nul
     resumeId,
     workspace: workspace ? normalizeWorkspaceIndex(workspace) : null,
     draft: draft ? normalizeDraftState(draft) : null,
+    localRevision: draft ? getDraftStateRevision(draft) : '',
+    operationVersion: draft?.savedAt ? Date.parse(draft.savedAt) || Date.now() : Date.now(),
     tombstone,
     accountUid: accountUid || '',
     reason,
@@ -329,54 +398,56 @@ async function queueDeleteSyncInTx(tx, resumeId, workspace, options = {}) {
 }
 
 export async function initializeLocalWorkspace() {
-  const db = await getLocalWorkspaceDb();
+  return runLocalMutation(async () => {
+    const db = await getLocalWorkspaceDb();
 
-  if (!db) {
-    return readLegacyWorkspaceSnapshot();
-  }
-
-  const existingWorkspaceRecord = await readWorkspaceRecord(db);
-
-  if (existingWorkspaceRecord?.workspace?.resumeIds?.length > 0) {
-    const workspace = normalizeWorkspaceIndex(existingWorkspaceRecord.workspace);
-    const activeResumeId = workspace.activeResumeId || workspace.resumeIds[0];
-    const draft = await readLocalDraft(activeResumeId);
-
-    markLocalWorkspacePresent();
-    return {
-      workspace,
-      activeResumeId,
-      draft,
-      source: 'indexeddb',
-    };
-  }
-
-  const legacySnapshot = readLegacyWorkspaceSnapshot();
-  const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, SYNC_META_STORE], 'readwrite');
-
-  await writeWorkspaceRecord(tx, legacySnapshot.workspace);
-
-  for (const resumeId of legacySnapshot.workspace.resumeIds) {
-    const draft = resumeId === legacySnapshot.activeResumeId
-      ? legacySnapshot.draft
-      : readLegacyDraftFromLocalStorage(resumeId);
-
-    if (draft) {
-      await writeDraftRecord(tx, resumeId, draft);
+    if (!db) {
+      return readLegacyWorkspaceSnapshot();
     }
-  }
 
-  await tx.objectStore(SYNC_META_STORE).put({
-    id: LOCAL_SYNC_META_ID,
-    migratedAt: new Date().toISOString(),
-    source: legacySnapshot.source,
+    const existingWorkspaceRecord = await readWorkspaceRecord(db);
+
+    if (existingWorkspaceRecord?.workspace?.resumeIds?.length > 0) {
+      const workspace = normalizeWorkspaceIndex(existingWorkspaceRecord.workspace);
+      const activeResumeId = workspace.activeResumeId || workspace.resumeIds[0];
+      const draft = await readLocalDraft(activeResumeId);
+
+      markLocalWorkspacePresent();
+      return {
+        workspace,
+        activeResumeId,
+        draft,
+        source: 'indexeddb',
+      };
+    }
+
+    const legacySnapshot = readLegacyWorkspaceSnapshot();
+    const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, SYNC_META_STORE], 'readwrite');
+
+    await writeWorkspaceRecord(tx, legacySnapshot.workspace);
+
+    for (const resumeId of legacySnapshot.workspace.resumeIds) {
+      const draft = resumeId === legacySnapshot.activeResumeId
+        ? legacySnapshot.draft
+        : readLegacyDraftFromLocalStorage(resumeId);
+
+      if (draft) {
+        await writeDraftRecord(tx, resumeId, draft);
+      }
+    }
+
+    await tx.objectStore(SYNC_META_STORE).put({
+      id: LOCAL_SYNC_META_ID,
+      migratedAt: new Date().toISOString(),
+      source: legacySnapshot.source,
+    });
+    await tx.done;
+
+    writeLocalStorageWorkspace(legacySnapshot.workspace);
+    writeLocalStorageDraft(legacySnapshot.activeResumeId, legacySnapshot.draft);
+
+    return legacySnapshot;
   });
-  await tx.done;
-
-  writeLocalStorageWorkspace(legacySnapshot.workspace);
-  writeLocalStorageDraft(legacySnapshot.activeResumeId, legacySnapshot.draft);
-
-  return legacySnapshot;
 }
 
 export async function readLocalWorkspaceSnapshot() {
@@ -414,10 +485,14 @@ export async function readLocalDraft(resumeId) {
   const record = await db.get(DRAFTS_STORE, resumeId);
 
   if (record?.draft) {
-    return normalizeDraftState(record.draft);
+    return normalizeDraftWithRevision(record.draft, getDraftRecordRevision(record));
   }
 
-  return readLegacyDraftFromLocalStorage(resumeId) || createBlankDraftState();
+  const legacyDraft = readLegacyDraftFromLocalStorage(resumeId);
+
+  return legacyDraft
+    ? normalizeDraftWithRevision(legacyDraft, getDraftStateRevision(legacyDraft) || `legacy-localstorage:${legacyDraft.savedAt || 'unknown'}`)
+    : normalizeDraftWithRevision(createBlankDraftState(), createLocalRevision());
 }
 
 export async function readAllLocalDrafts(workspace) {
@@ -439,34 +514,70 @@ export async function persistLocalDraftSnapshot({
   enqueueSync = true,
   persistWorkspace = true,
   reason = 'autosave',
+  expectedRevision = '',
+  allowStaleOverwrite = false,
 }) {
-  const db = await getLocalWorkspaceDb();
-  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
-  const normalizedDraft = normalizeDraftState(draft);
+  return runLocalMutation(async () => {
+    const db = await getLocalWorkspaceDb();
+    const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+    const normalizedDraft = normalizeDraftState(draft);
 
-  if (persistWorkspace) {
-    writeLocalStorageWorkspace(normalizedWorkspace);
-  }
-  writeLocalStorageDraft(resumeId, normalizedDraft);
+    if (!db || !resumeId) {
+      const nextRevision = createLocalRevision();
+      const draftWithRevision = normalizeDraftWithRevision(normalizedDraft, nextRevision);
 
-  if (!db || !resumeId) {
-    return { workspace: normalizedWorkspace, draft: normalizedDraft };
-  }
+      if (persistWorkspace) {
+        writeLocalStorageWorkspace(normalizedWorkspace);
+      }
+      writeLocalStorageDraft(resumeId, draftWithRevision);
+      return { workspace: normalizedWorkspace, draft: draftWithRevision, conflict: false };
+    }
 
-  const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE], 'readwrite');
+    const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE], 'readwrite');
+    const existingRecord = await tx.objectStore(DRAFTS_STORE).get(resumeId);
+    const currentRevision = existingRecord ? getDraftRecordRevision(existingRecord) : '';
 
-  if (persistWorkspace) {
-    await writeWorkspaceRecord(tx, normalizedWorkspace);
-  }
-  await writeDraftRecord(tx, resumeId, normalizedDraft);
+    if (
+      expectedRevision &&
+      currentRevision &&
+      currentRevision !== expectedRevision &&
+      !allowStaleOverwrite
+    ) {
+      await tx.done;
+      return {
+        workspace: normalizedWorkspace,
+        draft: existingRecord?.draft ? normalizeDraftWithRevision(existingRecord.draft, currentRevision) : null,
+        conflict: true,
+        expectedRevision,
+        currentRevision,
+      };
+    }
 
-  if (enqueueSync) {
-    await queueWorkspaceSyncInTx(tx, normalizedWorkspace, { accountUid, reason });
-    await queueDraftSyncInTx(tx, resumeId, normalizedWorkspace, normalizedDraft, { accountUid, reason });
-  }
+    const nextRevision = createLocalRevision();
+    const draftWithRevision = normalizeDraftWithRevision(normalizedDraft, nextRevision);
 
-  await tx.done;
-  return { workspace: normalizedWorkspace, draft: normalizedDraft };
+    if (persistWorkspace) {
+      await writeWorkspaceRecord(tx, normalizedWorkspace);
+    }
+    await writeDraftRecord(tx, resumeId, draftWithRevision, { localRevision: nextRevision });
+
+    if (enqueueSync && persistWorkspace) {
+      await queueWorkspaceSyncInTx(tx, normalizedWorkspace, { accountUid, reason });
+    }
+
+    if (enqueueSync) {
+      await queueDraftSyncInTx(tx, resumeId, normalizedWorkspace, draftWithRevision, { accountUid, reason });
+    }
+
+    await tx.done;
+
+    if (persistWorkspace) {
+      writeLocalStorageWorkspace(normalizedWorkspace);
+    }
+    writeLocalStorageDraft(resumeId, draftWithRevision);
+
+    return { workspace: normalizedWorkspace, draft: draftWithRevision, conflict: false };
+  });
 }
 
 export async function persistLocalWorkspaceSnapshot({
@@ -475,25 +586,27 @@ export async function persistLocalWorkspaceSnapshot({
   enqueueSync = true,
   reason = 'workspace',
 }) {
-  const db = await getLocalWorkspaceDb();
-  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+  return runLocalMutation(async () => {
+    const db = await getLocalWorkspaceDb();
+    const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
 
-  writeLocalStorageWorkspace(normalizedWorkspace);
+    writeLocalStorageWorkspace(normalizedWorkspace);
 
-  if (!db) {
+    if (!db) {
+      return normalizedWorkspace;
+    }
+
+    const tx = db.transaction([WORKSPACE_STORE, OUTBOX_STORE], 'readwrite');
+
+    await writeWorkspaceRecord(tx, normalizedWorkspace);
+
+    if (enqueueSync) {
+      await queueWorkspaceSyncInTx(tx, normalizedWorkspace, { accountUid, reason });
+    }
+
+    await tx.done;
     return normalizedWorkspace;
-  }
-
-  const tx = db.transaction([WORKSPACE_STORE, OUTBOX_STORE], 'readwrite');
-
-  await writeWorkspaceRecord(tx, normalizedWorkspace);
-
-  if (enqueueSync) {
-    await queueWorkspaceSyncInTx(tx, normalizedWorkspace, { accountUid, reason });
-  }
-
-  await tx.done;
-  return normalizedWorkspace;
+  });
 }
 
 export async function persistLocalResumeDelete({
@@ -503,88 +616,94 @@ export async function persistLocalResumeDelete({
   enqueueSync = true,
   reason = 'delete',
 }) {
-  const db = await getLocalWorkspaceDb();
-  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+  return runLocalMutation(async () => {
+    const db = await getLocalWorkspaceDb();
+    const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
 
-  writeLocalStorageWorkspace(normalizedWorkspace);
-  removeLocalStorageDraft(resumeId);
+    writeLocalStorageWorkspace(normalizedWorkspace);
+    removeLocalStorageDraft(resumeId);
 
-  if (!db || !resumeId) {
+    if (!db || !resumeId) {
+      return normalizedWorkspace;
+    }
+
+    const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
+
+    await writeWorkspaceRecord(tx, normalizedWorkspace);
+    await tx.objectStore(DRAFTS_STORE).delete(resumeId);
+
+    if (enqueueSync) {
+      await queueWorkspaceSyncInTx(tx, normalizedWorkspace, { accountUid, reason });
+      await queueDeleteSyncInTx(tx, resumeId, normalizedWorkspace, { accountUid, reason });
+    }
+
+    await tx.done;
     return normalizedWorkspace;
-  }
-
-  const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
-
-  await writeWorkspaceRecord(tx, normalizedWorkspace);
-  await tx.objectStore(DRAFTS_STORE).delete(resumeId);
-
-  if (enqueueSync) {
-    await queueWorkspaceSyncInTx(tx, normalizedWorkspace, { accountUid, reason });
-    await queueDeleteSyncInTx(tx, resumeId, normalizedWorkspace, { accountUid, reason });
-  }
-
-  await tx.done;
-  return normalizedWorkspace;
+  });
 }
 
 export async function replaceLocalWorkspaceFromCloud({ workspace, draftsByResumeId, accountUid = '' }) {
-  const db = await getLocalWorkspaceDb();
-  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+  return runLocalMutation(async () => {
+    const db = await getLocalWorkspaceDb();
+    const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
 
-  writeLocalStorageWorkspace(normalizedWorkspace);
+    writeLocalStorageWorkspace(normalizedWorkspace);
 
-  draftsByResumeId.forEach((draft, resumeId) => {
-    writeLocalStorageDraft(resumeId, normalizeDraftState(draft));
-  });
-
-  if (!db) {
-    return;
-  }
-
-  const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE, ACCOUNT_BINDING_STORE], 'readwrite');
-
-  await writeWorkspaceRecord(tx, normalizedWorkspace);
-  await tx.objectStore(DRAFTS_STORE).clear();
-  await tx.objectStore(OUTBOX_STORE).clear();
-  await tx.objectStore(TOMBSTONES_STORE).clear();
-
-  for (const resumeId of normalizedWorkspace.resumeIds) {
-    const draft = draftsByResumeId.get(resumeId);
-
-    if (draft) {
-      await writeDraftRecord(tx, resumeId, normalizeDraftState(draft));
-    }
-  }
-
-  if (accountUid) {
-    await tx.objectStore(ACCOUNT_BINDING_STORE).put({
-      id: LOCAL_ACCOUNT_BINDING_ID,
-      uid: accountUid,
-      updatedAt: new Date().toISOString(),
+    draftsByResumeId.forEach((draft, resumeId) => {
+      writeLocalStorageDraft(resumeId, normalizeDraftState(draft));
     });
-  }
 
-  await tx.done;
+    if (!db) {
+      return;
+    }
+
+    const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE, ACCOUNT_BINDING_STORE], 'readwrite');
+
+    await writeWorkspaceRecord(tx, normalizedWorkspace);
+    await tx.objectStore(DRAFTS_STORE).clear();
+    await tx.objectStore(OUTBOX_STORE).clear();
+    await tx.objectStore(TOMBSTONES_STORE).clear();
+
+    for (const resumeId of normalizedWorkspace.resumeIds) {
+      const draft = draftsByResumeId.get(resumeId);
+
+      if (draft) {
+        await writeDraftRecord(tx, resumeId, normalizeDraftState(draft));
+      }
+    }
+
+    if (accountUid) {
+      await tx.objectStore(ACCOUNT_BINDING_STORE).put({
+        id: LOCAL_ACCOUNT_BINDING_ID,
+        uid: accountUid,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    await tx.done;
+  });
 }
 
 export async function enqueueFullWorkspaceSync({ accountUid = '', reason = 'full-sync' } = {}) {
-  const snapshot = await readLocalWorkspaceSnapshot();
-  const drafts = await readAllLocalDrafts(snapshot.workspace);
-  const db = await getLocalWorkspaceDb();
+  return runLocalMutation(async () => {
+    const snapshot = await readLocalWorkspaceSnapshot();
+    const drafts = await readAllLocalDrafts(snapshot.workspace);
+    const db = await getLocalWorkspaceDb();
 
-  if (!db) {
-    return [];
-  }
+    if (!db) {
+      return [];
+    }
 
-  const tx = db.transaction([OUTBOX_STORE], 'readwrite');
-  await queueWorkspaceSyncInTx(tx, snapshot.workspace, { accountUid, reason });
+    const tx = db.transaction([OUTBOX_STORE], 'readwrite');
+    await queueWorkspaceSyncInTx(tx, snapshot.workspace, { accountUid, reason });
 
-  for (const [resumeId, draft] of drafts) {
-    await queueDraftSyncInTx(tx, resumeId, snapshot.workspace, draft, { accountUid, reason });
-  }
+    for (const [resumeId, draft] of drafts) {
+      await queueDraftSyncInTx(tx, resumeId, snapshot.workspace, draft, { accountUid, reason });
+    }
 
-  await tx.done;
-  return Array.from(drafts.keys());
+    await tx.done;
+    return Array.from(drafts.keys());
+  });
 }
 
 export async function readPendingOutbox({ limit = 150 } = {}) {
@@ -647,6 +766,34 @@ export async function markOutboxFailed(operationIds, errorMessage = '') {
       lastError: errorMessage,
       updatedAt: new Date().toISOString(),
       status: 'pending',
+    });
+  }
+
+  await tx.done;
+}
+
+export async function markOutboxStale(operationIds, errorMessage = 'Skipped stale cloud write.') {
+  const db = await getLocalWorkspaceDb();
+  const ids = Array.isArray(operationIds) ? operationIds.filter(Boolean) : [];
+
+  if (!db || ids.length === 0) {
+    return;
+  }
+
+  const tx = db.transaction(OUTBOX_STORE, 'readwrite');
+
+  for (const id of ids) {
+    const record = await tx.store.get(id);
+
+    if (!record) {
+      continue;
+    }
+
+    await tx.store.put({
+      ...record,
+      lastError: errorMessage,
+      updatedAt: new Date().toISOString(),
+      status: 'stale',
     });
   }
 
