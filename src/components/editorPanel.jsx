@@ -78,6 +78,19 @@ const sectionMeta = {
     }
 };
 
+function formatSectionRailLabel(value) {
+    const label = typeof value === "string" ? value.trim() : "";
+    const hasLetters = /[A-Za-z]/.test(label);
+    const isAllCaps = hasLetters && label === label.toUpperCase();
+
+    if (!isAllCaps) {
+        return label;
+    }
+
+    const lowerLabel = label.toLowerCase();
+    return `${lowerLabel.charAt(0).toUpperCase()}${lowerLabel.slice(1)}`;
+}
+
 export default function EditorPanel({
     activeTab,
     setActiveTab,
@@ -109,7 +122,7 @@ export default function EditorPanel({
         },
         ...resumeBlocks.map((section) => ({
             id: section.id,
-            navLabel: section.title,
+            navLabel: formatSectionRailLabel(section.title),
             navHint: sectionMeta[section.id]?.navHint || sectionMeta[section.kind]?.navHint || (
                 section.kind === "roles" ? "Roles and highlights" : "Section details"
             )

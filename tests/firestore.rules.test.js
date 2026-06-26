@@ -41,7 +41,7 @@ function createResumeDoc(overrides = {}) {
     schemaVersion: 1,
     resumeId,
     name: 'Resume 1',
-    template: 'modern',
+    template: 'compact',
     resume: {
       personal: {
         name: 'Ada Lovelace',

@@ -19,7 +19,7 @@ service cloud.firestore {
     }
 
     function isValidTemplate(value) {
-      return value in ['modern', 'executive', 'compact'];
+      return value in ['executive', 'compact'];
     }
 
     function isValidSetting(value) {

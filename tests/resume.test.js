@@ -241,12 +241,12 @@ test('resume settings produce bounded preview and print variables', () => {
     horizontalMargins: -99,
     verticalMargins: 2,
   });
-  const vars = getResumePresentationVars(settings, 'modern');
+  const vars = getResumePresentationVars(settings, 'compact');
 
   assert.equal(settings.textSize, 5);
   assert.equal(settings.horizontalMargins, -5);
   assert.match(vars['--resume-page-margin-inline'], /in$/);
-  assert.match(getResumePrintPageRule(settings, 'modern'), /^@page/);
+  assert.match(getResumePrintPageRule(settings, 'compact'), /^@page/);
 
   const updatedResume = updateResumeSetting(createEmptyResume(), 'textSize', 1);
   assert.equal(updatedResume.settings.textSize, 1);

@@ -3,9 +3,8 @@ export const WORKSPACE_INDEX_STORAGE_KEY = 'resumeloomr:index:v1';
 export const RESUME_STORAGE_KEY_PREFIX = 'resumeloomr:resume:';
 export const MAX_WORKSPACE_RESUME_NAME_LENGTH = 25;
 export const MAX_WORKSPACE_RESUMES = 100;
-export const DEFAULT_TEMPLATE = 'modern';
+export const DEFAULT_TEMPLATE = 'compact';
 export const TEMPLATE_OPTIONS = [
-  { id: 'modern', label: 'Modern' },
   { id: 'executive', label: 'Executive' },
   { id: 'compact', label: 'Compact' },
 ];
@@ -54,27 +53,6 @@ const DEFAULT_SECTION_BLOCKS = [
   { id: 'publications', kind: 'publications', title: 'Publications' },
 ];
 const RESUME_PRESENTATION_BASES = {
-  modern: {
-    pageMinHeightPx: 1090,
-    pageMarginInlineIn: 0.5,
-    pageMarginTopIn: 0.5,
-    pageMarginBottomIn: 0.5,
-    nameSizeRem: 1.5,
-    headingSizeRem: 0.625,
-    bodySizeRem: 0.75,
-    detailSizeRem: 0.6875,
-    metaSizeRem: 0.6875,
-    headlineSizeRem: 0.8125,
-    bodyLineHeight: 1.3,
-    detailLineHeight: 1.45,
-    listLineHeight: 1.4,
-    sectionGapPx: 12,
-    sectionHeadingGapPx: 8,
-    entryGapPx: 6,
-    repeatedEntryGapPx: 8,
-    detailGapPx: 4,
-    listGapPx: 4,
-  },
   executive: {
     pageMinHeightPx: 1090,
     pageMarginInlineIn: 0.5,
