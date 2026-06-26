@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 
 import {
   DEFAULT_TEMPLATE,
+  MAX_RESUME_SECTIONS,
   MAX_WORKSPACE_RESUMES,
+  SECTION_TEMPLATE_GROUPS,
+  addResumeSectionBlock,
   createDuplicateResumeName,
   createEmptyResume,
   createFreshWorkspaceDraft,
@@ -180,6 +183,39 @@ test('section helpers reorder and remove blocks without a separate order field',
 
   resume = removeResumeSectionBlock(resume, 'skills');
   assert.equal(getSection(resume, 'skills'), undefined);
+});
+
+test('section template helper appends repeatable block sections with unique names', () => {
+  let resume = createEmptyResume();
+
+  const firstInternship = addResumeSectionBlock(resume, 'internships');
+  resume = firstInternship.resume;
+  const secondInternship = addResumeSectionBlock(resume, 'internships');
+  resume = secondInternship.resume;
+  const fallbackCustom = addResumeSectionBlock(resume, 'unknown-template');
+  resume = fallbackCustom.resume;
+
+  assert.ok(SECTION_TEMPLATE_GROUPS.some((group) => group.templates.some((template) => template.id === 'internships')));
+  assert.equal(getSection(resume, firstInternship.sectionId).kind, 'roles');
+  assert.equal(getSection(resume, firstInternship.sectionId).title, 'Internships');
+  assert.equal(getSection(resume, secondInternship.sectionId).title, 'Internships 2');
+  assert.notEqual(firstInternship.sectionId, secondInternship.sectionId);
+  assert.equal(getSection(resume, fallbackCustom.sectionId).kind, 'custom');
+  assert.equal(getSection(resume, fallbackCustom.sectionId).title, 'Custom Section');
+});
+
+test('section template helper stops at the resume section safety cap', () => {
+  let resume = createEmptyResume();
+
+  while (resume.sections.length < MAX_RESUME_SECTIONS) {
+    resume = addResumeSectionBlock(resume, 'custom-section').resume;
+  }
+
+  const capped = addResumeSectionBlock(resume, 'custom-section');
+
+  assert.equal(resume.sections.length, MAX_RESUME_SECTIONS);
+  assert.equal(capped.resume.sections.length, MAX_RESUME_SECTIONS);
+  assert.equal(capped.sectionId, '');
 });
 
 test('preview model renders ordered block sections and filters empty sections', () => {

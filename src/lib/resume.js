@@ -3,6 +3,7 @@ export const WORKSPACE_INDEX_STORAGE_KEY = 'resumeloomr:index:v1';
 export const RESUME_STORAGE_KEY_PREFIX = 'resumeloomr:resume:';
 export const MAX_WORKSPACE_RESUME_NAME_LENGTH = 25;
 export const MAX_WORKSPACE_RESUMES = 100;
+export const MAX_RESUME_SECTIONS = 100;
 export const DEFAULT_TEMPLATE = 'compact';
 export const TEMPLATE_OPTIONS = [
   { id: 'executive', label: 'Executive' },
@@ -18,6 +19,53 @@ export const SECTION_BLOCK_KINDS = [
   'awards',
   'publications',
   'custom',
+];
+export const SECTION_TEMPLATE_GROUPS = [
+  {
+    id: 'common',
+    label: 'Common',
+    templates: [
+      { id: 'education', kind: 'education', title: 'Education' },
+      { id: 'experience', kind: 'roles', title: 'Experience' },
+      { id: 'skills', kind: 'skills', title: 'Skills' },
+      { id: 'projects', kind: 'projects', title: 'Projects' },
+      { id: 'certifications', kind: 'certifications', title: 'Certifications' },
+      { id: 'languages', kind: 'languages', title: 'Languages' },
+      { id: 'awards', kind: 'awards', title: 'Awards' },
+      { id: 'publications', kind: 'publications', title: 'Publications' },
+    ],
+  },
+  {
+    id: 'roles',
+    label: 'Role sections',
+    templates: [
+      { id: 'internships', kind: 'roles', title: 'Internships' },
+      { id: 'research', kind: 'roles', title: 'Research' },
+      { id: 'teaching', kind: 'roles', title: 'Teaching' },
+      { id: 'clinical-experience', kind: 'roles', title: 'Clinical Experience' },
+      { id: 'military-service', kind: 'roles', title: 'Military Service' },
+      { id: 'leadership', kind: 'roles', title: 'Leadership' },
+      { id: 'volunteering', kind: 'roles', title: 'Volunteering' },
+      { id: 'campus-involvement', kind: 'roles', title: 'Campus Involvement' },
+      { id: 'community-service', kind: 'roles', title: 'Community Service' },
+    ],
+  },
+  {
+    id: 'academic-technical',
+    label: 'Academic and technical',
+    templates: [
+      { id: 'presentations', kind: 'publications', title: 'Presentations' },
+      { id: 'patents', kind: 'publications', title: 'Patents' },
+      { id: 'professional-affiliations', kind: 'custom', title: 'Professional Affiliations' },
+    ],
+  },
+  {
+    id: 'other',
+    label: 'Other',
+    templates: [
+      { id: 'custom-section', kind: 'custom', title: 'Custom Section' },
+    ],
+  },
 ];
 export const RESUME_SETTINGS_DEFAULTS = {
   textSize: 0,
@@ -52,6 +100,9 @@ const DEFAULT_SECTION_BLOCKS = [
   { id: 'awards', kind: 'awards', title: 'Awards' },
   { id: 'publications', kind: 'publications', title: 'Publications' },
 ];
+const SECTION_TEMPLATE_MAP = new Map(
+  SECTION_TEMPLATE_GROUPS.flatMap((group) => group.templates.map((template) => [template.id, template])),
+);
 const RESUME_PRESENTATION_BASES = {
   executive: {
     pageMinHeightPx: 1090,
@@ -381,6 +432,35 @@ function uniqueSectionId(rawId, usedIds, kind, title, index) {
   return nextId;
 }
 
+function getSectionTemplate(templateId) {
+  const template = SECTION_TEMPLATE_MAP.get(trimText(templateId));
+
+  if (template) {
+    return template;
+  }
+
+  return SECTION_TEMPLATE_MAP.get('custom-section');
+}
+
+function createUniqueSectionTitle(sections, title) {
+  const baseTitle = trimText(title) || 'Custom Section';
+  const existingTitles = new Set(
+    sections.map((section) => trimText(section.title).toLowerCase()).filter(Boolean),
+  );
+
+  if (!existingTitles.has(baseTitle.toLowerCase())) {
+    return baseTitle;
+  }
+
+  let suffix = 2;
+
+  while (existingTitles.has(`${baseTitle} ${suffix}`.toLowerCase())) {
+    suffix += 1;
+  }
+
+  return `${baseTitle} ${suffix}`;
+}
+
 function normalizeSectionBlock(section, index, usedIds) {
   const kind = normalizeSectionKind(section?.kind);
   const defaultBlock = DEFAULT_SECTION_BLOCKS[index] || {};
@@ -424,6 +504,46 @@ export function createDefaultSections() {
     ...section,
     entries: [createEntryForKind(section.kind)],
   }));
+}
+
+export function createResumeSectionBlock(resume, templateId) {
+  const normalizedResume = normalizeResume(resume);
+
+  if (normalizedResume.sections.length >= MAX_RESUME_SECTIONS) {
+    return null;
+  }
+
+  const template = getSectionTemplate(templateId);
+  const kind = normalizeSectionKind(template.kind);
+  const title = createUniqueSectionTitle(normalizedResume.sections, template.title);
+  const usedIds = new Set(normalizedResume.sections.map((section) => section.id));
+
+  return normalizeSectionBlock({
+    id: createSectionId(kind, title),
+    kind,
+    title,
+    entries: [createEntryForKind(kind)],
+  }, normalizedResume.sections.length, usedIds);
+}
+
+export function addResumeSectionBlock(resume, templateId) {
+  const normalizedResume = normalizeResume(resume);
+  const section = createResumeSectionBlock(normalizedResume, templateId);
+
+  if (!section) {
+    return {
+      resume: normalizedResume,
+      sectionId: '',
+    };
+  }
+
+  return {
+    resume: {
+      ...normalizedResume,
+      sections: [...normalizedResume.sections, section],
+    },
+    sectionId: section.id,
+  };
 }
 
 export function createEmptyResume() {

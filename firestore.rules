@@ -83,7 +83,7 @@ service cloud.firestore {
     function isValidSections(sections) {
       return sections is list &&
         sections.size() > 0 &&
-        sections.size() <= 32;
+        sections.size() <= 100;
     }
 
     function isValidResumeShape(resume) {

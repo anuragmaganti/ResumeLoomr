@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
     closestCenter,
@@ -101,10 +101,15 @@ export default function SectionTabs({
     setActiveTab,
     sections = defaultSections,
     onReorderSections,
-    onReorderSection
+    onReorderSection,
+    sectionTemplateGroups = [],
+    onAddSection,
+    canAddMoreSections = true
 }) {
     const [activeDragId, setActiveDragId] = useState(null);
     const [activeDragRect, setActiveDragRect] = useState(null);
+    const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+    const addControlRef = useRef(null);
     const sectionIds = useMemo(() => getSectionIds(sections), [sections]);
     const sectionById = useMemo(
         () => new Map(sections.map((section) => [section.id, section])),
@@ -117,6 +122,7 @@ export default function SectionTabs({
     const activeDragSection = activeDragId ? sectionById.get(activeDragId) : null;
     const activeDragIndex = activeDragId ? sectionIds.indexOf(activeDragId) : -1;
     const canReorder = Boolean(onReorderSections || onReorderSection);
+    const canAddSections = Boolean(onAddSection && sectionTemplateGroups.length > 0);
     const sensors = useSensors(
         useSensor(ResumeLoomrPointerSensor, {
             activationConstraint: {
@@ -173,6 +179,39 @@ export default function SectionTabs({
         }
     }
 
+    function handleAddSection(templateId) {
+        onAddSection?.(templateId);
+        setIsAddMenuOpen(false);
+    }
+
+    useEffect(() => {
+        if (!isAddMenuOpen) {
+            return undefined;
+        }
+
+        function handlePointerDown(event) {
+            if (addControlRef.current?.contains(event.target)) {
+                return;
+            }
+
+            setIsAddMenuOpen(false);
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === "Escape") {
+                setIsAddMenuOpen(false);
+            }
+        }
+
+        document.addEventListener("pointerdown", handlePointerDown);
+        document.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            document.removeEventListener("pointerdown", handlePointerDown);
+            document.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [isAddMenuOpen]);
+
     const sectionDragOverlay = (
         <DragOverlay adjustScale={false} zIndex={1000}>
             <SectionTabOverlay
@@ -188,29 +227,69 @@ export default function SectionTabs({
     );
 
     return (
-        <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleSectionDragStart}
-            onDragEnd={handleSectionDragEnd}
-            onDragCancel={resetSectionDragState}
-        >
-            <SortableContext items={sectionIds} strategy={rectSortingStrategy}>
-                <div className="tabs" role="tablist" aria-label="Resume sections">
-                    {orderedSections.map((section, index) => (
-                        <SortableSectionTab
-                            key={section.id}
-                            section={section}
-                            index={index}
-                            isActive={activeTab === section.id}
-                            isLocked={section.id === "personal" || !canReorder}
-                            setActiveTab={setActiveTab}
-                        />
-                    ))}
-                </div>
-            </SortableContext>
+        <>
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleSectionDragStart}
+                onDragEnd={handleSectionDragEnd}
+                onDragCancel={resetSectionDragState}
+            >
+                <SortableContext items={sectionIds} strategy={rectSortingStrategy}>
+                    <div className="tabs" role="tablist" aria-label="Resume sections">
+                        {orderedSections.map((section, index) => (
+                            <SortableSectionTab
+                                key={section.id}
+                                section={section}
+                                index={index}
+                                isActive={activeTab === section.id}
+                                isLocked={section.id === "personal" || !canReorder}
+                                setActiveTab={setActiveTab}
+                            />
+                        ))}
+                    </div>
+                </SortableContext>
 
-            {typeof document === "undefined" ? sectionDragOverlay : createPortal(sectionDragOverlay, document.body)}
-        </DndContext>
+                {typeof document === "undefined" ? sectionDragOverlay : createPortal(sectionDragOverlay, document.body)}
+            </DndContext>
+
+            {canAddSections ? (
+                <div className="sectionAddControl" ref={addControlRef}>
+                    <button
+                        className="button buttonSecondary sectionAddButton"
+                        type="button"
+                        aria-expanded={isAddMenuOpen}
+                        aria-controls="section-add-menu"
+                        disabled={!canAddMoreSections}
+                        onClick={() => setIsAddMenuOpen((isOpen) => !isOpen)}
+                    >
+                        {canAddMoreSections ? "+ Add section" : "Section limit reached"}
+                    </button>
+
+                    {isAddMenuOpen && canAddMoreSections ? (
+                        <div className="sectionAddMenu" id="section-add-menu" role="menu" aria-label="Add resume section">
+                            {sectionTemplateGroups.map((group) => (
+                                <div className="sectionAddGroup" key={group.id}>
+                                    <div className="sectionAddGroupLabel">{group.label}</div>
+                                    <div className="sectionAddGroupList">
+                                        {group.templates.map((template) => (
+                                            <button
+                                                className="sectionAddOption"
+                                                type="button"
+                                                role="menuitem"
+                                                key={template.id}
+                                                onClick={() => handleAddSection(template.id)}
+                                            >
+                                                {template.title}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
+        </>
     );
 }

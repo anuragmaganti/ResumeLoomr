@@ -8,6 +8,7 @@ import {
     createEditorTargetAttributes,
     sectionTitleEditorPath
 } from "../lib/editorTargets";
+import { MAX_RESUME_SECTIONS, SECTION_TEMPLATE_GROUPS } from "../lib/resume";
 
 const sectionMeta = {
     personal: {
@@ -109,6 +110,7 @@ export default function EditorPanel({
     onClearPreviewEditTarget
 }) {
     const handledPreviewRequestIdRef = useRef(0);
+    const pendingAddedSectionIdRef = useRef("");
     const resumeBlocks = Array.isArray(resume.sections) ? resume.sections : [];
     const activeBlock = resumeBlocks.find((section) => section.id === activeTab);
     const currentSectionLabel = activeTab === "personal"
@@ -141,6 +143,17 @@ export default function EditorPanel({
     const setManualActiveTab = (sectionId) => {
         onClearPreviewEditTarget?.();
         setActiveTab(sectionId);
+    };
+    const handleAddSection = (templateId) => {
+        const nextSectionId = actions.addResumeSection(templateId);
+
+        if (!nextSectionId) {
+            return;
+        }
+
+        onClearPreviewEditTarget?.();
+        pendingAddedSectionIdRef.current = nextSectionId;
+        setActiveTab(nextSectionId);
     };
 
     useEffect(() => {
@@ -203,6 +216,31 @@ export default function EditorPanel({
         };
     }, [activeTab, previewEditTarget, setActiveTab]);
 
+    useEffect(() => {
+        const pendingSectionId = pendingAddedSectionIdRef.current;
+
+        if (!pendingSectionId || activeTab !== pendingSectionId) {
+            return undefined;
+        }
+
+        let frameId = window.requestAnimationFrame(() => {
+            const sectionTitleInput = document.getElementById(`section-title-${pendingSectionId}`);
+
+            if (!sectionTitleInput) {
+                return;
+            }
+
+            sectionTitleInput.scrollIntoView({ block: "center", behavior: "smooth" });
+            sectionTitleInput.focus({ preventScroll: true });
+            sectionTitleInput.select?.();
+            pendingAddedSectionIdRef.current = "";
+        });
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+        };
+    }, [activeTab]);
+
     return (
         <section className="editorPanel">
             <div className="editorWorkspace" style={editorWorkspaceStyle}>
@@ -224,6 +262,9 @@ export default function EditorPanel({
                             sections={sections}
                             onReorderSection={onReorderSection}
                             onReorderSections={onReorderSections}
+                            sectionTemplateGroups={SECTION_TEMPLATE_GROUPS}
+                            onAddSection={handleAddSection}
+                            canAddMoreSections={resumeBlocks.length < MAX_RESUME_SECTIONS}
                         />
                     </aside>
                 </div>

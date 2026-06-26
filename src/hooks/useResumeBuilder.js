@@ -4,6 +4,7 @@ import {
   DEFAULT_TEMPLATE,
   MAX_WORKSPACE_RESUMES,
   TEMPLATE_OPTIONS,
+  addResumeSectionBlock,
   addRoleBlockActivity,
   addRoleBlockEntry,
   addSectionBlockEducationCustomSection,
@@ -973,6 +974,27 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     },
     updateResumeSetting(settingId, delta) {
       updateResume((currentResume) => updateResumeSettingValue(currentResume, settingId, delta));
+    },
+    addResumeSection(templateId) {
+      let nextSectionId = '';
+
+      flushSync(() => {
+        setSaveState('saving');
+        setResume((currentResume) => {
+          const sourceResume = currentDraftRef.current?.resume || currentResume;
+          const result = addResumeSectionBlock(sourceResume, templateId);
+          nextSectionId = result.sectionId;
+
+          currentDraftRef.current = {
+            ...currentDraftRef.current,
+            resume: result.resume,
+          };
+
+          return result.resume;
+        });
+      });
+
+      return nextSectionId;
     },
     removeResumeSection(sectionId) {
       updateResume((currentResume) => removeResumeSectionBlock(currentResume, sectionId));

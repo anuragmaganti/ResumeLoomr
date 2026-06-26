@@ -154,10 +154,21 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
       ...createResumeDoc(),
       ['section' + 'Order']: ['personal', 'experience'],
     }));
+    await assertSucceeds(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        sections: Array.from({ length: 100 }, (_, index) => ({
+          id: `section-${index}`,
+          kind: 'custom',
+          title: `Section ${index}`,
+          entries: [],
+        })),
+      },
+    })));
     await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
       resume: {
         ...createResumeDoc().resume,
-        sections: Array.from({ length: 33 }, (_, index) => ({
+        sections: Array.from({ length: 101 }, (_, index) => ({
           id: `section-${index}`,
           kind: 'custom',
           title: `Section ${index}`,
