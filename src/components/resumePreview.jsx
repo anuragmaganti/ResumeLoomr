@@ -427,6 +427,8 @@ export default function ResumePreview({
             return;
         }
 
+        event.preventDefault();
+
         onEditTarget({
             sectionId: targetElement.dataset.editSectionId,
             field: targetElement.dataset.editField || '',
@@ -434,6 +436,8 @@ export default function ResumePreview({
             itemIndex: targetElement.dataset.editItemIndex ? Number(targetElement.dataset.editItemIndex) : undefined,
             nestedPath: targetElement.dataset.editNestedPath || '',
             path: targetElement.dataset.editPath,
+            scrollX: window.scrollX,
+            scrollY: window.scrollY,
         });
     }
 

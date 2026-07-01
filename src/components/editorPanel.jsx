@@ -92,6 +92,32 @@ function formatSectionRailLabel(value) {
     return `${lowerLabel.charAt(0).toUpperCase()}${lowerLabel.slice(1)}`;
 }
 
+function scrollElementWithinContainer(element, container) {
+    if (!element || !container) {
+        return;
+    }
+
+    const elementRect = element.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const topOverflow = elementRect.top - containerRect.top;
+    const bottomOverflow = elementRect.bottom - containerRect.bottom;
+
+    if (topOverflow < 0) {
+        container.scrollTo({
+            top: container.scrollTop + topOverflow - 16,
+            behavior: "smooth"
+        });
+        return;
+    }
+
+    if (bottomOverflow > 0) {
+        container.scrollTo({
+            top: container.scrollTop + bottomOverflow + 16,
+            behavior: "smooth"
+        });
+    }
+}
+
 export default function EditorPanel({
     activeTab,
     setActiveTab,
@@ -249,9 +275,7 @@ export default function EditorPanel({
             const previousScrollX = Number.isFinite(previewEditTarget.scrollX) ? previewEditTarget.scrollX : window.scrollX;
             const previousScrollY = Number.isFinite(previewEditTarget.scrollY) ? previewEditTarget.scrollY : window.scrollY;
 
-            if (!previewEditTarget.preserveScroll) {
-                fieldElement.scrollIntoView({ block: "center", behavior: "smooth" });
-            }
+            scrollElementWithinContainer(fieldElement, fieldElement.closest(".formContainer"));
 
             focusElement?.focus({ preventScroll: true });
 
@@ -271,18 +295,16 @@ export default function EditorPanel({
                 });
             }
 
-            if (previewEditTarget.preserveScroll) {
-                const restorePreservedScroll = () => {
-                    if (!isCancelled) {
-                        window.scrollTo(previousScrollX, previousScrollY);
-                    }
-                };
+            const restorePreservedScroll = () => {
+                if (!isCancelled) {
+                    window.scrollTo(previousScrollX, previousScrollY);
+                }
+            };
 
-                restorePreservedScroll();
-                restoreFrameId = window.requestAnimationFrame(restorePreservedScroll);
-                restoreTimeoutIds.push(window.setTimeout(restorePreservedScroll, 80));
-                restoreTimeoutIds.push(window.setTimeout(restorePreservedScroll, 180));
-            }
+            restorePreservedScroll();
+            restoreFrameId = window.requestAnimationFrame(restorePreservedScroll);
+            restoreTimeoutIds.push(window.setTimeout(restorePreservedScroll, 80));
+            restoreTimeoutIds.push(window.setTimeout(restorePreservedScroll, 180));
         }
 
         frameId = window.requestAnimationFrame(focusAndHighlightTarget);
@@ -316,7 +338,7 @@ export default function EditorPanel({
                 return;
             }
 
-            sectionTitleInput.scrollIntoView({ block: "center", behavior: "smooth" });
+            scrollElementWithinContainer(sectionTitleInput, sectionTitleInput.closest(".formContainer"));
             sectionTitleInput.focus({ preventScroll: true });
             sectionTitleInput.select?.();
             pendingAddedSectionIdRef.current = "";
