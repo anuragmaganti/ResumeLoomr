@@ -43,6 +43,7 @@ import {
 import {
   createOutboxAckDescriptor,
   createDraftContentHash,
+  createSavedDraftState,
   filterOutboxOperationsForAccount,
   mergeLocalAndCloudWorkspaces,
   outboxOperationBelongsToAccount,
@@ -366,6 +367,23 @@ test('draft content hashes ignore saved time but track content', () => {
 
   assert.equal(createDraftContentHash(firstDraft), createDraftContentHash(secondDraft));
   assert.notEqual(createDraftContentHash(firstDraft), createDraftContentHash(thirdDraft));
+});
+
+test('saved draft state stamps a fresh save time', async () => {
+  const oldDraft = createDraft('Fresh Save', '2000-01-01T03:10:00.000Z');
+  const beforeSave = Date.now();
+  await new Promise((resolve) => setTimeout(resolve, 2));
+  const savedDraft = createSavedDraftState(oldDraft);
+
+  assert.ok(Date.parse(savedDraft.savedAt) >= beforeSave);
+  assert.notEqual(savedDraft.savedAt, oldDraft.savedAt);
+
+  const blankSavedDraft = createSavedDraftState({
+    ...oldDraft,
+    savedAt: null,
+  });
+
+  assert.match(blankSavedDraft.savedAt, /^\d{4}-\d{2}-\d{2}T/);
 });
 
 test('login merge restores cloud resumes into blank local workspaces', () => {

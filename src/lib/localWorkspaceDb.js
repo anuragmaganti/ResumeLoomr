@@ -1235,8 +1235,13 @@ export async function markOutboxStale(operations, errorMessage = 'Skipped stale 
   await tx.done;
 }
 
-export function createSavedDraftState({ resume, template, savedAt = new Date().toISOString(), localRevision = '' }) {
-  const payload = createDraftPayload({ resume, template, savedAt, localRevision });
+export function createSavedDraftState({ resume, template, localRevision = '' }) {
+  const payload = createDraftPayload({
+    resume,
+    template,
+    savedAt: new Date().toISOString(),
+    localRevision,
+  });
 
   return {
     resume: payload.resume,
