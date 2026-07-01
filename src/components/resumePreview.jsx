@@ -462,14 +462,25 @@ export default function ResumePreview({
         }
     }
 
+    function getPreviewDragScrollTarget() {
+        const hasFreshScrollCapture = Date.now() - activeDragScrollRef.current.capturedAt < 1000;
+
+        return hasFreshScrollCapture
+            ? {
+                scrollX: activeDragScrollRef.current.x,
+                scrollY: activeDragScrollRef.current.y,
+            }
+            : {
+                scrollX: window.scrollX,
+                scrollY: window.scrollY,
+            };
+    }
+
     function openPreviewEditTarget(target) {
         if (target?.path) {
             onEditTarget?.({
                 ...target,
-                ...(target.preserveScroll ? {
-                    scrollX: activeDragScrollRef.current.x,
-                    scrollY: activeDragScrollRef.current.y,
-                } : {}),
+                ...getPreviewDragScrollTarget(),
             });
         }
     }
@@ -527,7 +538,6 @@ export default function ResumePreview({
                 sectionId: activeMeta.sectionId,
                 field: '__title',
                 path: sectionTitleEditorPath(activeMeta.sectionId),
-                preserveScroll: true,
             });
             return;
         }
@@ -555,7 +565,6 @@ export default function ResumePreview({
                 entryId: activeMeta.entryId,
                 field,
                 path: sectionEntryEditorPath(activeMeta.sectionId, activeMeta.entryId, field),
-                preserveScroll: true,
             });
             return;
         }
@@ -575,7 +584,6 @@ export default function ResumePreview({
                 field: activeMeta.field,
                 itemIndex: overMeta.itemIndex,
                 path: sectionEntryListEditorPath(activeMeta.sectionId, activeMeta.entryId, activeMeta.field, overMeta.itemIndex),
-                preserveScroll: true,
             });
         }
     }

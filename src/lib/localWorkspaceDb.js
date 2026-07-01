@@ -19,7 +19,6 @@ export const LOCAL_WORKSPACE_ID = 'main';
 export const LOCAL_SYNC_META_ID = 'main';
 export const LOCAL_ACCOUNT_BINDING_ID = 'current';
 export const LOCAL_WORKSPACE_PRESENT_KEY = 'resumeloomr:local-workspace-present:v1';
-export const LOCAL_PENDING_CLEAR_KEY = 'resumeloomr:pending-clear-after-sync:v1';
 
 const WORKSPACE_STORE = 'workspace';
 const DRAFTS_STORE = 'drafts';
@@ -176,14 +175,6 @@ function markLocalWorkspacePresent() {
     getStorage()?.setItem(LOCAL_WORKSPACE_PRESENT_KEY, 'true');
   } catch {
     // IndexedDB remains the durable source of truth if localStorage is full.
-  }
-}
-
-function clearLocalWorkspacePresent() {
-  try {
-    getStorage()?.removeItem(LOCAL_WORKSPACE_PRESENT_KEY);
-  } catch {
-    // Best effort only.
   }
 }
 
@@ -1242,25 +1233,6 @@ export async function markOutboxStale(operations, errorMessage = 'Skipped stale 
   }
 
   await tx.done;
-}
-
-export async function hasPendingOutbox() {
-  return (await readPendingOutbox({ limit: 1 })).length > 0;
-}
-
-export async function clearLocalWorkspaceDb() {
-  const db = await getLocalWorkspaceDb();
-
-  if (!db) {
-    clearLocalWorkspacePresent();
-    return;
-  }
-
-  const tx = db.transaction(STORE_NAMES, 'readwrite');
-
-  await Promise.all(STORE_NAMES.map((storeName) => tx.objectStore(storeName).clear()));
-  await tx.done;
-  clearLocalWorkspacePresent();
 }
 
 export function createSavedDraftState({ resume, template, savedAt = new Date().toISOString(), localRevision = '' }) {

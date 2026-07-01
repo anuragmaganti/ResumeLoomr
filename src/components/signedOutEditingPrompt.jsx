@@ -41,7 +41,7 @@ export default function SignedOutEditingPrompt({
           Click No if multiple people use this device. Your cloud resumes stay safe in your account either way.
         </div>
 
-        <label className="trustedDeviceOption signedOutPromptRemember">
+        <label className="optionCheckboxCard signedOutPromptRemember">
           <input
             type="checkbox"
             checked={rememberChoice}

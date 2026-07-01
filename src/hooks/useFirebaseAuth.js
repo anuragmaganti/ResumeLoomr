@@ -8,22 +8,15 @@ import {
   signOut,
 } from 'firebase/auth';
 import {
-  clearFirebaseBrowserCache,
   getFirebaseAuth,
-  getFirebaseDbCacheMode,
   hasFirebaseConfig,
   initializeFirebaseAppCheck,
-  isFirebaseDbInitialized,
 } from '../lib/firebaseClient.js';
 import {
   clearConnectedAccount,
   readConnectedAccount,
   writeConnectedAccount,
 } from '../lib/browserConnection.js';
-import {
-  getTrustedDevicePreference,
-  setTrustedDevicePreference,
-} from '../lib/firebaseWorkspace.js';
 import {
   clearResumeSyncSession,
   createResumeSyncSession,
@@ -55,9 +48,7 @@ export function useFirebaseAuth() {
   const [authError, setAuthError] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [trustedDevice, setTrustedDevice] = useState(() => getTrustedDevicePreference());
   const [connectedAccount, setConnectedAccount] = useState(() => readConnectedAccount());
-  const trustedDeviceLocked = Boolean(user) || isFirebaseDbInitialized();
 
   useEffect(() => {
     if (!firebaseEnabled) {
@@ -74,10 +65,7 @@ export function useFirebaseAuth() {
 
     return onAuthStateChanged(auth, (nextUser) => {
       if (nextUser) {
-        const account = writeConnectedAccount(nextUser, {
-          trustedDevice,
-          cacheMode: getFirebaseDbCacheMode(),
-        });
+        const account = writeConnectedAccount(nextUser);
         setConnectedAccount(account);
         nextUser.getIdToken()
           .then((idToken) => createResumeSyncSession(idToken))
@@ -93,17 +81,7 @@ export function useFirebaseAuth() {
       setUser(nextUser);
       setAuthReady(true);
     });
-  }, [firebaseEnabled, trustedDevice]);
-
-  function updateTrustedDevice(nextValue) {
-    if (trustedDeviceLocked) {
-      setAuthError('Sign out and back in to change offline cache.');
-      return;
-    }
-
-    setTrustedDevice(nextValue);
-    setTrustedDevicePreference(nextValue);
-  }
+  }, [firebaseEnabled]);
 
   async function runAuthAction(action) {
     setAuthError('');
@@ -140,9 +118,6 @@ export function useFirebaseAuth() {
     authError,
     firebaseEnabled,
     isAuthModalOpen,
-    trustedDevice,
-    trustedDeviceLocked,
-    dbCacheMode: getFirebaseDbCacheMode(),
     openAuthModal() {
       setAuthError('');
       setIsAuthModalOpen(true);
@@ -151,7 +126,6 @@ export function useFirebaseAuth() {
       setAuthError('');
       setIsAuthModalOpen(false);
     },
-    setTrustedDevice: updateTrustedDevice,
     signInWithGoogle() {
       return runAuthAction((auth) => signInWithPopup(auth, new GoogleAuthProvider()));
     },
@@ -193,10 +167,7 @@ export function useFirebaseAuth() {
         }
 
         await clearResumeSyncSession();
-        await clearFirebaseBrowserCache();
         clearConnectedAccount();
-        setTrustedDevice(false);
-        setTrustedDevicePreference(false);
         setConnectedAccount(null);
       } catch (error) {
         setAuthError(getFriendlyAuthError(error));

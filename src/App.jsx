@@ -110,7 +110,6 @@ function App() {
   } = useResumeBuilder({
     user: builderUser,
     authReady: auth.authReady,
-    trustedDevice: auth.trustedDevice,
   });
   const isImportingResume = importState.status === 'processing';
 
@@ -480,9 +479,6 @@ function App() {
           isOpen={auth.isAuthModalOpen}
           busy={auth.authBusy}
           error={auth.authError}
-          trustedDevice={auth.trustedDevice}
-          trustedDeviceLocked={auth.trustedDeviceLocked}
-          onTrustedDeviceChange={auth.setTrustedDevice}
           onClose={auth.closeAuthModal}
           onGoogleSignIn={auth.signInWithGoogle}
           onEmailSignIn={auth.signInWithEmail}
@@ -520,7 +516,6 @@ function App() {
           authUser={auth.user}
           connectedAccount={auth.connectedAccount}
           firebaseEnabled={auth.firebaseEnabled}
-          trustedDevice={auth.trustedDevice}
           signedOutEditingPreference={signedOutEditingPreference}
           busy={auth.authBusy}
           onOpen={() => setIsAccountSettingsOpen(true)}

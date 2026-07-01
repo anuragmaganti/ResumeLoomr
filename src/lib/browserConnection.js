@@ -1,9 +1,4 @@
 import {
-  CLOUD_DEVICE_ID_KEY,
-  CLOUD_SESSION_ID_KEY,
-  CLOUD_TRUSTED_DEVICE_KEY,
-} from './firebaseWorkspace.js';
-import {
   DRAFT_STORAGE_KEY,
   RESUME_STORAGE_KEY_PREFIX,
   WORKSPACE_INDEX_STORAGE_KEY,
@@ -15,13 +10,22 @@ import {
 
 export const CONNECTED_ACCOUNT_STORAGE_KEY = 'resumeloomr:connected-account:v1';
 export const SIGNED_OUT_EDITING_PREFERENCE_KEY = 'resumeloomr:signed-out-editing-preference:v1';
-export const GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY = 'resumeloomr:guest-backup-before-cloud-mirror:v1';
-export const GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY = 'resumeloomr:cloud-mirror-manifest:v1';
-const LEGACY_CLOUD_IMPORT_PREFIX = 'resumeloomr:firebase-imported:';
 export const DEFAULT_SIGNED_OUT_EDITING_PREFERENCE = {
   allow: true,
   skipPrompt: false,
 };
+const STALE_LOCAL_STORAGE_KEYS = [
+  'resumeloomr:guest-backup-before-cloud-mirror:v1',
+  'resumeloomr:cloud-mirror-manifest:v1',
+  'resumeloomr:firebase-device-id',
+  'resumeloomr:firebase-trusted-device',
+];
+const STALE_SESSION_STORAGE_KEYS = [
+  'resumeloomr:firebase-session-id',
+];
+const STALE_LOCAL_STORAGE_PREFIXES = [
+  'resumeloomr:firebase-imported:',
+];
 
 function getStorage(storage) {
   if (storage) {
@@ -45,6 +49,15 @@ function getSessionStorage(storage) {
   }
 
   return window.sessionStorage;
+}
+
+function isStorageLike(value) {
+  return Boolean(
+    value &&
+      typeof value.getItem === 'function' &&
+      typeof value.setItem === 'function' &&
+      typeof value.removeItem === 'function',
+  );
 }
 
 function safeParse(rawValue) {
@@ -77,13 +90,11 @@ export function readConnectedAccount(storage) {
     email: typeof account.email === 'string' ? account.email : '',
     displayName: typeof account.displayName === 'string' ? account.displayName : '',
     lastConnectedAt: typeof account.lastConnectedAt === 'string' ? account.lastConnectedAt : '',
-    trustedDevice: Boolean(account.trustedDevice),
-    cacheMode: typeof account.cacheMode === 'string' ? account.cacheMode : '',
   };
 }
 
-export function writeConnectedAccount(user, { trustedDevice = false, cacheMode = '' } = {}, storage) {
-  const targetStorage = getStorage(storage);
+export function writeConnectedAccount(user, optionsOrStorage, storage) {
+  const targetStorage = getStorage(storage || (isStorageLike(optionsOrStorage) ? optionsOrStorage : null));
 
   if (!targetStorage || !user?.uid) {
     return null;
@@ -94,8 +105,6 @@ export function writeConnectedAccount(user, { trustedDevice = false, cacheMode =
     email: user.email || '',
     displayName: user.displayName || '',
     lastConnectedAt: new Date().toISOString(),
-    trustedDevice: Boolean(trustedDevice),
-    cacheMode: cacheMode || '',
   };
 
   targetStorage.setItem(CONNECTED_ACCOUNT_STORAGE_KEY, JSON.stringify(account));
@@ -188,10 +197,9 @@ export function clearLocalResumeWorkspaceData(storage) {
       key === WORKSPACE_INDEX_STORAGE_KEY ||
       key === DRAFT_STORAGE_KEY ||
       key === LOCAL_WORKSPACE_PRESENT_KEY ||
-      key === GUEST_WORKSPACE_CLOUD_MIRROR_BACKUP_KEY ||
-      key === GUEST_WORKSPACE_CLOUD_MIRROR_MANIFEST_KEY ||
+      STALE_LOCAL_STORAGE_KEYS.includes(key) ||
       key?.startsWith(RESUME_STORAGE_KEY_PREFIX) ||
-      key?.startsWith(LEGACY_CLOUD_IMPORT_PREFIX)
+      STALE_LOCAL_STORAGE_PREFIXES.some((prefix) => key?.startsWith(prefix))
     ) {
       keysToRemove.push(key);
     }
@@ -214,8 +222,7 @@ export function clearBrowserResumeConnectionData({ storage, sessionStorage } = {
 
   clearLocalResumeWorkspaceData(targetStorage);
   targetStorage.removeItem(CONNECTED_ACCOUNT_STORAGE_KEY);
-  targetStorage.removeItem(CLOUD_DEVICE_ID_KEY);
-  targetStorage.removeItem(CLOUD_TRUSTED_DEVICE_KEY);
   targetStorage.removeItem(SIGNED_OUT_EDITING_PREFERENCE_KEY);
-  targetSessionStorage?.removeItem(CLOUD_SESSION_ID_KEY);
+  STALE_LOCAL_STORAGE_KEYS.forEach((key) => targetStorage.removeItem(key));
+  STALE_SESSION_STORAGE_KEYS.forEach((key) => targetSessionStorage?.removeItem(key));
 }

@@ -17,9 +17,9 @@ import {
 export const IMPORT_FILE_MAX_BYTES = 3 * 1024 * 1024;
 export const DEFAULT_GEMINI_IMPORT_MODEL = 'gemini-3.1-flash-lite';
 export const DEFAULT_GEMINI_THINKING_LEVEL = 'medium';
-export const DEFAULT_GEMINI_MAX_OUTPUT_TOKENS = 20000;
-export const PDF_TEXT_EXTRACTION_TIMEOUT_MS = 2000;
-export const GEMINI_GENERATE_RETRY_DELAYS_MS = [750, 1500];
+const DEFAULT_GEMINI_MAX_OUTPUT_TOKENS = 20000;
+const PDF_TEXT_EXTRACTION_TIMEOUT_MS = 2000;
+const GEMINI_GENERATE_RETRY_DELAYS_MS = [750, 1500];
 
 const PDF_MIME_TYPE = 'application/pdf';
 const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -2237,7 +2237,7 @@ function getQuotaViolations(parsedError) {
     .filter((violation) => violation.quotaMetric || violation.quotaId);
 }
 
-export function getGeminiErrorDetails(error) {
+function getGeminiErrorDetails(error) {
   const parsedError = parseJsonErrorMessage(error?.message || '');
   const statusCode = getNumericStatusCode(error?.statusCode, error?.code, parsedError?.code, error?.status);
   const status = trimText(parsedError?.status || (Number.isFinite(Number(error?.status)) ? '' : error?.status));

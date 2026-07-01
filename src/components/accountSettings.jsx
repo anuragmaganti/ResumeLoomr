@@ -12,7 +12,6 @@ export default function AccountSettings({
   authUser,
   connectedAccount,
   firebaseEnabled,
-  trustedDevice,
   signedOutEditingPreference,
   busy,
   onOpen,
@@ -35,9 +34,7 @@ export default function AccountSettings({
   const isSignedIn = Boolean(authUser);
   const hasRememberedAccount = Boolean(connectedAccount?.uid);
   const connectionMode = isSignedIn
-    ? trustedDevice
-      ? 'Signed in on a trusted browser'
-      : 'Signed in for this browser session'
+    ? 'Signed in and syncing to your account'
     : hasRememberedAccount
       ? 'Signed out, but this browser has local resume data from an account'
       : 'Local-only browser';

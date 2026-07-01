@@ -1018,7 +1018,7 @@ html[data-theme="dark"] .brandLogo--dark {
   box-shadow: 0 0 0 4px var(--color-accent-soft);
 }
 
-.trustedDeviceOption {
+.optionCheckboxCard {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
@@ -1032,7 +1032,7 @@ html[data-theme="dark"] .brandLogo--dark {
   line-height: 1.35;
 }
 
-.trustedDeviceOption input {
+.optionCheckboxCard input {
   margin-top: 2px;
 }
 

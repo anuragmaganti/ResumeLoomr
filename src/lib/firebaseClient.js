@@ -1,15 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { getAuth } from 'firebase/auth';
-import {
-  clearIndexedDbPersistence,
-  getFirestore,
-  initializeFirestore,
-  memoryLocalCache,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-  terminate,
-} from 'firebase/firestore';
 
 const env = import.meta.env || {};
 
@@ -23,9 +14,6 @@ const firebaseConfig = {
 
 let appInstance = null;
 let authInstance = null;
-let dbInstance = null;
-let dbCacheMode = null;
-let dbCacheFallbackReason = '';
 let appCheckInitialized = false;
 
 export function hasFirebaseConfig() {
@@ -76,77 +64,4 @@ export function initializeFirebaseAppCheck() {
     isTokenAutoRefreshEnabled: true,
   });
   appCheckInitialized = true;
-}
-
-export function getFirebaseDb({ trustedDevice = false } = {}) {
-  const app = getFirebaseApp();
-
-  if (!app) {
-    return null;
-  }
-
-  const requestedMode = trustedDevice ? 'persistent' : 'memory';
-
-  if (dbInstance) {
-    return dbInstance;
-  }
-
-  try {
-    dbInstance = initializeFirestore(app, {
-      localCache: trustedDevice
-        ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-        : memoryLocalCache(),
-    });
-    dbCacheMode = requestedMode;
-  } catch (error) {
-    if (!trustedDevice) {
-      throw error;
-    }
-
-    dbInstance = initializeFirestore(app, {
-      localCache: memoryLocalCache(),
-    });
-    dbCacheMode = 'memory';
-    dbCacheFallbackReason = error?.message || 'Persistent cache unavailable.';
-  }
-
-  return dbInstance;
-}
-
-export function getFirebaseDbCacheMode() {
-  return dbCacheMode;
-}
-
-export function isFirebaseDbInitialized() {
-  return Boolean(dbInstance);
-}
-
-export function getFirebaseDbCacheFallbackReason() {
-  return dbCacheFallbackReason;
-}
-
-export async function clearFirebaseBrowserCache() {
-  const app = getFirebaseApp();
-  const db = dbInstance || (app ? getFirestore(app) : null);
-
-  if (!db) {
-    dbCacheMode = null;
-    dbCacheFallbackReason = '';
-    return;
-  }
-
-  const shouldTerminate = Boolean(dbInstance);
-  dbInstance = null;
-  dbCacheMode = null;
-
-  try {
-    if (shouldTerminate) {
-      await terminate(db);
-    }
-
-    await clearIndexedDbPersistence(db);
-    dbCacheFallbackReason = '';
-  } catch (error) {
-    dbCacheFallbackReason = error?.message || 'Could not clear Firebase browser cache.';
-  }
 }

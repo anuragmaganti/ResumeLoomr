@@ -165,10 +165,6 @@ function asText(value) {
   return typeof value === 'string' ? value : '';
 }
 
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
 function clampNumber(value, min, max) {
   const numericValue = Number(value);
 
@@ -1569,8 +1565,4 @@ export function getResumePrintPageRule(settings, template) {
   const verticalMargin = Math.max(0.2, base.pageMarginTopIn + (normalizedSettings.verticalMargins * MARGIN_STEP_IN));
 
   return `@page { margin: ${formatInches(verticalMargin)} ${formatInches(horizontalMargin)} ${formatInches(verticalMargin)} ${formatInches(horizontalMargin)}; }`;
-}
-
-export function cloneDraft(draft) {
-  return clone(normalizeDraftPayload(draft));
 }
