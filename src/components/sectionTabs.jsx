@@ -121,16 +121,30 @@ function SectionAddDialog({
             }
 
             const viewportPadding = 16;
-            const dialogWidth = Math.min(820, window.innerWidth - viewportPadding * 2);
-            const left = Math.min(
-                Math.max(viewportPadding, anchorRect.left),
-                window.innerWidth - dialogWidth - viewportPadding
+            const preferredLeft = anchorRect.right + 12;
+            const maxDialogWidth = Math.min(820, window.innerWidth - viewportPadding * 2);
+            const rightSideWidth = window.innerWidth - preferredLeft - viewportPadding;
+            const dialogWidth = rightSideWidth >= 360
+                ? Math.min(maxDialogWidth, rightSideWidth)
+                : maxDialogWidth;
+            const left = rightSideWidth >= 360
+                ? preferredLeft
+                : Math.min(
+                    Math.max(viewportPadding, preferredLeft),
+                    window.innerWidth - dialogWidth - viewportPadding
+                );
+            const dialogHeight = Math.min(
+                dialogRef.current?.scrollHeight || 520,
+                window.innerHeight - viewportPadding * 2
             );
-            const bottom = Math.max(viewportPadding, window.innerHeight - anchorRect.top + 10);
+            const top = Math.min(
+                Math.max(viewportPadding, anchorRect.top - 8),
+                window.innerHeight - dialogHeight - viewportPadding
+            );
 
             setAnchorStyle({
                 "--section-add-dialog-left": `${left}px`,
-                "--section-add-dialog-bottom": `${bottom}px`,
+                "--section-add-dialog-top": `${top}px`,
                 "--section-add-dialog-width": `${dialogWidth}px`
             });
         }
@@ -138,6 +152,7 @@ function SectionAddDialog({
         updateAnchorStyle();
 
         const frameId = window.requestAnimationFrame(() => {
+            updateAnchorStyle();
             firstOptionRef.current?.focus({ preventScroll: true });
         });
 

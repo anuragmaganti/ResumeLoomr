@@ -1790,9 +1790,9 @@ html[data-theme="dark"] .sectionAddDialogBackdrop {
 .sectionAddDialogLayer--anchored .sectionAddDialog {
   position: fixed;
   left: var(--section-add-dialog-left);
-  bottom: var(--section-add-dialog-bottom);
+  top: var(--section-add-dialog-top);
   width: var(--section-add-dialog-width);
-  max-height: calc(100dvh - var(--section-add-dialog-bottom) - 16px);
+  max-height: calc(100dvh - var(--section-add-dialog-top) - 16px);
 }
 
 html[data-theme="dark"] .sectionAddDialog {
