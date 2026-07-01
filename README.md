@@ -7,73 +7,92 @@
   </picture>
 </p>
 
-ResumeLoomr is a block-based, local-first resume builder with Firebase Auth, IndexedDB persistence, optional Firestore cloud sync, Gemini-powered PDF/DOCX resume import, live preview, and multi-resume workspaces.
+ResumeLoomr is a local-first, AI-assisted resume builder for creating, importing, editing, previewing, and printing multiple resumes in one browser workspace.
 
-It is designed for people who want a fast resume editor that works immediately in the browser, supports imported resumes, and can sync across devices when they choose to sign in.
+The app uses a block-first resume model, IndexedDB local persistence, Firebase Auth, Firestore cloud backup, Vercel API routes, and Gemini-powered PDF/DOCX import. Users can work without an account, then sign in when they want cross-device sync.
 
 ## Features
 
-### Live Resume Builder
+### Resume Editing
 
-- Edit resume content in a structured editor while the resume preview updates immediately.
-- Click text in the live preview to jump directly to the matching editor field.
-- Print or save the active resume from the browser using print-optimized styling.
-- Use light and dark UI themes without changing the printed resume output.
+- Edit a structured resume form while the live preview updates immediately.
+- Click any editable text in the live preview to open the matching editor field.
+- Drag sections, entries, and bullet points directly inside the live preview to reorder them.
+- Drag sections in the editor rail and drag resume tabs in the resume rail with dnd-kit sortable interactions.
+- Add repeatable sections such as Education, Experience, Internships, Research, Teaching, Leadership, Volunteering, Skills, Projects, Certifications, Languages, Awards, Publications, Presentations, Patents, Professional Affiliations, and custom sections.
+- Rename section titles inline, including temporarily blank names that fall back to an untitled section label on blur.
+- Collapse and expand repeated entry cards for dense editing.
 
-### Block-Based Resume Model
+### Live Preview And Print
 
-- Every resume is stored as ordered section blocks instead of a rigid fixed schema.
-- Personal details stay first; every other section is a movable block.
-- Supported block types include education, roles, skills, projects, certifications, languages, awards, publications, and custom sections.
-- Role-based sections can represent experience, internships, research, teaching, leadership, volunteering, clinical experience, military service, community service, and similar resume categories.
-- Users can add, rename, remove, and reorder sections from the editor rail.
+- Preview uses the same data and presentation settings as print output.
+- Print/Save uses browser print output with resume-specific document title naming.
+- The live preview supports subtle hover affordances, click-to-edit, and drag-to-reorder without affecting printed output.
+- Personal details stay first; every other section is ordered by the resume’s section block list.
+- Resume text, margins, line spacing, section spacing, heading size, and name size can be adjusted from the settings rail.
+- Two templates are available today: `Compact` as the default and `Executive` as an alternate layout.
+
+### Block-First Data Model
+
+- Every resume uses one canonical block model: `personal`, `settings`, and ordered `sections`.
+- Fixed legacy arrays such as `experience`, `education`, `skills`, and `sectionOrder` are no longer the app model.
+- Role sections share one implementation, so Experience, Internships, Leadership, Research, Teaching, Clinical Experience, Military Service, Volunteering, Campus Involvement, and Community Service all use the same editor and preview path.
+- Imported resumes and manually created resumes are edited through the same section block forms.
+- Custom imported headings can stay editable without forcing them into a rigid schema.
 
 ### Multi-Resume Workspace
 
-- Create, rename, duplicate, delete, reorder, and switch between multiple resumes.
-- Resume tabs live in a dedicated rail so users can keep several versions, such as role-specific or no-skills variants.
+- Create, rename, duplicate, delete, reorder, and switch between resumes.
+- Resume tabs live in a wrapping rail under the main header.
+- Resume rail order is user-controlled and persists locally and through cloud sync.
+- A single browser workspace supports up to `100` resumes.
 - Each resume keeps its own content, section order, template, and presentation settings.
 
-### Local-First Storage
+### Local-First Persistence
 
-- The browser is the immediate source of truth while editing.
-- Resume drafts are persisted locally with IndexedDB.
-- UI actions such as editing, switching resumes, importing, deleting, and reordering are designed to happen locally first instead of waiting on the network.
-- Local data remains available for signed-out users unless they choose to clear this browser.
+- The browser’s IndexedDB workspace is the immediate source of truth.
+- Edits, imports, deletes, switches, reorders, and template/settings changes save locally before cloud sync is attempted.
+- Local saves update the visible `Saved locally` timestamp from the actual local save time.
+- Local drafts include `localRevision` metadata to prevent stale tab saves from overwriting newer local changes.
+- `localStorage` is kept only for small compatibility markers, theme/settings, and fallback/migration helpers.
+- Signed-out users can keep editing locally, and settings explain how to clear local resume copies from a shared browser.
 
-### Optional Account Sync
+### Account Sync
 
-- Firebase Auth supports account-based sync.
-- Firestore stores a cloud copy of the user workspace for cross-device access.
-- Background sync mirrors local changes to the cloud when a user is signed in.
-- Browser settings let users control whether resumes remain available after sign out, which matters on shared computers.
+- Firebase Auth provides Google and email/password sign-in.
+- Firestore stores the cloud copy of each signed-in user’s workspace and resumes.
+- Vercel API routes verify Firebase identity before reading or writing cloud data.
+- Sync is background-only: UI actions never wait for Firestore to finish.
+- A durable local outbox queues cloud operations for workspace updates, draft upserts, and deletes.
+- Outbox acknowledgements are version-aware using `id`, `operationVersion`, and `localRevision`, so an old in-flight sync cannot clear a newer local edit.
+- Sync operations are scoped to the signed-in Firebase account to avoid cross-account writes from shared browsers.
+- A service worker requests Background Sync where supported; otherwise queued changes sync on reconnect or the next app open.
 
-### Gemini-Powered Resume Import
+### AI Resume Import
 
-- Signed-in users can import an existing resume from PDF or DOCX.
-- Readable PDFs are text-extracted first for speed and lower cost.
+- Signed-in users can import existing resumes from PDF or DOCX.
+- Guests see the same import action, but it opens the sign-in modal first.
+- Files are sent to a secure Vercel API route; Gemini and Firebase Admin secrets are never exposed to the browser bundle.
+- Readable PDFs are text-extracted first for lower latency and cost.
 - Scanned or low-quality PDFs can fall back to Gemini document understanding.
 - DOCX files are extracted server-side with Mammoth.
-- Gemini 3.1 Flash-Lite is used through a secure Vercel API route; the API key is never exposed to the client.
-- The import pipeline is source-first: it segments the uploaded resume into source sections, classifies those sections, then compiles them into editable ResumeLoomr blocks.
+- Gemini 3.1 Flash-Lite powers classification and mapping.
+- The import pipeline is source-first: the server builds a source document model, classifies smaller chunks, compiles final ResumeLoomr section blocks, and preserves unmapped content as editable data instead of silently dropping it.
+- Uploaded files and extracted text are processed in memory and are not stored by the import API.
 
-### Presentation Controls
+## How The App Works
 
-- Choose between professional resume templates.
-- Adjust text size, horizontal margins, vertical margins, line spacing, section spacing, entry spacing, heading size, and name size.
-- Live preview and print output use the same presentation settings.
-
-## How It Works
-
-ResumeLoomr uses a local-first architecture:
+ResumeLoomr is intentionally local-first:
 
 1. The user edits a resume in React state.
-2. Changes are saved into IndexedDB as the durable local workspace.
-3. If the user is signed in, sync work is queued in a local outbox.
-4. A Vercel API verifies the user session and writes the latest workspace and resume drafts to Firestore.
-5. On login from another browser, cloud resumes are merged into the local workspace rather than replacing local work.
+2. The active draft is saved to IndexedDB with a fresh `savedAt` timestamp and `localRevision`.
+3. If signed in, the local save also queues an outbox operation.
+4. A debounced foreground sync, service worker sync, or next app session sends the outbox to `/api/sync-workspace`.
+5. The Vercel API verifies the Firebase user and writes valid operations to Firestore.
+6. Firestore responds with exact operation acknowledgements.
+7. The browser clears only the exact outbox versions that were acknowledged.
 
-The core resume shape is intentionally simple:
+The core draft shape is:
 
 ```js
 {
@@ -90,43 +109,56 @@ The core resume shape is intentionally simple:
 }
 ```
 
-This model makes imported resumes, manually created resumes, custom sections, reordered sections, and future resume categories use the same editor and preview path.
+The core local storage concept is:
 
-## Key Product Decisions
+```text
+IndexedDB
+workspace       current resume ids, active resume, names, ordering
+drafts          one normalized draft per resume
+outbox          queued cloud sync operations
+tombstones      pending cloud deletes
+syncMeta        local sync metadata
+accountBinding  browser/account connection metadata
+```
 
-- **Local-first editing:** editing should feel instant and should not fail just because the network is unavailable.
-- **Cloud as a mirror:** Firestore is used for backup and cross-device sync, not as the click-path source of truth.
-- **Block-first data model:** sections are flexible blocks so resumes can represent internships, leadership, research, publications, custom imported headings, and future categories without schema rewrites.
-- **Secure AI import:** Gemini runs only on the server through Vercel API routes. Uploaded files and extracted text are processed in memory and are not stored server-side.
-- **Source-first import parsing:** the importer preserves source order and content by compiling from a source document model instead of asking the AI to generate the final app draft in one large response.
+## Key Decisions
+
+- **Local first, cloud second:** the editor remains usable even if the network, Firebase, or Vercel sync is unavailable.
+- **Firestore is a mirror:** Firestore is for backup and cross-device restore, not the source that blocks editing.
+- **Block-first schema:** flexible ordered sections make imports, custom headings, internships, research, leadership, and future section types easier to support.
+- **Source-first AI import:** the importer preserves source order and content by compiling from a detected source document instead of asking the AI to produce the final app schema in one large response.
+- **Server-only secrets:** Gemini and Firebase Admin credentials live only in Vercel/server environments.
+- **Versioned sync acknowledgements:** stale cloud responses cannot clear newer local outbox work.
+- **No trusted-device Firestore cache mode:** the app no longer relies on Firestore’s browser cache for correctness; IndexedDB is the durable local workspace.
 
 ## Tech Stack
 
 - React 19
 - Vite
 - JavaScript
-- CSS modules by convention through app stylesheets
+- Plain CSS stylesheets
+- dnd-kit for sortable resume rails, section rails, and preview reordering
 - IndexedDB via `idb`
 - Firebase Auth
 - Firestore
-- Firebase Admin for server-side sync/auth verification
+- Firebase Admin for server-side auth verification and cloud writes
+- Vercel API routes for sync sessions, workspace sync, and AI import
 - Gemini API through `@google/genai`
-- Mammoth for DOCX text extraction
-- pdf-parse for readable PDF text extraction
-- dnd-kit for drag-and-drop ordering
-- Zod for server-side request and AI response validation
-- Vercel API routes for secure server work
+- Mammoth for DOCX extraction
+- pdf-parse for readable PDF extraction
+- Zod for server-side validation
+- Vercel Analytics
 
 ## Project Structure
 
 ```text
-api/                 Vercel API routes for import and sync
-server/              Server-only Firebase and Gemini helpers
-public/              Icons, logo assets, and sync worker
-src/components/      React UI components and editor forms
-src/hooks/           App-level resume builder and auth hooks
-src/lib/             Resume model, local storage, sync, Firebase, and import clients
-src/styles/          Shared button, form, and preview styling
+api/                 Vercel API routes for import, sync sessions, and workspace sync
+server/              Server-only Firebase Admin and Gemini import helpers
+public/              Logos, favicon assets, and sync worker
+src/components/      React UI components, rails, preview, and editor forms
+src/hooks/           Resume builder and Firebase auth hooks
+src/lib/             Resume model, IndexedDB workspace, sync client, import client
+src/styles/          Form, button, and resume preview styles
 tests/               Node tests and Firestore rules tests
 ```
 
@@ -136,8 +168,9 @@ tests/               Node tests and Firestore rules tests
 
 - Node.js LTS
 - npm
-- Firebase project if you want auth/cloud sync
-- Gemini API key if you want resume import
+- Firebase project for auth/cloud sync
+- Gemini API key for resume import
+- Java installed locally if you want to run Firestore emulator tests
 
 ### Install
 
@@ -151,11 +184,11 @@ npm install
 npm run dev
 ```
 
-The app can run in local-only mode without Firebase or Gemini environment variables.
+The frontend can run in local-only mode without Firebase or Gemini environment variables.
 
 ### Run With API Routes
 
-For import and server-backed sync flows, use Vercel’s local runtime:
+Use Vercel’s local runtime for signed-in sync and resume import:
 
 ```bash
 npx vercel dev
@@ -163,7 +196,7 @@ npx vercel dev
 
 ## Environment Variables
 
-Client-side Firebase values are public app configuration and must be prefixed with `VITE_`:
+Client-side Firebase config is public app configuration and must use `VITE_`:
 
 ```bash
 VITE_FIREBASE_API_KEY=
@@ -174,7 +207,7 @@ VITE_FIREBASE_MEASUREMENT_ID=
 VITE_FIREBASE_APPCHECK_SITE_KEY=
 ```
 
-Server-only values must not use the `VITE_` prefix:
+Server-only variables must not use `VITE_`:
 
 ```bash
 GEMINI_API_KEY=
@@ -196,11 +229,15 @@ npm test         # Run Node tests
 
 ## Testing
 
-The project includes tests for:
+The test suite covers:
 
 - Block-first resume normalization and editing helpers
-- Section creation, ordering, and validation
-- Local/cloud workspace merge behavior
+- Section creation, renaming, ordering, deletion, and validation
+- Preview model rendering and print presentation variables
+- Saved-local timestamp behavior
+- Local/cloud login merge behavior
+- Account-scoped sync operations
+- Versioned outbox acknowledgements
 - AI import file validation and source-document compilation
 - Gemini request configuration
 - Firestore Security Rules through the emulator
@@ -219,20 +256,25 @@ PATH="/opt/homebrew/opt/openjdk/bin:$PATH" npx firebase-tools emulators:exec --o
 
 ## Security And Privacy Notes
 
-- Gemini and Firebase Admin secrets are server-only.
+- Unsigned users can create and edit resumes locally without an account.
+- Signed-in users sync through Firebase Auth and Firestore.
 - Resume import requires sign-in.
+- Gemini and Firebase Admin credentials are server-only.
 - Firestore rules restrict users to their own workspace and resume documents.
-- The app is designed so unsigned users can keep working locally without creating an account.
-- Users can clear the browser connection and local resume copies from settings.
+- Sync API routes verify Firebase identity server-side before cloud reads/writes.
+- Uploaded resume files are processed in memory by the import route and are not intentionally stored server-side.
+- Users can remove the account connection and local resume copies from browser settings.
+- On shared computers, users should disable keeping resumes available after sign out or clear the browser connection.
 
 ## Deployment
 
-The app is built for Vercel:
+ResumeLoomr is built for Vercel:
 
 - Frontend: Vite static build
 - Server work: Vercel API routes
 - Auth/database: Firebase Auth and Firestore
 - AI import: Gemini API called from the server only
+- Sync worker: static service worker in `public/sync-worker.js`
 
 Firestore rules are deployed separately:
 
@@ -240,6 +282,6 @@ Firestore rules are deployed separately:
 npx firebase-tools deploy --only firestore:rules --project resumeloomr
 ```
 
-## Current Focus
+## Status
 
-ResumeLoomr is moving toward a simpler, fully block-first editing system with a smaller codebase, stronger import accuracy, and a cleaner local-first sync model.
+The app is currently optimized around a block-first model, direct preview editing/reordering, local-first IndexedDB persistence, Firebase-backed account sync, and source-first Gemini resume import.
