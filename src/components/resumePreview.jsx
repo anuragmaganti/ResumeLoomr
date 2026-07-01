@@ -43,6 +43,7 @@ const PREVIEW_ZOOM_MODES = {
     FIT_WIDTH: 'fitWidth',
 };
 const DEFAULT_PREVIEW_PAGE_MAX_WIDTH = 952;
+const DEFAULT_PREVIEW_PAGE_MIN_HEIGHT = 1090;
 
 function getDefaultPreviewZoomMode() {
     return PREVIEW_ZOOM_MODES.FIT_PAGE;
@@ -1532,6 +1533,10 @@ export default function ResumePreview({
     }
 
     const sectionDragItems = previewModel.sectionBlocks.map((block) => sectionDragId(block.id));
+    const emptyPageHeight = parseCssPixelValue(
+        presentationVars['--resume-page-min-height'],
+        DEFAULT_PREVIEW_PAGE_MIN_HEIGHT,
+    );
     const scaledPageHeight = Math.max(pageMetrics.pageHeight, pageMetrics.contentHeight) * pageMetrics.scale;
     const pageShellStyle = previewModel.hasContent && pageMetrics.pageWidth > 0
         ? {
@@ -1543,6 +1548,8 @@ export default function ResumePreview({
         : {
             '--preview-page-scale': 1,
             '--preview-page-width': '100%',
+            width: '100%',
+            height: `${emptyPageHeight}px`,
         };
     const dragOverlayStyle = {
         ...presentationVars,
