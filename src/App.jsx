@@ -43,6 +43,7 @@ function App() {
   const previewEditRequestIdRef = useRef(0);
   const [previewEditTarget, setPreviewEditTarget] = useState(null);
   const [editorCaretTarget, setEditorCaretTarget] = useState(null);
+  const [previewLayout, setPreviewLayout] = useState({ mode: 'fitWidth', width: 0 });
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') {
       return 'light';
@@ -231,6 +232,14 @@ function App() {
           : { path: target.path, offset, value }
       ));
     });
+  }, []);
+
+  const handlePreviewLayoutChange = useCallback((nextLayout) => {
+    setPreviewLayout((currentLayout) => (
+      currentLayout.mode === nextLayout.mode && currentLayout.width === nextLayout.width
+        ? currentLayout
+        : nextLayout
+    ));
   }, []);
 
   const clearPreviewEditTarget = useCallback((requestId) => {
@@ -581,7 +590,12 @@ function App() {
           </button>
         </div>
 
-        <main className="workspace">
+        <main
+          className={`workspace ${previewLayout.mode === 'fitPage' && previewLayout.width > 0 ? 'isPreviewFitPageLayout' : ''}`}
+          style={previewLayout.mode === 'fitPage' && previewLayout.width > 0
+            ? { '--workspace-fit-page-width': `${previewLayout.width}px` }
+            : undefined}
+        >
           <div className={`workspaceColumn workspaceColumnEditor ${mobileView === 'preview' ? 'isMobileHidden' : ''}`}>
             <EditorPanel
               activeTab={activeTab}
@@ -610,6 +624,7 @@ function App() {
               settings={resume.settings}
               panelRef={previewPanelRef}
               onEditTarget={handlePreviewEditTarget}
+              onLayoutChange={handlePreviewLayoutChange}
               onReorderSections={reorderSections}
               onReorderSectionEntries={actions.reorderSectionEntries}
               onReorderSectionTextList={actions.reorderSectionTextList}

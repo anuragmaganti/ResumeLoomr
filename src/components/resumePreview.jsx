@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
     closestCenter,
@@ -38,6 +38,40 @@ const personalLinkFieldMap = {
 };
 
 const DRAG_ID_SEPARATOR = '::';
+const PREVIEW_ZOOM_MODES = {
+    FIT_PAGE: 'fitPage',
+    FIT_WIDTH: 'fitWidth',
+};
+const DEFAULT_PREVIEW_PAGE_MAX_WIDTH = 952;
+
+function getDefaultPreviewZoomMode() {
+    return PREVIEW_ZOOM_MODES.FIT_PAGE;
+}
+
+function parseCssPixelValue(value, fallback = 0) {
+    const parsed = Number.parseFloat(value);
+
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getPreviewStickyTop(frameElement) {
+    const frameStyles = window.getComputedStyle(frameElement);
+    const stickyTop = parseCssPixelValue(frameStyles.top, 0);
+
+    return Number.isFinite(stickyTop) ? stickyTop : 0;
+}
+
+function metricsAreEqual(current, next) {
+    return (
+        current.pageWidth === next.pageWidth &&
+        current.pageHeight === next.pageHeight &&
+        current.contentHeight === next.contentHeight &&
+        current.pageCount === next.pageCount &&
+        current.layoutWidth === next.layoutWidth &&
+        current.hasDistinctZoomModes === next.hasDistinctZoomModes &&
+        Math.abs(current.scale - next.scale) < 0.001
+    );
+}
 
 function sectionDragId(sectionId) {
     return ['section', sectionId].join(DRAG_ID_SEPARATOR);
@@ -117,7 +151,19 @@ function getPreviewSortableElement(sortableId) {
         .find((element) => element.dataset.previewSortableId === String(sortableId));
 }
 
-function SortablePreviewSection({ blockId, className, children }) {
+function normalizePreviewSortableTransform(transform, previewScale) {
+    if (!transform || !Number.isFinite(previewScale) || previewScale <= 0 || Math.abs(previewScale - 1) < 0.001) {
+        return transform;
+    }
+
+    return {
+        ...transform,
+        x: transform.x / previewScale,
+        y: transform.y / previewScale,
+    };
+}
+
+function SortablePreviewSection({ blockId, className, previewScale, children }) {
     const sortableId = sectionDragId(blockId);
     const {
         attributes,
@@ -128,7 +174,7 @@ function SortablePreviewSection({ blockId, className, children }) {
         isDragging,
     } = useSortable({ id: sortableId });
     const style = {
-        transform: CSS.Translate.toString(transform),
+        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
         transition,
     };
     const handleProps = {
@@ -157,7 +203,7 @@ function StaticPreviewSection({ className, children }) {
     );
 }
 
-function SortablePreviewEntry({ sectionId, entryId, className, children }) {
+function SortablePreviewEntry({ sectionId, entryId, className, previewScale, children }) {
     const sortableId = entryDragId(sectionId, entryId);
     const {
         attributes,
@@ -168,7 +214,7 @@ function SortablePreviewEntry({ sectionId, entryId, className, children }) {
         isDragging,
     } = useSortable({ id: sortableId });
     const style = {
-        transform: CSS.Translate.toString(transform),
+        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
         transition,
     };
     const handleProps = {
@@ -197,7 +243,7 @@ function StaticPreviewEntry({ className, children }) {
     );
 }
 
-function SortablePreviewBullet({ sectionId, entryId, field, itemIndex, editProps, children }) {
+function SortablePreviewBullet({ sectionId, entryId, field, itemIndex, editProps, previewScale, children }) {
     const sortableId = bulletDragId(sectionId, entryId, field, itemIndex);
     const {
         attributes,
@@ -208,7 +254,7 @@ function SortablePreviewBullet({ sectionId, entryId, field, itemIndex, editProps
         isDragging,
     } = useSortable({ id: sortableId });
     const style = {
-        transform: CSS.Translate.toString(transform),
+        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
         transition,
     };
     const handleProps = {
@@ -300,16 +346,29 @@ export default function ResumePreview({
     settings,
     panelRef,
     onEditTarget,
+    onLayoutChange,
     onReorderSections,
     onReorderSectionEntries,
     onReorderSectionTextList,
     activeEditorCaret,
 }) {
     const resumeRef = useRef(null);
+    const previewFrameRef = useRef(null);
     const suppressPreviewClickRef = useRef(false);
     const activeDragScrollRef = useRef({ x: 0, y: 0, capturedAt: 0 });
     const [activeDragMeta, setActiveDragMeta] = useState(null);
     const [activeDragRect, setActiveDragRect] = useState(null);
+    const [previewZoomMode, setPreviewZoomMode] = useState(getDefaultPreviewZoomMode);
+    const [hasSelectedPreviewZoom, setHasSelectedPreviewZoom] = useState(false);
+    const [pageMetrics, setPageMetrics] = useState({
+        pageWidth: 0,
+        pageHeight: 0,
+        contentHeight: 0,
+        pageCount: 1,
+        scale: 1,
+        layoutWidth: 0,
+        hasDistinctZoomModes: false,
+    });
     const presentationVars = useMemo(() => getResumePresentationVars(settings, template), [settings, template]);
     const printPageRule = useMemo(() => getResumePrintPageRule(settings, template), [settings, template]);
     const sensors = useSensors(
@@ -327,6 +386,153 @@ export default function ResumePreview({
             }))
         ].filter((item) => item.text)
     ), [previewModel.personal]);
+
+    useEffect(() => {
+        if (hasSelectedPreviewZoom || typeof window === 'undefined') {
+            return undefined;
+        }
+
+        function updateDefaultZoomMode() {
+            setPreviewZoomMode(getDefaultPreviewZoomMode());
+        }
+
+        updateDefaultZoomMode();
+        window.addEventListener('resize', updateDefaultZoomMode);
+
+        return () => window.removeEventListener('resize', updateDefaultZoomMode);
+    }, [hasSelectedPreviewZoom]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        let frameId = 0;
+
+        function readPageMetrics() {
+            const resumeElement = resumeRef.current;
+            const frameElement = previewFrameRef.current;
+
+            if (!resumeElement || !frameElement || !previewModel.hasContent) {
+                setPageMetrics((current) => {
+                    const next = {
+                        pageWidth: 0,
+                        pageHeight: 0,
+                        contentHeight: 0,
+                        pageCount: 1,
+                        scale: 1,
+                        layoutWidth: 0,
+                        hasDistinctZoomModes: false,
+                    };
+
+                    return metricsAreEqual(current, next) ? current : next;
+                });
+                return;
+            }
+
+            const styles = window.getComputedStyle(resumeElement);
+            const appElement = document.querySelector('.app');
+            const appStyles = appElement ? window.getComputedStyle(appElement) : null;
+            const maxPageWidth = parseCssPixelValue(
+                appStyles?.getPropertyValue('--workspace-preview-max-width'),
+                DEFAULT_PREVIEW_PAGE_MAX_WIDTH,
+            );
+            const frameRect = frameElement.getBoundingClientRect();
+            const availableWidth = Math.max(240, frameElement.clientWidth || frameRect.width);
+            const fitPageWidth = maxPageWidth;
+            const fitWidthPageWidth = Math.max(1, Math.min(availableWidth, maxPageWidth));
+            const pageWidth = previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE
+                ? fitPageWidth
+                : fitWidthPageWidth;
+            const pageContentHeight = parseCssPixelValue(styles.getPropertyValue('--resume-page-min-height'), resumeElement.offsetHeight);
+            const verticalBorder = parseCssPixelValue(styles.borderTopWidth) + parseCssPixelValue(styles.borderBottomWidth);
+            const usesBorderBox = styles.boxSizing === 'border-box';
+            const pageHeight = Math.max(
+                1,
+                usesBorderBox
+                    ? pageContentHeight
+                    : pageContentHeight + parseCssPixelValue(styles.paddingTop) + parseCssPixelValue(styles.paddingBottom) + verticalBorder,
+            );
+            const contentHeight = Math.max(pageHeight, resumeElement.scrollHeight + verticalBorder);
+            const pageCount = Math.max(1, Math.ceil((contentHeight - 1) / pageHeight));
+            const availableHeight = Math.max(
+                320,
+                window.innerHeight - getPreviewStickyTop(frameElement) - 24,
+            );
+            const fitPageHeightScale = Math.min(availableHeight / pageHeight, 1);
+            const fitPageScale = Math.min(availableWidth / fitPageWidth, fitPageHeightScale, 1);
+            const hasDistinctZoomModes = fitPageScale < 0.995;
+            const scale = previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE
+                ? Math.max(0.35, fitPageScale)
+                : 1;
+            const layoutScale = previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE
+                ? Math.max(0.35, fitPageHeightScale)
+                : 1;
+            const nextMetrics = {
+                pageWidth: Math.round(pageWidth),
+                pageHeight: Math.round(pageHeight),
+                contentHeight: Math.round(contentHeight),
+                pageCount,
+                scale: Number(scale.toFixed(4)),
+                layoutWidth: Math.round(pageWidth * layoutScale),
+                hasDistinctZoomModes,
+            };
+
+            setPageMetrics((current) => (metricsAreEqual(current, nextMetrics) ? current : nextMetrics));
+        }
+
+        function scheduleRead() {
+            window.cancelAnimationFrame(frameId);
+            frameId = window.requestAnimationFrame(readPageMetrics);
+        }
+
+        scheduleRead();
+        window.addEventListener('resize', scheduleRead);
+
+        let resizeObserver;
+
+        if (typeof ResizeObserver !== 'undefined') {
+            resizeObserver = new ResizeObserver(scheduleRead);
+
+            if (resumeRef.current) {
+                resizeObserver.observe(resumeRef.current);
+            }
+
+            if (previewFrameRef.current) {
+                resizeObserver.observe(previewFrameRef.current);
+            }
+        }
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+            window.removeEventListener('resize', scheduleRead);
+            resizeObserver?.disconnect();
+        };
+    }, [previewModel, presentationVars, previewZoomMode]);
+
+    useEffect(() => {
+        if (!onLayoutChange) {
+            return undefined;
+        }
+
+        const isFitPageLayout = previewModel.hasContent
+            && previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE
+            && pageMetrics.pageWidth > 0
+            && pageMetrics.layoutWidth > 0;
+        const nextLayout = isFitPageLayout
+            ? {
+                mode: PREVIEW_ZOOM_MODES.FIT_PAGE,
+                width: pageMetrics.layoutWidth,
+            }
+            : {
+                mode: previewZoomMode,
+                width: 0,
+            };
+
+        onLayoutChange(nextLayout);
+
+        return undefined;
+    }, [onLayoutChange, pageMetrics.layoutWidth, pageMetrics.pageWidth, previewModel.hasContent, previewZoomMode]);
 
     function personalTarget(field) {
         return createPreviewEditAttributes({
@@ -611,6 +817,7 @@ export default function ResumePreview({
                                 field={field}
                                 itemIndex={item.sourceIndex}
                                 editProps={createTarget ? createTarget(item.sourceIndex) : {}}
+                                previewScale={pageMetrics.scale}
                             >
                                 {renderTextWithCaret(item.text, bulletPath)}
                             </SortablePreviewBullet>
@@ -662,6 +869,7 @@ export default function ResumePreview({
                 sectionId={block.id}
                 entryId={entry.id}
                 className="previewEntry"
+                previewScale={pageMetrics.scale}
             >
                 {(entryHandleProps) => (
                     <>
@@ -696,7 +904,7 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className={`resumeSection ${sectionClassName}`}>
+            <SectionShell key={block.id} blockId={block.id} className={`resumeSection ${sectionClassName}`} previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
                         <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -759,6 +967,7 @@ export default function ResumePreview({
                 sectionId={block.id}
                 entryId={institution.id}
                 className="educationSection"
+                previewScale={pageMetrics.scale}
             >
                 {(entryHandleProps) => (
                     <>
@@ -887,7 +1096,7 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className="resumeSection educationDiv">
+            <SectionShell key={block.id} blockId={block.id} className="resumeSection educationDiv" previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
                         <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -914,6 +1123,7 @@ export default function ResumePreview({
                 sectionId={block.id}
                 entryId={job.id}
                 className="experienceSection"
+                previewScale={pageMetrics.scale}
             >
                 {(entryHandleProps) => (
                     <>
@@ -962,7 +1172,7 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className="resumeSection experienceDiv">
+            <SectionShell key={block.id} blockId={block.id} className="resumeSection experienceDiv" previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
                         <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -989,6 +1199,7 @@ export default function ResumePreview({
                 sectionId={block.id}
                 entryId={entry.id}
                 className="skillGroup"
+                previewScale={pageMetrics.scale}
             >
                 {(entryHandleProps) => (
                     <>
@@ -1019,7 +1230,7 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className="resumeSection skillsDiv">
+            <SectionShell key={block.id} blockId={block.id} className="resumeSection skillsDiv" previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
                         <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -1046,6 +1257,7 @@ export default function ResumePreview({
                 sectionId={block.id}
                 entryId={entry.id}
                 className="previewEntry"
+                previewScale={pageMetrics.scale}
             >
                 {(entryHandleProps) => (
                     <>
@@ -1086,7 +1298,7 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className="resumeSection projectsDiv">
+            <SectionShell key={block.id} blockId={block.id} className="resumeSection projectsDiv" previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
                         <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -1113,6 +1325,7 @@ export default function ResumePreview({
                 sectionId={block.id}
                 entryId={entry.id}
                 className="previewEntry previewEntry--tight"
+                previewScale={pageMetrics.scale}
             >
                 {(entryHandleProps) => (
                     <div className="previewInlineHeader">
@@ -1134,7 +1347,7 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className="resumeSection languagesDiv">
+            <SectionShell key={block.id} blockId={block.id} className="resumeSection languagesDiv" previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
                         <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -1161,6 +1374,7 @@ export default function ResumePreview({
                 sectionId={block.id}
                 entryId={entry.id}
                 className="previewEntry"
+                previewScale={pageMetrics.scale}
             >
                 {(entryHandleProps) => (
                     <>
@@ -1201,7 +1415,7 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className="resumeSection customDiv">
+            <SectionShell key={block.id} blockId={block.id} className="resumeSection customDiv" previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
                         <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -1318,6 +1532,18 @@ export default function ResumePreview({
     }
 
     const sectionDragItems = previewModel.sectionBlocks.map((block) => sectionDragId(block.id));
+    const scaledPageHeight = Math.max(pageMetrics.pageHeight, pageMetrics.contentHeight) * pageMetrics.scale;
+    const pageShellStyle = previewModel.hasContent && pageMetrics.pageWidth > 0
+        ? {
+            '--preview-page-scale': pageMetrics.scale,
+            '--preview-page-width': `${pageMetrics.pageWidth}px`,
+            width: `${pageMetrics.pageWidth * pageMetrics.scale}px`,
+            height: `${scaledPageHeight}px`,
+        }
+        : {
+            '--preview-page-scale': 1,
+            '--preview-page-width': '100%',
+        };
     const dragOverlayStyle = {
         ...presentationVars,
         ...(activeDragRect ? {
@@ -1325,10 +1551,22 @@ export default function ResumePreview({
             height: `${activeDragRect.height}px`,
         } : {}),
     };
+    const dragOverlayScale = Number.isFinite(pageMetrics.scale) && pageMetrics.scale > 0
+        ? pageMetrics.scale
+        : 1;
+    const dragOverlayContentStyle = activeDragRect
+        ? {
+            width: `${activeDragRect.width / dragOverlayScale}px`,
+            height: `${activeDragRect.height / dragOverlayScale}px`,
+            transform: `scale(${dragOverlayScale})`,
+        }
+        : undefined;
     const previewDragOverlay = (
         <DragOverlay adjustScale={false} dropAnimation={null} zIndex={1000}>
             <div className={`previewDragOverlayFrame ${templateClassName(template)}`} style={dragOverlayStyle}>
-                {renderPreviewDragOverlay()}
+                <div className="previewDragOverlayScaleLayer" style={dragOverlayContentStyle}>
+                    {renderPreviewDragOverlay()}
+                </div>
             </div>
         </DragOverlay>
     );
@@ -1340,38 +1578,102 @@ export default function ResumePreview({
             </SortableContext>
         ),
     ].filter(Boolean);
+    const pageLabel = pageMetrics.pageCount === 1 ? '1 page' : `${pageMetrics.pageCount} pages`;
+    const showPreviewZoomControl = previewModel.hasContent && pageMetrics.hasDistinctZoomModes;
+
+    function handlePreviewZoomChange(mode) {
+        setHasSelectedPreviewZoom(true);
+        setPreviewZoomMode(mode);
+    }
+
+    function renderPageMarkers() {
+        if (!previewModel.hasContent || pageMetrics.pageCount <= 1 || pageMetrics.pageHeight <= 0) {
+            return null;
+        }
+
+        return (
+            <div className="resumePageMarkers" aria-hidden="true">
+                {Array.from({ length: pageMetrics.pageCount - 1 }, (_, index) => {
+                    const pageNumber = index + 2;
+
+                    return (
+                        <div
+                            className="resumePageMarker"
+                            key={`page-marker-${pageNumber}`}
+                            style={{ top: `${pageMetrics.pageHeight * (index + 1)}px` }}
+                        >
+                            <span>Page {pageNumber}</span>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }
 
     return (
         <>
             <style media="print">{printPageRule}</style>
             <section ref={panelRef} className="previewPanel">
-                <div className="previewFrame">
-                    <div
-                        ref={resumeRef}
-                        className={`resumePage ${templateClassName(template)}`}
-                        style={presentationVars}
-                        onClick={handlePreviewClick}
-                        onPointerDownCapture={handlePreviewDragHandleCapture}
-                        onKeyDownCapture={handlePreviewDragHandleCapture}
-                    >
-                        {previewModel.hasContent ? (
-                            <DndContext
-                                sensors={sensors}
-                                collisionDetection={previewCollisionDetection}
-                                onDragStart={handlePreviewDragStart}
-                                onDragCancel={handlePreviewDragCancel}
-                                onDragEnd={handlePreviewDragEnd}
-                            >
-                                {orderedSections}
-                                {typeof document === 'undefined' ? previewDragOverlay : createPortal(previewDragOverlay, document.body)}
-                            </DndContext>
-                        ) : (
-                            <div className="resumeEmptyState">
-                                <p className="resumeEmptyEyebrow">Live preview</p>
-                                <h3>Your resume will appear here</h3>
-                                <p>Start with your personal details, then add education and experience. Empty sections stay out of the final document until you add real content.</p>
+                <div ref={previewFrameRef} className="previewFrame">
+                    {previewModel.hasContent && (
+                        <div className="previewToolbar">
+                            <span className="previewPageCount">{pageLabel}</span>
+                            {showPreviewZoomControl && (
+                                <div className="previewZoomControl" role="group" aria-label="Preview zoom mode">
+                                    <button
+                                        type="button"
+                                        className={`previewZoomButton${previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE ? ' isActive' : ''}`}
+                                        onClick={() => handlePreviewZoomChange(PREVIEW_ZOOM_MODES.FIT_PAGE)}
+                                        aria-pressed={previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE}
+                                    >
+                                        Full page
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`previewZoomButton${previewZoomMode === PREVIEW_ZOOM_MODES.FIT_WIDTH ? ' isActive' : ''}`}
+                                        onClick={() => handlePreviewZoomChange(PREVIEW_ZOOM_MODES.FIT_WIDTH)}
+                                        aria-pressed={previewZoomMode === PREVIEW_ZOOM_MODES.FIT_WIDTH}
+                                    >
+                                        Large view
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="previewPageViewport">
+                        <div className="previewPageScaleShell" style={pageShellStyle}>
+                            <div className="previewPageScaleLayer">
+                                <div
+                                    ref={resumeRef}
+                                    className={`resumePage ${templateClassName(template)}`}
+                                    style={presentationVars}
+                                    onClick={handlePreviewClick}
+                                    onPointerDownCapture={handlePreviewDragHandleCapture}
+                                    onKeyDownCapture={handlePreviewDragHandleCapture}
+                                >
+                                    {previewModel.hasContent ? (
+                                        <DndContext
+                                            sensors={sensors}
+                                            collisionDetection={previewCollisionDetection}
+                                            onDragStart={handlePreviewDragStart}
+                                            onDragCancel={handlePreviewDragCancel}
+                                            onDragEnd={handlePreviewDragEnd}
+                                        >
+                                            {orderedSections}
+                                            {typeof document === 'undefined' ? previewDragOverlay : createPortal(previewDragOverlay, document.body)}
+                                        </DndContext>
+                                    ) : (
+                                        <div className="resumeEmptyState">
+                                            <p className="resumeEmptyEyebrow">Live preview</p>
+                                            <h3>Your resume will appear here</h3>
+                                            <p>Start with your personal details, then add education and experience. Empty sections stay out of the final document until you add real content.</p>
+                                        </div>
+                                    )}
+                                </div>
+                                {renderPageMarkers()}
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
             </section>

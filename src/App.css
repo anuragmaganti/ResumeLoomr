@@ -1147,6 +1147,7 @@ html[data-theme="dark"] .brandLogo--dark {
   position: relative;
   z-index: 1;
   display: grid;
+  width: min(100%, var(--workspace-content-max-width));
   grid-template-columns: clamp(430px, 44vw, 680px) minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
@@ -1204,7 +1205,14 @@ html[data-theme="dark"] .brandLogo--dark {
 
 .settingsRail {
   container-type: inline-size;
+  container-name: settings-rail;
   --settings-inset: 5px;
+  --settings-stepper-button-size: 20px;
+  --settings-stepper-value-width: 22px;
+  --settings-stepper-control-size: 20px;
+  --settings-stepper-gap: 3px;
+  --settings-stepper-font-size: 0.75rem;
+  --settings-label-size: 0.625rem;
 }
 
 @media (min-width: 981px) {
@@ -1270,6 +1278,7 @@ html[data-theme="dark"] .brandLogo--dark {
 
 .settingsControl {
   container-type: inline-size;
+  container-name: settings-control;
   display: grid;
   grid-template-columns: 1fr;
   align-items: center;
@@ -1331,7 +1340,7 @@ html[data-theme="dark"] .brandLogo--dark {
   min-width: 0;
   max-width: 100%;
   color: var(--color-text-subtle);
-  font-size: 0.625rem;
+  font-size: var(--settings-label-size);
   font-weight: 750;
   line-height: 1.1;
   text-align: center;
@@ -1387,11 +1396,39 @@ html[data-theme="dark"] .brandLogo--dark {
 
 .settingsStepper {
   display: inline-grid;
-  grid-template-columns: auto auto auto;
+  grid-template-columns:
+    var(--settings-stepper-button-size)
+    var(--settings-stepper-value-width)
+    var(--settings-stepper-button-size);
   align-items: center;
   justify-self: center;
-  gap: 3px;
+  gap: var(--settings-stepper-gap);
+  min-width: 0;
   max-width: 100%;
+}
+
+@container settings-control (max-width: 80px) {
+  .settingsStepper {
+    --settings-stepper-button-size: 18px;
+    --settings-stepper-value-width: 20px;
+    --settings-stepper-control-size: 18px;
+    --settings-stepper-gap: 2px;
+    --settings-stepper-font-size: 0.6875rem;
+  }
+}
+
+@container settings-control (max-width: 64px) {
+  .settingsControlLabel {
+    --settings-label-size: 0.5625rem;
+  }
+
+  .settingsStepper {
+    --settings-stepper-button-size: 16px;
+    --settings-stepper-value-width: 18px;
+    --settings-stepper-control-size: 17px;
+    --settings-stepper-gap: 1px;
+    --settings-stepper-font-size: 0.625rem;
+  }
 }
 
 @container (min-width: 220px) {
@@ -1434,15 +1471,16 @@ html[data-theme="dark"] .brandLogo--dark {
 .button.settingsAdjustButton {
   display: inline-grid;
   place-items: center;
-  min-width: 20px;
-  height: 20px;
-  min-height: 20px;
+  width: var(--settings-stepper-button-size);
+  min-width: 0;
+  height: var(--settings-stepper-control-size);
+  min-height: var(--settings-stepper-control-size);
   padding: 0;
   border: 1px solid var(--color-border);
   border-radius: 999px;
   background: var(--color-surface-muted);
   color: var(--color-text);
-  font-size: 0.75rem;
+  font-size: var(--settings-stepper-font-size);
   font-weight: 700;
   line-height: 1;
   box-shadow: none;
@@ -1451,7 +1489,7 @@ html[data-theme="dark"] .brandLogo--dark {
 }
 
 .settingsControlValue {
-  min-width: 22px;
+  width: var(--settings-stepper-value-width);
   border-color: transparent;
   background: transparent;
 }
@@ -2005,6 +2043,43 @@ html[data-theme="dark"] .sectionAddDialog {
   }
 }
 
+@media (min-width: 981px) {
+  .workspace.isPreviewFitPageLayout {
+    --workspace-fit-page-editor-min: min(430px, calc(100% - 320px - var(--space-4)));
+    --workspace-fit-page-preview-width: min(
+      var(--workspace-fit-page-width),
+      calc(100% - var(--workspace-fit-page-editor-min) - var(--space-4))
+    );
+    grid-template-columns:
+      minmax(var(--workspace-fit-page-editor-min), 1fr)
+      minmax(0, var(--workspace-fit-page-preview-width));
+  }
+
+  .workspace.isPreviewFitPageLayout .workspaceColumnEditor {
+    width: auto;
+  }
+
+  .workspace.isPreviewFitPageLayout .editorWorkspace {
+    grid-template-columns: clamp(104px, 10.5vw, 140px) minmax(0, 1fr);
+  }
+
+  .workspace.isPreviewFitPageLayout .editorStage {
+    width: auto;
+    max-width: none;
+    justify-self: stretch;
+  }
+
+  .workspace.isPreviewFitPageLayout .workspaceColumnPreview {
+    justify-self: end;
+    width: 100%;
+  }
+
+  .workspace.isPreviewFitPageLayout .previewPanel,
+  .workspace.isPreviewFitPageLayout .previewFrame {
+    width: 100%;
+  }
+}
+
 @media (max-width: 980px) {
   .topbar {
     grid-template-columns: 1fr;
@@ -2224,7 +2299,8 @@ html[data-theme="dark"] .sectionAddDialog {
   .mobileWorkspaceToggle,
   .workspaceColumnEditor,
   .editorPanel {
-    display: none;
+    display: none !important;
+    visibility: hidden !important;
   }
 
   .workspaceColumnPreview,

@@ -7,9 +7,9 @@
   </picture>
 </p>
 
-ResumeLoomr is a local-first, AI-assisted resume builder for creating, importing, editing, previewing, and printing multiple resumes in one browser workspace.
+ResumeLoomr is a local-first, AI-assisted resume builder for creating, importing, editing, previewing, syncing, and printing multiple resumes in one browser workspace.
 
-The app uses a block-first resume model, IndexedDB local persistence, Firebase Auth, Firestore cloud backup, Vercel API routes, and Gemini-powered PDF/DOCX import. Users can work without an account, then sign in when they want cross-device sync.
+The app uses a block-first resume model, IndexedDB as the working store, Firebase Auth and Firestore for account backup, Vercel API routes for secure server work, and Gemini-powered PDF/DOCX import. Users can work without an account, then sign in when they want cloud backup, cross-device restore, or resume import.
 
 ## Features
 
@@ -19,7 +19,8 @@ The app uses a block-first resume model, IndexedDB local persistence, Firebase A
 - Click any editable text in the live preview to open the matching editor field.
 - Drag sections, entries, and bullet points directly inside the live preview to reorder them.
 - Drag sections in the editor rail and drag resume tabs in the resume rail with dnd-kit sortable interactions.
-- Add repeatable sections such as Education, Experience, Internships, Research, Teaching, Leadership, Volunteering, Skills, Projects, Certifications, Languages, Awards, Publications, Presentations, Patents, Professional Affiliations, and custom sections.
+- New resumes start with Personal, Education, Internships, Experience, Projects, and Skills.
+- Add repeatable sections such as Research, Teaching, Leadership, Volunteering, Certifications, Languages, Awards, Publications, Presentations, Patents, Professional Affiliations, and custom sections.
 - Rename section titles inline, including temporarily blank names that fall back to an untitled section label on blur.
 - Collapse and expand repeated entry cards for dense editing.
 
@@ -28,9 +29,10 @@ The app uses a block-first resume model, IndexedDB local persistence, Firebase A
 - Preview uses the same data and presentation settings as print output.
 - Print/Save uses browser print output with resume-specific document title naming.
 - The live preview supports subtle hover affordances, click-to-edit, and drag-to-reorder without affecting printed output.
+- Preview controls support `Full page` and `Large view` when those modes produce different sizes; on wide screens where they match, the controls stay hidden.
 - Personal details stay first; every other section is ordered by the resume’s section block list.
 - Resume text, margins, line spacing, section spacing, heading size, and name size can be adjusted from the settings rail.
-- Two templates are available today: `Compact` as the default and `Executive` as an alternate layout.
+- Two print templates are available today: `Compact` as the default and `Executive` as an alternate layout.
 
 ### Block-First Data Model
 
@@ -46,7 +48,7 @@ The app uses a block-first resume model, IndexedDB local persistence, Firebase A
 - Resume tabs live in a wrapping rail under the main header.
 - Resume rail order is user-controlled and persists locally and through cloud sync.
 - A single browser workspace supports up to `100` resumes.
-- Each resume keeps its own content, section order, template, and presentation settings.
+- Each resume keeps its own content, ordered section blocks, template, and presentation settings.
 
 ### Local-First Persistence
 
@@ -55,7 +57,7 @@ The app uses a block-first resume model, IndexedDB local persistence, Firebase A
 - Local saves update the visible `Saved locally` timestamp from the actual local save time.
 - Local drafts include `localRevision` metadata to prevent stale tab saves from overwriting newer local changes.
 - `localStorage` is kept only for small compatibility markers, theme/settings, and fallback/migration helpers.
-- Signed-out users can keep editing locally, and settings explain how to clear local resume copies from a shared browser.
+- Signed-out users can keep editing locally, and settings explain how to remove account connection data and local resume copies from a shared browser.
 
 ### Account Sync
 
@@ -67,6 +69,7 @@ The app uses a block-first resume model, IndexedDB local persistence, Firebase A
 - Outbox acknowledgements are version-aware using `id`, `operationVersion`, and `localRevision`, so an old in-flight sync cannot clear a newer local edit.
 - Sync operations are scoped to the signed-in Firebase account to avoid cross-account writes from shared browsers.
 - A service worker requests Background Sync where supported; otherwise queued changes sync on reconnect or the next app open.
+- Login always performs a safe local/cloud merge so existing browser resumes and cloud resumes are preserved instead of one side replacing the other.
 
 ### AI Resume Import
 
