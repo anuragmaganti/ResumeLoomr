@@ -7,8 +7,8 @@ export const MAX_RESUME_SECTIONS = 100;
 export const UNTITLED_SECTION_TITLE = 'Untitled section';
 export const DEFAULT_TEMPLATE = 'compact';
 export const TEMPLATE_OPTIONS = [
-  { id: 'executive', label: 'Executive' },
   { id: 'compact', label: 'Compact' },
+  { id: 'executive', label: 'Executive' },
 ];
 export const SECTION_BLOCK_KINDS = [
   'education',

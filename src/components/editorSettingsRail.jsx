@@ -1,17 +1,17 @@
 import { useState } from "react";
 
 const settingOptions = [
-  { id: "textSize", label: "Text size" },
-  { id: "horizontalMargins", label: "Horizontal margins" },
-  { id: "verticalMargins", label: "Vertical margins" }
+  { id: "textSize", label: "Text size", shortLabel: "Text" },
+  { id: "horizontalMargins", label: "Horizontal margins", shortLabel: "Side margin" },
+  { id: "verticalMargins", label: "Vertical margins", shortLabel: "Top margin" }
 ];
 
 const advancedSettingOptions = [
-  { id: "lineSpacing", label: "Line spacing" },
-  { id: "sectionSpacing", label: "Section spacing" },
-  { id: "entrySpacing", label: "Entry spacing" },
-  { id: "headingSize", label: "Heading size" },
-  { id: "nameSize", label: "Name size" }
+  { id: "lineSpacing", label: "Line spacing", shortLabel: "Line gap" },
+  { id: "sectionSpacing", label: "Section spacing", shortLabel: "Section gap" },
+  { id: "entrySpacing", label: "Entry spacing", shortLabel: "Entry gap" },
+  { id: "headingSize", label: "Heading size", shortLabel: "Headings" },
+  { id: "nameSize", label: "Name size", shortLabel: "Name size" }
 ];
 
 function formatSettingValue(value) {
@@ -36,7 +36,7 @@ export default function EditorSettingsRail({
 
     return (
       <div className="settingsControl" key={setting.id}>
-        <span className="settingsControlLabel">{setting.label}</span>
+        <span className="settingsControlLabel">{setting.shortLabel}</span>
 
         <div className="settingsStepper" role="group" aria-label={setting.label}>
           <button
@@ -72,35 +72,34 @@ export default function EditorSettingsRail({
       </div>
 
       <div className="settingsRailList">
-        <label className="settingsTemplateControl settingsControl" htmlFor="settings-template-select">
+        <div className="settingsTemplateControl settingsControl">
           <span className="settingsControlLabel">Template</span>
-          <select
-            id="settings-template-select"
-            className="toolbarSelect settingsTemplateSelect"
-            value={template}
-            onChange={(event) => onTemplateChange(event.target.value)}
-            aria-label="Choose resume template"
-          >
+          <div className="settingsTemplateSegment" role="group" aria-label="Choose resume template">
             {templateOptions.map((option) => (
-              <option key={option.id} value={option.id}>
+              <button
+                type="button"
+                className={`settingsTemplateOption${template === option.id ? " isActive" : ""}`}
+                key={option.id}
+                onClick={() => onTemplateChange(option.id)}
+                aria-pressed={template === option.id}
+              >
                 {option.label}
-              </option>
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+        </div>
 
         {settingOptions.map(renderSettingControl)}
 
         <button
           type="button"
-          className="settingsControl settingsControlToggle"
+          className="settingsAdvancedToggle"
           onClick={() => setIsAdvancedOpen((current) => !current)}
           aria-expanded={isAdvancedOpen}
           aria-controls="advanced-settings-group"
         >
-          <span className="settingsControlLabel">
-            {isAdvancedOpen ? "Collapse" : "Advanced Settings"}
-          </span>
+          <span>Advanced</span>
+          <span aria-hidden="true">{isAdvancedOpen ? "▴" : "▾"}</span>
         </button>
 
         <div

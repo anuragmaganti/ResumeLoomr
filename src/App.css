@@ -1219,15 +1219,15 @@ html[data-theme="dark"] .brandLogo--dark {
 
 .settingsRailInner {
   display: grid;
-  gap: var(--space-2);
+  gap: 7px;
 }
 
 .settingsRailHeader {
   display: grid;
   gap: 0;
-  justify-items: center;
-  padding: 2px 0 2px;
-  text-align: center;
+  justify-items: start;
+  padding: 0 2px;
+  text-align: left;
 }
 
 .settingsRailHeader h2,
@@ -1240,7 +1240,11 @@ html[data-theme="dark"] .brandLogo--dark {
 
 .settingsRailList {
   display: grid;
-  gap: 6px;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius-lg) - var(--settings-inset));
+  background: color-mix(in srgb, var(--color-surface-muted) 72%, var(--color-surface-elevated));
 }
 
 .settingsAdvancedGroup {
@@ -1259,7 +1263,7 @@ html[data-theme="dark"] .brandLogo--dark {
 
 .settingsAdvancedContent {
   display: grid;
-  gap: 6px;
+  gap: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -1267,82 +1271,118 @@ html[data-theme="dark"] .brandLogo--dark {
 .settingsControl {
   container-type: inline-size;
   display: grid;
-  justify-items: center;
-  gap: 6px;
+  grid-template-columns: 1fr;
+  align-items: center;
+  justify-items: stretch;
+  gap: 4px;
   min-width: 0;
-  padding: 8px 6px;
-  border: 1px solid var(--color-border);
-  border-radius: calc(var(--radius-lg) - var(--settings-inset));
-  background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-soft));
+  min-height: 34px;
+  padding: 7px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  background: transparent;
   text-align: center;
 }
 
-.settingsControlToggle {
+.settingsAdvancedContent .settingsControl:last-child {
+  border-bottom: 0;
+}
+
+.settingsAdvancedToggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
   width: 100%;
+  padding: 6px 7px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  background: transparent;
+  color: var(--color-text-subtle);
+  font-size: 0.625rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: left;
   cursor: pointer;
   transition:
     background-color var(--transition-base),
-    border-color var(--transition-base),
     color var(--transition-base),
     transform var(--transition-fast);
 }
 
-.settingsControlToggle:not(:disabled):hover {
-  border-color: var(--color-border-strong);
-  background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-muted));
-  transform: translateY(-1px);
+.settingsAdvancedToggle:not(:disabled):hover,
+.settingsAdvancedToggle:focus-visible {
+  background: color-mix(in srgb, var(--color-surface-elevated) 72%, transparent);
+  color: var(--color-text);
+  outline: none;
 }
 
-.settingsControlToggle:not(:disabled):active {
-  transform: translateY(0);
+.settingsAdvancedToggle:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+.settingsAdvancedToggle[aria-expanded="false"] {
+  border-bottom: 0;
 }
 
 .settingsControlLabel {
   display: block;
-  width: 100%;
+  min-width: 0;
   max-width: 100%;
   color: var(--color-text-subtle);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  line-height: 1.2;
-  white-space: normal;
-  text-wrap: balance;
-  overflow-wrap: break-word;
+  font-size: 0.625rem;
+  font-weight: 750;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .settingsTemplateControl {
   cursor: default;
 }
 
-.settingsTemplateSelect {
+.settingsTemplateSegment {
+  display: inline-grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
   width: 100%;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--color-surface-muted) 84%, var(--color-surface-elevated));
+}
+
+.settingsTemplateOption {
   min-width: 0;
-  min-height: 24px;
-  padding: 0 18px 0 7px;
-  border-radius: 999px;
-  font-size: 0.6875rem;
+  min-height: 19px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.5625rem;
+  font-weight: 800;
   line-height: 1;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
-    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%),
-    linear-gradient(
-      180deg,
-      var(--color-surface-elevated),
-      var(--color-surface-muted)
-    );
-  background-position:
-    calc(100% - 11px) calc(50% - 1px),
-    calc(100% - 7px) calc(50% - 1px),
-    0 0;
-  background-size:
-    4px 4px,
-    4px 4px,
-    100% 100%;
-  background-repeat: no-repeat;
-  box-shadow: none;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.settingsTemplateOption.isActive {
+  background: var(--color-surface-elevated);
+  color: var(--color-text);
+  box-shadow: var(--shadow-xs);
+}
+
+.settingsTemplateOption:not(.isActive):hover,
+.settingsTemplateOption:focus-visible {
+  color: var(--color-text);
+  outline: none;
 }
 
 .settingsStepper {
@@ -1350,15 +1390,51 @@ html[data-theme="dark"] .brandLogo--dark {
   grid-template-columns: auto auto auto;
   align-items: center;
   justify-self: center;
-  gap: 4px;
+  gap: 3px;
   max-width: 100%;
+}
+
+@container (min-width: 220px) {
+  .settingsControl {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 6px 7px;
+    text-align: left;
+  }
+
+  .settingsControlLabel {
+    text-align: left;
+  }
+
+  .settingsTemplateSegment {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: min(100%, 180px);
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface-muted);
+  }
+
+  .settingsTemplateOption {
+    min-height: 20px;
+    padding: 0 5px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    font-size: 0.5625rem;
+  }
+
+  .settingsStepper {
+    justify-self: end;
+  }
 }
 
 .settingsControlValue,
 .button.settingsAdjustButton {
   display: inline-grid;
   place-items: center;
-  min-width: 24px;
+  min-width: 20px;
   height: 20px;
   min-height: 20px;
   padding: 0;
@@ -1366,7 +1442,7 @@ html[data-theme="dark"] .brandLogo--dark {
   border-radius: 999px;
   background: var(--color-surface-muted);
   color: var(--color-text);
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   line-height: 1;
   box-shadow: none;
@@ -1375,6 +1451,7 @@ html[data-theme="dark"] .brandLogo--dark {
 }
 
 .settingsControlValue {
+  min-width: 22px;
   border-color: transparent;
   background: transparent;
 }
@@ -1412,114 +1489,6 @@ html[data-theme="dark"] .brandLogo--dark {
   border-color: var(--color-danger-hover-border);
   background: var(--color-danger-hover-bg);
   color: var(--color-danger-hover-text);
-}
-
-@container (max-width: 170px) {
-  .settingsRailInner {
-    gap: 6px;
-  }
-
-  .settingsRailHeader {
-    padding-bottom: 0;
-  }
-
-  .settingsRailHeader h2 {
-    font-size: 0.8125rem;
-  }
-
-  .settingsRailList {
-    gap: 5px;
-  }
-
-  .settingsAdvancedContent {
-    gap: 5px;
-  }
-
-  .settingsControl {
-    gap: 5px;
-    padding: 7px 5px;
-  }
-
-  .settingsControlLabel {
-    font-size: 0.625rem;
-    line-height: 1.15;
-  }
-
-  .settingsStepper {
-    gap: 3px;
-  }
-
-  .settingsControlValue,
-  .button.settingsAdjustButton {
-    min-width: 22px;
-    height: 18px;
-    min-height: 18px;
-    font-size: 0.78125rem;
-  }
-}
-
-@container (max-width: 148px) {
-  .settingsRailInner {
-    gap: 5px;
-  }
-
-  .settingsRailHeader h2 {
-    font-size: 0.75rem;
-  }
-
-  .settingsControl {
-    gap: 4px;
-    padding: 6px 4px;
-  }
-
-  .settingsControlLabel {
-    font-size: 0.59375rem;
-    line-height: 1.1;
-  }
-
-  .settingsStepper {
-    gap: 2px;
-  }
-
-  .settingsAdvancedContent {
-    gap: 4px;
-  }
-
-  .settingsControlValue,
-  .button.settingsAdjustButton {
-    min-width: 20px;
-    height: 17px;
-    min-height: 17px;
-    font-size: 0.75rem;
-  }
-}
-
-@container (max-width: 122px) {
-  .settingsControl {
-    gap: 3px;
-    padding: 5px 3px;
-  }
-
-  .settingsControlLabel {
-    font-size: 0.53125rem;
-    line-height: 1.05;
-  }
-
-  .settingsStepper {
-    gap: 1px;
-  }
-
-  .settingsAdvancedContent {
-    gap: 3px;
-  }
-
-  .settingsControlValue,
-  .button.settingsAdjustButton {
-    min-width: 17px;
-    height: 15px;
-    min-height: 15px;
-    font-size: 0.6875rem;
-  }
 }
 
 .editorStage {
