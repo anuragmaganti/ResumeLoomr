@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import './App.css'
 import './styles/buttons.css'
 import './styles/forms.css'
@@ -42,6 +42,7 @@ function App() {
   const [signedOutEditingPreference, setSignedOutEditingPreference] = useState(() => readSignedOutEditingPreference());
   const previewEditRequestIdRef = useRef(0);
   const [previewEditTarget, setPreviewEditTarget] = useState(null);
+  const [editorCaretTarget, setEditorCaretTarget] = useState(null);
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') {
       return 'light';
@@ -210,6 +211,28 @@ function App() {
     setActiveTab(target.sectionId);
     setMobileView('editor');
   }
+
+  const updateEditorCaretTarget = useCallback((target) => {
+    if (!target?.path) {
+      startTransition(() => {
+        setEditorCaretTarget(null);
+      });
+      return;
+    }
+
+    const offset = Number.isFinite(target.offset) ? Math.max(0, target.offset) : 0;
+    const value = typeof target.value === 'string' ? target.value : undefined;
+
+    startTransition(() => {
+      setEditorCaretTarget((currentTarget) => (
+        currentTarget?.path === target.path &&
+        currentTarget?.offset === offset &&
+        currentTarget?.value === value
+          ? currentTarget
+          : { path: target.path, offset, value }
+      ));
+    });
+  }, []);
 
   const clearPreviewEditTarget = useCallback((requestId) => {
     setPreviewEditTarget((currentTarget) => {
@@ -581,6 +604,7 @@ function App() {
               maxHeight={editorStageMaxHeight}
               previewEditTarget={previewEditTarget}
               onClearPreviewEditTarget={clearPreviewEditTarget}
+              onEditorCaretChange={updateEditorCaretTarget}
             />
           </div>
 
@@ -591,6 +615,10 @@ function App() {
               settings={resume.settings}
               panelRef={previewPanelRef}
               onEditTarget={handlePreviewEditTarget}
+              onReorderSections={reorderSections}
+              onReorderSectionEntries={actions.reorderSectionEntries}
+              onReorderSectionTextList={actions.reorderSectionTextList}
+              activeEditorCaret={editorCaretTarget}
             />
           </div>
         </main>

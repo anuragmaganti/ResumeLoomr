@@ -70,6 +70,123 @@
     color var(--transition-fast);
 }
 
+.resumePage [data-preview-drag-handle] {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.resumePage [data-preview-drag-handle]:active {
+  cursor: grabbing;
+}
+
+.previewTextCaret {
+    display: inline-block;
+    width: 0;
+    height: 1em;
+    margin: -0.12em 0 0;
+    border-left: 1px solid var(--color-accent-strong);
+    vertical-align: -0.14em;
+    animation: previewTextCaretBlink 1s steps(1, end) infinite;
+    pointer-events: none;
+}
+
+.previewTextCaretSegment {
+    white-space: break-spaces;
+}
+
+@keyframes previewTextCaretBlink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.previewSortableItem {
+  transition:
+    transform var(--transition-fast),
+    opacity var(--transition-fast),
+    outline-color var(--transition-fast),
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.previewSortableSection.isPreviewSortingPlaceholder,
+.previewSortableEntry.isPreviewSortingPlaceholder,
+.previewSortableBullet.isPreviewSortingPlaceholder {
+  border-radius: 8px;
+  outline: 0;
+  border: 1px dashed var(--color-accent-strong);
+  background: color-mix(in srgb, var(--color-accent-soft) 28%, transparent 72%);
+  box-shadow: inset 0 0 0 1px var(--color-accent-strong);
+}
+
+.previewSortableSection.isPreviewSortingPlaceholder > *,
+.previewSortableEntry.isPreviewSortingPlaceholder > * {
+  opacity: 0;
+}
+
+.previewSortableBullet.isPreviewSortingPlaceholder {
+  color: transparent;
+}
+
+.previewDragOverlayFrame {
+  box-sizing: border-box;
+  pointer-events: none;
+  max-width: calc(100vw - 32px);
+  border-radius: 12px;
+  border: 1px solid var(--color-accent-strong);
+  outline: 2px solid var(--color-accent);
+  outline-offset: -5px;
+  background: color-mix(in srgb, var(--resume-page-bg, var(--color-surface-elevated)) 82%, var(--color-accent-soft) 18%);
+  color: var(--resume-page-text, var(--text-primary));
+  box-shadow:
+    0 12px 28px rgba(15, 23, 42, 0.18),
+    var(--shadow-md);
+  cursor: grabbing;
+  overflow: hidden;
+}
+
+.previewDragOverlay {
+  width: 100%;
+  height: 100%;
+  max-height: inherit;
+  background: transparent;
+  box-shadow: none;
+  outline: 0;
+}
+
+.previewDragOverlay .resumeSection {
+  margin: 0;
+  padding: 0;
+  border-bottom: none;
+}
+
+.previewDragOverlay h2 {
+  margin: 0 0 var(--resume-section-heading-gap, 8px);
+  color: var(--resume-page-heading, var(--text-primary));
+  font-size: var(--resume-heading-size, 0.625rem);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.previewDragOverlay--entry .resumeSection > h2 {
+  display: none;
+}
+
+.previewDragOverlay--bullet {
+  margin: 0;
+  padding-left: 16px;
+  color: inherit;
+}
+
 @media (hover: hover) {
   .resumePage [data-edit-section-id]:hover {
     background: color-mix(in srgb, var(--color-accent-soft) 56%, transparent);
@@ -462,6 +579,24 @@
     cursor: default;
     background: transparent !important;
     box-shadow: none !important;
+  }
+
+  .resumePage [data-preview-drag-handle] {
+    cursor: default;
+  }
+
+  .previewTextCaret {
+    display: none !important;
+  }
+
+  .previewSortableItem,
+  .previewSortableSection.isPreviewSortingPlaceholder,
+  .previewSortableEntry.isPreviewSortingPlaceholder,
+  .previewSortableBullet.isPreviewSortingPlaceholder {
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+    transition: none;
   }
 
   .resumePage--executive,

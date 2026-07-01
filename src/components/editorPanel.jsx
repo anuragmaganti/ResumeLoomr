@@ -8,7 +8,7 @@ import {
     createEditorTargetAttributes,
     sectionTitleEditorPath
 } from "../lib/editorTargets";
-import { MAX_RESUME_SECTIONS, SECTION_TEMPLATE_GROUPS } from "../lib/resume";
+import { MAX_RESUME_SECTIONS, SECTION_TEMPLATE_GROUPS, UNTITLED_SECTION_TITLE } from "../lib/resume";
 
 const sectionMeta = {
     personal: {
@@ -107,15 +107,20 @@ export default function EditorPanel({
     markTouched,
     maxHeight,
     previewEditTarget,
-    onClearPreviewEditTarget
+    onClearPreviewEditTarget,
+    onEditorCaretChange
 }) {
     const handledPreviewRequestIdRef = useRef(0);
     const pendingAddedSectionIdRef = useRef("");
+    const caretSyncFrameIdRef = useRef(0);
     const resumeBlocks = Array.isArray(resume.sections) ? resume.sections : [];
     const activeBlock = resumeBlocks.find((section) => section.id === activeTab);
+    const currentSectionTitleValue = activeTab === "personal"
+        ? sectionMeta.personal.label
+        : activeBlock?.title ?? "";
     const currentSectionLabel = activeTab === "personal"
         ? sectionMeta.personal.label
-        : activeBlock?.title || "Section";
+        : activeBlock?.title?.trim() || UNTITLED_SECTION_TITLE;
     const sections = [
         {
             id: "personal",
@@ -124,7 +129,7 @@ export default function EditorPanel({
         },
         ...resumeBlocks.map((section) => ({
             id: section.id,
-            navLabel: formatSectionRailLabel(section.title),
+            navLabel: formatSectionRailLabel(section.title) || UNTITLED_SECTION_TITLE,
             navHint: sectionMeta[section.id]?.navHint || sectionMeta[section.kind]?.navHint || (
                 section.kind === "roles" ? "Roles and highlights" : "Section details"
             )
@@ -155,6 +160,45 @@ export default function EditorPanel({
         pendingAddedSectionIdRef.current = nextSectionId;
         setActiveTab(nextSectionId);
     };
+    const isEditorTextField = (element) => Boolean(
+        element &&
+        element.matches?.("input[data-editor-path], textarea[data-editor-path]") &&
+        typeof element.selectionStart === "number"
+    );
+    const syncEditorCaretFromEvent = (event) => {
+        const fieldElement = event.target;
+
+        if (!isEditorTextField(fieldElement)) {
+            return;
+        }
+
+        if (caretSyncFrameIdRef.current) {
+            window.cancelAnimationFrame(caretSyncFrameIdRef.current);
+        }
+
+        caretSyncFrameIdRef.current = window.requestAnimationFrame(() => {
+            caretSyncFrameIdRef.current = 0;
+
+            if (document.activeElement !== fieldElement) {
+                return;
+            }
+
+            onEditorCaretChange?.({
+                path: fieldElement.dataset.editorPath,
+                offset: fieldElement.selectionStart,
+                value: fieldElement.value,
+            });
+        });
+    };
+    const clearEditorCaretAfterBlur = (event) => {
+        const editorStageElement = event.currentTarget;
+
+        window.setTimeout(() => {
+            if (!editorStageElement.contains(document.activeElement)) {
+                onEditorCaretChange?.(null);
+            }
+        }, 0);
+    };
 
     useEffect(() => {
         if (
@@ -173,6 +217,8 @@ export default function EditorPanel({
 
         let isCancelled = false;
         let frameId = 0;
+        let restoreFrameId = 0;
+        const restoreTimeoutIds = [];
         let attempts = 0;
 
         function findEditorTarget() {
@@ -200,9 +246,43 @@ export default function EditorPanel({
             const focusElement = fieldElement.matches("input, textarea")
                 ? fieldElement
                 : fieldElement.querySelector("input, textarea");
+            const previousScrollX = Number.isFinite(previewEditTarget.scrollX) ? previewEditTarget.scrollX : window.scrollX;
+            const previousScrollY = Number.isFinite(previewEditTarget.scrollY) ? previewEditTarget.scrollY : window.scrollY;
 
-            fieldElement.scrollIntoView({ block: "center", behavior: "smooth" });
+            if (!previewEditTarget.preserveScroll) {
+                fieldElement.scrollIntoView({ block: "center", behavior: "smooth" });
+            }
+
             focusElement?.focus({ preventScroll: true });
+
+            if (focusElement && typeof focusElement.value === "string") {
+                const caretOffset = focusElement.value.length;
+
+                try {
+                    focusElement.setSelectionRange?.(caretOffset, caretOffset);
+                } catch {
+                    // Some text-like input types do not support explicit selection ranges.
+                }
+
+                onEditorCaretChange?.({
+                    path: previewEditTarget.path,
+                    offset: caretOffset,
+                    value: focusElement.value,
+                });
+            }
+
+            if (previewEditTarget.preserveScroll) {
+                const restorePreservedScroll = () => {
+                    if (!isCancelled) {
+                        window.scrollTo(previousScrollX, previousScrollY);
+                    }
+                };
+
+                restorePreservedScroll();
+                restoreFrameId = window.requestAnimationFrame(restorePreservedScroll);
+                restoreTimeoutIds.push(window.setTimeout(restorePreservedScroll, 80));
+                restoreTimeoutIds.push(window.setTimeout(restorePreservedScroll, 180));
+            }
         }
 
         frameId = window.requestAnimationFrame(focusAndHighlightTarget);
@@ -213,8 +293,14 @@ export default function EditorPanel({
             if (frameId) {
                 window.cancelAnimationFrame(frameId);
             }
+
+            if (restoreFrameId) {
+                window.cancelAnimationFrame(restoreFrameId);
+            }
+
+            restoreTimeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
         };
-    }, [activeTab, previewEditTarget, setActiveTab]);
+    }, [activeTab, onEditorCaretChange, previewEditTarget, setActiveTab]);
 
     useEffect(() => {
         const pendingSectionId = pendingAddedSectionIdRef.current;
@@ -240,6 +326,12 @@ export default function EditorPanel({
             window.cancelAnimationFrame(frameId);
         };
     }, [activeTab]);
+
+    useEffect(() => () => {
+        if (caretSyncFrameIdRef.current) {
+            window.cancelAnimationFrame(caretSyncFrameIdRef.current);
+        }
+    }, []);
 
     return (
         <section className="editorPanel">
@@ -269,7 +361,15 @@ export default function EditorPanel({
                     </aside>
                 </div>
 
-                <div className="editorStage panel">
+                <div
+                    className="editorStage panel"
+                    onFocus={syncEditorCaretFromEvent}
+                    onInput={syncEditorCaretFromEvent}
+                    onKeyUp={syncEditorCaretFromEvent}
+                    onMouseUp={syncEditorCaretFromEvent}
+                    onSelect={syncEditorCaretFromEvent}
+                    onBlur={clearEditorCaretAfterBlur}
+                >
                     <div className="editorPanelHeader">
                         <div className="editorPanelHeading">
                             <h3>{currentSectionLabel}</h3>
@@ -305,8 +405,9 @@ export default function EditorPanel({
                                 <input
                                     id={`section-title-${activeTab}`}
                                     {...createEditorTargetAttributes(sectionTitleEditorPath(activeTab))}
-                                    value={currentSectionLabel}
+                                    value={currentSectionTitleValue}
                                     onChange={(event) => actions.updateSectionTitle(activeTab, event.target.value)}
+                                    onBlur={() => actions.commitSectionTitle(activeTab)}
                                 />
                             </div>
                         ) : null}

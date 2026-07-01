@@ -4,6 +4,7 @@ export const RESUME_STORAGE_KEY_PREFIX = 'resumeloomr:resume:';
 export const MAX_WORKSPACE_RESUME_NAME_LENGTH = 25;
 export const MAX_WORKSPACE_RESUMES = 100;
 export const MAX_RESUME_SECTIONS = 100;
+export const UNTITLED_SECTION_TITLE = 'Untitled section';
 export const DEFAULT_TEMPLATE = 'compact';
 export const TEMPLATE_OPTIONS = [
   { id: 'executive', label: 'Executive' },
@@ -215,8 +216,52 @@ function moveItem(array, index, direction) {
   return nextItems;
 }
 
+function moveItemToIndex(array, fromIndex, toIndex) {
+  if (
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= array.length ||
+    toIndex >= array.length ||
+    fromIndex === toIndex
+  ) {
+    return array;
+  }
+
+  const nextItems = [...array];
+  const [item] = nextItems.splice(fromIndex, 1);
+  nextItems.splice(toIndex, 0, item);
+  return nextItems;
+}
+
 function moveItemById(items, itemId, direction) {
   return moveItem(items, items.findIndex((item) => item.id === itemId), direction);
+}
+
+function reorderItemSubsetById(items, orderedItemIds) {
+  const requestedIds = Array.isArray(orderedItemIds) ? orderedItemIds.map(trimText).filter(Boolean) : [];
+  const requestedIdSet = new Set(requestedIds);
+  const itemById = new Map(items.map((item) => [item.id, item]));
+
+  if (
+    requestedIds.length === 0 ||
+    requestedIdSet.size !== requestedIds.length ||
+    requestedIds.some((itemId) => !itemById.has(itemId))
+  ) {
+    return items;
+  }
+
+  const reorderedItems = requestedIds.map((itemId) => itemById.get(itemId));
+  let reorderedIndex = 0;
+
+  return items.map((item) => {
+    if (!requestedIdSet.has(item.id)) {
+      return item;
+    }
+
+    const nextItem = reorderedItems[reorderedIndex];
+    reorderedIndex += 1;
+    return nextItem;
+  });
 }
 
 function reorderItemById(items, itemId, targetItemId, placement = 'before') {
@@ -464,7 +509,12 @@ function createUniqueSectionTitle(sections, title) {
 function normalizeSectionBlock(section, index, usedIds) {
   const kind = normalizeSectionKind(section?.kind);
   const defaultBlock = DEFAULT_SECTION_BLOCKS[index] || {};
-  const title = trimText(section?.title) || defaultBlock.title || (kind === 'roles' ? 'Experience' : 'Custom');
+  const hasExplicitTitle = section && typeof section === 'object' && Object.hasOwn(section, 'title');
+  const title = trimText(section?.title) || (
+    hasExplicitTitle
+      ? UNTITLED_SECTION_TITLE
+      : defaultBlock.title || (kind === 'roles' ? 'Experience' : 'Custom')
+  );
   const entries = Array.isArray(section?.entries) ? section.entries : [];
 
   return {
@@ -762,7 +812,14 @@ export function updateResumeSetting(resume, settingId, delta) {
 export function updateSectionTitle(resume, sectionId, value) {
   return updateSection(resume, sectionId, (section) => ({
     ...section,
-    title: trimText(value) || section.title,
+    title: asText(value),
+  }));
+}
+
+export function commitSectionTitle(resume, sectionId) {
+  return updateSection(resume, sectionId, (section) => ({
+    ...section,
+    title: trimText(section.title) || UNTITLED_SECTION_TITLE,
   }));
 }
 
@@ -800,19 +857,22 @@ export function reorderResumeSectionBlock(resume, sectionId, targetSectionId, pl
 
 export function reorderResumeSectionBlocksToMatch(resume, orderedSectionIds) {
   const normalizedResume = normalizeResume(resume);
-  const requestedIds = Array.isArray(orderedSectionIds) ? orderedSectionIds : [];
-  const existingIds = new Set(normalizedResume.sections.map((section) => section.id));
-  const nextSections = [
-    ...requestedIds
-      .filter((sectionId) => existingIds.has(sectionId))
-      .map((sectionId) => normalizedResume.sections.find((section) => section.id === sectionId)),
-    ...normalizedResume.sections.filter((section) => !requestedIds.includes(section.id)),
-  ];
+  const nextSections = reorderItemSubsetById(
+    normalizedResume.sections,
+    Array.isArray(orderedSectionIds) ? orderedSectionIds.filter((sectionId) => sectionId !== 'personal') : [],
+  );
 
   return {
     ...normalizedResume,
     sections: nextSections,
   };
+}
+
+export function reorderSectionBlockEntriesToMatch(resume, sectionId, orderedEntryIds) {
+  return updateSection(resume, sectionId, (section) => ({
+    ...section,
+    entries: reorderItemSubsetById(section.entries, orderedEntryIds),
+  }));
 }
 
 export function updateSectionBlockEntry(resume, sectionId, entryId, field, value) {
@@ -888,6 +948,29 @@ export function moveSectionBlockTextListItem(resume, sectionId, entryId, field, 
       ...entry,
       [field]: moveItem(normalizeStringList(entry[field]), itemIndex, direction),
     })),
+  }));
+}
+
+export function reorderSectionBlockTextListItem(resume, sectionId, entryId, field, fromIndex, toIndex) {
+  return updateSection(resume, sectionId, (section) => ({
+    ...section,
+    entries: updateEntry(section.entries, entryId, (entry) => {
+      const items = normalizeStringList(entry[field]);
+      const visibleIndexes = items
+        .map((item, index) => (trimText(normalizeBulletText(item)) ? index : -1))
+        .filter((index) => index >= 0);
+      const fromSourceIndex = visibleIndexes[fromIndex];
+      const toSourceIndex = visibleIndexes[toIndex];
+
+      if (fromSourceIndex === undefined || toSourceIndex === undefined) {
+        return entry;
+      }
+
+      return {
+        ...entry,
+        [field]: moveItemToIndex(items, fromSourceIndex, toSourceIndex),
+      };
+    }),
   }));
 }
 

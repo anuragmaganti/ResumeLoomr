@@ -6,7 +6,10 @@ import {
   MAX_RESUME_SECTIONS,
   MAX_WORKSPACE_RESUMES,
   SECTION_TEMPLATE_GROUPS,
+  UNTITLED_SECTION_TITLE,
   addResumeSectionBlock,
+  addRoleBlockEntry,
+  commitSectionTitle,
   createDuplicateResumeName,
   createEmptyResume,
   createFreshWorkspaceDraft,
@@ -22,6 +25,8 @@ import {
   normalizeResumeSettings,
   normalizeWorkspaceIndex,
   removeResumeSectionBlock,
+  reorderSectionBlockEntriesToMatch,
+  reorderSectionBlockTextListItem,
   reorderResumeSectionBlocksToMatch,
   reorderWorkspaceResumesToMatch,
   updatePersonalField,
@@ -172,6 +177,19 @@ test('generic block actions handle projects and section titles', () => {
   assert.equal(getSection(resume, 'projects').entries[0].highlights[0], 'Built a resume editor');
 });
 
+test('section titles can be temporarily blank and commit to an untitled fallback', () => {
+  let resume = createEmptyResume();
+
+  resume = updateSectionTitle(resume, 'projects', '');
+  assert.equal(getSection(resume, 'projects').title, '');
+
+  const normalizedDraft = normalizeDraftPayload({ resume });
+  assert.equal(getSection(normalizedDraft.resume, 'projects').title, UNTITLED_SECTION_TITLE);
+
+  resume = commitSectionTitle(resume, 'projects');
+  assert.equal(getSection(resume, 'projects').title, UNTITLED_SECTION_TITLE);
+});
+
 test('section helpers reorder and remove blocks without a separate order field', () => {
   let resume = createEmptyResume();
 
@@ -179,10 +197,42 @@ test('section helpers reorder and remove blocks without a separate order field',
   assert.deepEqual(resume.sections.slice(0, 4).map((section) => section.id), ['education', 'experience', 'projects', 'skills']);
 
   resume = reorderResumeSectionBlocksToMatch(resume, ['skills', 'education', 'experience']);
-  assert.deepEqual(resume.sections.slice(0, 4).map((section) => section.id), ['skills', 'education', 'experience', 'projects']);
+  assert.deepEqual(resume.sections.slice(0, 4).map((section) => section.id), ['skills', 'education', 'projects', 'experience']);
 
   resume = removeResumeSectionBlock(resume, 'skills');
   assert.equal(getSection(resume, 'skills'), undefined);
+});
+
+test('section entry and text-list exact reorders stay inside their target block', () => {
+  let resume = createEmptyResume();
+  const experience = getSection(resume, 'experience');
+  const firstEntryId = experience.entries[0].id;
+
+  resume = updateRoleBlockEntry(resume, 'experience', firstEntryId, 'company', 'First company');
+  resume = updateRoleBlockActivity(resume, 'experience', firstEntryId, 0, 'First bullet');
+  resume = updateRoleBlockActivity(resume, 'experience', firstEntryId, 1, 'Second bullet');
+  resume = updateRoleBlockActivity(resume, 'experience', firstEntryId, 2, 'Third bullet');
+  resume = updateSectionBlockTextList(resume, 'projects', getSection(resume, 'projects').entries[0].id, 'highlights', 0, 'Project bullet');
+
+  resume = reorderSectionBlockTextListItem(resume, 'experience', firstEntryId, 'activities', 0, 2);
+
+  assert.deepEqual(getSection(resume, 'experience').entries[0].activities.slice(0, 3), [
+    'Second bullet',
+    'Third bullet',
+    'First bullet',
+  ]);
+  assert.equal(getSection(resume, 'projects').entries[0].highlights[0], 'Project bullet');
+
+  resume = addRoleBlockEntry(resume, 'experience');
+  const secondEntryId = getSection(resume, 'experience').entries[1].id;
+
+  resume = updateRoleBlockEntry(resume, 'experience', secondEntryId, 'company', 'Second company');
+  resume = reorderSectionBlockEntriesToMatch(resume, 'experience', [secondEntryId, firstEntryId]);
+
+  assert.deepEqual(getSection(resume, 'experience').entries.map((entry) => entry.company).slice(0, 2), [
+    'Second company',
+    'First company',
+  ]);
 });
 
 test('section template helper appends repeatable block sections with unique names', () => {

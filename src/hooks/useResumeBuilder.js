@@ -11,6 +11,7 @@ import {
   addSectionBlockEducationProgram,
   addSectionBlockEntry,
   addSectionBlockTextListItem,
+  commitSectionTitle,
   createDuplicateResumeName,
   createEmptyResume,
   createNextResumeName,
@@ -33,6 +34,8 @@ import {
   removeSectionBlockEducationProgram,
   removeSectionBlockEntry,
   removeSectionBlockTextListItem,
+  reorderSectionBlockEntriesToMatch,
+  reorderSectionBlockTextListItem,
   reorderResumeSectionBlock,
   reorderResumeSectionBlocksToMatch,
   reorderWorkspaceResumes,
@@ -972,6 +975,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     updateSectionTitle(sectionId, value) {
       updateResume((currentResume) => updateSectionTitle(currentResume, sectionId, value));
     },
+    commitSectionTitle(sectionId) {
+      updateResume((currentResume) => commitSectionTitle(currentResume, sectionId));
+    },
     updateResumeSetting(settingId, delta) {
       updateResume((currentResume) => updateResumeSettingValue(currentResume, settingId, delta));
     },
@@ -1032,6 +1038,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     moveSectionBlockEntry(sectionId, entryId, direction) {
       updateResume((currentResume) => moveSectionBlockEntry(currentResume, sectionId, entryId, direction));
     },
+    reorderSectionEntries(sectionId, nextEntryIds) {
+      updateResume((currentResume) => reorderSectionBlockEntriesToMatch(currentResume, sectionId, nextEntryIds));
+    },
     removeSectionBlockEntry(sectionId, entryId) {
       updateResume((currentResume) => removeSectionBlockEntry(currentResume, sectionId, entryId));
     },
@@ -1043,6 +1052,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     },
     moveSectionBlockTextListItem(sectionId, entryId, field, itemIndex, direction) {
       updateResume((currentResume) => moveSectionBlockTextListItem(currentResume, sectionId, entryId, field, itemIndex, direction));
+    },
+    reorderSectionTextList(sectionId, entryId, field, fromIndex, toIndex) {
+      updateResume((currentResume) => reorderSectionBlockTextListItem(currentResume, sectionId, entryId, field, fromIndex, toIndex));
     },
     removeSectionBlockTextListItem(sectionId, entryId, field, itemIndex) {
       updateResume((currentResume) => removeSectionBlockTextListItem(currentResume, sectionId, entryId, field, itemIndex));
