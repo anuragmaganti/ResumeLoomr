@@ -956,19 +956,10 @@ export function reorderSectionBlockTextListItem(resume, sectionId, entryId, fiel
     ...section,
     entries: updateEntry(section.entries, entryId, (entry) => {
       const items = normalizeStringList(entry[field]);
-      const visibleIndexes = items
-        .map((item, index) => (trimText(normalizeBulletText(item)) ? index : -1))
-        .filter((index) => index >= 0);
-      const fromSourceIndex = visibleIndexes[fromIndex];
-      const toSourceIndex = visibleIndexes[toIndex];
-
-      if (fromSourceIndex === undefined || toSourceIndex === undefined) {
-        return entry;
-      }
 
       return {
         ...entry,
-        [field]: moveItemToIndex(items, fromSourceIndex, toSourceIndex),
+        [field]: moveItemToIndex(items, fromIndex, toIndex),
       };
     }),
   }));
@@ -1207,7 +1198,7 @@ function toPreviewRoleEntries(entries) {
       company: trimText(entry.company),
       role: trimText(entry.role),
       yearsExp: trimText(entry.yearsExp),
-      activities: normalizeStringList(entry.activities, { minItems: 0 }).map(normalizeBulletText).filter(Boolean),
+      activities: toPreviewTextList(entry.activities),
     }));
 }
 
@@ -1230,7 +1221,7 @@ function toPreviewProjectEntries(entries) {
       subtitle: trimText(entry.subtitle),
       years: trimText(entry.years),
       summary: trimText(entry.summary),
-      highlights: normalizeStringList(entry.highlights, { minItems: 0 }).map(normalizeBulletText).filter(Boolean),
+      highlights: toPreviewTextList(entry.highlights),
     }));
 }
 
@@ -1289,8 +1280,17 @@ function toPreviewCustomEntries(entries) {
       subtitle: trimText(entry.subtitle),
       years: trimText(entry.years),
       details: trimText(entry.details),
-      highlights: normalizeStringList(entry.highlights, { minItems: 0 }).map(normalizeBulletText).filter(Boolean),
+      highlights: toPreviewTextList(entry.highlights),
     }));
+}
+
+function toPreviewTextList(items) {
+  return normalizeStringList(items, { minItems: 0 })
+    .map((item, index) => ({
+      text: normalizeBulletText(item),
+      sourceIndex: index,
+    }))
+    .filter((item) => item.text);
 }
 
 function toPreviewEntries(section) {
@@ -1362,6 +1362,7 @@ export function getPreviewModel(candidateResume) {
       id: section.id,
       kind: section.kind,
       title: trimText(section.title),
+      entryOrder: section.entries.map((entry) => entry.id),
       entries: toPreviewEntries(section),
     }))
     .filter((section) => section.entries.length > 0);
@@ -1372,6 +1373,7 @@ export function getPreviewModel(candidateResume) {
       ...personal,
       links,
     },
+    sectionOrder: resume.sections.map((section) => section.id),
     sectionBlocks,
     showPersonal: personalHasContent(personal),
   };

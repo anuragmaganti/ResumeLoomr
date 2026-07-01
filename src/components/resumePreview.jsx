@@ -267,6 +267,33 @@ function getPrimaryEntryField(block, entry) {
     return 'title';
 }
 
+function moveIdWithinOrder(ids, activeId, overId) {
+    const fromIndex = ids.indexOf(activeId);
+    const toIndex = ids.indexOf(overId);
+
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) {
+        return ids;
+    }
+
+    return arrayMove(ids, fromIndex, toIndex);
+}
+
+function getPreviewBulletText(item) {
+    if (item && typeof item === 'object') {
+        return item.text || '';
+    }
+
+    return item === undefined || item === null ? '' : String(item);
+}
+
+function getPreviewBulletSourceIndex(item, fallbackIndex) {
+    if (item && typeof item === 'object' && Number.isInteger(item.sourceIndex)) {
+        return item.sourceIndex;
+    }
+
+    return fallbackIndex;
+}
+
 export default function ResumePreview({
     previewModel,
     template,
@@ -483,12 +510,13 @@ export default function ResumePreview({
         suppressNextPreviewClick();
 
         if (activeMeta.type === 'section') {
-            const sectionIds = previewModel.sectionBlocks.map((block) => block.id);
-            const fromIndex = sectionIds.indexOf(activeMeta.sectionId);
-            const toIndex = sectionIds.indexOf(overMeta.sectionId);
+            const sectionIds = Array.isArray(previewModel.sectionOrder) && previewModel.sectionOrder.length > 0
+                ? previewModel.sectionOrder
+                : previewModel.sectionBlocks.map((block) => block.id);
+            const nextSectionIds = moveIdWithinOrder(sectionIds, activeMeta.sectionId, overMeta.sectionId);
 
-            if (fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) {
-                onReorderSections?.(arrayMove(sectionIds, fromIndex, toIndex));
+            if (nextSectionIds !== sectionIds) {
+                onReorderSections?.(nextSectionIds);
             }
 
             openPreviewEditTarget({
@@ -508,12 +536,13 @@ export default function ResumePreview({
                 return;
             }
 
-            const entryIds = block?.entries.map((blockEntry) => blockEntry.id) || [];
-            const fromIndex = entryIds.indexOf(activeMeta.entryId);
-            const toIndex = entryIds.indexOf(overMeta.entryId);
+            const entryIds = Array.isArray(block.entryOrder) && block.entryOrder.length > 0
+                ? block.entryOrder
+                : block.entries.map((blockEntry) => blockEntry.id);
+            const nextEntryIds = moveIdWithinOrder(entryIds, activeMeta.entryId, overMeta.entryId);
 
-            if (fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) {
-                onReorderSectionEntries?.(activeMeta.sectionId, arrayMove(entryIds, fromIndex, toIndex));
+            if (nextEntryIds !== entryIds) {
+                onReorderSectionEntries?.(activeMeta.sectionId, nextEntryIds);
             }
 
             const field = getPrimaryEntryField(block, entry);
@@ -552,29 +581,33 @@ export default function ResumePreview({
             return null;
         }
 
-        const bulletIds = items.map((_, index) => bulletDragId(sectionId, entryId, field, index));
+        const normalizedItems = items.map((item, index) => ({
+            text: getPreviewBulletText(item),
+            sourceIndex: getPreviewBulletSourceIndex(item, index),
+        }));
+        const bulletIds = normalizedItems.map((item) => bulletDragId(sectionId, entryId, field, item.sourceIndex));
         const bulletList = (
             <ul className="previewEntryList">
-                {items.map((item, index) => {
-                    const bulletPath = sectionEntryListEditorPath(sectionId, entryId, field, index);
+                {normalizedItems.map((item) => {
+                    const bulletPath = sectionEntryListEditorPath(sectionId, entryId, field, item.sourceIndex);
 
                     return sortable ? (
                             <SortablePreviewBullet
-                                key={`${entryId}-${field}-${index}`}
+                                key={`${entryId}-${field}-${item.sourceIndex}`}
                                 sectionId={sectionId}
                                 entryId={entryId}
                                 field={field}
-                                itemIndex={index}
-                                editProps={createTarget ? createTarget(index) : {}}
+                                itemIndex={item.sourceIndex}
+                                editProps={createTarget ? createTarget(item.sourceIndex) : {}}
                             >
-                                {renderTextWithCaret(item, bulletPath)}
+                                {renderTextWithCaret(item.text, bulletPath)}
                             </SortablePreviewBullet>
                         ) : (
                             <StaticPreviewBullet
-                                key={`${entryId}-${field}-${index}`}
-                                editProps={createTarget ? createTarget(index) : {}}
+                                key={`${entryId}-${field}-${item.sourceIndex}`}
+                                editProps={createTarget ? createTarget(item.sourceIndex) : {}}
                             >
-                                {renderTextWithCaret(item, bulletPath)}
+                                {renderTextWithCaret(item.text, bulletPath)}
                             </StaticPreviewBullet>
                         );
                 })}
@@ -1257,7 +1290,10 @@ export default function ResumePreview({
         if (activeDragMeta.type === 'bullet') {
             const block = findBlock(activeDragMeta.sectionId);
             const entry = findEntry(block, activeDragMeta.entryId);
-            const text = entry?.[activeDragMeta.field]?.[activeDragMeta.itemIndex];
+            const bullet = entry?.[activeDragMeta.field]?.find((item, index) => (
+                getPreviewBulletSourceIndex(item, index) === activeDragMeta.itemIndex
+            ));
+            const text = getPreviewBulletText(bullet);
 
             return text ? (
                 <ul className="previewEntryList previewDragOverlay previewDragOverlay--bullet">

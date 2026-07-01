@@ -276,14 +276,21 @@ test('preview model renders ordered block sections and filters empty sections', 
   resume = updateRoleBlockEntry(resume, 'experience', roleEntryId, 'company', 'Navy');
   resume = updateRoleBlockEntry(resume, 'experience', roleEntryId, 'role', 'Computer Scientist');
   resume = updateRoleBlockEntry(resume, 'experience', roleEntryId, 'yearsExp', '1944 - 1986');
-  resume = updateRoleBlockActivity(resume, 'experience', roleEntryId, 0, '- Built compilers');
+  resume = updateRoleBlockActivity(resume, 'experience', roleEntryId, 0, '');
+  resume = updateRoleBlockActivity(resume, 'experience', roleEntryId, 1, '- Built compilers');
+  resume = addRoleBlockEntry(resume, 'experience');
+  const emptyRoleEntryId = getSection(resume, 'experience').entries[1].id;
 
   const preview = getPreviewModel(resume);
 
   assert.equal(preview.hasContent, true);
   assert.equal(preview.personal.name, 'Grace Hopper');
+  assert.deepEqual(preview.sectionOrder.slice(0, 4), ['education', 'experience', 'skills', 'projects']);
   assert.deepEqual(preview.sectionBlocks.map((section) => section.id), ['experience']);
-  assert.deepEqual(preview.sectionBlocks[0].entries[0].activities, ['Built compilers']);
+  assert.deepEqual(preview.sectionBlocks[0].entryOrder.slice(0, 2), [roleEntryId, emptyRoleEntryId]);
+  assert.deepEqual(preview.sectionBlocks[0].entries[0].activities, [
+    { text: 'Built compilers', sourceIndex: 1 },
+  ]);
 });
 
 test('validateResume uses block editor paths', () => {
@@ -440,7 +447,10 @@ test('source document compiler preserves section order and block kinds', () => {
   assert.equal(result.draft.resume.personal.linkedinUrl, 'linkedin.com/in/janedoe');
   assert.deepEqual(preview.sectionBlocks.map((section) => section.title), ['EDUCATION', 'TECHNICAL SKILLS', 'EXPERIENCE']);
   assert.deepEqual(preview.sectionBlocks.map((section) => section.kind), ['education', 'skills', 'roles']);
-  assert.deepEqual(preview.sectionBlocks[2].entries[0].activities, ['Built internal tools', 'Improved performance']);
+  assert.deepEqual(preview.sectionBlocks[2].entries[0].activities, [
+    { text: 'Built internal tools', sourceIndex: 0 },
+    { text: 'Improved performance', sourceIndex: 1 },
+  ]);
 });
 
 test('source coverage warnings are non-blocking when content is preserved', () => {
