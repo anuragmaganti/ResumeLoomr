@@ -1207,6 +1207,16 @@ html[data-theme="dark"] .brandLogo--dark {
   --settings-inset: 5px;
 }
 
+@media (min-width: 981px) {
+  .editorRail {
+    order: 1;
+  }
+
+  .settingsRail {
+    order: 2;
+  }
+}
+
 .settingsRailInner {
   display: grid;
   gap: var(--space-2);
@@ -2109,7 +2119,34 @@ html[data-theme="dark"] .sectionAddDialog {
   }
 
   .tabs {
+    --tabs-inset: 5px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .tabs .tabButton {
+    min-height: 30px;
+    padding: 5px 6px;
+    gap: 0;
+  }
+
+  .tabs .tabIndex,
+  .tabs .tabHint {
+    display: none;
+  }
+
+  .tabs .tabCopy {
+    gap: 0;
+  }
+
+  .tabs .tabLabel {
+    font-size: 0.6875rem;
+    line-height: 1;
+  }
+
+  .tabButton.sectionAddButton {
+    min-height: 32px;
+    padding: 3px 6px;
   }
 }
 
@@ -2152,10 +2189,6 @@ html[data-theme="dark"] .sectionAddDialog {
 
   .resumePillRenameInput {
     width: min(100%, 168px);
-  }
-
-  .tabs {
-    grid-template-columns: 1fr;
   }
 
   .noticeBanner {
