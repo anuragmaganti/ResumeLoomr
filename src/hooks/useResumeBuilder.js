@@ -520,7 +520,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       setSyncState('syncing');
       const idToken = await currentUser.getIdToken();
       await createResumeSyncSession(idToken);
-      const result = await syncLocalOutbox({ idToken });
+      const result = await syncLocalOutbox({ idToken, accountUid: currentUser.uid });
 
       if (result.staleCount > 0 || result.status === 'stale') {
         setSyncState('stale');

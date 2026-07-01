@@ -2,6 +2,8 @@ const DB_NAME = 'resumeloomr-local-workspace';
 const DB_VERSION = 1;
 const OUTBOX_STORE = 'outbox';
 const TOMBSTONES_STORE = 'tombstones';
+const ACCOUNT_BINDING_STORE = 'accountBinding';
+const ACCOUNT_BINDING_ID = 'current';
 const SYNC_TAG = 'resumeloomr-sync-outbox';
 
 function openWorkspaceDb() {
@@ -31,8 +33,8 @@ function openWorkspaceDb() {
         db.createObjectStore('syncMeta', { keyPath: 'id' });
       }
 
-      if (!db.objectStoreNames.contains('accountBinding')) {
-        db.createObjectStore('accountBinding', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(ACCOUNT_BINDING_STORE)) {
+        db.createObjectStore(ACCOUNT_BINDING_STORE, { keyPath: 'id' });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -97,6 +99,10 @@ function operationMatchesAck(operation, ack) {
   );
 }
 
+function operationBelongsToAccount(operation, accountUid) {
+  return Boolean(accountUid) && String(operation?.accountUid || '').trim() === accountUid;
+}
+
 function getOperationAcksFromResponse(payload, operations, descriptorKey, legacyIdKey) {
   if (Array.isArray(payload?.[descriptorKey])) {
     return payload[descriptorKey].map(normalizeAckDescriptor).filter(Boolean);
@@ -111,6 +117,13 @@ function getOperationAcksFromResponse(payload, operations, descriptorKey, legacy
   return payload[legacyIdKey]
     .map((operationId) => normalizeAckDescriptor(operationById.get(operationId)))
     .filter(Boolean);
+}
+
+async function readCurrentAccountUid(db) {
+  const tx = db.transaction(ACCOUNT_BINDING_STORE, 'readonly');
+  const account = await getRecord(tx.objectStore(ACCOUNT_BINDING_STORE), ACCOUNT_BINDING_ID);
+
+  return String(account?.uid || '').trim();
 }
 
 async function markSynced(db, operations) {
@@ -181,9 +194,15 @@ async function markStale(db, operations, errorMessage = 'Skipped stale cloud wri
 
 async function syncOutbox() {
   const db = await openWorkspaceDb();
+  const accountUid = await readCurrentAccountUid(db);
+
+  if (!accountUid) {
+    return;
+  }
+
   const tx = db.transaction(OUTBOX_STORE, 'readonly');
   const operations = (await getAll(tx.objectStore(OUTBOX_STORE)))
-    .filter((operation) => operation?.status === 'pending')
+    .filter((operation) => operation?.status === 'pending' && operationBelongsToAccount(operation, accountUid))
     .sort((a, b) => String(a.updatedAt).localeCompare(String(b.updatedAt)))
     .slice(0, 150);
 
@@ -198,8 +217,12 @@ async function syncOutbox() {
         'Content-Type': 'application/json',
       },
       credentials: 'include',
-      body: JSON.stringify({ operations }),
+      body: JSON.stringify({ accountUid, operations }),
     });
+
+    if (response.status === 409) {
+      return;
+    }
 
     if (!response.ok) {
       throw new Error(`Cloud sync failed with ${response.status}`);
@@ -208,9 +231,11 @@ async function syncOutbox() {
     const payload = await response.json();
     const syncedOperations = getOperationAcksFromResponse(payload, operations, 'syncedOperations', 'syncedOperationIds');
     const staleOperations = getOperationAcksFromResponse(payload, operations, 'staleOperations', 'staleOperationIds');
+    const rejectedOperations = getOperationAcksFromResponse(payload, operations, 'rejectedOperations', 'rejectedOperationIds');
 
     await markSynced(db, syncedOperations);
     await markStale(db, staleOperations);
+    await markStale(db, rejectedOperations, 'Skipped cloud sync because these changes belong to another account.');
   } catch (error) {
     await markFailed(db, operations.map(normalizeAckDescriptor).filter(Boolean), error?.message || 'Cloud sync failed.');
     throw error;

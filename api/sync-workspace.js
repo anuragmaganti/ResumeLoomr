@@ -92,6 +92,33 @@ function createOperationAck(operation) {
   };
 }
 
+function getOperationAccountUid(operation) {
+  return typeof operation?.accountUid === 'string' ? operation.accountUid.trim() : '';
+}
+
+export function operationBelongsToSyncAccount(operation, accountUid) {
+  return Boolean(accountUid) && getOperationAccountUid(operation) === accountUid;
+}
+
+export function partitionSyncOperationsByAccount(operations, accountUid) {
+  const scopedOperations = [];
+  const rejectedOperations = [];
+
+  operations.forEach((operation) => {
+    if (operationBelongsToSyncAccount(operation, accountUid)) {
+      scopedOperations.push(operation);
+      return;
+    }
+
+    rejectedOperations.push(createOperationAck(operation));
+  });
+
+  return {
+    scopedOperations,
+    rejectedOperations,
+  };
+}
+
 function createWorkspaceDoc(workspace, { deviceId = 'browser', sessionId = 'background-sync', updatedAt = new Date().toISOString(), version = Date.now() } = {}) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const resumeIds = normalizedWorkspace.resumeIds.slice(0, CLOUD_WORKSPACE_RESUME_LIMIT);
@@ -384,26 +411,47 @@ export default async function handler(req, res) {
 
     const body = await readRequestBody(req);
     const operations = normalizeOperationList(body);
+    const requestAccountUid = typeof body?.accountUid === 'string' ? body.accountUid.trim() : '';
 
     if (operations.length === 0) {
       sendJson(res, 200, {
         ok: true,
         syncedOperations: [],
         staleOperations: [],
+        rejectedOperations: [],
         syncedOperationIds: [],
         staleOperationIds: [],
+        rejectedOperationIds: [],
       });
       return;
     }
 
-    const { syncedOperations, staleOperations } = await applySyncOperations(decodedUser.uid, operations);
+    if (requestAccountUid && requestAccountUid !== decodedUser.uid) {
+      sendJson(res, 409, {
+        error: {
+          code: 'sync/account-mismatch',
+          message: 'This browser sync session belongs to a different account.',
+        },
+      });
+      return;
+    }
+
+    const {
+      scopedOperations,
+      rejectedOperations,
+    } = partitionSyncOperationsByAccount(operations, decodedUser.uid);
+    const { syncedOperations, staleOperations } = scopedOperations.length > 0
+      ? await applySyncOperations(decodedUser.uid, scopedOperations)
+      : { syncedOperations: [], staleOperations: [] };
 
     sendJson(res, 200, {
       ok: true,
       syncedOperations,
       staleOperations,
+      rejectedOperations,
       syncedOperationIds: syncedOperations.map((operation) => operation.id),
       staleOperationIds: staleOperations.map((operation) => operation.id),
+      rejectedOperationIds: rejectedOperations.map((operation) => operation.id),
     });
   } catch (error) {
     const statusCode = error instanceof FirebaseAdminError ? error.statusCode : (error?.statusCode || 500);

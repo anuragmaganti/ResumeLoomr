@@ -43,12 +43,18 @@ import {
 import {
   createOutboxAckDescriptor,
   createDraftContentHash,
+  filterOutboxOperationsForAccount,
   mergeLocalAndCloudWorkspaces,
+  outboxOperationBelongsToAccount,
   outboxOperationMatchesAck,
 } from '../src/lib/localWorkspaceDb.js';
 import {
   getOperationAcksFromResponse,
 } from '../src/lib/backgroundSync.js';
+import {
+  operationBelongsToSyncAccount,
+  partitionSyncOperationsByAccount,
+} from '../api/sync-workspace.js';
 import {
   DEFAULT_GEMINI_IMPORT_MODEL,
   DEFAULT_GEMINI_THINKING_LEVEL,
@@ -431,6 +437,68 @@ test('outbox acknowledgement matching requires the exact operation version and r
     operationVersion: 200,
     localRevision: 'delete-token',
   }), true);
+});
+
+test('outbox account filtering keeps cloud sync scoped to the signed-in user', () => {
+  const operations = [
+    {
+      id: 'upsertDraft:a1',
+      type: 'upsertDraft',
+      accountUid: 'account-a',
+    },
+    {
+      id: 'upsertDraft:b1',
+      type: 'upsertDraft',
+      accountUid: 'account-b',
+    },
+    {
+      id: 'upsertDraft:guest',
+      type: 'upsertDraft',
+      accountUid: '',
+    },
+  ];
+
+  assert.equal(outboxOperationBelongsToAccount(operations[0], 'account-a'), true);
+  assert.equal(outboxOperationBelongsToAccount(operations[1], 'account-a'), false);
+  assert.equal(outboxOperationBelongsToAccount(operations[2], 'account-a'), false);
+  assert.deepEqual(
+    filterOutboxOperationsForAccount(operations, 'account-a').map((operation) => operation.id),
+    ['upsertDraft:a1'],
+  );
+});
+
+test('sync API partitions operations by the authenticated Firebase account', () => {
+  const operations = [
+    {
+      id: 'workspace',
+      type: 'workspace',
+      accountUid: 'account-a',
+      operationVersion: 10,
+      localRevision: 'workspace-a',
+    },
+    {
+      id: 'upsertDraft:r1',
+      type: 'upsertDraft',
+      accountUid: 'account-b',
+      operationVersion: 20,
+      localRevision: 'draft-b',
+    },
+    {
+      id: 'upsertDraft:guest',
+      type: 'upsertDraft',
+      accountUid: '',
+      operationVersion: 30,
+      localRevision: 'guest-draft',
+    },
+  ];
+  const result = partitionSyncOperationsByAccount(operations, 'account-a');
+
+  assert.equal(operationBelongsToSyncAccount(operations[0], 'account-a'), true);
+  assert.deepEqual(result.scopedOperations.map((operation) => operation.id), ['workspace']);
+  assert.deepEqual(result.rejectedOperations, [
+    { id: 'upsertDraft:r1', operationVersion: 20, localRevision: 'draft-b' },
+    { id: 'upsertDraft:guest', operationVersion: 30, localRevision: 'guest-draft' },
+  ]);
 });
 
 test('sync response acknowledgement mapping preserves sent operation descriptors', () => {

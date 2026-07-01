@@ -121,8 +121,12 @@ export function getOperationAcksFromResponse(payload, operations, descriptorKey,
     .filter(Boolean);
 }
 
-export async function syncLocalOutbox({ idToken = '', useCookie = false } = {}) {
-  const operations = await readPendingOutbox();
+export async function syncLocalOutbox({ idToken = '', useCookie = false, accountUid = '' } = {}) {
+  const normalizedAccountUid = String(accountUid || '').trim();
+  const canAttemptCloudSync = Boolean(idToken || useCookie);
+  const operations = normalizedAccountUid
+    ? await readPendingOutbox({ accountUid: normalizedAccountUid })
+    : await readPendingOutbox();
 
   if (operations.length === 0) {
     return {
@@ -132,7 +136,7 @@ export async function syncLocalOutbox({ idToken = '', useCookie = false } = {}) 
     };
   }
 
-  if (!idToken && !useCookie) {
+  if (!canAttemptCloudSync || !normalizedAccountUid) {
     await requestResumeBackgroundSync();
     return {
       status: 'queued',
@@ -155,6 +159,7 @@ export async function syncLocalOutbox({ idToken = '', useCookie = false } = {}) 
       headers,
       credentials: 'include',
       body: JSON.stringify({
+        accountUid: normalizedAccountUid,
         operations,
       }),
     });
@@ -167,15 +172,20 @@ export async function syncLocalOutbox({ idToken = '', useCookie = false } = {}) 
     const payload = await response.json();
     const syncedOperations = getOperationAcksFromResponse(payload, operations, 'syncedOperations', 'syncedOperationIds');
     const staleOperations = getOperationAcksFromResponse(payload, operations, 'staleOperations', 'staleOperationIds');
+    const rejectedOperations = getOperationAcksFromResponse(payload, operations, 'rejectedOperations', 'rejectedOperationIds');
 
     await markOutboxSynced(syncedOperations);
     await markOutboxStale(staleOperations);
+    await markOutboxStale(rejectedOperations, 'Skipped cloud sync because these changes belong to another account.');
+
+    const skippedCount = staleOperations.length + rejectedOperations.length;
 
     return {
-      status: staleOperations.length > 0 ? 'stale' : 'synced',
+      status: skippedCount > 0 ? 'stale' : 'synced',
       syncedCount: syncedOperations.length,
       staleCount: staleOperations.length,
-      pendingCount: Math.max(0, operations.length - syncedOperations.length),
+      rejectedCount: rejectedOperations.length,
+      pendingCount: Math.max(0, operations.length - syncedOperations.length - skippedCount),
     };
   } catch (error) {
     await markOutboxFailed(operations.map(createOutboxAckDescriptor).filter(Boolean), error?.message || 'Cloud sync failed.');

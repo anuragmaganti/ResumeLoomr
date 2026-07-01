@@ -100,6 +100,20 @@ export function outboxOperationMatchesAck(operation, ack) {
   );
 }
 
+export function outboxOperationBelongsToAccount(operation, accountUid) {
+  const normalizedAccountUid = trimText(accountUid);
+
+  return Boolean(normalizedAccountUid) && trimText(operation?.accountUid) === normalizedAccountUid;
+}
+
+export function filterOutboxOperationsForAccount(operations, accountUid) {
+  if (!Array.isArray(operations)) {
+    return [];
+  }
+
+  return operations.filter((operation) => outboxOperationBelongsToAccount(operation, accountUid));
+}
+
 function normalizeDraftWithRevision(draft, localRevision = '') {
   return {
     ...normalizeDraftState(draft),
@@ -1122,7 +1136,7 @@ export async function persistLoginMergedWorkspace({
   });
 }
 
-export async function readPendingOutbox({ limit = 150 } = {}) {
+export async function readPendingOutbox({ limit = 150, accountUid = null } = {}) {
   const db = await getLocalWorkspaceDb();
 
   if (!db) {
@@ -1130,9 +1144,12 @@ export async function readPendingOutbox({ limit = 150 } = {}) {
   }
 
   const records = await db.getAll(OUTBOX_STORE);
+  const pendingRecords = records.filter((record) => record?.status === 'pending');
+  const scopedRecords = accountUid === null || typeof accountUid === 'undefined'
+    ? pendingRecords
+    : filterOutboxOperationsForAccount(pendingRecords, accountUid);
 
-  return records
-    .filter((record) => record?.status === 'pending')
+  return scopedRecords
     .sort((a, b) => String(a.updatedAt).localeCompare(String(b.updatedAt)))
     .slice(0, limit);
 }
