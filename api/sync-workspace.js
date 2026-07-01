@@ -84,6 +84,14 @@ function getOperationVersion(operation) {
   return getTimestamp(operation?.updatedAt) || Date.now();
 }
 
+function createOperationAck(operation) {
+  return {
+    id: operation.id,
+    operationVersion: Number(operation.operationVersion || 0) || 0,
+    localRevision: typeof operation.localRevision === 'string' ? operation.localRevision : '',
+  };
+}
+
 function createWorkspaceDoc(workspace, { deviceId = 'browser', sessionId = 'background-sync', updatedAt = new Date().toISOString(), version = Date.now() } = {}) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const resumeIds = normalizedWorkspace.resumeIds.slice(0, CLOUD_WORKSPACE_RESUME_LIMIT);
@@ -264,8 +272,8 @@ async function applySyncOperations(uid, operations) {
   const db = getAdminDb();
   const workspaceRef = db.doc(`users/${uid}/workspace/main`);
   const { workspaceOperation, draftOperations, deleteOperations } = coalesceOperations(operations);
-  const syncedOperationIds = [];
-  const staleOperationIds = [];
+  const syncedOperations = [];
+  const staleOperations = [];
 
   await db.runTransaction(async (transaction) => {
     const workspace = workspaceOperation?.workspace ? normalizeWorkspaceIndex(workspaceOperation.workspace) : null;
@@ -308,9 +316,9 @@ async function applySyncOperations(uid, operations) {
 
       if (currentVersion <= workspaceWrite.doc.version) {
         transaction.set(workspaceWrite.ref, workspaceWrite.doc, { merge: false });
-        syncedOperationIds.push(workspaceWrite.operation.id);
+        syncedOperations.push(createOperationAck(workspaceWrite.operation));
       } else {
-        staleOperationIds.push(workspaceWrite.operation.id);
+        staleOperations.push(createOperationAck(workspaceWrite.operation));
       }
     }
 
@@ -320,9 +328,9 @@ async function applySyncOperations(uid, operations) {
 
       if (currentVersion <= write.doc.version) {
         transaction.set(write.ref, write.doc, { merge: true });
-        syncedOperationIds.push(write.operation.id);
+        syncedOperations.push(createOperationAck(write.operation));
       } else {
-        staleOperationIds.push(write.operation.id);
+        staleOperations.push(createOperationAck(write.operation));
       }
     });
 
@@ -332,14 +340,14 @@ async function applySyncOperations(uid, operations) {
 
       if (currentVersion <= write.tombstoneVersion) {
         transaction.delete(write.ref);
-        syncedOperationIds.push(write.operation.id);
+        syncedOperations.push(createOperationAck(write.operation));
       } else {
-        staleOperationIds.push(write.operation.id);
+        staleOperations.push(createOperationAck(write.operation));
       }
     });
   });
 
-  return { syncedOperationIds, staleOperationIds };
+  return { syncedOperations, staleOperations };
 }
 
 export default async function handler(req, res) {
@@ -380,17 +388,22 @@ export default async function handler(req, res) {
     if (operations.length === 0) {
       sendJson(res, 200, {
         ok: true,
+        syncedOperations: [],
+        staleOperations: [],
         syncedOperationIds: [],
+        staleOperationIds: [],
       });
       return;
     }
 
-    const { syncedOperationIds, staleOperationIds } = await applySyncOperations(decodedUser.uid, operations);
+    const { syncedOperations, staleOperations } = await applySyncOperations(decodedUser.uid, operations);
 
     sendJson(res, 200, {
       ok: true,
-      syncedOperationIds,
-      staleOperationIds,
+      syncedOperations,
+      staleOperations,
+      syncedOperationIds: syncedOperations.map((operation) => operation.id),
+      staleOperationIds: staleOperations.map((operation) => operation.id),
     });
   } catch (error) {
     const statusCode = error instanceof FirebaseAdminError ? error.statusCode : (error?.statusCode || 500);

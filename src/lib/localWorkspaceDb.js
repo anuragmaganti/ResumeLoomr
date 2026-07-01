@@ -62,6 +62,44 @@ function getDraftStateRevision(draft) {
   return draft?.localRevision || '';
 }
 
+function normalizeOutboxAckDescriptor(operation) {
+  if (!operation || typeof operation !== 'object') {
+    return null;
+  }
+
+  const id = trimText(operation.id);
+
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    operationVersion: Number(operation.operationVersion || 0) || 0,
+    localRevision: trimText(operation.localRevision),
+  };
+}
+
+export function createOutboxAckDescriptor(operation) {
+  return normalizeOutboxAckDescriptor(operation);
+}
+
+export function outboxOperationMatchesAck(operation, ack) {
+  const normalizedAck = normalizeOutboxAckDescriptor(ack);
+
+  if (!operation || !normalizedAck || operation.id !== normalizedAck.id) {
+    return false;
+  }
+
+  const operationVersion = Number(operation.operationVersion || 0) || 0;
+  const operationRevision = trimText(operation.localRevision);
+
+  return (
+    operationVersion === normalizedAck.operationVersion &&
+    operationRevision === normalizedAck.localRevision
+  );
+}
+
 function normalizeDraftWithRevision(draft, localRevision = '') {
   return {
     ...normalizeDraftState(draft),
@@ -456,7 +494,7 @@ function createOutboxRecord({ type, resumeId = '', workspace = null, draft = nul
     resumeId,
     workspace: workspace ? normalizeWorkspaceIndex(workspace) : null,
     draft: draft ? normalizeDraftState(draft) : null,
-    localRevision: draft ? getDraftStateRevision(draft) : '',
+    localRevision: draft ? (getDraftStateRevision(draft) || createLocalRevision()) : createLocalRevision(),
     operationVersion: draft?.savedAt ? Date.parse(draft.savedAt) || Date.now() : Date.now(),
     tombstone,
     accountUid: accountUid || '',
@@ -1099,19 +1137,30 @@ export async function readPendingOutbox({ limit = 150 } = {}) {
     .slice(0, limit);
 }
 
-export async function markOutboxSynced(operationIds) {
-  const db = await getLocalWorkspaceDb();
-  const ids = Array.isArray(operationIds) ? operationIds.filter(Boolean) : [];
+function normalizeOutboxAckList(operations) {
+  return Array.isArray(operations)
+    ? operations.map(normalizeOutboxAckDescriptor).filter(Boolean)
+    : [];
+}
 
-  if (!db || ids.length === 0) {
+export async function markOutboxSynced(operations) {
+  const db = await getLocalWorkspaceDb();
+  const acks = normalizeOutboxAckList(operations);
+
+  if (!db || acks.length === 0) {
     return;
   }
 
   const tx = db.transaction([OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
 
-  for (const id of ids) {
-    const record = await tx.objectStore(OUTBOX_STORE).get(id);
-    await tx.objectStore(OUTBOX_STORE).delete(id);
+  for (const ack of acks) {
+    const record = await tx.objectStore(OUTBOX_STORE).get(ack.id);
+
+    if (!outboxOperationMatchesAck(record, ack)) {
+      continue;
+    }
+
+    await tx.objectStore(OUTBOX_STORE).delete(ack.id);
 
     if (record?.type === 'deleteDraft' && record.resumeId) {
       await tx.objectStore(TOMBSTONES_STORE).delete(record.resumeId);
@@ -1121,20 +1170,20 @@ export async function markOutboxSynced(operationIds) {
   await tx.done;
 }
 
-export async function markOutboxFailed(operationIds, errorMessage = '') {
+export async function markOutboxFailed(operations, errorMessage = '') {
   const db = await getLocalWorkspaceDb();
-  const ids = Array.isArray(operationIds) ? operationIds.filter(Boolean) : [];
+  const acks = normalizeOutboxAckList(operations);
 
-  if (!db || ids.length === 0) {
+  if (!db || acks.length === 0) {
     return;
   }
 
   const tx = db.transaction(OUTBOX_STORE, 'readwrite');
 
-  for (const id of ids) {
-    const record = await tx.store.get(id);
+  for (const ack of acks) {
+    const record = await tx.store.get(ack.id);
 
-    if (!record) {
+    if (!outboxOperationMatchesAck(record, ack)) {
       continue;
     }
 
@@ -1150,20 +1199,20 @@ export async function markOutboxFailed(operationIds, errorMessage = '') {
   await tx.done;
 }
 
-export async function markOutboxStale(operationIds, errorMessage = 'Skipped stale cloud write.') {
+export async function markOutboxStale(operations, errorMessage = 'Skipped stale cloud write.') {
   const db = await getLocalWorkspaceDb();
-  const ids = Array.isArray(operationIds) ? operationIds.filter(Boolean) : [];
+  const acks = normalizeOutboxAckList(operations);
 
-  if (!db || ids.length === 0) {
+  if (!db || acks.length === 0) {
     return;
   }
 
   const tx = db.transaction(OUTBOX_STORE, 'readwrite');
 
-  for (const id of ids) {
-    const record = await tx.store.get(id);
+  for (const ack of acks) {
+    const record = await tx.store.get(ack.id);
 
-    if (!record) {
+    if (!outboxOperationMatchesAck(record, ack)) {
       continue;
     }
 

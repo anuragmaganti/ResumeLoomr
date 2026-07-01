@@ -41,9 +41,14 @@ import {
   validateResume,
 } from '../src/lib/resume.js';
 import {
+  createOutboxAckDescriptor,
   createDraftContentHash,
   mergeLocalAndCloudWorkspaces,
+  outboxOperationMatchesAck,
 } from '../src/lib/localWorkspaceDb.js';
+import {
+  getOperationAcksFromResponse,
+} from '../src/lib/backgroundSync.js';
 import {
   DEFAULT_GEMINI_IMPORT_MODEL,
   DEFAULT_GEMINI_THINKING_LEVEL,
@@ -386,6 +391,74 @@ test('login merge preserves local and cloud content without dropping either side
   assert.deepEqual(result.workspace.resumeIds, ['local-1', 'cloud-1']);
   assert.equal(result.syncPlan.workspaceNeedsSync, true);
   assert.deepEqual(result.syncPlan.upsertResumeIds, ['local-1']);
+});
+
+test('outbox acknowledgement matching requires the exact operation version and revision', () => {
+  const operation = {
+    id: 'upsertDraft:r1',
+    type: 'upsertDraft',
+    operationVersion: 100,
+    localRevision: 'rev-a',
+  };
+
+  assert.deepEqual(createOutboxAckDescriptor(operation), {
+    id: 'upsertDraft:r1',
+    operationVersion: 100,
+    localRevision: 'rev-a',
+  });
+  assert.equal(outboxOperationMatchesAck(operation, {
+    id: 'upsertDraft:r1',
+    operationVersion: 100,
+    localRevision: 'rev-a',
+  }), true);
+  assert.equal(outboxOperationMatchesAck(operation, {
+    id: 'upsertDraft:r1',
+    operationVersion: 101,
+    localRevision: 'rev-a',
+  }), false);
+  assert.equal(outboxOperationMatchesAck(operation, {
+    id: 'upsertDraft:r1',
+    operationVersion: 100,
+    localRevision: 'rev-b',
+  }), false);
+  assert.equal(outboxOperationMatchesAck({
+    id: 'deleteDraft:r1',
+    type: 'deleteDraft',
+    operationVersion: 200,
+    localRevision: 'delete-token',
+  }, {
+    id: 'deleteDraft:r1',
+    operationVersion: 200,
+    localRevision: 'delete-token',
+  }), true);
+});
+
+test('sync response acknowledgement mapping preserves sent operation descriptors', () => {
+  const operations = [
+    {
+      id: 'workspace',
+      type: 'workspace',
+      operationVersion: 10,
+      localRevision: 'workspace-token',
+    },
+    {
+      id: 'upsertDraft:r1',
+      type: 'upsertDraft',
+      operationVersion: 20,
+      localRevision: 'draft-rev',
+    },
+  ];
+
+  assert.deepEqual(getOperationAcksFromResponse({
+    syncedOperations: [{ id: 'workspace', operationVersion: 10, localRevision: 'workspace-token' }],
+  }, operations, 'syncedOperations', 'syncedOperationIds'), [
+    { id: 'workspace', operationVersion: 10, localRevision: 'workspace-token' },
+  ]);
+  assert.deepEqual(getOperationAcksFromResponse({
+    syncedOperationIds: ['upsertDraft:r1'],
+  }, operations, 'syncedOperations', 'syncedOperationIds'), [
+    { id: 'upsertDraft:r1', operationVersion: 20, localRevision: 'draft-rev' },
+  ]);
 });
 
 test('import file normalization rejects unsupported or oversized uploads', () => {

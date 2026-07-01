@@ -72,14 +72,61 @@ function putRecord(store, record) {
   });
 }
 
-async function markSynced(db, operationIds) {
+function normalizeAckDescriptor(operation) {
+  if (!operation || typeof operation !== 'object' || typeof operation.id !== 'string' || operation.id === '') {
+    return null;
+  }
+
+  return {
+    id: operation.id,
+    operationVersion: Number(operation.operationVersion || 0) || 0,
+    localRevision: typeof operation.localRevision === 'string' ? operation.localRevision : '',
+  };
+}
+
+function operationMatchesAck(operation, ack) {
+  const normalizedAck = normalizeAckDescriptor(ack);
+
+  if (!operation || !normalizedAck || operation.id !== normalizedAck.id) {
+    return false;
+  }
+
+  return (
+    (Number(operation.operationVersion || 0) || 0) === normalizedAck.operationVersion &&
+    (typeof operation.localRevision === 'string' ? operation.localRevision : '') === normalizedAck.localRevision
+  );
+}
+
+function getOperationAcksFromResponse(payload, operations, descriptorKey, legacyIdKey) {
+  if (Array.isArray(payload?.[descriptorKey])) {
+    return payload[descriptorKey].map(normalizeAckDescriptor).filter(Boolean);
+  }
+
+  if (!Array.isArray(payload?.[legacyIdKey])) {
+    return [];
+  }
+
+  const operationById = new Map(operations.map((operation) => [operation.id, operation]));
+
+  return payload[legacyIdKey]
+    .map((operationId) => normalizeAckDescriptor(operationById.get(operationId)))
+    .filter(Boolean);
+}
+
+async function markSynced(db, operations) {
   const tx = db.transaction([OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
   const outboxStore = tx.objectStore(OUTBOX_STORE);
   const tombstoneStore = tx.objectStore(TOMBSTONES_STORE);
+  const acks = Array.isArray(operations) ? operations.map(normalizeAckDescriptor).filter(Boolean) : [];
 
-  await Promise.all(operationIds.map(async (operationId) => {
-    const record = await getRecord(outboxStore, operationId);
-    await deleteRecord(outboxStore, operationId);
+  await Promise.all(acks.map(async (ack) => {
+    const record = await getRecord(outboxStore, ack.id);
+
+    if (!operationMatchesAck(record, ack)) {
+      return;
+    }
+
+    await deleteRecord(outboxStore, ack.id);
 
     if (record?.type === 'deleteDraft' && record.resumeId) {
       await deleteRecord(tombstoneStore, record.resumeId);
@@ -91,14 +138,43 @@ async function markFailed(db, operations, errorMessage) {
   const tx = db.transaction(OUTBOX_STORE, 'readwrite');
   const outboxStore = tx.objectStore(OUTBOX_STORE);
   const now = new Date().toISOString();
+  const acks = Array.isArray(operations) ? operations.map(normalizeAckDescriptor).filter(Boolean) : [];
 
-  await Promise.all(operations.map(async (operation) => {
+  await Promise.all(acks.map(async (ack) => {
+    const operation = await getRecord(outboxStore, ack.id);
+
+    if (!operationMatchesAck(operation, ack)) {
+      return;
+    }
+
     await putRecord(outboxStore, {
       ...operation,
       attempts: Number(operation.attempts || 0) + 1,
       lastError: errorMessage,
       updatedAt: now,
       status: 'pending',
+    });
+  }));
+}
+
+async function markStale(db, operations, errorMessage = 'Skipped stale cloud write.') {
+  const tx = db.transaction(OUTBOX_STORE, 'readwrite');
+  const outboxStore = tx.objectStore(OUTBOX_STORE);
+  const now = new Date().toISOString();
+  const acks = Array.isArray(operations) ? operations.map(normalizeAckDescriptor).filter(Boolean) : [];
+
+  await Promise.all(acks.map(async (ack) => {
+    const operation = await getRecord(outboxStore, ack.id);
+
+    if (!operationMatchesAck(operation, ack)) {
+      return;
+    }
+
+    await putRecord(outboxStore, {
+      ...operation,
+      lastError: errorMessage,
+      updatedAt: now,
+      status: 'stale',
     });
   }));
 }
@@ -130,13 +206,13 @@ async function syncOutbox() {
     }
 
     const payload = await response.json();
-    const syncedOperationIds = Array.isArray(payload.syncedOperationIds)
-      ? payload.syncedOperationIds
-      : operations.map((operation) => operation.id);
+    const syncedOperations = getOperationAcksFromResponse(payload, operations, 'syncedOperations', 'syncedOperationIds');
+    const staleOperations = getOperationAcksFromResponse(payload, operations, 'staleOperations', 'staleOperationIds');
 
-    await markSynced(db, syncedOperationIds);
+    await markSynced(db, syncedOperations);
+    await markStale(db, staleOperations);
   } catch (error) {
-    await markFailed(db, operations, error?.message || 'Cloud sync failed.');
+    await markFailed(db, operations.map(normalizeAckDescriptor).filter(Boolean), error?.message || 'Cloud sync failed.');
     throw error;
   }
 }
