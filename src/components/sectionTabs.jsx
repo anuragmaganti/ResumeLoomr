@@ -96,6 +96,152 @@ function SectionTabOverlay({ section, index, isActive, style }) {
     );
 }
 
+function SectionAddDialog({
+    isOpen,
+    anchorRef,
+    sectionTemplateGroups,
+    onSelectTemplate,
+    onClose
+}) {
+    const dialogRef = useRef(null);
+    const firstOptionRef = useRef(null);
+    const [anchorStyle, setAnchorStyle] = useState(null);
+
+    useEffect(() => {
+        if (!isOpen) {
+            return undefined;
+        }
+
+        function updateAnchorStyle() {
+            const anchorRect = anchorRef?.current?.getBoundingClientRect();
+
+            if (!anchorRect || window.innerWidth <= 720) {
+                setAnchorStyle(null);
+                return;
+            }
+
+            const viewportPadding = 16;
+            const dialogWidth = Math.min(820, window.innerWidth - viewportPadding * 2);
+            const left = Math.min(
+                Math.max(viewportPadding, anchorRect.left),
+                window.innerWidth - dialogWidth - viewportPadding
+            );
+            const bottom = Math.max(viewportPadding, window.innerHeight - anchorRect.top + 10);
+
+            setAnchorStyle({
+                "--section-add-dialog-left": `${left}px`,
+                "--section-add-dialog-bottom": `${bottom}px`,
+                "--section-add-dialog-width": `${dialogWidth}px`
+            });
+        }
+
+        updateAnchorStyle();
+
+        const frameId = window.requestAnimationFrame(() => {
+            firstOptionRef.current?.focus({ preventScroll: true });
+        });
+
+        function handleKeyDown(event) {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                onClose({ restoreFocus: true });
+            }
+        }
+
+        window.addEventListener("resize", updateAnchorStyle);
+        window.addEventListener("scroll", updateAnchorStyle, true);
+        document.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+            window.removeEventListener("resize", updateAnchorStyle);
+            window.removeEventListener("scroll", updateAnchorStyle, true);
+            document.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [anchorRef, isOpen, onClose]);
+
+    if (!isOpen || typeof document === "undefined") {
+        return null;
+    }
+
+    function handleDialogKeyDown(event) {
+        if (event.key !== "Tab") {
+            return;
+        }
+
+        const focusableElements = Array.from(dialogRef.current?.querySelectorAll("button:not(:disabled)") || []);
+
+        if (focusableElements.length === 0) {
+            return;
+        }
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey && document.activeElement === firstElement) {
+            event.preventDefault();
+            lastElement.focus();
+            return;
+        }
+
+        if (!event.shiftKey && document.activeElement === lastElement) {
+            event.preventDefault();
+            firstElement.focus();
+        }
+    }
+
+    const firstTemplateId = sectionTemplateGroups.find((group) => group.templates.length > 0)?.templates[0]?.id || "";
+    const dialog = (
+        <div
+            className={`sectionAddDialogLayer${anchorStyle ? " sectionAddDialogLayer--anchored" : ""}`}
+            style={anchorStyle || undefined}
+        >
+            <button
+                type="button"
+                className="sectionAddDialogBackdrop"
+                tabIndex={-1}
+                onClick={() => onClose({ restoreFocus: true })}
+                aria-label="Close section selector"
+            />
+
+            <section
+                id="section-add-dialog"
+                className="sectionAddDialog panel"
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Choose a section"
+                onKeyDown={handleDialogKeyDown}
+            >
+                <div className="sectionAddDialogGroups">
+                    {sectionTemplateGroups.map((group) => (
+                        <div className={`sectionAddDialogGroup sectionAddDialogGroup--${group.id}`} key={group.id}>
+                            <div className="sectionAddDialogGroupLabel">{group.label}</div>
+                            <div className="sectionAddDialogOptionGrid">
+                                {group.templates.map((template) => {
+                                    return (
+                                        <button
+                                            className="sectionAddDialogOption"
+                                            type="button"
+                                            key={template.id}
+                                            ref={template.id === firstTemplateId ? firstOptionRef : undefined}
+                                            onClick={() => onSelectTemplate(template.id)}
+                                        >
+                                            {template.title}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+        </div>
+    );
+
+    return createPortal(dialog, document.body);
+}
+
 export default function SectionTabs({
     activeTab,
     setActiveTab,
@@ -109,7 +255,7 @@ export default function SectionTabs({
     const [activeDragId, setActiveDragId] = useState(null);
     const [activeDragRect, setActiveDragRect] = useState(null);
     const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
-    const addControlRef = useRef(null);
+    const addButtonRef = useRef(null);
     const sectionIds = useMemo(() => getSectionIds(sections), [sections]);
     const sectionById = useMemo(
         () => new Map(sections.map((section) => [section.id, section])),
@@ -184,33 +330,15 @@ export default function SectionTabs({
         setIsAddMenuOpen(false);
     }
 
-    useEffect(() => {
-        if (!isAddMenuOpen) {
-            return undefined;
+    function closeAddDialog({ restoreFocus = false } = {}) {
+        setIsAddMenuOpen(false);
+
+        if (restoreFocus) {
+            window.requestAnimationFrame(() => {
+                addButtonRef.current?.focus({ preventScroll: true });
+            });
         }
-
-        function handlePointerDown(event) {
-            if (addControlRef.current?.contains(event.target)) {
-                return;
-            }
-
-            setIsAddMenuOpen(false);
-        }
-
-        function handleKeyDown(event) {
-            if (event.key === "Escape") {
-                setIsAddMenuOpen(false);
-            }
-        }
-
-        document.addEventListener("pointerdown", handlePointerDown);
-        document.addEventListener("keydown", handleKeyDown);
-
-        return () => {
-            document.removeEventListener("pointerdown", handlePointerDown);
-            document.removeEventListener("keydown", handleKeyDown);
-        };
-    }, [isAddMenuOpen]);
+    }
 
     const sectionDragOverlay = (
         <DragOverlay adjustScale={false} zIndex={1000}>
@@ -247,50 +375,44 @@ export default function SectionTabs({
                                 setActiveTab={setActiveTab}
                             />
                         ))}
+
+                        {canAddSections ? (
+                            <div className="sectionAddControl">
+                                <button
+                                    ref={addButtonRef}
+                                    className="tabButton sectionAddButton isLocked"
+                                    type="button"
+                                    aria-label={canAddMoreSections ? "Add section" : "Section limit reached"}
+                                    aria-expanded={isAddMenuOpen}
+                                    aria-haspopup="dialog"
+                                    aria-controls="section-add-dialog"
+                                    disabled={!canAddMoreSections}
+                                    onClick={() => {
+                                        if (isAddMenuOpen) {
+                                            closeAddDialog();
+                                            return;
+                                        }
+
+                                        setIsAddMenuOpen(true);
+                                    }}
+                                >
+                                    <span className="sectionAddButtonIcon" aria-hidden="true">+</span>
+                                </button>
+
+                                <SectionAddDialog
+                                    isOpen={isAddMenuOpen && canAddMoreSections}
+                                    anchorRef={addButtonRef}
+                                    sectionTemplateGroups={sectionTemplateGroups}
+                                    onSelectTemplate={handleAddSection}
+                                    onClose={closeAddDialog}
+                                />
+                            </div>
+                        ) : null}
                     </div>
                 </SortableContext>
 
                 {typeof document === "undefined" ? sectionDragOverlay : createPortal(sectionDragOverlay, document.body)}
             </DndContext>
-
-            {canAddSections ? (
-                <div className="sectionAddControl" ref={addControlRef}>
-                    <button
-                        className="tabButton sectionAddButton isLocked"
-                        type="button"
-                        aria-label={canAddMoreSections ? "Add section" : "Section limit reached"}
-                        aria-expanded={isAddMenuOpen}
-                        aria-controls="section-add-menu"
-                        disabled={!canAddMoreSections}
-                        onClick={() => setIsAddMenuOpen((isOpen) => !isOpen)}
-                    >
-                        +
-                    </button>
-
-                    {isAddMenuOpen && canAddMoreSections ? (
-                        <div className="sectionAddMenu" id="section-add-menu" role="menu" aria-label="Add resume section">
-                            {sectionTemplateGroups.map((group) => (
-                                <div className="sectionAddGroup" key={group.id}>
-                                    <div className="sectionAddGroupLabel">{group.label}</div>
-                                    <div className="sectionAddGroupList">
-                                        {group.templates.map((template) => (
-                                            <button
-                                                className="sectionAddOption"
-                                                type="button"
-                                                role="menuitem"
-                                                key={template.id}
-                                                onClick={() => handleAddSection(template.id)}
-                                            >
-                                                {template.title}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : null}
-                </div>
-            ) : null}
         </>
     );
 }

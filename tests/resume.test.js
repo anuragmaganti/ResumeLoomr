@@ -113,14 +113,9 @@ test('createEmptyResume returns the block-first resume shape', () => {
     [
       ['education', 'education', 'Education'],
       ['experience', 'roles', 'Experience'],
-      ['skills', 'skills', 'Skills'],
+      ['internships', 'roles', 'Internships'],
       ['projects', 'projects', 'Projects'],
-      ['certifications', 'certifications', 'Certifications'],
-      ['volunteering', 'roles', 'Volunteering'],
-      ['leadership', 'roles', 'Leadership'],
-      ['languages', 'languages', 'Languages'],
-      ['awards', 'awards', 'Awards'],
-      ['publications', 'publications', 'Publications'],
+      ['skills', 'skills', 'Skills'],
     ],
   );
   assert.equal(getSection(resume, 'experience').entries[0].activities.length, 1);
@@ -206,10 +201,10 @@ test('section helpers reorder and remove blocks without a separate order field',
   let resume = createEmptyResume();
 
   resume = moveResumeSectionBlock(resume, 'projects', -1);
-  assert.deepEqual(resume.sections.slice(0, 4).map((section) => section.id), ['education', 'experience', 'projects', 'skills']);
+  assert.deepEqual(resume.sections.slice(0, 5).map((section) => section.id), ['education', 'experience', 'projects', 'internships', 'skills']);
 
   resume = reorderResumeSectionBlocksToMatch(resume, ['skills', 'education', 'experience']);
-  assert.deepEqual(resume.sections.slice(0, 4).map((section) => section.id), ['skills', 'education', 'projects', 'experience']);
+  assert.deepEqual(resume.sections.slice(0, 5).map((section) => section.id), ['skills', 'education', 'projects', 'internships', 'experience']);
 
   resume = removeResumeSectionBlock(resume, 'skills');
   assert.equal(getSection(resume, 'skills'), undefined);
@@ -259,8 +254,8 @@ test('section template helper appends repeatable block sections with unique name
 
   assert.ok(SECTION_TEMPLATE_GROUPS.some((group) => group.templates.some((template) => template.id === 'internships')));
   assert.equal(getSection(resume, firstInternship.sectionId).kind, 'roles');
-  assert.equal(getSection(resume, firstInternship.sectionId).title, 'Internships');
-  assert.equal(getSection(resume, secondInternship.sectionId).title, 'Internships 2');
+  assert.equal(getSection(resume, firstInternship.sectionId).title, 'Internships 2');
+  assert.equal(getSection(resume, secondInternship.sectionId).title, 'Internships 3');
   assert.notEqual(firstInternship.sectionId, secondInternship.sectionId);
   assert.equal(getSection(resume, fallbackCustom.sectionId).kind, 'custom');
   assert.equal(getSection(resume, fallbackCustom.sectionId).title, 'Custom Section');
@@ -297,7 +292,7 @@ test('preview model renders ordered block sections and filters empty sections', 
 
   assert.equal(preview.hasContent, true);
   assert.equal(preview.personal.name, 'Grace Hopper');
-  assert.deepEqual(preview.sectionOrder.slice(0, 4), ['education', 'experience', 'skills', 'projects']);
+  assert.deepEqual(preview.sectionOrder.slice(0, 5), ['education', 'experience', 'internships', 'projects', 'skills']);
   assert.deepEqual(preview.sectionBlocks.map((section) => section.id), ['experience']);
   assert.deepEqual(preview.sectionBlocks[0].entryOrder.slice(0, 2), [roleEntryId, emptyRoleEntryId]);
   assert.deepEqual(preview.sectionBlocks[0].entries[0].activities, [
