@@ -20,6 +20,10 @@
   --resume-detail-gap: 4px;
   --resume-list-gap: 4px;
   --resume-print-min-height: 10in;
+  --preview-edit-highlight-bg: color-mix(in srgb, var(--color-accent-soft) 56%, transparent);
+  --preview-edit-highlight-ring: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  --preview-edit-pulse-bg: color-mix(in srgb, var(--color-accent-soft) 74%, transparent);
+  --preview-edit-pulse-ring: color-mix(in srgb, var(--color-accent) 30%, transparent);
   position: relative;
   width: min(100%, 952px);
   min-height: var(--resume-page-min-height);
@@ -38,6 +42,13 @@
     border-color var(--transition-base),
     color var(--transition-base),
     box-shadow var(--transition-base);
+}
+
+html[data-theme="dark"] .resumePage {
+  --preview-edit-highlight-bg: color-mix(in srgb, #60a5fa 10%, transparent);
+  --preview-edit-highlight-ring: color-mix(in srgb, #93c5fd 20%, transparent);
+  --preview-edit-pulse-bg: color-mix(in srgb, #60a5fa 15%, transparent);
+  --preview-edit-pulse-ring: color-mix(in srgb, #93c5fd 28%, transparent);
 }
 
 .sampleResumeNotice {
@@ -342,8 +353,44 @@
 
 @media (hover: hover) {
   .resumePage [data-edit-section-id]:hover {
-    background: color-mix(in srgb, var(--color-accent-soft) 56%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
+    background: var(--preview-edit-highlight-bg);
+    box-shadow: 0 0 0 2px var(--preview-edit-highlight-ring);
+  }
+}
+
+.resumePage [data-preview-pulse="odd"] {
+  animation: previewTargetPulseOdd 900ms ease-out;
+}
+
+.resumePage [data-preview-pulse="even"] {
+  animation: previewTargetPulseEven 900ms ease-out;
+}
+
+@keyframes previewTargetPulseOdd {
+  0%,
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+
+  18%,
+  58% {
+    background: var(--preview-edit-pulse-bg);
+    box-shadow: 0 0 0 2px var(--preview-edit-pulse-ring);
+  }
+}
+
+@keyframes previewTargetPulseEven {
+  0%,
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+
+  18%,
+  58% {
+    background: var(--preview-edit-pulse-bg);
+    box-shadow: 0 0 0 2px var(--preview-edit-pulse-ring);
   }
 }
 
@@ -796,6 +843,10 @@
     cursor: default;
     background: transparent !important;
     box-shadow: none !important;
+  }
+
+  .resumePage [data-preview-pulse] {
+    animation: none !important;
   }
 
   .resumePage [data-preview-drag-handle] {

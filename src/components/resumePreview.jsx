@@ -353,6 +353,7 @@ export default function ResumePreview({
     onReorderSectionEntries,
     onReorderSectionTextList,
     activeEditorCaret,
+    previewPulseTarget,
 }) {
     const resumeRef = useRef(null);
     const previewFrameRef = useRef(null);
@@ -388,6 +389,12 @@ export default function ResumePreview({
             }))
         ].filter((item) => item.text)
     ), [previewModel.personal]);
+
+    function previewPulseAttributes(path) {
+        return previewPulseTarget?.path === path && previewPulseTarget?.requestId
+            ? { 'data-preview-pulse': previewPulseTarget.requestId % 2 === 0 ? 'even' : 'odd' }
+            : {};
+    }
 
     useEffect(() => {
         if (hasSelectedPreviewZoom || typeof window === 'undefined') {
@@ -537,50 +544,74 @@ export default function ResumePreview({
     }, [onLayoutChange, pageMetrics.layoutWidth, pageMetrics.pageWidth, previewModel.hasContent, previewZoomMode]);
 
     function personalTarget(field) {
-        return createPreviewEditAttributes({
-            sectionId: 'personal',
-            field,
-            path: personalEditorPath(field),
-        });
+        const path = personalEditorPath(field);
+
+        return {
+            ...createPreviewEditAttributes({
+                sectionId: 'personal',
+                field,
+                path,
+            }),
+            ...previewPulseAttributes(path),
+        };
     }
 
     function sectionTitleTarget(sectionId) {
-        return createPreviewEditAttributes({
-            sectionId,
-            field: '__title',
-            path: sectionTitleEditorPath(sectionId),
-        });
+        const path = sectionTitleEditorPath(sectionId);
+
+        return {
+            ...createPreviewEditAttributes({
+                sectionId,
+                field: '__title',
+                path,
+            }),
+            ...previewPulseAttributes(path),
+        };
     }
 
     function entryTarget(sectionId, entryId, field) {
-        return createPreviewEditAttributes({
-            sectionId,
-            entryId,
-            field,
-            path: sectionEntryEditorPath(sectionId, entryId, field),
-        });
+        const path = sectionEntryEditorPath(sectionId, entryId, field);
+
+        return {
+            ...createPreviewEditAttributes({
+                sectionId,
+                entryId,
+                field,
+                path,
+            }),
+            ...previewPulseAttributes(path),
+        };
     }
 
     function listTarget(sectionId, entryId, field, itemIndex) {
-        return createPreviewEditAttributes({
-            sectionId,
-            entryId,
-            field,
-            itemIndex,
-            path: sectionEntryListEditorPath(sectionId, entryId, field, itemIndex),
-        });
+        const path = sectionEntryListEditorPath(sectionId, entryId, field, itemIndex);
+
+        return {
+            ...createPreviewEditAttributes({
+                sectionId,
+                entryId,
+                field,
+                itemIndex,
+                path,
+            }),
+            ...previewPulseAttributes(path),
+        };
     }
 
     function nestedTarget(sectionId, entryId, nestedPath) {
         const pathParts = nestedPath.split('.');
+        const path = sectionEntryNestedEditorPath(sectionId, entryId, nestedPath);
 
-        return createPreviewEditAttributes({
-            sectionId,
-            entryId,
-            field: pathParts[pathParts.length - 1] || nestedPath,
-            nestedPath,
-            path: sectionEntryNestedEditorPath(sectionId, entryId, nestedPath),
-        });
+        return {
+            ...createPreviewEditAttributes({
+                sectionId,
+                entryId,
+                field: pathParts[pathParts.length - 1] || nestedPath,
+                nestedPath,
+                path,
+            }),
+            ...previewPulseAttributes(path),
+        };
     }
 
     function renderTextWithCaret(value, path, { prefix = '', suffix = '', fallback = '' } = {}) {

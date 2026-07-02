@@ -6,6 +6,7 @@ import EntryActionMenu from "./forms/entryActionMenu";
 import EditorSettingsRail from "./editorSettingsRail";
 import {
     createEditorTargetAttributes,
+    personalEditorPath,
     sectionTitleEditorPath
 } from "../lib/editorTargets";
 import { MAX_RESUME_SECTIONS, SECTION_TEMPLATE_GROUPS, UNTITLED_SECTION_TITLE } from "../lib/resume";
@@ -134,6 +135,7 @@ export default function EditorPanel({
     maxHeight,
     previewEditTarget,
     onClearPreviewEditTarget,
+    onPreviewPulseTarget,
     onEditorCaretChange
 }) {
     const handledPreviewRequestIdRef = useRef(0);
@@ -173,6 +175,9 @@ export default function EditorPanel({
         : undefined;
     const setManualActiveTab = (sectionId) => {
         onClearPreviewEditTarget?.();
+        onPreviewPulseTarget?.({
+            path: sectionId === "personal" ? personalEditorPath("name") : sectionTitleEditorPath(sectionId)
+        });
         setActiveTab(sectionId);
     };
     const handleAddSection = (templateId) => {
@@ -186,13 +191,17 @@ export default function EditorPanel({
         pendingAddedSectionIdRef.current = nextSectionId;
         setActiveTab(nextSectionId);
     };
+    const getEditorFieldElement = (element) => {
+        const target = typeof Element !== "undefined" && element instanceof Element ? element : null;
+
+        return target?.closest?.("input[data-editor-path], textarea[data-editor-path]") || null;
+    };
     const isEditorTextField = (element) => Boolean(
         element &&
-        element.matches?.("input[data-editor-path], textarea[data-editor-path]") &&
         typeof element.selectionStart === "number"
     );
     const syncEditorCaretFromEvent = (event) => {
-        const fieldElement = event.target;
+        const fieldElement = getEditorFieldElement(event.target);
 
         if (!isEditorTextField(fieldElement)) {
             return;
@@ -215,6 +224,25 @@ export default function EditorPanel({
                 value: fieldElement.value,
             });
         });
+    };
+    const pulsePreviewFromEditorEvent = (event) => {
+        const fieldElement = getEditorFieldElement(event.target);
+
+        if (!fieldElement) {
+            return;
+        }
+
+        onPreviewPulseTarget?.({
+            path: fieldElement.dataset.editorPath
+        });
+    };
+    const handleEditorFocus = (event) => {
+        syncEditorCaretFromEvent(event);
+        pulsePreviewFromEditorEvent(event);
+    };
+    const handleEditorMouseUp = (event) => {
+        syncEditorCaretFromEvent(event);
+        pulsePreviewFromEditorEvent(event);
     };
     const clearEditorCaretAfterBlur = (event) => {
         const editorStageElement = event.currentTarget;
@@ -385,10 +413,11 @@ export default function EditorPanel({
 
                 <div
                     className="editorStage panel"
-                    onFocus={syncEditorCaretFromEvent}
+                    onFocus={handleEditorFocus}
+                    onPointerUpCapture={pulsePreviewFromEditorEvent}
                     onInput={syncEditorCaretFromEvent}
                     onKeyUp={syncEditorCaretFromEvent}
-                    onMouseUp={syncEditorCaretFromEvent}
+                    onMouseUp={handleEditorMouseUp}
                     onSelect={syncEditorCaretFromEvent}
                     onBlur={clearEditorCaretAfterBlur}
                 >

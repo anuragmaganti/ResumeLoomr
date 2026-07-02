@@ -82,7 +82,9 @@ function App() {
   const [accountSwitchResolutionUid, setAccountSwitchResolutionUid] = useState('');
   const [signedOutEditingPreference, setSignedOutEditingPreference] = useState(() => readSignedOutEditingPreference());
   const previewEditRequestIdRef = useRef(0);
+  const previewPulseRequestIdRef = useRef(0);
   const [previewEditTarget, setPreviewEditTarget] = useState(null);
+  const [previewPulseTarget, setPreviewPulseTarget] = useState(null);
   const [editorCaretTarget, setEditorCaretTarget] = useState(null);
   const [previewLayout, setPreviewLayout] = useState({ mode: 'fitWidth', width: 0 });
   const [sampleOrderOverridesByResumeId, setSampleOrderOverridesByResumeId] = useState({});
@@ -262,6 +264,18 @@ function App() {
     setActiveTab(target.sectionId);
     setMobileView('editor');
   }
+
+  const handlePreviewPulseTarget = useCallback((target) => {
+    if (!target?.path) {
+      return;
+    }
+
+    previewPulseRequestIdRef.current += 1;
+    setPreviewPulseTarget({
+      path: target.path,
+      requestId: previewPulseRequestIdRef.current,
+    });
+  }, []);
 
   const updateEditorCaretTarget = useCallback((target) => {
     if (!target?.path) {
@@ -721,6 +735,7 @@ function App() {
               maxHeight={editorStageMaxHeight}
               previewEditTarget={previewEditTarget}
               onClearPreviewEditTarget={clearPreviewEditTarget}
+              onPreviewPulseTarget={handlePreviewPulseTarget}
               onEditorCaretChange={updateEditorCaretTarget}
             />
           </div>
@@ -738,6 +753,7 @@ function App() {
               onReorderSectionEntries={handlePreviewReorderSectionEntries}
               onReorderSectionTextList={handlePreviewReorderSectionTextList}
               activeEditorCaret={editorCaretTarget}
+              previewPulseTarget={previewPulseTarget}
             />
           </div>
         </main>
