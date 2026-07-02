@@ -924,3 +924,94 @@ export function createSamplePreviewModel(resume, resumeId, realPreviewModel = ge
     showPersonal: true,
   };
 }
+
+function toPlaceholderText(value) {
+  if (typeof value === 'string') {
+    return trimText(value);
+  }
+
+  if (value && typeof value === 'object' && typeof value.text === 'string') {
+    return trimText(value.text);
+  }
+
+  return '';
+}
+
+function readPlaceholderValue(candidate, pathParts) {
+  let current = candidate;
+
+  for (const pathPart of pathParts) {
+    if (current === null || current === undefined) {
+      return '';
+    }
+
+    if (Array.isArray(current)) {
+      const itemIndex = Number(pathPart);
+
+      if (!Number.isInteger(itemIndex) || itemIndex < 0 || itemIndex >= current.length) {
+        return '';
+      }
+
+      current = current[itemIndex];
+      continue;
+    }
+
+    current = current[pathPart];
+  }
+
+  return toPlaceholderText(current);
+}
+
+export function createSamplePlaceholderResolver(resume, samplePreviewModel) {
+  if (!samplePreviewModel?.isSamplePreview) {
+    return (_path, fallback = '') => fallback;
+  }
+
+  const normalizedResume = normalizeResume(resume);
+  const realSectionById = new Map(normalizedResume.sections.map((section) => [section.id, section]));
+  const sampleSectionById = new Map(
+    (Array.isArray(samplePreviewModel.sectionBlocks) ? samplePreviewModel.sectionBlocks : [])
+      .map((section) => [section.id, section])
+  );
+
+  return (path, fallback = '') => {
+    const fallbackText = typeof fallback === 'string' ? fallback : '';
+
+    if (typeof path !== 'string' || !path) {
+      return fallbackText;
+    }
+
+    const pathParts = path.split('.');
+
+    if (pathParts[0] === 'personal') {
+      const personalValue = readPlaceholderValue(samplePreviewModel.personal, pathParts.slice(1));
+      return personalValue || fallbackText;
+    }
+
+    if (pathParts[0] !== 'sections' || pathParts.length < 3) {
+      return fallbackText;
+    }
+
+    const [, sectionId, entryIdOrTitle, ...entryPathParts] = pathParts;
+    const sampleSection = sampleSectionById.get(sectionId);
+
+    if (!sampleSection) {
+      return fallbackText;
+    }
+
+    if (entryIdOrTitle === '__title') {
+      return toPlaceholderText(sampleSection.title) || fallbackText;
+    }
+
+    const sampleEntries = Array.isArray(sampleSection.entries) ? sampleSection.entries : [];
+    const exactSampleEntry = sampleEntries.find((entry) => entry.id === entryIdOrTitle);
+    const realSection = realSectionById.get(sectionId);
+    const realEntryIndex = Array.isArray(realSection?.entries)
+      ? realSection.entries.findIndex((entry) => entry.id === entryIdOrTitle)
+      : -1;
+    const sampleEntry = exactSampleEntry || (realEntryIndex >= 0 ? sampleEntries[realEntryIndex] : null);
+    const entryValue = readPlaceholderValue(sampleEntry, entryPathParts);
+
+    return entryValue || fallbackText;
+  };
+}

@@ -6,11 +6,12 @@ import EntryActionMenu from "./entryActionMenu";
 import FormFieldError from "./formFieldError";
 import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function EducationForm({ section, actions, getFieldError, markTouched, editorTarget }) {
+export default function EducationForm({ section, actions, getFieldError, markTouched, editorTarget, placeholderFor }) {
     const entries = section.entries || [];
     const sectionId = section.id;
 
     const pathFor = (entryId, field) => `sections.${sectionId}.${entryId}.${field}`;
+    const placeholder = (entryId, field, fallback) => placeholderFor?.(pathFor(entryId, field), fallback) || fallback;
     const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
     const updateField = (entryId, field, value) => actions.updateSectionBlockEntry(sectionId, entryId, field, value);
     const addEntry = () => actions.addSectionBlockEntry(sectionId);
@@ -65,7 +66,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                 value={entry.school}
                                 onChange={(event) => updateField(entry.id, 'school', event.target.value)}
                                 onBlur={() => markTouched(pathFor(entry.id, 'school'))}
-                                placeholder="University or school name"
+                                placeholder={placeholder(entry.id, 'school', 'University or school name')}
                             />
                             <FormFieldError message={getFieldError(pathFor(entry.id, 'school'))} />
                         </div>
@@ -80,7 +81,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                     value={entry.location}
                                     onChange={(event) => updateField(entry.id, 'location', event.target.value)}
                                     onBlur={() => markTouched(pathFor(entry.id, 'location'))}
-                                    placeholder="Cambridge, MA"
+                                    placeholder={placeholder(entry.id, 'location', 'Cambridge, MA')}
                                 />
                             </div>
 
@@ -93,7 +94,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                     value={entry.yearsEdu}
                                     onChange={(event) => updateField(entry.id, 'yearsEdu', event.target.value)}
                                     onBlur={() => markTouched(pathFor(entry.id, 'yearsEdu'))}
-                                    placeholder="2020 - 2024"
+                                    placeholder={placeholder(entry.id, 'yearsEdu', '2020 - 2024')}
                                 />
                                 <FormFieldError message={getFieldError(pathFor(entry.id, 'yearsEdu'))} />
                             </div>
@@ -117,7 +118,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                                                 value={program.degree}
                                                                 onChange={(event) => actions.updateSectionBlockEducationProgram(sectionId, entry.id, programIndex, 'degree', event.target.value)}
                                                                 onBlur={() => markTouched(pathFor(entry.id, `programs.${programIndex}.degree`))}
-                                                                placeholder="B.S. Computer Science"
+                                                                placeholder={placeholder(entry.id, `programs.${programIndex}.degree`, 'B.S. Computer Science')}
                                                             />
                                                         </div>
 
@@ -130,7 +131,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                                                 value={program.yearsEdu}
                                                                 onChange={(event) => actions.updateSectionBlockEducationProgram(sectionId, entry.id, programIndex, 'yearsEdu', event.target.value)}
                                                                 onBlur={() => markTouched(pathFor(entry.id, `programs.${programIndex}.yearsEdu`))}
-                                                                placeholder="2020 - 2024"
+                                                                placeholder={placeholder(entry.id, `programs.${programIndex}.yearsEdu`, '2020 - 2024')}
                                                             />
                                                         </div>
                                                     </div>
@@ -145,7 +146,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                                                 value={program.gpa}
                                                                 onChange={(event) => actions.updateSectionBlockEducationProgram(sectionId, entry.id, programIndex, 'gpa', event.target.value)}
                                                                 onBlur={() => markTouched(pathFor(entry.id, `programs.${programIndex}.gpa`))}
-                                                                placeholder="3.9 / 4.0"
+                                                                placeholder={placeholder(entry.id, `programs.${programIndex}.gpa`, '3.9 / 4.0')}
                                                             />
                                                         </div>
 
@@ -158,7 +159,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                                                 value={program.honors}
                                                                 onChange={(event) => actions.updateSectionBlockEducationProgram(sectionId, entry.id, programIndex, 'honors', event.target.value)}
                                                                 onBlur={() => markTouched(pathFor(entry.id, `programs.${programIndex}.honors`))}
-                                                                placeholder="Magna Cum Laude"
+                                                                placeholder={placeholder(entry.id, `programs.${programIndex}.honors`, 'Magna Cum Laude')}
                                                             />
                                                         </div>
                                                     </div>
@@ -199,7 +200,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                             value={entry.degree}
                                             onChange={(event) => updateField(entry.id, 'degree', event.target.value)}
                                             onBlur={() => markTouched(pathFor(entry.id, 'degree'))}
-                                            placeholder="B.S. Computer Science"
+                                            placeholder={placeholder(entry.id, 'degree', 'B.S. Computer Science')}
                                         />
                                         <FormFieldError message={getFieldError(pathFor(entry.id, 'degree'))} />
                                     </div>
@@ -213,7 +214,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                             value={entry.gpa}
                                             onChange={(event) => updateField(entry.id, 'gpa', event.target.value)}
                                             onBlur={() => markTouched(pathFor(entry.id, 'gpa'))}
-                                            placeholder="3.9 / 4.0"
+                                            placeholder={placeholder(entry.id, 'gpa', '3.9 / 4.0')}
                                         />
                                     </div>
                                 </div>
@@ -227,7 +228,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                         value={entry.honors}
                                         onChange={(event) => updateField(entry.id, 'honors', event.target.value)}
                                         onBlur={() => markTouched(pathFor(entry.id, 'honors'))}
-                                        placeholder="Magna Cum Laude, Dean's List"
+                                        placeholder={placeholder(entry.id, 'honors', "Magna Cum Laude, Dean's List")}
                                     />
                                 </div>
                             </>
@@ -242,7 +243,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                 onChange={(event) => updateField(entry.id, 'coursework', event.target.value)}
                                 onBlur={() => markTouched(pathFor(entry.id, 'coursework'))}
                                 rows={2}
-                                placeholder="Human-Computer Interaction, Algorithms, Product Strategy"
+                                placeholder={placeholder(entry.id, 'coursework', 'Human-Computer Interaction, Algorithms, Product Strategy')}
                             />
                         </div>
 
@@ -255,7 +256,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                 onChange={(event) => updateField(entry.id, 'awards', event.target.value)}
                                 onBlur={() => markTouched(pathFor(entry.id, 'awards'))}
                                 rows={2}
-                                placeholder="Scholarships, distinctions, academic awards"
+                                placeholder={placeholder(entry.id, 'awards', 'Scholarships, distinctions, academic awards')}
                             />
                         </div>
 
@@ -276,7 +277,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                                         value={section.label}
                                                         onChange={(event) => updateCustomSection(entry.id, sectionIndex, 'label', event.target.value)}
                                                         onBlur={() => markTouched(pathFor(entry.id, `customSections.${sectionIndex}.label`))}
-                                                        placeholder="Capstone project"
+                                                        placeholder={placeholder(entry.id, `customSections.${sectionIndex}.label`, 'Capstone project')}
                                                     />
                                                 </div>
 
@@ -289,7 +290,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                                         onChange={(event) => updateCustomSection(entry.id, sectionIndex, 'content', event.target.value)}
                                                         onBlur={() => markTouched(pathFor(entry.id, `customSections.${sectionIndex}.content`))}
                                                         rows={2}
-                                                        placeholder="Add the details you want to show under this custom section."
+                                                        placeholder={placeholder(entry.id, `customSections.${sectionIndex}.content`, 'Add the details you want to show under this custom section.')}
                                                     />
                                                 </div>
                                             </div>

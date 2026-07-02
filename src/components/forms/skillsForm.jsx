@@ -4,10 +4,11 @@ import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function SkillsForm({ section, actions, getFieldError, markTouched, editorTarget }) {
+export default function SkillsForm({ section, actions, getFieldError, markTouched, editorTarget, placeholderFor }) {
   const entries = section.entries || [];
   const sectionId = section.id;
   const pathFor = (entryId, field) => `sections.${sectionId}.${entryId}.${field}`;
+  const placeholder = (entryId, field, fallback) => placeholderFor?.(pathFor(entryId, field), fallback) || fallback;
   const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
   const updateEntry = (entryId, field, value) => actions.updateSectionBlockEntry(sectionId, entryId, field, value);
   const addEntry = () => actions.addSectionBlockEntry(sectionId);
@@ -47,7 +48,7 @@ export default function SkillsForm({ section, actions, getFieldError, markTouche
                 value={entry.category}
                 onChange={(event) => updateEntry(entry.id, 'category', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'category'))}
-                placeholder="Product design"
+                placeholder={placeholder(entry.id, 'category', 'Product design')}
               />
             </div>
 
@@ -60,7 +61,7 @@ export default function SkillsForm({ section, actions, getFieldError, markTouche
                 onChange={(event) => updateEntry(entry.id, 'items', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'items'))}
                 rows={2}
-                placeholder="Design systems, prototyping, user research, Figma"
+                placeholder={placeholder(entry.id, 'items', 'Design systems, prototyping, user research, Figma')}
               />
               <FormFieldError message={getFieldError(pathFor(entry.id, 'items'))} />
             </div>

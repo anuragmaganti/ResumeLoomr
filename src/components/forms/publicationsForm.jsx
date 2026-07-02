@@ -4,10 +4,11 @@ import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function PublicationsForm({ section, actions, getFieldError, markTouched, editorTarget }) {
+export default function PublicationsForm({ section, actions, getFieldError, markTouched, editorTarget, placeholderFor }) {
   const entries = section.entries || [];
   const sectionId = section.id;
   const pathFor = (entryId, field) => `sections.${sectionId}.${entryId}.${field}`;
+  const placeholder = (entryId, field, fallback) => placeholderFor?.(pathFor(entryId, field), fallback) || fallback;
   const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
   const updateEntry = (entryId, field, value) => actions.updateSectionBlockEntry(sectionId, entryId, field, value);
   const addEntry = () => actions.addSectionBlockEntry(sectionId);
@@ -48,7 +49,7 @@ export default function PublicationsForm({ section, actions, getFieldError, mark
                   value={entry.title}
                   onChange={(event) => updateEntry(entry.id, 'title', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'title'))}
-                  placeholder="Designing for clarity in high-density interfaces"
+                  placeholder={placeholder(entry.id, 'title', 'Designing for clarity in high-density interfaces')}
                 />
                 <FormFieldError message={getFieldError(pathFor(entry.id, 'title'))} />
               </div>
@@ -62,7 +63,7 @@ export default function PublicationsForm({ section, actions, getFieldError, mark
                   value={entry.years}
                   onChange={(event) => updateEntry(entry.id, 'years', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'years'))}
-                  placeholder="2024"
+                  placeholder={placeholder(entry.id, 'years', '2024')}
                 />
               </div>
             </div>
@@ -76,7 +77,7 @@ export default function PublicationsForm({ section, actions, getFieldError, mark
                 value={entry.publisher}
                 onChange={(event) => updateEntry(entry.id, 'publisher', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'publisher'))}
-                placeholder="Smashing Magazine"
+                placeholder={placeholder(entry.id, 'publisher', 'Smashing Magazine')}
               />
             </div>
 
@@ -89,7 +90,7 @@ export default function PublicationsForm({ section, actions, getFieldError, mark
                 onChange={(event) => updateEntry(entry.id, 'details', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'details'))}
                 rows={2}
-                placeholder="Add context like co-authors, publication type, or impact."
+                placeholder={placeholder(entry.id, 'details', 'Add context like co-authors, publication type, or impact.')}
               />
             </div>
           </form>

@@ -5,9 +5,10 @@ import FormFieldError from "./formFieldError";
 import ReorderableTextList from "./reorderableTextList";
 import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function CustomBlockForm({ section, actions, getFieldError, markTouched, editorTarget }) {
+export default function CustomBlockForm({ section, actions, getFieldError, markTouched, editorTarget, placeholderFor }) {
   const entries = section.entries || [];
   const pathFor = (entryId, field) => `sections.${section.id}.${entryId}.${field}`;
+  const placeholder = (entryId, field, fallback) => placeholderFor?.(pathFor(entryId, field), fallback) || fallback;
   const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
 
   return (
@@ -43,7 +44,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                 value={entry.title}
                 onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'title', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'title'))}
-                placeholder="Entry title"
+                placeholder={placeholder(entry.id, 'title', 'Entry title')}
               />
               <FormFieldError message={getFieldError(pathFor(entry.id, 'title'))} />
             </div>
@@ -57,7 +58,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                 value={entry.subtitle}
                 onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'subtitle', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'subtitle'))}
-                placeholder="Optional context"
+                placeholder={placeholder(entry.id, 'subtitle', 'Optional context')}
               />
             </div>
 
@@ -71,7 +72,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                   value={entry.location}
                   onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'location', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'location'))}
-                  placeholder="City, State"
+                  placeholder={placeholder(entry.id, 'location', 'City, State')}
                 />
               </div>
 
@@ -84,7 +85,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                   value={entry.years}
                   onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'years', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'years'))}
-                  placeholder="2024"
+                  placeholder={placeholder(entry.id, 'years', '2024')}
                 />
               </div>
             </div>
@@ -98,7 +99,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                 onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'details', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'details'))}
                 rows={2}
-                placeholder="Add details for this entry."
+                placeholder={placeholder(entry.id, 'details', 'Add details for this entry.')}
               />
             </div>
 
@@ -108,6 +109,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
               idPrefix={`custom-highlights-${section.id}-${entry.id}`}
               pathPrefix={pathFor(entry.id, 'highlights')}
               placeholder="Add a detail or bullet."
+              placeholderFor={placeholderFor}
               addLabel="Add highlight"
               getFieldError={getFieldError}
               markTouched={markTouched}

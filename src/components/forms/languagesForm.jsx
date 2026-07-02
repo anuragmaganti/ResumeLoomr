@@ -3,10 +3,11 @@ import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function LanguagesForm({ section, actions, getFieldError, markTouched, editorTarget }) {
+export default function LanguagesForm({ section, actions, getFieldError, markTouched, editorTarget, placeholderFor }) {
   const entries = section.entries || [];
   const sectionId = section.id;
   const pathFor = (entryId, field) => `sections.${sectionId}.${entryId}.${field}`;
+  const placeholder = (entryId, field, fallback) => placeholderFor?.(pathFor(entryId, field), fallback) || fallback;
   const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
   const updateEntry = (entryId, field, value) => actions.updateSectionBlockEntry(sectionId, entryId, field, value);
   const addEntry = () => actions.addSectionBlockEntry(sectionId);
@@ -47,7 +48,7 @@ export default function LanguagesForm({ section, actions, getFieldError, markTou
                   value={entry.language}
                   onChange={(event) => updateEntry(entry.id, 'language', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'language'))}
-                  placeholder="Spanish"
+                  placeholder={placeholder(entry.id, 'language', 'Spanish')}
                 />
                 <FormFieldError message={getFieldError(pathFor(entry.id, 'language'))} />
               </div>
@@ -61,7 +62,7 @@ export default function LanguagesForm({ section, actions, getFieldError, markTou
                   value={entry.proficiency}
                   onChange={(event) => updateEntry(entry.id, 'proficiency', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'proficiency'))}
-                  placeholder="Professional working proficiency"
+                  placeholder={placeholder(entry.id, 'proficiency', 'Professional working proficiency')}
                 />
               </div>
             </div>

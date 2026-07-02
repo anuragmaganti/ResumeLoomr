@@ -73,6 +73,7 @@ import {
   validateImportResumeFile,
 } from '../src/lib/importResume.js';
 import {
+  createSamplePlaceholderResolver,
   createSamplePreviewModel,
   getSampleResumeIndex,
 } from '../src/lib/sampleResumes.js';
@@ -379,6 +380,37 @@ test('Erlich sample uses reference content and supports preview-only entry order
   ]);
   assert.deepEqual(reorderedPreview.sectionBlocks.find((section) => section.id === roleBlock.id).entryOrder, [...roleIds].reverse());
   assert.equal(JSON.stringify(resume), before);
+});
+
+test('sample placeholder resolver mirrors sample preview fields without mutating resumes', () => {
+  let resume = createEmptyResume();
+  const before = JSON.stringify(resume);
+  const preview = createSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
+  const placeholderFor = createSamplePlaceholderResolver(resume, preview);
+  const educationEntryId = getSection(resume, 'education').entries[0].id;
+  const experienceEntryId = getSection(resume, 'experience').entries[0].id;
+  const projectsEntryId = getSection(resume, 'projects').entries[0].id;
+  const skillsEntryId = getSection(resume, 'skills').entries[0].id;
+
+  assert.equal(placeholderFor('personal.name', 'Jordan Lee'), 'Erlich Bachman');
+  assert.equal(placeholderFor('personal.githubUrl', 'github.com/jordanlee'), 'github.com/jordanlee');
+  assert.equal(placeholderFor(`sections.education.${educationEntryId}.school`, 'School'), 'Hampshire College');
+  assert.equal(placeholderFor(`sections.education.${educationEntryId}.customSections.0.label`, 'Capstone'), 'Additional Academic Exposure');
+  assert.equal(placeholderFor(`sections.experience.${experienceEntryId}.company`, 'Organization'), 'Aviato');
+  assert.equal(placeholderFor(`sections.experience.${experienceEntryId}.role`, 'Role'), 'Founder & CEO');
+  assert.equal(placeholderFor(`sections.experience.${experienceEntryId}.activities.0`, 'Highlight').includes('Built and exited Aviato'), true);
+  assert.equal(placeholderFor(`sections.projects.${projectsEntryId}.name`, 'Project'), 'Aviato Brand System');
+  assert.equal(placeholderFor(`sections.skills.${skillsEntryId}.items`, 'Skills').includes('Demo-day posture'), true);
+  assert.equal(placeholderFor('sections.awards.missing.title', 'Employee of the Year'), 'Employee of the Year');
+  assert.equal(JSON.stringify(resume), before);
+
+  resume = addRoleBlockEntry(resume, 'experience');
+  const secondExperienceEntryId = getSection(resume, 'experience').entries[1].id;
+  const previewWithSecondRole = createSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
+  const placeholderForSecondRole = createSamplePlaceholderResolver(resume, previewWithSecondRole);
+
+  assert.equal(placeholderForSecondRole(`sections.experience.${secondExperienceEntryId}.company`, 'Organization'), 'Pied Piper');
+  assert.equal(placeholderForSecondRole(`sections.experience.${secondExperienceEntryId}.role`, 'Role'), 'Board Member / 10% Stakeholder');
 });
 
 test('each fictional sample renders multiple complete experience entries', () => {

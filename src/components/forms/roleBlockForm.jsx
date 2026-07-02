@@ -4,8 +4,9 @@ import FormFieldError from "./formFieldError";
 import ReorderableTextList from "./reorderableTextList";
 import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function RoleBlockForm({ section, actions, getFieldError, markTouched, editorTarget }) {
+export default function RoleBlockForm({ section, actions, getFieldError, markTouched, editorTarget, placeholderFor }) {
   const entries = section.entries || [];
+  const placeholder = (path, fallback) => placeholderFor?.(path, fallback) || fallback;
 
   return (
     <div className="formStack">
@@ -44,7 +45,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                     value={entry.company}
                     onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'company', event.target.value)}
                     onBlur={() => markTouched(`${pathPrefix}.company`)}
-                    placeholder="Organization or company"
+                    placeholder={placeholder(`${pathPrefix}.company`, 'Organization or company')}
                   />
                   <FormFieldError message={getFieldError(`${pathPrefix}.company`)} />
                 </div>
@@ -58,7 +59,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                     value={entry.role}
                     onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'role', event.target.value)}
                     onBlur={() => markTouched(`${pathPrefix}.role`)}
-                    placeholder="Role title"
+                    placeholder={placeholder(`${pathPrefix}.role`, 'Role title')}
                   />
                   <FormFieldError message={getFieldError(`${pathPrefix}.role`)} />
                 </div>
@@ -74,7 +75,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                     value={entry.location}
                     onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'location', event.target.value)}
                     onBlur={() => markTouched(`${pathPrefix}.location`)}
-                    placeholder="City, State"
+                    placeholder={placeholder(`${pathPrefix}.location`, 'City, State')}
                   />
                 </div>
 
@@ -87,7 +88,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                     value={entry.yearsExp}
                     onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'yearsExp', event.target.value)}
                     onBlur={() => markTouched(`${pathPrefix}.yearsExp`)}
-                    placeholder="2022 - Present"
+                    placeholder={placeholder(`${pathPrefix}.yearsExp`, '2022 - Present')}
                   />
                   <FormFieldError message={getFieldError(`${pathPrefix}.yearsExp`)} />
                 </div>
@@ -99,6 +100,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                 idPrefix={`role-highlights-${section.id}-${entry.id}`}
                 pathPrefix={`${pathPrefix}.activities`}
                 placeholder="Describe a measurable accomplishment or core responsibility."
+                placeholderFor={placeholderFor}
                 addLabel="Add highlight"
                 getFieldError={getFieldError}
                 markTouched={markTouched}

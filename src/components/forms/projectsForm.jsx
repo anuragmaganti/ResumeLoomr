@@ -5,10 +5,11 @@ import FormFieldError from "./formFieldError";
 import ReorderableTextList from "./reorderableTextList";
 import { createEditorTargetAttributes } from "../../lib/editorTargets";
 
-export default function ProjectsForm({ section, actions, getFieldError, markTouched, editorTarget }) {
+export default function ProjectsForm({ section, actions, getFieldError, markTouched, editorTarget, placeholderFor }) {
   const entries = section.entries || [];
   const sectionId = section.id;
   const pathFor = (entryId, field) => `sections.${sectionId}.${entryId}.${field}`;
+  const placeholder = (entryId, field, fallback) => placeholderFor?.(pathFor(entryId, field), fallback) || fallback;
   const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
   const updateEntry = (entryId, field, value) => actions.updateSectionBlockEntry(sectionId, entryId, field, value);
   const addEntry = () => actions.addSectionBlockEntry(sectionId);
@@ -59,7 +60,7 @@ export default function ProjectsForm({ section, actions, getFieldError, markTouc
                   value={entry.name}
                   onChange={(event) => updateEntry(entry.id, 'name', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'name'))}
-                  placeholder="ResumeLoomr"
+                  placeholder={placeholder(entry.id, 'name', 'ResumeLoomr')}
                 />
                 <FormFieldError message={getFieldError(pathFor(entry.id, 'name'))} />
               </div>
@@ -73,7 +74,7 @@ export default function ProjectsForm({ section, actions, getFieldError, markTouc
                   value={entry.years}
                   onChange={(event) => updateEntry(entry.id, 'years', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'years'))}
-                  placeholder="2025 - Present"
+                  placeholder={placeholder(entry.id, 'years', '2025 - Present')}
                 />
               </div>
             </div>
@@ -87,7 +88,7 @@ export default function ProjectsForm({ section, actions, getFieldError, markTouc
                 value={entry.subtitle}
                 onChange={(event) => updateEntry(entry.id, 'subtitle', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'subtitle'))}
-                placeholder="React, Vite, plain CSS"
+                placeholder={placeholder(entry.id, 'subtitle', 'React, Vite, plain CSS')}
               />
             </div>
 
@@ -100,7 +101,7 @@ export default function ProjectsForm({ section, actions, getFieldError, markTouc
                 onChange={(event) => updateEntry(entry.id, 'summary', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'summary'))}
                 rows={2}
-                placeholder="Summarize what the project is, who it served, or what made it notable."
+                placeholder={placeholder(entry.id, 'summary', 'Summarize what the project is, who it served, or what made it notable.')}
               />
             </div>
 
@@ -110,6 +111,7 @@ export default function ProjectsForm({ section, actions, getFieldError, markTouc
               idPrefix={`project-highlights-${entry.id}`}
               pathPrefix={pathFor(entry.id, 'highlights')}
               placeholder="Add a measurable project outcome or implementation detail."
+              placeholderFor={placeholderFor}
               addLabel="Add highlight"
               getFieldError={getFieldError}
               markTouched={markTouched}

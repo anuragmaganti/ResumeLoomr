@@ -15,7 +15,7 @@ import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
 import { importResumeFile } from './lib/importResume.js';
 import { clearResumeSyncSession } from './lib/backgroundSync.js';
-import { createSamplePreviewModel } from './lib/sampleResumes.js';
+import { createSamplePlaceholderResolver, createSamplePreviewModel } from './lib/sampleResumes.js';
 import {
   clearBrowserResumeConnectionData,
   clearLocalResumeWorkspaceData,
@@ -162,6 +162,10 @@ function App() {
   const samplePreviewModel = useMemo(
     () => createSamplePreviewModel(resume, activeResumeId, previewModel, sampleOrderOverrides),
     [activeResumeId, previewModel, resume, sampleOrderOverrides],
+  );
+  const samplePlaceholderFor = useMemo(
+    () => createSamplePlaceholderResolver(resume, samplePreviewModel),
+    [resume, samplePreviewModel],
   );
   const displayPreviewModel = samplePreviewModel || previewModel;
   const isSamplePreview = Boolean(samplePreviewModel);
@@ -734,6 +738,7 @@ function App() {
               markTouched={markTouched}
               maxHeight={editorStageMaxHeight}
               previewEditTarget={previewEditTarget}
+              placeholderFor={samplePlaceholderFor}
               onClearPreviewEditTarget={clearPreviewEditTarget}
               onPreviewPulseTarget={handlePreviewPulseTarget}
               onEditorCaretChange={updateEditorCaretTarget}

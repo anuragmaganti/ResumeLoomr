@@ -9,6 +9,7 @@ export default function ReorderableTextList({
   idPrefix,
   pathPrefix,
   placeholder,
+  placeholderFor,
   addLabel,
   getFieldError,
   markTouched,
@@ -31,7 +32,7 @@ export default function ReorderableTextList({
               onChange={(event) => onChangeItem(itemIndex, event.target.value)}
               onBlur={() => markTouched(`${pathPrefix}.${itemIndex}`)}
               rows={2}
-              placeholder={placeholder}
+              placeholder={placeholderFor?.(`${pathPrefix}.${itemIndex}`, placeholder) || placeholder}
             />
             <FormFieldError message={getFieldError(`${pathPrefix}.${itemIndex}`)} />
           </div>

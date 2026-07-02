@@ -2,7 +2,9 @@ import AutoResizeTextarea from "../autoResizeTextarea";
 import FormFieldError from "./formFieldError";
 import { createEditorTargetAttributes, personalEditorPath } from "../../lib/editorTargets";
 
-export default function PersonalForm({ personal, actions, getFieldError, markTouched }) {
+export default function PersonalForm({ personal, actions, getFieldError, markTouched, placeholderFor }) {
+    const placeholder = (field, fallback) => placeholderFor?.(personalEditorPath(field), fallback) || fallback;
+
     return (
         <fieldset className="formSection">
             <form onSubmit={(event) => event.preventDefault()}>
@@ -16,7 +18,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                         value={personal.name}
                         onChange={(event) => actions.updatePersonalField('name', event.target.value)}
                         onBlur={() => markTouched('personal.name')}
-                        placeholder="Jordan Lee"
+                        placeholder={placeholder('name', 'Jordan Lee')}
                     />
                     <FormFieldError message={getFieldError('personal.name')} />
                 </div>
@@ -32,7 +34,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             value={personal.headline}
                             onChange={(event) => actions.updatePersonalField('headline', event.target.value)}
                             onBlur={() => markTouched('personal.headline')}
-                            placeholder="Frontend Engineer"
+                            placeholder={placeholder('headline', 'Frontend Engineer')}
                         />
                     </div>
 
@@ -46,7 +48,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             value={personal.location}
                             onChange={(event) => actions.updatePersonalField('location', event.target.value)}
                             onBlur={() => markTouched('personal.location')}
-                            placeholder="New York, NY"
+                            placeholder={placeholder('location', 'New York, NY')}
                         />
                     </div>
                 </div>
@@ -62,7 +64,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             value={personal.phone}
                             onChange={(event) => actions.updatePersonalField('phone', event.target.value)}
                             onBlur={() => markTouched('personal.phone')}
-                            placeholder="(555) 123-4567"
+                            placeholder={placeholder('phone', '(555) 123-4567')}
                         />
                         <FormFieldError message={getFieldError('personal.phone')} />
                     </div>
@@ -77,7 +79,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             value={personal.email}
                             onChange={(event) => actions.updatePersonalField('email', event.target.value)}
                             onBlur={() => markTouched('personal.email')}
-                            placeholder="jordan@example.com"
+                            placeholder={placeholder('email', 'jordan@example.com')}
                         />
                         <FormFieldError message={getFieldError('personal.email')} />
                     </div>
@@ -94,7 +96,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             value={personal.linkedinUrl}
                             onChange={(event) => actions.updatePersonalField('linkedinUrl', event.target.value)}
                             onBlur={() => markTouched('personal.linkedinUrl')}
-                            placeholder="linkedin.com/in/jordanlee"
+                            placeholder={placeholder('linkedinUrl', 'linkedin.com/in/jordanlee')}
                         />
                         <FormFieldError message={getFieldError('personal.linkedinUrl')} />
                     </div>
@@ -109,7 +111,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             value={personal.githubUrl}
                             onChange={(event) => actions.updatePersonalField('githubUrl', event.target.value)}
                             onBlur={() => markTouched('personal.githubUrl')}
-                            placeholder="github.com/jordanlee"
+                            placeholder={placeholder('githubUrl', 'github.com/jordanlee')}
                         />
                         <FormFieldError message={getFieldError('personal.githubUrl')} />
                     </div>
@@ -126,7 +128,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             value={personal.portfolioUrl}
                             onChange={(event) => actions.updatePersonalField('portfolioUrl', event.target.value)}
                             onBlur={() => markTouched('personal.portfolioUrl')}
-                            placeholder="jordanlee.com"
+                            placeholder={placeholder('portfolioUrl', 'jordanlee.com')}
                         />
                         <FormFieldError message={getFieldError('personal.portfolioUrl')} />
                     </div>
@@ -141,7 +143,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                             value={personal.customField}
                             onChange={(event) => actions.updatePersonalField('customField', event.target.value)}
                             onBlur={() => markTouched('personal.customField')}
-                            placeholder="Behance: behance.net/jordanlee"
+                            placeholder={placeholder('customField', 'Behance: behance.net/jordanlee')}
                         />
                     </div>
                 </div>
@@ -156,7 +158,7 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                         onChange={(event) => actions.updatePersonalField('aboutMe', event.target.value)}
                         onBlur={() => markTouched('personal.aboutMe')}
                         rows={2}
-                        placeholder="Write a short summary that highlights your experience, strengths, and goals."
+                        placeholder={placeholder('aboutMe', 'Write a short summary that highlights your experience, strengths, and goals.')}
                     />
                 </div>
             </form>

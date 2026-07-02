@@ -134,6 +134,7 @@ export default function EditorPanel({
     markTouched,
     maxHeight,
     previewEditTarget,
+    placeholderFor,
     onClearPreviewEditTarget,
     onPreviewPulseTarget,
     onEditorCaretChange
@@ -459,6 +460,7 @@ export default function EditorPanel({
                                     value={currentSectionTitleValue}
                                     onChange={(event) => actions.updateSectionTitle(activeTab, event.target.value)}
                                     onBlur={() => actions.commitSectionTitle(activeTab)}
+                                    placeholder={placeholderFor?.(sectionTitleEditorPath(activeTab), UNTITLED_SECTION_TITLE) || UNTITLED_SECTION_TITLE}
                                 />
                             </div>
                         ) : null}
@@ -469,6 +471,7 @@ export default function EditorPanel({
                                 actions={actions}
                                 getFieldError={getFieldError}
                                 markTouched={markTouched}
+                                placeholderFor={placeholderFor}
                             />
                         )}
                         {activeTab !== "personal" && activeBlock && (
@@ -478,6 +481,7 @@ export default function EditorPanel({
                                 getFieldError={getFieldError}
                                 markTouched={markTouched}
                                 editorTarget={previewEditTarget}
+                                placeholderFor={placeholderFor}
                             />
                         )}
                     </div>
