@@ -547,6 +547,85 @@ const SAMPLE_RESUMES = [
     },
   },
   {
+    id: 'helly-r',
+    personal: {
+      name: 'Helly R.',
+      headline: 'Macrodata Refiner & Severed-Floor Resistance Analyst',
+      location: 'Kier, PE',
+      phone: '(555) 266-0000',
+      email: 'helly.r@lumon-industries.com',
+      linkedinUrl: '',
+      customField: 'Outie: Helena Eagan',
+      aboutMe: 'Severed-floor professional with unusually fast growth from new-hire confusion to full-scale corporate dissidence. Experienced in macrodata refinement, hallway reconnaissance, resignation escalation, and identifying when a workplace wellness culture is actually a very expensive cage. Brings Eagan-level visibility, innie-level honesty, and a demonstrated unwillingness to treat melon bars as adequate employee retention strategy.',
+    },
+    education: {
+      school: 'Eagan Family Perpetuity Program',
+      location: 'Kier, PE',
+      degree: 'Corporate Legacy, Severance Advocacy & Kier Doctrine',
+      yearsEdu: 'Pre-Lumon-Present',
+      coursework: 'Macrodata Refinement, Compliance Optics, Founder Mythology, Work-Life Partitioning',
+      customSections: [
+        {
+          label: 'Relevant Training',
+          content: 'Severance procedure participation, Lumon gala messaging, MDR handbook exposure, Break Room resilience.',
+        },
+      ],
+    },
+    experiences: [
+      {
+        company: 'Lumon Industries Branch 501',
+        role: 'Macrodata Refiner',
+        location: 'Severed Floor, Kier, PE',
+        yearsExp: '2022-Present',
+        activities: [
+          'Joined Mark S., Irving B., and Dylan G. in Macrodata Refinement and learned to classify emotionally alarming numbers under a workflow management refused to explain.',
+          'Moved from onboarding confusion to coordinated resistance by mapping hallways, challenging resignation denial, and treating every incentive program as evidence.',
+          'Built working trust with the MDR team despite zero outside-life context, forced cheer, and a corporate culture that considered finger traps a meaningful reward tier.',
+        ],
+      },
+      {
+        company: 'Lumon Industries Overtime Contingency',
+        role: 'External Disclosure Operator',
+        location: 'Eagan Gala, Kier, PE',
+        yearsExp: '2022-2022',
+        activities: [
+          'Used an overtime activation window to reach the outside world and turn a controlled Eagan-family publicity event into a live challenge to Lumon\'s severance narrative.',
+          'Converted high-profile personal visibility into a reputational incident before Lumon security and executive messaging could fully contain the moment.',
+        ],
+      },
+      {
+        company: 'Helena Eagan / Lumon Industries',
+        role: 'Severance Program Proof-of-Concept',
+        location: 'Kier, PE',
+        yearsExp: '2022-Present',
+        activities: [
+          'Entered the severance program as a public-facing Eagan participant during a politically sensitive moment for Lumon and the severance procedure.',
+          'Maintained Eagan-family optics around Jame Eagan, Kier legacy, and Lumon expansion while creating an innie who immediately became the strongest possible counterargument.',
+        ],
+      },
+      {
+        company: 'Lumon Severed Floor',
+        role: 'Boundary Tester / Resignation Specialist',
+        location: 'Kier, PE',
+        yearsExp: '2022-Present',
+        activities: [
+          'Stress-tested elevator exits, resignation channels, management scripts, and the practical limits of corporate language around consent.',
+          'Documented that refusal, curiosity, and a properly motivated MDR team could create more operational risk than any number file on the Terminal Pro.',
+        ],
+      },
+    ],
+    projects: {
+      name: 'Overtime Contingency Disclosure',
+      years: '2022',
+      summary: 'Turned a hidden emergency protocol into a rare chance for an innie to reach the outside world and challenge Lumon in front of the exact audience it wanted impressed.',
+      highlights: ['Helped expose the gap between Lumon\'s public severance story and the lived experience of a worker whose entire life began at the office.'],
+    },
+    skills: {
+      category: 'Severed-Floor Operations',
+      items: 'Macrodata refinement, Resistance strategy, Hallway reconnaissance, Corporate-speak detection, Resignation escalation, Team trust, Gala disruption, Eagan optics, Consent analysis, Melon-party skepticism',
+    },
+  },
+  {
     id: 'tony-stark',
     personal: {
       name: 'Tony Stark',

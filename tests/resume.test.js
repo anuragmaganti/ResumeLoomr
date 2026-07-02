@@ -339,7 +339,7 @@ test('sample resume selection is deterministic and render-only for empty resumes
   assert.equal(firstSample.isSamplePreview, true);
   assert.equal(firstSample.sectionBlocks.every((section) => resume.sections.some((realSection) => realSection.id === section.id)), true);
   assert.deepEqual(reorderedSample.sectionBlocks.find((section) => section.id === roleBlock.id).entries[0].activities.map((activity) => activity.sourceIndex), reorderedActivityOrder);
-  assert.equal(sampleIndexes.size, 8);
+  assert.equal(sampleIndexes.size, 9);
 });
 
 test('Erlich sample uses reference content and supports preview-only entry order', () => {
@@ -384,7 +384,7 @@ test('Erlich sample uses reference content and supports preview-only entry order
 test('each fictional sample renders multiple complete experience entries', () => {
   const previewsBySampleId = new Map();
 
-  for (let index = 0; index < 128 && previewsBySampleId.size < 8; index += 1) {
+  for (let index = 0; index < 128 && previewsBySampleId.size < 9; index += 1) {
     const resume = createEmptyResume();
     const before = JSON.stringify(resume);
     const preview = createSamplePreviewModel(resume, `resume-${index}`, getPreviewModel(resume));
@@ -396,7 +396,7 @@ test('each fictional sample renders multiple complete experience entries', () =>
     assert.equal(JSON.stringify(resume), before);
   }
 
-  assert.equal(previewsBySampleId.size, 8);
+  assert.equal(previewsBySampleId.size, 9);
 
   for (const [sampleId, preview] of previewsBySampleId.entries()) {
     const roleBlock = preview.sectionBlocks.find((section) => section.id === 'experience');
