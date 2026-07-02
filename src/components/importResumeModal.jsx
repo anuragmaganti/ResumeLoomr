@@ -51,11 +51,8 @@ export default function ImportResumeModal({
     <div className="authOverlay importResumeOverlay" role="presentation">
       <div className="authBackdrop" onClick={resetAndClose} aria-hidden="true" />
       <section className="authDialog importResumeDialog panel" role="dialog" aria-modal="true" aria-labelledby="import-resume-title">
-        <div className="authDialogHeader">
-          <div>
-            <p className="authEyebrow">Resume import</p>
-            <h2 id="import-resume-title">Import an existing resume</h2>
-          </div>
+        <div className="authDialogHeader importResumeHeader">
+          <h2 id="import-resume-title">Import an existing resume</h2>
           <button type="button" className="authCloseButton" onClick={resetAndClose} aria-label="Close import" disabled={busy}>
             x
           </button>
@@ -66,19 +63,26 @@ export default function ImportResumeModal({
         </p>
 
         <form className="importResumeForm" onSubmit={handleSubmit}>
-          <label className="importResumeDropzone">
+          <label className={`importResumeDropzone${selectedFile ? ' hasFile' : ''}`} aria-label="Choose resume file to import">
             <input
               type="file"
               accept=".pdf,.docx,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg"
               onChange={handleFileChange}
               disabled={busy}
             />
-            <span className="importResumeDropzoneTitle">
-              {selectedFile ? selectedFile.name : 'Choose PDF, DOCX, PNG, JPG, or JPEG'}
+            <span className="importResumeDropzoneIcon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" focusable="false">
+                <path className="importResumeIconPage" d="M15 6h13.5L38 15.5V40a2 2 0 0 1-2 2H15a5 5 0 0 1-5-5V11a5 5 0 0 1 5-5Z" />
+                <path className="importResumeIconFold" d="M28 7v9h9" />
+                <path className="importResumeIconArrow" d="M24 18v14m0 0-5-5m5 5 5-5" />
+                <path className="importResumeIconTray" d="M17 36h14" />
+              </svg>
             </span>
-            <span className="importResumeDropzoneHint">
-              The upload is processed securely on the server. Your AI key is never sent to this browser.
-            </span>
+            {selectedFile ? (
+              <span className="importResumeDropzoneTitle">
+                {selectedFile.name}
+              </span>
+            ) : null}
           </label>
 
           {error || fileError ? (

@@ -9,7 +9,7 @@
 
 ResumeLoomr is a local-first, AI-assisted resume builder for creating, importing, editing, previewing, syncing, and printing multiple resumes in one browser workspace.
 
-The app uses a block-first resume model, IndexedDB as the working store, Firebase Auth and Firestore for account backup, Vercel API routes for secure server work, and Gemini-powered PDF/DOCX import. Users can work without an account, then sign in when they want cloud backup, cross-device restore, or resume import.
+The app uses a block-first resume model, IndexedDB as the working store, Firebase Auth and Firestore for account backup, Vercel API routes for secure server work, and Gemini-powered PDF, DOCX, and image import. Users can work without an account, then sign in when they want cloud backup, cross-device restore, or resume import.
 
 ## Features
 
@@ -79,6 +79,7 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 - Readable PDFs are text-extracted first for lower latency and cost.
 - Scanned or low-quality PDFs can fall back to Gemini document understanding.
 - DOCX files are extracted server-side with Mammoth.
+- PNG, JPG, and JPEG resume images are processed through Gemini image understanding, then compiled through the same source-first block pipeline.
 - Gemini 3.1 Flash-Lite powers classification and mapping.
 - The import pipeline is source-first: the server builds a source document model, classifies smaller chunks, compiles final ResumeLoomr section blocks, and preserves unmapped content as editable data instead of silently dropping it.
 - Uploaded files and extracted text are processed in memory and are not stored by the import API.

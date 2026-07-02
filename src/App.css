@@ -900,6 +900,10 @@ html[data-theme="dark"] .brandLogo--dark {
   gap: var(--space-4);
 }
 
+.importResumeHeader {
+  align-items: center;
+}
+
 .authEyebrow {
   margin: 0 0 6px;
   color: var(--color-text-muted);
@@ -1055,7 +1059,9 @@ html[data-theme="dark"] .brandLogo--dark {
 .importResumeDropzone {
   position: relative;
   display: grid;
-  gap: 8px;
+  place-items: center;
+  gap: 10px;
+  min-height: 132px;
   padding: var(--space-5);
   border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-lg);
@@ -1083,23 +1089,60 @@ html[data-theme="dark"] .brandLogo--dark {
   cursor: pointer;
 }
 
+.importResumeDropzoneIcon {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  transition:
+    transform var(--transition-fast),
+    color var(--transition-base);
+}
+
+.importResumeDropzone:hover .importResumeDropzoneIcon,
+.importResumeDropzone:focus-within .importResumeDropzoneIcon {
+  transform: translateY(-1px);
+}
+
+.importResumeDropzoneIcon svg {
+  display: block;
+  width: 82px;
+  height: 82px;
+}
+
+.importResumeIconPage {
+  fill: var(--color-accent-soft);
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.importResumeIconFold,
+.importResumeIconArrow,
+.importResumeIconTray {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+}
+
 .importResumeDropzoneTitle {
   position: relative;
   z-index: 1;
+  max-width: 100%;
   overflow: hidden;
+  color: var(--color-text-subtle);
   font-size: 0.95rem;
   font-weight: 800;
   line-height: 1.2;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.importResumeDropzoneHint {
-  position: relative;
-  z-index: 1;
-  color: var(--color-text-subtle);
-  font-size: 0.82rem;
-  line-height: 1.45;
 }
 
 .importResumeActions {
