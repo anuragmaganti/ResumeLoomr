@@ -1,5 +1,7 @@
 import { KeyboardSensor, PointerSensor } from '@dnd-kit/core';
 
+const keyboardActivator = KeyboardSensor.activators[0];
+
 function isDragBlocked(event) {
   const target = event?.target instanceof Element ? event.target : null;
 
@@ -18,8 +20,14 @@ export class ResumeLoomrPointerSensor extends PointerSensor {
 export class ResumeLoomrKeyboardSensor extends KeyboardSensor {
   static activators = [
     {
-      eventName: 'onKeyDown',
-      handler: ({ nativeEvent }) => !isDragBlocked(nativeEvent),
+      eventName: keyboardActivator.eventName,
+      handler: (event, options, context) => {
+        if (isDragBlocked(event.nativeEvent)) {
+          return false;
+        }
+
+        return keyboardActivator.handler(event, options, context);
+      },
     },
   ];
 }
