@@ -147,6 +147,12 @@ test('normalizeDraftPayload creates block-only drafts and fills missing defaults
           title: 'Internships',
           entries: [{ company: 'Analytical Engines', role: 'Intern' }],
         },
+        {
+          id: 'custom-notes',
+          kind: 'custom',
+          title: 'Professional Affiliations',
+          entries: [{ title: 'Association for Computing', subtitle: 'Member' }],
+        },
       ],
     },
   });
@@ -155,8 +161,10 @@ test('normalizeDraftPayload creates block-only drafts and fills missing defaults
   assert.equal(normalized.template, DEFAULT_TEMPLATE);
   assert.equal(normalized.resume.personal.name, 'Ada Lovelace');
   assert.equal(normalized.resume.settings.textSize, 5);
-  assert.deepEqual(normalized.resume.sections.map((section) => section.id), ['custom-work']);
+  assert.deepEqual(normalized.resume.sections.map((section) => section.id), ['custom-work', 'custom-notes']);
   assert.equal(normalized.resume.sections[0].entries[0].company, 'Analytical Engines');
+  assert.equal(normalized.resume.sections[0].entries[0].location, '');
+  assert.equal(normalized.resume.sections[1].entries[0].location, '');
   assert.equal(Object.hasOwn(normalized, 'section' + 'Order'), false);
 });
 
@@ -167,6 +175,7 @@ test('block actions update roles, education details, and list items', () => {
 
   resume = updateRoleBlockEntry(resume, 'experience', roleEntryId, 'company', 'Acme');
   resume = updateRoleBlockEntry(resume, 'experience', roleEntryId, 'role', 'Designer');
+  resume = updateRoleBlockEntry(resume, 'experience', roleEntryId, 'location', 'New York, NY');
   resume = updateRoleBlockActivity(resume, 'experience', roleEntryId, 0, 'Led redesign');
   resume = updateSectionBlockEntry(resume, 'education', educationEntryId, 'school', 'Example University');
   resume = updateSectionBlockEducationProgram(resume, 'education', educationEntryId, 0, 'degree', 'Ignored because no program exists');
@@ -174,6 +183,7 @@ test('block actions update roles, education details, and list items', () => {
   resume = updateSectionBlockEducationCustomSection(resume, 'education', educationEntryId, 0, 'content', 'Algorithms, HCI');
 
   assert.equal(getSection(resume, 'experience').entries[0].company, 'Acme');
+  assert.equal(getSection(resume, 'experience').entries[0].location, 'New York, NY');
   assert.equal(getSection(resume, 'experience').entries[0].activities[0], 'Led redesign');
   assert.equal(getSection(resume, 'education').entries[0].school, 'Example University');
   assert.equal(getSection(resume, 'education').entries[0].customSections[0].label, 'Coursework');
@@ -361,6 +371,12 @@ test('Erlich sample uses reference content and supports preview-only entry order
     ['Hacker Hostel', 'Founder / Resident Mentor'],
     ['Bachmanity Capital', 'Co-Founder / General Partner'],
   ]);
+  assert.deepEqual(roleBlock.entries.map((entry) => [entry.location, entry.yearsExp]), [
+    ['San Francisco, CA', '2018-2020'],
+    ['Palo Alto, CA', '2020-2022'],
+    ['5230 Newell Road, Palo Alto, CA', '2010-2016'],
+    ['Palo Alto, CA', '2016-2016'],
+  ]);
   assert.deepEqual(reorderedPreview.sectionBlocks.find((section) => section.id === roleBlock.id).entryOrder, [...roleIds].reverse());
   assert.equal(JSON.stringify(resume), before);
 });
@@ -391,7 +407,9 @@ test('each fictional sample renders multiple complete experience entries', () =>
     for (const entry of roleBlock.entries) {
       assert.ok(entry.company, `${sampleId} experience should include an organization`);
       assert.ok(entry.role, `${sampleId} experience should include a role title`);
-      assert.ok(entry.yearsExp, `${sampleId} experience should include date/location metadata`);
+      assert.ok(entry.location, `${sampleId} experience should include a location`);
+      assert.ok(entry.yearsExp, `${sampleId} experience should include date metadata`);
+      assert.equal(entry.yearsExp.includes('|'), false, `${sampleId} date field should not contain location separators`);
       assert.ok(entry.activities.length >= 2, `${sampleId} experience should include multiple highlights`);
     }
   }
@@ -763,7 +781,7 @@ test('source role compiler maps image-style company/date/role hierarchy into rol
         id: 'source-experience-1',
         title: 'EXPERIENCE',
         lines: [
-          'Aviato',
+          'Aviato | San Francisco, CA',
           '2018-2020',
           'Founder & CEO',
           '• Built a flight search company',
@@ -782,6 +800,7 @@ test('source role compiler maps image-style company/date/role hierarchy into rol
   assert.equal(roles.length, 2);
   assert.equal(roles[0].company, 'Aviato');
   assert.equal(roles[0].role, 'Founder & CEO');
+  assert.equal(roles[0].location, 'San Francisco, CA');
   assert.equal(roles[0].yearsExp, '2018-2020');
   assert.deepEqual(roles[0].activities.map((activity) => activity.text), [
     'Built a flight search company',

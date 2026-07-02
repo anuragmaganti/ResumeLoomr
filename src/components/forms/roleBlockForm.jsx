@@ -16,7 +16,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
           <CollapsibleEntryCard
             key={entry.id}
             summary={buildEntrySummary(
-              [entry.company, entry.role, entry.yearsExp],
+              [entry.company, entry.role, entry.location, entry.yearsExp],
               "Add organization, role, and dates"
             )}
             fallbackSummary="Add organization, role, and dates"
@@ -50,6 +50,35 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                 </div>
 
                 <div className="field">
+                  <label htmlFor={`role-title-${section.id}-${entry.id}`}>Role</label>
+                  <input
+                    type="text"
+                    id={`role-title-${section.id}-${entry.id}`}
+                    {...createEditorTargetAttributes(`${pathPrefix}.role`, { entryId: entry.id })}
+                    value={entry.role}
+                    onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'role', event.target.value)}
+                    onBlur={() => markTouched(`${pathPrefix}.role`)}
+                    placeholder="Role title"
+                  />
+                  <FormFieldError message={getFieldError(`${pathPrefix}.role`)} />
+                </div>
+              </div>
+
+              <div className="fieldGrid fieldGridTwo">
+                <div className="field">
+                  <label htmlFor={`role-location-${section.id}-${entry.id}`}>Location</label>
+                  <input
+                    type="text"
+                    id={`role-location-${section.id}-${entry.id}`}
+                    {...createEditorTargetAttributes(`${pathPrefix}.location`, { entryId: entry.id })}
+                    value={entry.location}
+                    onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'location', event.target.value)}
+                    onBlur={() => markTouched(`${pathPrefix}.location`)}
+                    placeholder="City, State"
+                  />
+                </div>
+
+                <div className="field">
                   <label htmlFor={`role-years-${section.id}-${entry.id}`}>Dates</label>
                   <input
                     type="text"
@@ -62,20 +91,6 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                   />
                   <FormFieldError message={getFieldError(`${pathPrefix}.yearsExp`)} />
                 </div>
-              </div>
-
-              <div className="field">
-                <label htmlFor={`role-title-${section.id}-${entry.id}`}>Role</label>
-                <input
-                  type="text"
-                  id={`role-title-${section.id}-${entry.id}`}
-                  {...createEditorTargetAttributes(`${pathPrefix}.role`, { entryId: entry.id })}
-                  value={entry.role}
-                  onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'role', event.target.value)}
-                  onBlur={() => markTouched(`${pathPrefix}.role`)}
-                  placeholder="Role title"
-                />
-                <FormFieldError message={getFieldError(`${pathPrefix}.role`)} />
               </div>
 
               <ReorderableTextList

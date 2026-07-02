@@ -564,7 +564,7 @@ function countImportedRoleEntries(block) {
   }
 
   return block.entries.filter((entry) => (
-    [entry.company, entry.role, entry.yearsExp].some((value) => trimText(value) !== '') ||
+    [entry.company, entry.role, entry.location, entry.yearsExp].some((value) => trimText(value) !== '') ||
     entry.activities.some((activity) => getImportedListItemText(activity) !== '')
   )).length;
 }
@@ -575,7 +575,7 @@ function importedRoleBlockHasMergedEntries(block) {
   }
 
   return block.entries.some((entry) => (
-    [entry.company, entry.role, entry.yearsExp].some((value) => /;\s*\S/.test(trimText(value)))
+    [entry.company, entry.role, entry.location, entry.yearsExp].some((value) => /;\s*\S/.test(trimText(value)))
   ));
 }
 
@@ -1531,12 +1531,11 @@ function parseRoleEntryLine(line) {
     }
   }
 
-  const yearsExp = [location, dateText].filter(Boolean).join(' | ');
-
   return {
     company,
     role,
-    yearsExp,
+    location,
+    yearsExp: dateText,
   };
 }
 
@@ -1672,12 +1671,13 @@ function compileRoleEntries(section) {
         id: `${section.id}-entry-${index + 1}`,
         company: parsedTitle.company || fallbackTitle,
         role,
+        location: parsedTitle.location,
         groupLabel: section.title,
         yearsExp: parsedTitle.yearsExp,
         activities: activities.length > 0 ? activities : [''],
       };
     })
-    .filter((entry) => [entry.company, entry.role, entry.yearsExp].some((value) => trimText(value) !== '') || entry.activities.some((activity) => trimText(activity) !== ''));
+    .filter((entry) => [entry.company, entry.role, entry.location, entry.yearsExp].some((value) => trimText(value) !== '') || entry.activities.some((activity) => trimText(activity) !== ''));
 }
 
 function parseInstitutionLine(line) {
@@ -2145,20 +2145,26 @@ function compileCustomEntries(section) {
       id: `${section.id}-entry-1`,
       title: section.title,
       subtitle: '',
+      location: '',
       years: '',
       details: '',
       highlights: [''],
     }];
   }
 
-  return sourceEntries.map((entry, index) => ({
-    id: `${section.id}-entry-${index + 1}`,
-    title: entry.titleLine || section.title,
-    subtitle: '',
-    years: '',
-    details: '',
-    highlights: entry.bullets.length > 0 ? entry.bullets : [''],
-  }));
+  return sourceEntries.map((entry, index) => {
+    const parsedTitle = parseRoleEntryLine([entry.titleLine, entry.dateLine].filter(Boolean).join(' '));
+
+    return {
+      id: `${section.id}-entry-${index + 1}`,
+      title: parsedTitle.company || entry.titleLine || section.title,
+      subtitle: parsedTitle.role || trimText(entry.roleLine),
+      location: parsedTitle.location,
+      years: parsedTitle.yearsExp,
+      details: '',
+      highlights: entry.bullets.length > 0 ? entry.bullets : [''],
+    };
+  });
 }
 
 function compileSourceSectionBlock(section, mapping, attachedCourseworkSections) {

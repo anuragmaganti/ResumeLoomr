@@ -444,7 +444,8 @@
   align-items: baseline;
 }
 
-.companyRoleLine {
+.companyRoleLine,
+.previewEntryTitleLine {
   min-width: 0;
 }
 
@@ -458,7 +459,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
+  gap: 0;
   min-width: 0;
 }
 
@@ -488,13 +489,32 @@
   font-weight: 600;
 }
 
-.role {
+.role,
+.customSubtitleYearsRow .previewEntrySubtitle {
   font-style: italic;
 }
 
 .yearsEdu,
 .yearsExp,
 .previewEntryMeta {
+  color: var(--resume-page-subtle);
+  font-size: var(--resume-meta-size);
+  line-height: var(--resume-detail-line-height);
+  white-space: nowrap;
+}
+
+.previewEntryMetaStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  color: var(--resume-page-subtle);
+  font-size: var(--resume-meta-size);
+  line-height: var(--resume-detail-line-height);
+  min-width: max-content;
+  text-align: right;
+}
+
+.previewEntryLocation {
   color: var(--resume-page-subtle);
   font-size: var(--resume-meta-size);
   line-height: var(--resume-detail-line-height);
@@ -509,13 +529,24 @@
   margin-top: var(--resume-detail-gap);
 }
 
-.educationGpa {
+.educationGpa,
+.educationGpaInline {
   line-height: var(--resume-detail-line-height);
 }
 
 .role,
-.previewEntrySubtitle {
+.previewEntrySubtitle:not(.previewEntrySubtitle--inline) {
   margin-top: max(0px, calc(var(--resume-detail-gap) - 2px));
+}
+
+.roleYearsExpFlex,
+.customSubtitleYearsRow {
+  margin-top: max(0px, calc(var(--resume-detail-gap) - 2px));
+}
+
+.roleYearsExpFlex .role,
+.customSubtitleYearsRow .previewEntrySubtitle {
+  margin-top: 0;
 }
 
 .schoolLocation {
@@ -545,6 +576,12 @@
   white-space: nowrap;
 }
 
+.eduLocation.previewEntryLocation {
+  color: var(--resume-page-subtle);
+  font-size: var(--resume-meta-size);
+  line-height: var(--resume-detail-line-height);
+}
+
 .educationMeta {
   display: flex;
   flex-wrap: wrap;
@@ -553,6 +590,7 @@
 }
 
 .educationDegreeRow .educationMeta {
+  display: inline;
   margin-top: 0;
 }
 
@@ -682,6 +720,12 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 2px;
+  }
+
+  .previewEntryMetaStack {
+    align-items: flex-start;
+    text-align: left;
+    min-width: 0;
   }
 
   .personalDetails {

@@ -974,91 +974,110 @@ export default function ResumePreview({
             >
                 {(entryHandleProps) => (
                     <>
-                        {(institution.school || institution.location || institution.yearsEdu) && (
+                        {(institution.school || institution.location) && (
                             <div className="degreeYearsEduFlex">
-                                {(institution.school || institution.location) && (
+                                {institution.school && (
                                     <div className="schoolLocation">
-                                        {institution.school && (
-                                            <span
-                                                className="school"
-                                                {...entryTarget(block.id, institution.id, 'school')}
-                                                {...entryHandleProps}
-                                            >
-                                                {renderTextWithCaret(institution.school, sectionEntryEditorPath(block.id, institution.id, 'school'))}
-                                            </span>
-                                        )}
-                                        {institution.location && (
-                                            <span className="eduLocation" {...entryTarget(block.id, institution.id, 'location')}>
-                                                {renderTextWithCaret(institution.location, sectionEntryEditorPath(block.id, institution.id, 'location'))}
-                                            </span>
-                                        )}
+                                        <span
+                                            className="school"
+                                            {...entryTarget(block.id, institution.id, 'school')}
+                                            {...entryHandleProps}
+                                        >
+                                            {renderTextWithCaret(institution.school, sectionEntryEditorPath(block.id, institution.id, 'school'))}
+                                        </span>
                                     </div>
                                 )}
-                                {institution.yearsEdu && (
-                                    <div className="yearsEdu" {...entryTarget(block.id, institution.id, 'yearsEdu')}>
-                                        {renderTextWithCaret(institution.yearsEdu, sectionEntryEditorPath(block.id, institution.id, 'yearsEdu'))}
+                                {institution.location && (
+                                    <div className="eduLocation previewEntryLocation" {...entryTarget(block.id, institution.id, 'location')}>
+                                        {renderTextWithCaret(institution.location, sectionEntryEditorPath(block.id, institution.id, 'location'))}
                                     </div>
                                 )}
                             </div>
                         )}
                         {institution.programs?.length > 0 ? (
-                            institution.programs.map((program, programIndex) => (
-                                <div className="schoolLocationRow" key={program.id}>
-                                    <div className="educationDegreeRow">
-                                        {program.degree && (
-                                            <div
-                                                className="degree"
-                                                {...nestedTarget(block.id, institution.id, `programs.${programIndex}.degree`)}
-                                            >
-                                                {renderTextWithCaret(program.degree, sectionEntryNestedEditorPath(block.id, institution.id, `programs.${programIndex}.degree`))}
-                                            </div>
-                                        )}
-                                        {program.honors && (
-                                            <div
-                                                className="educationMeta"
-                                                {...nestedTarget(block.id, institution.id, `programs.${programIndex}.honors`)}
-                                            >
-                                                <span>
-                                                    {renderTextWithCaret(program.honors, sectionEntryNestedEditorPath(block.id, institution.id, `programs.${programIndex}.honors`))}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    {(program.yearsEdu || program.gpa) && (
-                                        <div className="yearsEdu educationGpa">
-                                            {program.yearsEdu && (
-                                                <span {...nestedTarget(block.id, institution.id, `programs.${programIndex}.yearsEdu`)}>
-                                                    {renderTextWithCaret(program.yearsEdu, sectionEntryNestedEditorPath(block.id, institution.id, `programs.${programIndex}.yearsEdu`))}
+                            institution.programs.map((program, programIndex) => {
+                                const programYears = program.yearsEdu || (institution.programs.length === 1 ? institution.yearsEdu : '');
+                                const programYearsTarget = program.yearsEdu
+                                    ? nestedTarget(block.id, institution.id, `programs.${programIndex}.yearsEdu`)
+                                    : entryTarget(block.id, institution.id, 'yearsEdu');
+                                const programYearsPath = program.yearsEdu
+                                    ? sectionEntryNestedEditorPath(block.id, institution.id, `programs.${programIndex}.yearsEdu`)
+                                    : sectionEntryEditorPath(block.id, institution.id, 'yearsEdu');
+                                const programGpa = program.gpa || (institution.programs.length === 1 ? institution.gpa : '');
+                                const programGpaTarget = program.gpa
+                                    ? nestedTarget(block.id, institution.id, `programs.${programIndex}.gpa`)
+                                    : entryTarget(block.id, institution.id, 'gpa');
+                                const programGpaPath = program.gpa
+                                    ? sectionEntryNestedEditorPath(block.id, institution.id, `programs.${programIndex}.gpa`)
+                                    : sectionEntryEditorPath(block.id, institution.id, 'gpa');
+
+                                return (
+                                    <div className="schoolLocationRow" key={program.id}>
+                                        <div className="educationDegreeRow">
+                                            {program.degree && (
+                                                <span
+                                                    className="degree"
+                                                    {...nestedTarget(block.id, institution.id, `programs.${programIndex}.degree`)}
+                                                >
+                                                    {renderTextWithCaret(program.degree, sectionEntryNestedEditorPath(block.id, institution.id, `programs.${programIndex}.degree`))}
                                                 </span>
                                             )}
-                                            {program.yearsEdu && program.gpa ? <span> | </span> : null}
-                                            {program.gpa && (
-                                                <span {...nestedTarget(block.id, institution.id, `programs.${programIndex}.gpa`)}>
-                                                    {renderTextWithCaret(program.gpa, sectionEntryNestedEditorPath(block.id, institution.id, `programs.${programIndex}.gpa`), { prefix: 'GPA: ' })}
+                                            {programGpa && (
+                                                <span
+                                                    className="educationMeta educationGpaInline"
+                                                    {...programGpaTarget}
+                                                >
+                                                    {renderTextWithCaret(programGpa, programGpaPath, {
+                                                        prefix: program.degree ? ', GPA: ' : 'GPA: ',
+                                                    })}
+                                                </span>
+                                            )}
+                                            {program.honors && (
+                                                <span
+                                                    className="educationMeta"
+                                                    {...nestedTarget(block.id, institution.id, `programs.${programIndex}.honors`)}
+                                                >
+                                                    {renderTextWithCaret(program.honors, sectionEntryNestedEditorPath(block.id, institution.id, `programs.${programIndex}.honors`), {
+                                                        prefix: (program.degree || programGpa) ? ', ' : '',
+                                                    })}
                                                 </span>
                                             )}
                                         </div>
-                                    )}
-                                </div>
-                            ))
-                        ) : (
-                            (institution.degree || institution.honors || institution.gpa) && (
-                                <div className="schoolLocationRow">
-                                    <div className="educationDegreeRow">
-                                        {institution.degree && (
-                                            <div className="degree" {...entryTarget(block.id, institution.id, 'degree')}>
-                                                {renderTextWithCaret(institution.degree, sectionEntryEditorPath(block.id, institution.id, 'degree'))}
-                                            </div>
-                                        )}
-                                        {institution.honors && (
-                                            <div className="educationMeta" {...entryTarget(block.id, institution.id, 'honors')}>
-                                                <span>{renderTextWithCaret(institution.honors, sectionEntryEditorPath(block.id, institution.id, 'honors'))}</span>
+                                        {programYears && (
+                                            <div className="yearsEdu" {...programYearsTarget}>
+                                                {renderTextWithCaret(programYears, programYearsPath)}
                                             </div>
                                         )}
                                     </div>
-                                    {institution.gpa && (
-                                        <div className="yearsEdu educationGpa" {...entryTarget(block.id, institution.id, 'gpa')}>
-                                            {renderTextWithCaret(institution.gpa, sectionEntryEditorPath(block.id, institution.id, 'gpa'), { prefix: 'GPA: ' })}
+                                );
+                            })
+                        ) : (
+                            (institution.degree || institution.honors || institution.gpa || institution.yearsEdu) && (
+                                <div className="schoolLocationRow">
+                                    <div className="educationDegreeRow">
+                                        {institution.degree && (
+                                            <span className="degree" {...entryTarget(block.id, institution.id, 'degree')}>
+                                                {renderTextWithCaret(institution.degree, sectionEntryEditorPath(block.id, institution.id, 'degree'))}
+                                            </span>
+                                        )}
+                                        {institution.gpa && (
+                                            <span className="educationMeta educationGpaInline" {...entryTarget(block.id, institution.id, 'gpa')}>
+                                                {renderTextWithCaret(institution.gpa, sectionEntryEditorPath(block.id, institution.id, 'gpa'), {
+                                                    prefix: institution.degree ? ', GPA: ' : 'GPA: ',
+                                                })}
+                                            </span>
+                                        )}
+                                        {institution.honors && (
+                                            <span className="educationMeta" {...entryTarget(block.id, institution.id, 'honors')}>
+                                                {renderTextWithCaret(institution.honors, sectionEntryEditorPath(block.id, institution.id, 'honors'), {
+                                                    prefix: (institution.degree || institution.gpa) ? ', ' : '',
+                                                })}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {institution.yearsEdu && (
+                                        <div className="yearsEdu" {...entryTarget(block.id, institution.id, 'yearsEdu')}>
+                                            {renderTextWithCaret(institution.yearsEdu, sectionEntryEditorPath(block.id, institution.id, 'yearsEdu'))}
                                         </div>
                                     )}
                                 </div>
@@ -1130,29 +1149,37 @@ export default function ResumePreview({
             >
                 {(entryHandleProps) => (
                     <>
-                        {(job.company || job.role || job.yearsExp) && (
+                        {(job.company || job.location) && (
                             <div className="companyYearsExpFlex">
-                                {(job.company || job.role) && (
+                                {job.company && (
                                     <div className="companyRoleLine">
-                                        {job.company && (
-                                            <span
-                                                className="company"
-                                                {...entryTarget(block.id, job.id, 'company')}
-                                                {...entryHandleProps}
-                                            >
-                                                {renderTextWithCaret(job.company, sectionEntryEditorPath(block.id, job.id, 'company'))}
-                                            </span>
-                                        )}
-                                        {job.company && job.role && <span className="roleSeparator">, </span>}
-                                        {job.role && (
-                                            <span
-                                                className="role"
-                                                {...entryTarget(block.id, job.id, 'role')}
-                                                {...(!job.company ? entryHandleProps : {})}
-                                            >
-                                                {renderTextWithCaret(job.role, sectionEntryEditorPath(block.id, job.id, 'role'))}
-                                            </span>
-                                        )}
+                                        <span
+                                            className="company"
+                                            {...entryTarget(block.id, job.id, 'company')}
+                                            {...entryHandleProps}
+                                        >
+                                            {renderTextWithCaret(job.company, sectionEntryEditorPath(block.id, job.id, 'company'))}
+                                        </span>
+                                    </div>
+                                )}
+                                {job.location && (
+                                    <div className="previewEntryLocation" {...entryTarget(block.id, job.id, 'location')}>
+                                        {renderTextWithCaret(job.location, sectionEntryEditorPath(block.id, job.id, 'location'))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {(job.role || job.yearsExp || (!job.company && !job.location)) && (
+                            <div className="companyYearsExpFlex roleYearsExpFlex">
+                                {job.role && (
+                                    <div className="companyRoleLine">
+                                        <span
+                                            className="role"
+                                            {...entryTarget(block.id, job.id, 'role')}
+                                            {...(!job.company ? entryHandleProps : {})}
+                                        >
+                                            {renderTextWithCaret(job.role, sectionEntryEditorPath(block.id, job.id, 'role'))}
+                                        </span>
                                     </div>
                                 )}
                                 {job.yearsExp && (
@@ -1382,22 +1409,39 @@ export default function ResumePreview({
                 {(entryHandleProps) => (
                     <>
                         <div className="previewEntryHeader">
-                            <div
-                                className="previewEntryTitle"
-                                {...entryTarget(block.id, entry.id, 'title')}
-                                {...entryHandleProps}
-                            >
-                                {renderTextWithCaret(entry.title, sectionEntryEditorPath(block.id, entry.id, 'title'))}
+                            <div className="previewEntryTitleLine">
+                                <span
+                                    className="previewEntryTitle"
+                                    {...entryTarget(block.id, entry.id, 'title')}
+                                    {...entryHandleProps}
+                                >
+                                    {renderTextWithCaret(entry.title, sectionEntryEditorPath(block.id, entry.id, 'title'))}
+                                </span>
                             </div>
-                            {entry.years && (
-                                <div className="previewEntryMeta" {...entryTarget(block.id, entry.id, 'years')}>
-                                    {renderTextWithCaret(entry.years, sectionEntryEditorPath(block.id, entry.id, 'years'))}
+                            {entry.location && (
+                                <div className="previewEntryLocation" {...entryTarget(block.id, entry.id, 'location')}>
+                                    {renderTextWithCaret(entry.location, sectionEntryEditorPath(block.id, entry.id, 'location'))}
                                 </div>
                             )}
                         </div>
-                        {entry.subtitle && (
-                            <div className="previewEntrySubtitle" {...entryTarget(block.id, entry.id, 'subtitle')}>
-                                {renderTextWithCaret(entry.subtitle, sectionEntryEditorPath(block.id, entry.id, 'subtitle'))}
+                        {(entry.subtitle || entry.years) && (
+                            <div className="previewEntryHeader customSubtitleYearsRow">
+                                {entry.subtitle && (
+                                    <div className="previewEntryTitleLine">
+                                        <span
+                                            className="previewEntrySubtitle"
+                                            {...entryTarget(block.id, entry.id, 'subtitle')}
+                                            {...(!entry.title ? entryHandleProps : {})}
+                                        >
+                                            {renderTextWithCaret(entry.subtitle, sectionEntryEditorPath(block.id, entry.id, 'subtitle'))}
+                                        </span>
+                                    </div>
+                                )}
+                                {entry.years && (
+                                    <div className="previewEntryMeta" {...entryTarget(block.id, entry.id, 'years')}>
+                                        {renderTextWithCaret(entry.years, sectionEntryEditorPath(block.id, entry.id, 'years'))}
+                                    </div>
+                                )}
                             </div>
                         )}
                         {entry.details && (

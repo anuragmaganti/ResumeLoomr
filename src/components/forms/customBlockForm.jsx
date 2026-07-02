@@ -16,7 +16,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
         <CollapsibleEntryCard
           key={entry.id}
           summary={buildEntrySummary(
-            [entry.title, entry.subtitle || entry.details, entry.years],
+            [entry.title, entry.subtitle, entry.location, entry.years, entry.details],
             "Add title and details"
           )}
           fallbackSummary="Add title and details"
@@ -34,19 +34,45 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
           expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
         >
           <form onSubmit={(event) => event.preventDefault()}>
+            <div className="field">
+              <label htmlFor={`custom-title-${section.id}-${entry.id}`}>Title</label>
+              <input
+                type="text"
+                id={`custom-title-${section.id}-${entry.id}`}
+                {...editorAttrs(entry.id, 'title')}
+                value={entry.title}
+                onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'title', event.target.value)}
+                onBlur={() => markTouched(pathFor(entry.id, 'title'))}
+                placeholder="Entry title"
+              />
+              <FormFieldError message={getFieldError(pathFor(entry.id, 'title'))} />
+            </div>
+
+            <div className="field">
+              <label htmlFor={`custom-subtitle-${section.id}-${entry.id}`}>Subtitle</label>
+              <input
+                type="text"
+                id={`custom-subtitle-${section.id}-${entry.id}`}
+                {...editorAttrs(entry.id, 'subtitle')}
+                value={entry.subtitle}
+                onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'subtitle', event.target.value)}
+                onBlur={() => markTouched(pathFor(entry.id, 'subtitle'))}
+                placeholder="Optional context"
+              />
+            </div>
+
             <div className="fieldGrid fieldGridTwo">
               <div className="field">
-                <label htmlFor={`custom-title-${section.id}-${entry.id}`}>Title</label>
+                <label htmlFor={`custom-location-${section.id}-${entry.id}`}>Location</label>
                 <input
                   type="text"
-                  id={`custom-title-${section.id}-${entry.id}`}
-                  {...editorAttrs(entry.id, 'title')}
-                  value={entry.title}
-                  onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'title', event.target.value)}
-                  onBlur={() => markTouched(pathFor(entry.id, 'title'))}
-                  placeholder="Entry title"
+                  id={`custom-location-${section.id}-${entry.id}`}
+                  {...editorAttrs(entry.id, 'location')}
+                  value={entry.location}
+                  onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'location', event.target.value)}
+                  onBlur={() => markTouched(pathFor(entry.id, 'location'))}
+                  placeholder="City, State"
                 />
-                <FormFieldError message={getFieldError(pathFor(entry.id, 'title'))} />
               </div>
 
               <div className="field">
@@ -61,19 +87,6 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                   placeholder="2024"
                 />
               </div>
-            </div>
-
-            <div className="field">
-              <label htmlFor={`custom-subtitle-${section.id}-${entry.id}`}>Subtitle</label>
-              <input
-                type="text"
-                id={`custom-subtitle-${section.id}-${entry.id}`}
-                {...editorAttrs(entry.id, 'subtitle')}
-                value={entry.subtitle}
-                onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'subtitle', event.target.value)}
-                onBlur={() => markTouched(pathFor(entry.id, 'subtitle'))}
-                placeholder="Optional context"
-              />
             </div>
 
             <div className="field">

@@ -328,6 +328,7 @@ function createRoleEntry(candidate = {}) {
     id: trimText(candidate.id) || createId(),
     company: asText(candidate.company || candidate.organization || candidate.employer),
     role: asText(candidate.role || candidate.title),
+    location: asText(candidate.location),
     yearsExp: asText(candidate.yearsExp || candidate.years || candidate.dates),
     activities: normalizeStringList(candidate.activities || candidate.highlights),
   };
@@ -399,6 +400,7 @@ function createCustomEntry(candidate = {}) {
     id: trimText(candidate.id) || createId(),
     title: asText(candidate.title || candidate.name),
     subtitle: asText(candidate.subtitle),
+    location: asText(candidate.location),
     years: asText(candidate.years || candidate.dates),
     details: asText(candidate.details || candidate.summary),
     highlights: normalizeStringList(candidate.highlights || candidate.activities),
@@ -1120,7 +1122,7 @@ export function educationEntryHasContent(entry) {
 }
 
 export function roleEntryHasContent(entry) {
-  return entryHasTextContent(entry, ['company', 'role', 'yearsExp']) || listHasContent(entry.activities);
+  return entryHasTextContent(entry, ['company', 'role', 'location', 'yearsExp']) || listHasContent(entry.activities);
 }
 
 export function skillsEntryHasContent(entry) {
@@ -1148,7 +1150,7 @@ export function publicationEntryHasContent(entry) {
 }
 
 function customEntryHasContent(entry) {
-  return entryHasTextContent(entry, ['title', 'subtitle', 'years', 'details']) || listHasContent(entry.highlights);
+  return entryHasTextContent(entry, ['title', 'subtitle', 'location', 'years', 'details']) || listHasContent(entry.highlights);
 }
 
 export function normalizeBulletText(value) {
@@ -1194,6 +1196,7 @@ function toPreviewRoleEntries(entries) {
       id: entry.id,
       company: trimText(entry.company),
       role: trimText(entry.role),
+      location: trimText(entry.location),
       yearsExp: trimText(entry.yearsExp),
       activities: toPreviewTextList(entry.activities),
     }));
@@ -1275,6 +1278,7 @@ function toPreviewCustomEntries(entries) {
       id: entry.id,
       title: trimText(entry.title),
       subtitle: trimText(entry.subtitle),
+      location: trimText(entry.location),
       years: trimText(entry.years),
       details: trimText(entry.details),
       highlights: toPreviewTextList(entry.highlights),
