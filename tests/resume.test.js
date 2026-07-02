@@ -72,6 +72,10 @@ import {
 import {
   validateImportResumeFile,
 } from '../src/lib/importResume.js';
+import {
+  createSamplePreviewModel,
+  getSampleResumeIndex,
+} from '../src/lib/sampleResumes.js';
 
 function getSection(resume, sectionId) {
   return resume.sections.find((section) => section.id === sectionId);
@@ -302,6 +306,103 @@ test('preview model renders ordered block sections and filters empty sections', 
   assert.deepEqual(preview.sectionBlocks[0].entries[0].activities, [
     { text: 'Built compilers', sourceIndex: 1 },
   ]);
+});
+
+test('sample resume selection is deterministic and render-only for empty resumes', () => {
+  const resume = createEmptyResume();
+  const before = JSON.stringify(resume);
+  const realPreview = getPreviewModel(resume);
+  const firstSample = createSamplePreviewModel(resume, 'resume-alpha', realPreview);
+  const secondSample = createSamplePreviewModel(resume, 'resume-alpha', realPreview);
+  const roleBlock = firstSample.sectionBlocks.find((section) => section.kind === 'roles');
+  const roleEntryId = roleBlock.entries[0].id;
+  const activityOrder = roleBlock.entries[0].activities.map((activity) => activity.sourceIndex);
+  const reorderedActivityOrder = [activityOrder[1], activityOrder[0], ...activityOrder.slice(2)];
+  const reorderedSample = createSamplePreviewModel(resume, 'resume-alpha', realPreview, {
+    [`${roleBlock.id}.${roleEntryId}.activities`]: reorderedActivityOrder,
+  });
+  const sampleIndexes = new Set(Array.from({ length: 32 }, (_, index) => getSampleResumeIndex(`resume-${index}`)));
+
+  assert.equal(JSON.stringify(resume), before);
+  assert.equal(firstSample.sampleId, secondSample.sampleId);
+  assert.equal(firstSample.hasContent, true);
+  assert.equal(firstSample.isSamplePreview, true);
+  assert.equal(firstSample.sectionBlocks.every((section) => resume.sections.some((realSection) => realSection.id === section.id)), true);
+  assert.deepEqual(reorderedSample.sectionBlocks.find((section) => section.id === roleBlock.id).entries[0].activities.map((activity) => activity.sourceIndex), reorderedActivityOrder);
+  assert.equal(sampleIndexes.size, 8);
+});
+
+test('Erlich sample uses reference content and supports preview-only entry order', () => {
+  const resume = createEmptyResume();
+  const before = JSON.stringify(resume);
+  const realPreview = getPreviewModel(resume);
+  const preview = createSamplePreviewModel(resume, 'resume-5', realPreview);
+  const educationBlock = preview.sectionBlocks.find((section) => section.kind === 'education');
+  const roleBlock = preview.sectionBlocks.find((section) => section.id === 'experience');
+  const roleIds = roleBlock.entries.map((entry) => entry.id);
+  const reorderedPreview = createSamplePreviewModel(resume, 'resume-5', realPreview, {
+    [`${roleBlock.id}.entries`]: [...roleIds].reverse(),
+  });
+
+  assert.equal(preview.sampleId, 'erlich-bachman');
+  assert.equal(preview.personal.aboutMe.includes('identifying genius, housing genius'), true);
+  assert.equal(educationBlock.entries[0].coursework.includes('Ethics of Taking 10% for Advising'), true);
+  assert.deepEqual(educationBlock.entries[0].customSections, [
+    {
+      id: educationBlock.entries[0].customSections[0].id,
+      label: 'Additional Academic Exposure',
+      content: 'University of California, Berkeley, Reed College, Oberlin College',
+    },
+  ]);
+  assert.equal(roleBlock.entries.length, 4);
+  assert.deepEqual(roleBlock.entries.map((entry) => [entry.company, entry.role]), [
+    ['Aviato', 'Founder & CEO'],
+    ['Pied Piper', 'Board Member / 10% Stakeholder'],
+    ['Hacker Hostel', 'Founder / Resident Mentor'],
+    ['Bachmanity Capital', 'Co-Founder / General Partner'],
+  ]);
+  assert.deepEqual(reorderedPreview.sectionBlocks.find((section) => section.id === roleBlock.id).entryOrder, [...roleIds].reverse());
+  assert.equal(JSON.stringify(resume), before);
+});
+
+test('each fictional sample renders multiple complete experience entries', () => {
+  const previewsBySampleId = new Map();
+
+  for (let index = 0; index < 128 && previewsBySampleId.size < 8; index += 1) {
+    const resume = createEmptyResume();
+    const before = JSON.stringify(resume);
+    const preview = createSamplePreviewModel(resume, `resume-${index}`, getPreviewModel(resume));
+
+    if (!previewsBySampleId.has(preview.sampleId)) {
+      previewsBySampleId.set(preview.sampleId, preview);
+    }
+
+    assert.equal(JSON.stringify(resume), before);
+  }
+
+  assert.equal(previewsBySampleId.size, 8);
+
+  for (const [sampleId, preview] of previewsBySampleId.entries()) {
+    const roleBlock = preview.sectionBlocks.find((section) => section.id === 'experience');
+
+    assert.ok(roleBlock, `${sampleId} should render an experience block`);
+    assert.ok(roleBlock.entries.length >= 4, `${sampleId} should have fuller experience coverage`);
+
+    for (const entry of roleBlock.entries) {
+      assert.ok(entry.company, `${sampleId} experience should include an organization`);
+      assert.ok(entry.role, `${sampleId} experience should include a role title`);
+      assert.ok(entry.yearsExp, `${sampleId} experience should include date/location metadata`);
+      assert.ok(entry.activities.length >= 2, `${sampleId} experience should include multiple highlights`);
+    }
+  }
+});
+
+test('sample resume model is not used once real resume content exists', () => {
+  const resume = updatePersonalField(createEmptyResume(), 'name', 'Real Person');
+  const preview = getPreviewModel(resume);
+
+  assert.equal(preview.hasContent, true);
+  assert.equal(createSamplePreviewModel(resume, 'resume-alpha', preview), null);
 });
 
 test('validateResume uses block editor paths', () => {

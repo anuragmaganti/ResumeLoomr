@@ -40,6 +40,22 @@
     box-shadow var(--transition-base);
 }
 
+.sampleResumeNotice {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto var(--resume-section-gap);
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--resume-page-heading) 18%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--resume-page-heading) 7%, transparent);
+  color: var(--resume-page-muted);
+  font-size: calc(var(--resume-meta-size) * 0.92);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .previewToolbar {
   position: absolute;
   top: 12px;
@@ -685,7 +701,12 @@
   }
 
   .previewToolbar,
-  .resumePageMarkers {
+  .resumePageMarkers,
+  .sampleResumeNotice {
+    display: none !important;
+  }
+
+  .resumePage--sample {
     display: none !important;
   }
 

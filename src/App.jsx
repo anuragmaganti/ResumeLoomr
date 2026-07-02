@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css'
 import './styles/buttons.css'
 import './styles/forms.css'
@@ -15,6 +15,7 @@ import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
 import { importResumeFile } from './lib/importResume.js';
 import { clearResumeSyncSession } from './lib/backgroundSync.js';
+import { createSamplePreviewModel } from './lib/sampleResumes.js';
 import {
   clearBrowserResumeConnectionData,
   clearLocalResumeWorkspaceData,
@@ -25,6 +26,46 @@ import {
 } from './lib/browserConnection.js';
 
 const THEME_STORAGE_KEY = 'resumeloomr:theme';
+const EMPTY_SAMPLE_ORDER_OVERRIDES = {};
+
+function sampleTextListOrderKey(sectionId, entryId, field) {
+  return `${sectionId}.${entryId}.${field}`;
+}
+
+function sampleEntryOrderKey(sectionId) {
+  return `${sectionId}.entries`;
+}
+
+function getPreviewEntryOrder(previewModel, sectionId) {
+  const block = previewModel?.sectionBlocks?.find((section) => section.id === sectionId);
+  const entries = Array.isArray(block?.entries) ? block.entries : [];
+
+  return entries.map((entry) => entry.id).filter(Boolean);
+}
+
+function getPreviewTextListOrder(previewModel, sectionId, entryId, field) {
+  const block = previewModel?.sectionBlocks?.find((section) => section.id === sectionId);
+  const entry = block?.entries?.find((sectionEntry) => sectionEntry.id === entryId);
+  const items = Array.isArray(entry?.[field]) ? entry[field] : [];
+
+  return items.map((item, index) => (
+    Number.isFinite(item?.sourceIndex) ? item.sourceIndex : index
+  ));
+}
+
+function moveSourceIndexWithinOrder(order, fromIndex, toIndex) {
+  const fromPosition = order.indexOf(fromIndex);
+  const toPosition = order.indexOf(toIndex);
+
+  if (fromPosition < 0 || toPosition < 0 || fromPosition === toPosition) {
+    return order;
+  }
+
+  const nextOrder = [...order];
+  const [item] = nextOrder.splice(fromPosition, 1);
+  nextOrder.splice(toPosition, 0, item);
+  return nextOrder;
+}
 
 function App() {
   const previewPanelRef = useRef(null);
@@ -44,6 +85,7 @@ function App() {
   const [previewEditTarget, setPreviewEditTarget] = useState(null);
   const [editorCaretTarget, setEditorCaretTarget] = useState(null);
   const [previewLayout, setPreviewLayout] = useState({ mode: 'fitWidth', width: 0 });
+  const [sampleOrderOverridesByResumeId, setSampleOrderOverridesByResumeId] = useState({});
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') {
       return 'light';
@@ -112,6 +154,15 @@ function App() {
     user: builderUser,
     authReady: auth.authReady,
   });
+  const sampleOrderOverrides = activeResumeId
+    ? sampleOrderOverridesByResumeId[activeResumeId] || EMPTY_SAMPLE_ORDER_OVERRIDES
+    : EMPTY_SAMPLE_ORDER_OVERRIDES;
+  const samplePreviewModel = useMemo(
+    () => createSamplePreviewModel(resume, activeResumeId, previewModel, sampleOrderOverrides),
+    [activeResumeId, previewModel, resume, sampleOrderOverrides],
+  );
+  const displayPreviewModel = samplePreviewModel || previewModel;
+  const isSamplePreview = Boolean(samplePreviewModel);
   const isImportingResume = importState.status === 'processing';
 
   useEffect(() => {
@@ -179,7 +230,7 @@ function App() {
       observer.disconnect();
       window.removeEventListener('resize', syncEditorHeight);
     };
-  }, [template, previewModel]);
+  }, [template, displayPreviewModel]);
 
   useEffect(() => {
     function restoreDocumentTitle() {
@@ -233,6 +284,63 @@ function App() {
       ));
     });
   }, []);
+
+  const handlePreviewReorderSectionTextList = useCallback((sectionId, entryId, field, fromIndex, toIndex) => {
+    if (!isSamplePreview) {
+      actions.reorderSectionTextList(sectionId, entryId, field, fromIndex, toIndex);
+      return;
+    }
+
+    const currentOrder = getPreviewTextListOrder(displayPreviewModel, sectionId, entryId, field);
+    const nextOrder = moveSourceIndexWithinOrder(currentOrder, fromIndex, toIndex);
+
+    if (nextOrder === currentOrder || !activeResumeId) {
+      return;
+    }
+
+    const orderKey = sampleTextListOrderKey(sectionId, entryId, field);
+
+    setSampleOrderOverridesByResumeId((currentOverrides) => ({
+      ...currentOverrides,
+      [activeResumeId]: {
+        ...(currentOverrides[activeResumeId] || {}),
+        [orderKey]: nextOrder,
+      },
+    }));
+  }, [actions, activeResumeId, displayPreviewModel, isSamplePreview]);
+
+  const handlePreviewReorderSectionEntries = useCallback((sectionId, nextEntryIds) => {
+    if (!isSamplePreview) {
+      actions.reorderSectionEntries(sectionId, nextEntryIds);
+      return;
+    }
+
+    const currentOrder = getPreviewEntryOrder(displayPreviewModel, sectionId);
+    const nextOrder = Array.isArray(nextEntryIds) ? nextEntryIds.filter(Boolean) : [];
+
+    if (
+      !activeResumeId ||
+      currentOrder.length !== nextOrder.length ||
+      currentOrder.every((entryId, index) => entryId === nextOrder[index])
+    ) {
+      return;
+    }
+
+    const currentIdSet = new Set(currentOrder);
+    if (!nextOrder.every((entryId) => currentIdSet.has(entryId))) {
+      return;
+    }
+
+    const orderKey = sampleEntryOrderKey(sectionId);
+
+    setSampleOrderOverridesByResumeId((currentOverrides) => ({
+      ...currentOverrides,
+      [activeResumeId]: {
+        ...(currentOverrides[activeResumeId] || {}),
+        [orderKey]: nextOrder,
+      },
+    }));
+  }, [actions, activeResumeId, displayPreviewModel, isSamplePreview]);
 
   const handlePreviewLayoutChange = useCallback((nextLayout) => {
     setPreviewLayout((currentLayout) => (
@@ -619,15 +727,16 @@ function App() {
 
           <div className={`workspaceColumn workspaceColumnPreview ${mobileView === 'editor' ? 'isMobileHidden' : ''}`}>
             <ResumePreview
-              previewModel={previewModel}
+              previewModel={displayPreviewModel}
               template={template}
               settings={resume.settings}
+              isSamplePreview={isSamplePreview}
               panelRef={previewPanelRef}
               onEditTarget={handlePreviewEditTarget}
               onLayoutChange={handlePreviewLayoutChange}
               onReorderSections={reorderSections}
-              onReorderSectionEntries={actions.reorderSectionEntries}
-              onReorderSectionTextList={actions.reorderSectionTextList}
+              onReorderSectionEntries={handlePreviewReorderSectionEntries}
+              onReorderSectionTextList={handlePreviewReorderSectionTextList}
               activeEditorCaret={editorCaretTarget}
             />
           </div>

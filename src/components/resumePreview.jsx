@@ -345,6 +345,7 @@ export default function ResumePreview({
     previewModel,
     template,
     settings,
+    isSamplePreview = false,
     panelRef,
     onEditTarget,
     onLayoutChange,
@@ -586,6 +587,7 @@ export default function ResumePreview({
         const text = value === undefined || value === null ? '' : String(value);
         const displayText = text || fallback;
         const shouldShowCaret = (
+            !isSamplePreview &&
             !activeDragMeta?.type &&
             activeEditorCaret?.path === path &&
             Number.isFinite(activeEditorCaret.offset)
@@ -1653,7 +1655,7 @@ export default function ResumePreview({
                             <div className="previewPageScaleLayer">
                                 <div
                                     ref={resumeRef}
-                                    className={`resumePage ${templateClassName(template)}`}
+                                    className={`resumePage ${templateClassName(template)}${isSamplePreview ? ' resumePage--sample' : ''}`}
                                     style={presentationVars}
                                     onClick={handlePreviewClick}
                                     onPointerDownCapture={handlePreviewDragHandleCapture}
@@ -1667,6 +1669,11 @@ export default function ResumePreview({
                                             onDragCancel={handlePreviewDragCancel}
                                             onDragEnd={handlePreviewDragEnd}
                                         >
+                                            {isSamplePreview && (
+                                                <div className="sampleResumeNotice">
+                                                    {previewModel.sampleNotice || 'Sample resume - disappears when you start editing.'}
+                                                </div>
+                                            )}
                                             {orderedSections}
                                             {typeof document === 'undefined' ? previewDragOverlay : createPortal(previewDragOverlay, document.body)}
                                         </DndContext>
