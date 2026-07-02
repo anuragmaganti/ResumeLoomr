@@ -62,19 +62,19 @@ export default function ImportResumeModal({
         </div>
 
         <p className="authIntro">
-          Upload a PDF or DOCX under 3 MB. ResumeLoomr will create a new resume and place the extracted details into the editor.
+          Upload a PDF, DOCX, PNG, JPG, or JPEG under 3 MB. ResumeLoomr will create a new resume and place the extracted details into the editor.
         </p>
 
         <form className="importResumeForm" onSubmit={handleSubmit}>
           <label className="importResumeDropzone">
             <input
               type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept=".pdf,.docx,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg"
               onChange={handleFileChange}
               disabled={busy}
             />
             <span className="importResumeDropzoneTitle">
-              {selectedFile ? selectedFile.name : 'Choose PDF or DOCX'}
+              {selectedFile ? selectedFile.name : 'Choose PDF, DOCX, PNG, JPG, or JPEG'}
             </span>
             <span className="importResumeDropzoneHint">
               The upload is processed securely on the server. Your AI key is never sent to this browser.

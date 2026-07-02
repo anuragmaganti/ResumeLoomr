@@ -63,11 +63,15 @@ import {
   assessExtractedResumeText,
   compileSourceDocumentToImportedDraft,
   createGeminiImportGenerationConfig,
+  createImageSourceDocumentGeminiContents,
   createSourceDocumentCoverage,
   createSourceDocumentFromText,
   normalizeImportFilePayload,
   validateImportedDraftCoverage,
 } from '../server/importResume.js';
+import {
+  validateImportResumeFile,
+} from '../src/lib/importResume.js';
 
 function getSection(resume, sectionId) {
   return resume.sections.find((section) => section.id === sectionId);
@@ -549,7 +553,7 @@ test('import file normalization rejects unsupported or oversized uploads', () =>
       mimeType: 'text/plain',
       fileDataBase64: Buffer.from('plain text').toString('base64'),
     }),
-    /PDF or DOCX/,
+    /PDF, DOCX, PNG, JPG, or JPEG/,
   );
 
   assert.throws(
@@ -560,6 +564,49 @@ test('import file normalization rejects unsupported or oversized uploads', () =>
     }),
     /3 MB/,
   );
+});
+
+test('import file validation accepts PDF DOCX PNG JPG and JPEG files', () => {
+  assert.equal(validateImportResumeFile({ name: 'resume.pdf', type: 'application/pdf', size: 12 }), '');
+  assert.equal(validateImportResumeFile({ name: 'resume.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 12 }), '');
+  assert.equal(validateImportResumeFile({ name: 'resume.png', type: 'image/png', size: 12 }), '');
+  assert.equal(validateImportResumeFile({ name: 'resume.jpg', type: 'image/jpeg', size: 12 }), '');
+  assert.equal(validateImportResumeFile({ name: 'resume.jpeg', type: 'image/jpeg', size: 12 }), '');
+  assert.match(validateImportResumeFile({ name: 'resume.gif', type: 'image/gif', size: 12 }), /PDF, DOCX, PNG, JPG, or JPEG/);
+});
+
+test('server import file normalization accepts image resumes and rejects mismatched MIME types', () => {
+  const pngPayload = normalizeImportFilePayload({
+    fileName: 'resume.png',
+    mimeType: 'image/png',
+    fileDataBase64: Buffer.from('png bytes').toString('base64'),
+  });
+  const jpgPayload = normalizeImportFilePayload({
+    fileName: 'resume.jpg',
+    mimeType: 'application/octet-stream',
+    fileDataBase64: Buffer.from('jpg bytes').toString('base64'),
+  });
+
+  assert.equal(pngPayload.mimeType, 'image/png');
+  assert.equal(jpgPayload.mimeType, 'image/jpeg');
+  assert.throws(
+    () => normalizeImportFilePayload({
+      fileName: 'resume.png',
+      mimeType: 'application/pdf',
+      fileDataBase64: Buffer.from('not png').toString('base64'),
+    }),
+    /PDF, DOCX, PNG, JPG, or JPEG/,
+  );
+});
+
+test('image source document Gemini contents put instructions before inline image data', () => {
+  const contents = createImageSourceDocumentGeminiContents({
+    mimeType: 'image/jpeg',
+    base64: Buffer.from('image bytes').toString('base64'),
+  });
+
+  assert.equal(contents[0].text.includes('Transcribe this resume image'), true);
+  assert.equal(contents[1].inlineData.mimeType, 'image/jpeg');
 });
 
 test('PDF text assessment accepts resume-like text and rejects empty extraction', () => {
@@ -605,6 +652,93 @@ test('source document compiler preserves section order and block kinds', () => {
     { text: 'Built internal tools', sourceIndex: 0 },
     { text: 'Improved performance', sourceIndex: 1 },
   ]);
+});
+
+test('source role compiler maps image-style company/date/role hierarchy into role fields', () => {
+  const source = {
+    personalLines: ['Example Person'],
+    sections: [
+      {
+        id: 'source-experience-1',
+        title: 'EXPERIENCE',
+        lines: [
+          'Aviato',
+          '2018-2020',
+          'Founder & CEO',
+          '• Built a flight search company',
+          '• Led founder strategy',
+          'Pied Piper',
+          '2020-2022',
+          'Board Member / 10% Stakeholder',
+          '• Advised the executive team',
+        ],
+      },
+    ],
+  };
+  const result = compileSourceDocumentToImportedDraft(source, null, { sourceFileName: 'example.png' });
+  const roles = getPreviewModel(result.draft.resume).sectionBlocks[0].entries;
+
+  assert.equal(roles.length, 2);
+  assert.equal(roles[0].company, 'Aviato');
+  assert.equal(roles[0].role, 'Founder & CEO');
+  assert.equal(roles[0].yearsExp, '2018-2020');
+  assert.deepEqual(roles[0].activities.map((activity) => activity.text), [
+    'Built a flight search company',
+    'Led founder strategy',
+  ]);
+  assert.equal(roles[1].company, 'Pied Piper');
+  assert.equal(roles[1].role, 'Board Member / 10% Stakeholder');
+  assert.equal(roles[1].yearsExp, '2020-2022');
+});
+
+test('source role compiler promotes title-like first activities as a safety fallback', () => {
+  const source = {
+    personalLines: ['Example Person'],
+    sections: [
+      {
+        id: 'source-experience-1',
+        title: 'EXPERIENCE',
+        lines: [
+          'Example Labs 2021-2024',
+          '• Chief Strategist',
+          '• Built planning systems',
+        ],
+      },
+    ],
+  };
+  const result = compileSourceDocumentToImportedDraft(source, null, { sourceFileName: 'example.png' });
+  const role = getPreviewModel(result.draft.resume).sectionBlocks[0].entries[0];
+
+  assert.equal(role.company, 'Example Labs');
+  assert.equal(role.role, 'Chief Strategist');
+  assert.deepEqual(role.activities.map((activity) => activity.text), ['Built planning systems']);
+});
+
+test('source education compiler keeps academic exposure labels inside the current school', () => {
+  const source = {
+    personalLines: ['Example Person'],
+    sections: [
+      {
+        id: 'source-education-1',
+        title: 'EDUCATION',
+        lines: [
+          'Hampshire College Amherst, MA 2014-2018',
+          'B.A. Ultimate Frisbee',
+          'Relevant coursework: Applied Synergy, Ethics',
+          'Additional Academic Exposure: University of California, Berkeley, Reed College',
+        ],
+      },
+    ],
+  };
+  const result = compileSourceDocumentToImportedDraft(source, null, { sourceFileName: 'example.png' });
+  const educationEntries = getPreviewModel(result.draft.resume).sectionBlocks[0].entries;
+
+  assert.equal(educationEntries.length, 1);
+  assert.equal(educationEntries[0].school, 'Hampshire College');
+  assert.ok(educationEntries[0].customSections.some((section) => (
+    section.label === 'Additional Academic Exposure' &&
+    section.content.includes('University of California')
+  )));
 });
 
 test('source coverage warnings are non-blocking when content is preserved', () => {

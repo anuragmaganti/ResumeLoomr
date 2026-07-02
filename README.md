@@ -73,7 +73,7 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 
 ### AI Resume Import
 
-- Signed-in users can import existing resumes from PDF or DOCX.
+- Signed-in users can import existing resumes from PDF, DOCX, PNG, JPG, or JPEG.
 - Guests see the same import action, but it opens the sign-in modal first.
 - Files are sent to a secure Vercel API route; Gemini and Firebase Admin secrets are never exposed to the browser bundle.
 - Readable PDFs are text-extracted first for lower latency and cost.

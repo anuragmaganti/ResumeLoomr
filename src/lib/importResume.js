@@ -2,7 +2,17 @@ export const IMPORT_RESUME_MAX_BYTES = 3 * 1024 * 1024;
 
 const PDF_MIME_TYPE = 'application/pdf';
 const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-const SUPPORTED_EXTENSIONS = ['pdf', 'docx'];
+const PNG_MIME_TYPE = 'image/png';
+const JPEG_MIME_TYPE = 'image/jpeg';
+const OCTET_STREAM_MIME_TYPE = 'application/octet-stream';
+const SUPPORTED_FILE_TYPES_LABEL = 'PDF, DOCX, PNG, JPG, or JPEG';
+const SUPPORTED_EXTENSION_MIME_TYPES = {
+  pdf: new Set([PDF_MIME_TYPE, OCTET_STREAM_MIME_TYPE]),
+  docx: new Set([DOCX_MIME_TYPE, OCTET_STREAM_MIME_TYPE]),
+  png: new Set([PNG_MIME_TYPE, OCTET_STREAM_MIME_TYPE]),
+  jpg: new Set([JPEG_MIME_TYPE, OCTET_STREAM_MIME_TYPE]),
+  jpeg: new Set([JPEG_MIME_TYPE, OCTET_STREAM_MIME_TYPE]),
+};
 
 function getExtension(fileName) {
   const match = String(fileName || '').toLowerCase().match(/\.([a-z0-9]+)$/);
@@ -11,8 +21,9 @@ function getExtension(fileName) {
 
 function isSupportedResumeFile(file) {
   const extension = getExtension(file?.name);
+  const supportedMimeTypes = SUPPORTED_EXTENSION_MIME_TYPES[extension];
 
-  if (!SUPPORTED_EXTENSIONS.includes(extension)) {
+  if (!supportedMimeTypes) {
     return false;
   }
 
@@ -20,20 +31,16 @@ function isSupportedResumeFile(file) {
     return true;
   }
 
-  return (
-    file.type === PDF_MIME_TYPE ||
-    file.type === DOCX_MIME_TYPE ||
-    file.type === 'application/octet-stream'
-  );
+  return supportedMimeTypes.has(file.type);
 }
 
 export function validateImportResumeFile(file) {
   if (!file) {
-    return 'Choose a PDF or DOCX resume first.';
+    return `Choose a ${SUPPORTED_FILE_TYPES_LABEL} resume first.`;
   }
 
   if (!isSupportedResumeFile(file)) {
-    return 'Upload a PDF or DOCX resume file.';
+    return `Upload a ${SUPPORTED_FILE_TYPES_LABEL} resume file.`;
   }
 
   if (file.size <= 0) {
