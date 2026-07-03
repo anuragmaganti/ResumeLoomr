@@ -51,20 +51,63 @@ html[data-theme="dark"] .resumePage {
   --preview-edit-pulse-ring: color-mix(in srgb, #93c5fd 28%, transparent);
 }
 
-.sampleResumeNotice {
+.sampleInformationToggle {
+  position: absolute;
+  top: 12px;
+  left: 12px;
   display: flex;
   align-items: center;
-  width: fit-content;
-  max-width: 100%;
-  margin: 0 auto var(--resume-section-gap);
-  padding: 4px 9px;
-  border: 1px solid color-mix(in srgb, var(--resume-page-heading) 18%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--resume-page-heading) 7%, transparent);
+  gap: 7px;
+  max-width: calc(100% - 24px);
+  padding: 6px 9px 6px 7px;
+  border: 1px solid color-mix(in srgb, var(--resume-page-heading) 16%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--resume-page-bg) 88%, transparent);
   color: var(--resume-page-muted);
-  font-size: calc(var(--resume-meta-size) * 0.92);
+  font-size: calc(var(--resume-meta-size) * 0.94);
   font-weight: 700;
-  letter-spacing: 0.02em;
+  line-height: 1;
+  box-shadow: 0 10px 24px color-mix(in srgb, #0f172a 10%, transparent);
+  cursor: pointer;
+  user-select: none;
+  z-index: 5;
+}
+
+.sampleInformationToggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sampleInformationSwitch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--resume-page-muted) 28%, transparent);
+  transition: background-color var(--transition-base);
+}
+
+.sampleInformationSwitch::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--resume-page-bg);
+  box-shadow: 0 1px 3px color-mix(in srgb, #0f172a 24%, transparent);
+  content: "";
+  transition: transform var(--transition-base);
+}
+
+.sampleInformationToggle input:checked + .sampleInformationSwitch {
+  background: color-mix(in srgb, var(--color-accent) 78%, var(--resume-page-muted));
+}
+
+.sampleInformationToggle input:checked + .sampleInformationSwitch::after {
+  transform: translateX(12px);
 }
 
 .previewToolbar {
@@ -691,11 +734,41 @@ html[data-theme="dark"] .resumePage {
 .resumeEmptyState {
   display: grid;
   justify-items: center;
-  align-content: start;
+  align-content: center;
   gap: 6px;
-  min-height: 0;
+  min-height: calc(var(--resume-page-min-height) - var(--resume-page-margin-top) - var(--resume-page-margin-bottom));
   padding: 0;
   text-align: center;
+}
+
+.resumeEmptyState--choice {
+  gap: 18px;
+}
+
+.resumeEmptyState--blank {
+  visibility: hidden;
+}
+
+.resumeEmptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+}
+
+.resumeEmptyActions .button {
+  min-height: 44px;
+  padding-inline: 18px;
+  border-radius: 14px;
+}
+
+.resumeEmptyOr {
+  color: var(--resume-page-muted);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .resumeEmptyEyebrow {
@@ -793,11 +866,8 @@ html[data-theme="dark"] .resumePage {
 
   .previewToolbar,
   .resumePageMarkers,
-  .sampleResumeNotice {
-    display: none !important;
-  }
-
-  .resumePage--sample {
+  .sampleInformationToggle,
+  .resumeEmptyState {
     display: none !important;
   }
 

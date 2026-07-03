@@ -166,8 +166,6 @@ function ResumePillOverlay({ resume, isActive, style }) {
 
 export default function Header({
   onPrint,
-  onImportResume,
-  isImportingResume,
   resumeList,
   activeResumeId,
   activeResumeName,
@@ -383,17 +381,6 @@ export default function Header({
 
         <div className="topbarSide">
           <div className="topbarMeta">
-            <button
-              type="button"
-              className="button buttonPrimary importResumeButton"
-              onClick={onImportResume}
-              disabled={isImportingResume}
-            >
-              {isImportingResume ? (
-                <span className="buttonSpinner" aria-hidden="true" />
-              ) : null}
-              {isImportingResume ? 'Processing...' : 'Import your resume'}
-            </button>
             <button type="button" className="button buttonSecondary printButton" onClick={onPrint}>
               Print/Save
             </button>

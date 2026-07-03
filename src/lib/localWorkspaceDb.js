@@ -241,6 +241,24 @@ export function createDraftContentHash(draft) {
   return (hash >>> 0).toString(36);
 }
 
+function createDraftMergeContentHash(draft) {
+  const normalizedDraft = normalizeDraftState(draft);
+  const { sampleDisplay: _sampleDisplay, ...resumeForMerge } = normalizedDraft.resume || {};
+  const content = {
+    resume: resumeForMerge,
+    template: normalizedDraft.template,
+  };
+  const serialized = stableJson(content);
+  let hash = 2166136261;
+
+  for (let index = 0; index < serialized.length; index += 1) {
+    hash ^= serialized.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
 function draftHasVisibleText(draft) {
   const normalizedDraft = normalizeDraftPayload(draft);
   const personal = normalizedDraft.resume.personal || {};
@@ -799,17 +817,20 @@ export function mergeLocalAndCloudWorkspaces({
         return;
       }
 
-      const localHash = createDraftContentHash(localDraft);
-      const cloudHash = createDraftContentHash(cloudDraft);
+      const localHash = createDraftMergeContentHash(localDraft);
+      const cloudHash = createDraftMergeContentHash(cloudDraft);
+      const localFullHash = createDraftContentHash(localDraft);
+      const cloudFullHash = createDraftContentHash(cloudDraft);
 
       if (localHash === cloudHash) {
+        const localIsNewer = getDraftTimestamp(localDraft, normalizedLocalWorkspace.meta[resumeId]) >= getDraftTimestamp(cloudDraft, normalizedCloudWorkspace.meta[resumeId]);
+
         addResume({
           resumeId,
-          draft: getDraftTimestamp(localDraft, normalizedLocalWorkspace.meta[resumeId]) >= getDraftTimestamp(cloudDraft, normalizedCloudWorkspace.meta[resumeId])
-            ? localDraft
-            : cloudDraft,
+          draft: localIsNewer ? localDraft : cloudDraft,
           meta: localHasContent ? normalizedLocalWorkspace.meta[resumeId] : normalizedCloudWorkspace.meta[resumeId],
-          origin: 'cloud',
+          origin: localIsNewer && localFullHash !== cloudFullHash ? 'local' : 'cloud',
+          forceUpsert: localIsNewer && localFullHash !== cloudFullHash,
         });
         return;
       }

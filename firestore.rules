@@ -48,6 +48,16 @@ service cloud.firestore {
         isValidSetting(settings.nameSize);
     }
 
+    function isValidSampleDisplay(sampleDisplay) {
+      return sampleDisplay is map &&
+        sampleDisplay.keys().hasOnly([
+          'hasStarted',
+          'showInformation'
+        ]) &&
+        sampleDisplay.hasStarted is bool &&
+        sampleDisplay.showInformation is bool;
+    }
+
     function isValidMeta(meta, resumeIds) {
       return meta is map &&
         meta.keys().hasAll(resumeIds) &&
@@ -88,9 +98,10 @@ service cloud.firestore {
 
     function isValidResumeShape(resume) {
       return resume is map &&
-        resume.keys().hasOnly(['personal', 'settings', 'sections']) &&
+        resume.keys().hasOnly(['personal', 'settings', 'sampleDisplay', 'sections']) &&
         isValidPersonal(resume.personal) &&
         isValidSettings(resume.settings) &&
+        (!('sampleDisplay' in resume) || isValidSampleDisplay(resume.sampleDisplay)) &&
         isValidSections(resume.sections);
     }
 

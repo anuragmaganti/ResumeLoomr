@@ -65,6 +65,10 @@ function createResumeDoc(overrides = {}) {
         headingSize: 0,
         nameSize: 0,
       },
+      sampleDisplay: {
+        hasStarted: false,
+        showInformation: true,
+      },
       sections: [
         {
           id: 'experience',
@@ -107,6 +111,11 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
 
     await assertSucceeds(ownerDb.doc('users/user-a/workspace/main').set(createWorkspaceDoc()));
     await assertSucceeds(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc()));
+    await assertSucceeds(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: Object.fromEntries(
+        Object.entries(createResumeDoc().resume).filter(([key]) => key !== 'sampleDisplay'),
+      ),
+    })));
     await assertFails(otherDb.doc('users/user-a/resumes/resume-1').get());
     await assertFails(anonDb.doc('users/user-a/workspace/main').get());
     await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set({
@@ -148,6 +157,15 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
       resume: {
         ...createResumeDoc().resume,
         sections: [],
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        sampleDisplay: {
+          hasStarted: 'yes',
+          showInformation: true,
+        },
       },
     })));
     await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set({

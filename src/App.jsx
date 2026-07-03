@@ -15,7 +15,7 @@ import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
 import { importResumeFile } from './lib/importResume.js';
 import { clearResumeSyncSession } from './lib/backgroundSync.js';
-import { createSamplePlaceholderResolver, createSamplePreviewModel } from './lib/sampleResumes.js';
+import { createMixedSamplePreviewModel, createSamplePlaceholderResolver } from './lib/sampleResumes.js';
 import {
   clearBrowserResumeConnectionData,
   clearLocalResumeWorkspaceData,
@@ -159,9 +159,14 @@ function App() {
   const sampleOrderOverrides = activeResumeId
     ? sampleOrderOverridesByResumeId[activeResumeId] || EMPTY_SAMPLE_ORDER_OVERRIDES
     : EMPTY_SAMPLE_ORDER_OVERRIDES;
+  const sampleDisplay = resume.sampleDisplay || {};
+  const shouldShowEmptyResumeChoice = !previewModel.hasContent && !sampleDisplay.hasStarted;
+  const shouldShowSampleInformation = Boolean(sampleDisplay.hasStarted && sampleDisplay.showInformation);
   const samplePreviewModel = useMemo(
-    () => createSamplePreviewModel(resume, activeResumeId, previewModel, sampleOrderOverrides),
-    [activeResumeId, previewModel, resume, sampleOrderOverrides],
+    () => (shouldShowSampleInformation
+      ? createMixedSamplePreviewModel(resume, activeResumeId, previewModel, sampleOrderOverrides)
+      : null),
+    [activeResumeId, previewModel, resume, sampleOrderOverrides, shouldShowSampleInformation],
   );
   const samplePlaceholderFor = useMemo(
     () => createSamplePlaceholderResolver(resume, samplePreviewModel),
@@ -590,8 +595,6 @@ function App() {
       <div className="appShell">
         <Header
           onPrint={handlePrint}
-          onImportResume={handleImportResumeClick}
-          isImportingResume={isImportingResume}
           resumeList={resumeList}
           activeResumeId={activeResumeId}
           activeResumeName={activeResumeName}
@@ -759,6 +762,13 @@ function App() {
               onReorderSectionTextList={handlePreviewReorderSectionTextList}
               activeEditorCaret={editorCaretTarget}
               previewPulseTarget={previewPulseTarget}
+              showEmptyResumeChoice={shouldShowEmptyResumeChoice}
+              isImportingResume={isImportingResume}
+              showSampleInformationToggle={Boolean(sampleDisplay.hasStarted)}
+              showSampleInformation={shouldShowSampleInformation}
+              onImportResume={handleImportResumeClick}
+              onStartFromScratch={actions.startFromScratch}
+              onToggleSampleInformation={actions.setSampleInformationVisible}
             />
           </div>
         </main>

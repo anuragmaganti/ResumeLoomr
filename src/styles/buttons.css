@@ -355,14 +355,6 @@
   box-shadow: var(--shadow-xs);
 }
 
-.importResumeButton {
-  min-height: 34px;
-  padding: 0 10px;
-  border-radius: 10px;
-  font-size: 0.8125rem;
-  white-space: nowrap;
-}
-
 .buttonSpinner {
   width: 0.82em;
   height: 0.82em;

@@ -354,6 +354,13 @@ export default function ResumePreview({
     onReorderSectionTextList,
     activeEditorCaret,
     previewPulseTarget,
+    showEmptyResumeChoice = false,
+    isImportingResume = false,
+    showSampleInformationToggle = false,
+    showSampleInformation = true,
+    onImportResume,
+    onStartFromScratch,
+    onToggleSampleInformation,
 }) {
     const resumeRef = useRef(null);
     const previewFrameRef = useRef(null);
@@ -1694,6 +1701,55 @@ export default function ResumePreview({
         );
     }
 
+    function renderSampleInformationToggle() {
+        if (!showSampleInformationToggle || !onToggleSampleInformation) {
+            return null;
+        }
+
+        return (
+            <label className="sampleInformationToggle">
+                <input
+                    type="checkbox"
+                    checked={showSampleInformation}
+                    onChange={(event) => onToggleSampleInformation(event.target.checked)}
+                />
+                <span aria-hidden="true" className="sampleInformationSwitch" />
+                <span>Show sample information</span>
+            </label>
+        );
+    }
+
+    function renderEmptyChoice() {
+        if (!showEmptyResumeChoice) {
+            return <div className="resumeEmptyState resumeEmptyState--blank" aria-hidden="true" />;
+        }
+
+        return (
+            <div className="resumeEmptyState resumeEmptyState--choice">
+                <div className="resumeEmptyActions" aria-label="Choose how to start this resume">
+                    <button
+                        type="button"
+                        className="button buttonPrimary emptyImportButton"
+                        onClick={onImportResume}
+                        disabled={isImportingResume}
+                    >
+                        {isImportingResume ? <span className="buttonSpinner" aria-hidden="true" /> : null}
+                        {isImportingResume ? 'Processing...' : 'Import your resume'}
+                    </button>
+                    <span className="resumeEmptyOr">or</span>
+                    <button
+                        type="button"
+                        className="button buttonSecondary emptyScratchButton"
+                        onClick={onStartFromScratch}
+                        disabled={isImportingResume}
+                    >
+                        Start from scratch
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <>
             <style media="print">{printPageRule}</style>
@@ -1744,20 +1800,15 @@ export default function ResumePreview({
                                             onDragCancel={handlePreviewDragCancel}
                                             onDragEnd={handlePreviewDragEnd}
                                         >
-                                            {isSamplePreview && (
-                                                <div className="sampleResumeNotice">
-                                                    {previewModel.sampleNotice || 'Sample resume - disappears when you start editing.'}
-                                                </div>
-                                            )}
+                                            {renderSampleInformationToggle()}
                                             {orderedSections}
                                             {typeof document === 'undefined' ? previewDragOverlay : createPortal(previewDragOverlay, document.body)}
                                         </DndContext>
                                     ) : (
-                                        <div className="resumeEmptyState">
-                                            <p className="resumeEmptyEyebrow">Live preview</p>
-                                            <h3>Your resume will appear here</h3>
-                                            <p>Start with your personal details, then add education and experience. Empty sections stay out of the final document until you add real content.</p>
-                                        </div>
+                                        <>
+                                            {!showEmptyResumeChoice ? renderSampleInformationToggle() : null}
+                                            {renderEmptyChoice()}
+                                        </>
                                     )}
                                 </div>
                                 {renderPageMarkers()}

@@ -4,8 +4,6 @@ import {
   trimText,
 } from './resume.js';
 
-const SAMPLE_NOTICE = 'Sample resume - disappears when you start editing.';
-
 const SAMPLE_RESUMES = [
   {
     id: 'erlich-bachman',
@@ -758,11 +756,7 @@ function firstEntryId(section) {
 }
 
 function sampleEntryId(section, index) {
-  if (index === 0) {
-    return firstEntryId(section);
-  }
-
-  return `${section.id}-sample-entry-${index + 1}`;
+  return trimText(section?.entries?.[index]?.id) || `${section.id}-sample-entry-${index + 1}`;
 }
 
 function createSampleEducationEntry(section, sample) {
@@ -914,10 +908,223 @@ export function createSamplePreviewModel(resume, resumeId, realPreviewModel = ge
     hasContent: true,
     isSamplePreview: true,
     sampleId: sample.id,
-    sampleNotice: SAMPLE_NOTICE,
     personal: {
       ...personal,
       links,
+    },
+    sectionOrder: sectionBlocks.map((section) => section.id),
+    sectionBlocks,
+    showPersonal: true,
+  };
+}
+
+function mergePreviewText(realValue, sampleValue) {
+  return trimText(realValue) || trimText(sampleValue);
+}
+
+function createPersonalLinks(personal) {
+  return [
+    personal.linkedinUrl ? { id: 'linkedin', text: formatUrlForSampleDisplay(personal.linkedinUrl) } : null,
+    personal.portfolioUrl ? { id: 'portfolio', text: formatUrlForSampleDisplay(personal.portfolioUrl) } : null,
+    personal.githubUrl ? { id: 'github', text: formatUrlForSampleDisplay(personal.githubUrl) } : null,
+    personal.customField ? { id: 'custom', text: personal.customField } : null,
+  ].filter(Boolean);
+}
+
+function mergePreviewTextList(sampleItems, realItems) {
+  const realItemBySourceIndex = new Map(
+    (Array.isArray(realItems) ? realItems : [])
+      .map((item, index) => [
+        Number.isFinite(item?.sourceIndex) ? item.sourceIndex : index,
+        item,
+      ])
+  );
+  const usedRealIndexes = new Set();
+  const mergedItems = (Array.isArray(sampleItems) ? sampleItems : [])
+    .map((sampleItem, index) => {
+      const sourceIndex = Number.isFinite(sampleItem?.sourceIndex) ? sampleItem.sourceIndex : index;
+      const realItem = realItemBySourceIndex.get(sourceIndex);
+      usedRealIndexes.add(sourceIndex);
+
+      return {
+        ...sampleItem,
+        text: mergePreviewText(realItem?.text, sampleItem?.text),
+        sourceIndex,
+      };
+    })
+    .filter((item) => item.text);
+
+  (Array.isArray(realItems) ? realItems : []).forEach((realItem, index) => {
+    const sourceIndex = Number.isFinite(realItem?.sourceIndex) ? realItem.sourceIndex : index;
+
+    if (!usedRealIndexes.has(sourceIndex) && trimText(realItem?.text)) {
+      mergedItems.push({
+        text: trimText(realItem.text),
+        sourceIndex,
+      });
+    }
+  });
+
+  return mergedItems;
+}
+
+function mergeIndexedObjects(sampleItems, realItems, fields) {
+  const mergedItems = [];
+  const maxLength = Math.max(
+    Array.isArray(sampleItems) ? sampleItems.length : 0,
+    Array.isArray(realItems) ? realItems.length : 0,
+  );
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const sampleItem = sampleItems?.[index] || {};
+    const realItem = realItems?.[index] || {};
+    const mergedItem = {
+      ...sampleItem,
+      id: trimText(realItem.id) || trimText(sampleItem.id) || `sample-detail-${index + 1}`,
+    };
+
+    fields.forEach((field) => {
+      mergedItem[field] = mergePreviewText(realItem[field], sampleItem[field]);
+    });
+
+    if (fields.some((field) => trimText(mergedItem[field]))) {
+      mergedItems.push(mergedItem);
+    }
+  }
+
+  return mergedItems;
+}
+
+function mergeEducationEntry(sampleEntry, realEntry) {
+  return {
+    ...sampleEntry,
+    id: realEntry?.id || sampleEntry.id,
+    school: mergePreviewText(realEntry?.school, sampleEntry.school),
+    degree: mergePreviewText(realEntry?.degree, sampleEntry.degree),
+    yearsEdu: mergePreviewText(realEntry?.yearsEdu, sampleEntry.yearsEdu),
+    location: mergePreviewText(realEntry?.location, sampleEntry.location),
+    gpa: mergePreviewText(realEntry?.gpa, sampleEntry.gpa),
+    honors: mergePreviewText(realEntry?.honors, sampleEntry.honors),
+    coursework: mergePreviewText(realEntry?.coursework, sampleEntry.coursework),
+    awards: mergePreviewText(realEntry?.awards, sampleEntry.awards),
+    programs: mergeIndexedObjects(sampleEntry.programs, realEntry?.programs, ['degree', 'yearsEdu', 'gpa', 'honors']),
+    customSections: mergeIndexedObjects(sampleEntry.customSections, realEntry?.customSections, ['label', 'content']),
+  };
+}
+
+function mergeEntryByKind(kind, sampleEntry, realEntry) {
+  if (kind === 'education') {
+    return mergeEducationEntry(sampleEntry, realEntry);
+  }
+
+  if (kind === 'roles') {
+    return {
+      ...sampleEntry,
+      id: realEntry?.id || sampleEntry.id,
+      company: mergePreviewText(realEntry?.company, sampleEntry.company),
+      role: mergePreviewText(realEntry?.role, sampleEntry.role),
+      location: mergePreviewText(realEntry?.location, sampleEntry.location),
+      yearsExp: mergePreviewText(realEntry?.yearsExp, sampleEntry.yearsExp),
+      activities: mergePreviewTextList(sampleEntry.activities, realEntry?.activities),
+    };
+  }
+
+  if (kind === 'skills') {
+    return {
+      ...sampleEntry,
+      id: realEntry?.id || sampleEntry.id,
+      category: mergePreviewText(realEntry?.category, sampleEntry.category),
+      items: mergePreviewText(realEntry?.items, sampleEntry.items),
+    };
+  }
+
+  if (kind === 'projects') {
+    return {
+      ...sampleEntry,
+      id: realEntry?.id || sampleEntry.id,
+      name: mergePreviewText(realEntry?.name, sampleEntry.name),
+      subtitle: mergePreviewText(realEntry?.subtitle, sampleEntry.subtitle),
+      years: mergePreviewText(realEntry?.years, sampleEntry.years),
+      summary: mergePreviewText(realEntry?.summary, sampleEntry.summary),
+      highlights: mergePreviewTextList(sampleEntry.highlights, realEntry?.highlights),
+    };
+  }
+
+  return {
+    ...sampleEntry,
+    ...Object.fromEntries(
+      Object.keys(sampleEntry || {}).map((field) => [
+        field,
+        field === 'id' ? (realEntry?.id || sampleEntry.id) : mergePreviewText(realEntry?.[field], sampleEntry[field]),
+      ])
+    ),
+  };
+}
+
+function mergeSampleSection(sampleSection, realSection) {
+  const realEntries = Array.isArray(realSection?.entries) ? realSection.entries : [];
+  const realEntryById = new Map(realEntries.map((entry) => [entry.id, entry]));
+  const usedRealIds = new Set();
+  const entries = (Array.isArray(sampleSection.entries) ? sampleSection.entries : []).map((sampleEntry, index) => {
+    const realEntry = realEntryById.get(sampleEntry.id) || realEntries[index];
+
+    if (realEntry?.id) {
+      usedRealIds.add(realEntry.id);
+    }
+
+    return mergeEntryByKind(sampleSection.kind, sampleEntry, realEntry);
+  });
+
+  realEntries.forEach((realEntry) => {
+    if (!usedRealIds.has(realEntry.id)) {
+      entries.push(realEntry);
+    }
+  });
+
+  return {
+    ...sampleSection,
+    title: mergePreviewText(realSection?.title, sampleSection.title),
+    entryOrder: entries.map((entry) => entry.id),
+    entries,
+  };
+}
+
+export function createMixedSamplePreviewModel(resume, resumeId, realPreviewModel = getPreviewModel(resume), orderOverrides = {}) {
+  const samplePreviewModel = createSamplePreviewModel(resume, resumeId, { hasContent: false }, orderOverrides);
+
+  if (!samplePreviewModel) {
+    return null;
+  }
+
+  const realSectionById = new Map(
+    (Array.isArray(realPreviewModel?.sectionBlocks) ? realPreviewModel.sectionBlocks : [])
+      .map((section) => [section.id, section])
+  );
+  const sampleSectionIds = new Set(samplePreviewModel.sectionBlocks.map((section) => section.id));
+  const mergedPersonal = {
+    name: mergePreviewText(realPreviewModel?.personal?.name, samplePreviewModel.personal.name),
+    headline: mergePreviewText(realPreviewModel?.personal?.headline, samplePreviewModel.personal.headline),
+    location: mergePreviewText(realPreviewModel?.personal?.location, samplePreviewModel.personal.location),
+    phone: mergePreviewText(realPreviewModel?.personal?.phone, samplePreviewModel.personal.phone),
+    email: mergePreviewText(realPreviewModel?.personal?.email, samplePreviewModel.personal.email),
+    linkedinUrl: mergePreviewText(realPreviewModel?.personal?.linkedinUrl, samplePreviewModel.personal.linkedinUrl),
+    portfolioUrl: mergePreviewText(realPreviewModel?.personal?.portfolioUrl, samplePreviewModel.personal.portfolioUrl),
+    githubUrl: mergePreviewText(realPreviewModel?.personal?.githubUrl, samplePreviewModel.personal.githubUrl),
+    customField: mergePreviewText(realPreviewModel?.personal?.customField, samplePreviewModel.personal.customField),
+    aboutMe: mergePreviewText(realPreviewModel?.personal?.aboutMe, samplePreviewModel.personal.aboutMe),
+  };
+  const mergedSampleSections = samplePreviewModel.sectionBlocks.map((sampleSection) => (
+    mergeSampleSection(sampleSection, realSectionById.get(sampleSection.id))
+  ));
+  const realOnlySections = (Array.isArray(realPreviewModel?.sectionBlocks) ? realPreviewModel.sectionBlocks : [])
+    .filter((section) => !sampleSectionIds.has(section.id));
+  const sectionBlocks = [...mergedSampleSections, ...realOnlySections];
+
+  return {
+    ...samplePreviewModel,
+    personal: {
+      ...mergedPersonal,
+      links: createPersonalLinks(mergedPersonal),
     },
     sectionOrder: sectionBlocks.map((section) => section.id),
     sectionBlocks,

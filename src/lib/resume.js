@@ -84,6 +84,10 @@ export const RESUME_SETTINGS_DEFAULTS = {
   headingSize: 0,
   nameSize: 0,
 };
+export const SAMPLE_DISPLAY_DEFAULTS = {
+  hasStarted: false,
+  showInformation: true,
+};
 
 const RESUME_SETTINGS_MIN = -5;
 const RESUME_SETTINGS_MAX = 5;
@@ -533,6 +537,13 @@ export function normalizeResumeSettings(settings) {
   );
 }
 
+export function normalizeSampleDisplay(sampleDisplay) {
+  return {
+    hasStarted: Boolean(sampleDisplay?.hasStarted),
+    showInformation: sampleDisplay?.showInformation === false ? false : true,
+  };
+}
+
 export function createPersonal(candidate = {}) {
   return {
     name: asText(candidate.name),
@@ -599,6 +610,7 @@ export function createEmptyResume() {
   return {
     personal: createPersonal(),
     settings: normalizeResumeSettings(),
+    sampleDisplay: normalizeSampleDisplay(),
     sections: createDefaultSections(),
   };
 }
@@ -613,6 +625,7 @@ export function normalizeResume(candidate) {
   return {
     personal: createPersonal(resume.personal),
     settings: normalizeResumeSettings(resume.settings),
+    sampleDisplay: normalizeSampleDisplay(resume.sampleDisplay),
     sections,
   };
 }
@@ -805,6 +818,18 @@ export function updateResumeSetting(resume, settingId, delta) {
       ...normalizedResume.settings,
       [settingId]: clampInteger(currentValue + delta, RESUME_SETTINGS_MIN, RESUME_SETTINGS_MAX),
     },
+  };
+}
+
+export function updateSampleDisplay(resume, updates = {}) {
+  const normalizedResume = normalizeResume(resume);
+
+  return {
+    ...normalizedResume,
+    sampleDisplay: normalizeSampleDisplay({
+      ...normalizedResume.sampleDisplay,
+      ...updates,
+    }),
   };
 }
 

@@ -43,6 +43,7 @@ import {
   sanitizeWorkspaceResumeName,
   updatePersonalField,
   updateResumeSetting as updateResumeSettingValue,
+  updateSampleDisplay,
   updateRoleBlockActivity,
   updateRoleBlockEntry,
   updateSectionBlockEducationCustomSection,
@@ -980,6 +981,15 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     },
     updateResumeSetting(settingId, delta) {
       updateResume((currentResume) => updateResumeSettingValue(currentResume, settingId, delta));
+    },
+    startFromScratch() {
+      updateResume((currentResume) => updateSampleDisplay(currentResume, { hasStarted: true }));
+    },
+    setSampleInformationVisible(showInformation) {
+      updateResume((currentResume) => updateSampleDisplay(currentResume, {
+        hasStarted: true,
+        showInformation,
+      }));
     },
     addResumeSection(templateId) {
       let nextSectionId = '';

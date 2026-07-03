@@ -33,6 +33,7 @@ import {
   updateRoleBlockActivity,
   updateRoleBlockEntry,
   updateResumeSetting,
+  updateSampleDisplay,
   updateSectionBlockEducationCustomSection,
   updateSectionBlockEducationProgram,
   updateSectionBlockEntry,
@@ -73,6 +74,7 @@ import {
   validateImportResumeFile,
 } from '../src/lib/importResume.js';
 import {
+  createMixedSamplePreviewModel,
   createSamplePlaceholderResolver,
   createSamplePreviewModel,
   getSampleResumeIndex,
@@ -106,7 +108,11 @@ function createWorkspace(resumeIds, { activeResumeId = resumeIds[0], names = {},
 test('createEmptyResume returns the block-first resume shape', () => {
   const resume = createEmptyResume();
 
-  assert.deepEqual(Object.keys(resume).sort(), ['personal', 'sections', 'settings']);
+  assert.deepEqual(Object.keys(resume).sort(), ['personal', 'sampleDisplay', 'sections', 'settings']);
+  assert.deepEqual(resume.sampleDisplay, {
+    hasStarted: false,
+    showInformation: true,
+  });
   assert.deepEqual(resume.settings, {
     textSize: 0,
     horizontalMargins: 0,
@@ -167,6 +173,32 @@ test('normalizeDraftPayload creates block-only drafts and fills missing defaults
   assert.equal(normalized.resume.sections[0].entries[0].location, '');
   assert.equal(normalized.resume.sections[1].entries[0].location, '');
   assert.equal(Object.hasOwn(normalized, 'section' + 'Order'), false);
+});
+
+test('sample display metadata normalizes and updates with resume drafts', () => {
+  let resume = createEmptyResume();
+
+  resume = updateSampleDisplay(resume, { hasStarted: true, showInformation: false });
+
+  assert.deepEqual(resume.sampleDisplay, {
+    hasStarted: true,
+    showInformation: false,
+  });
+  assert.deepEqual(normalizeDraftPayload({ resume }).resume.sampleDisplay, {
+    hasStarted: true,
+    showInformation: false,
+  });
+  assert.deepEqual(normalizeDraftPayload({
+    resume: {
+      ...resume,
+      sampleDisplay: {
+        hasStarted: 'yes',
+      },
+    },
+  }).resume.sampleDisplay, {
+    hasStarted: true,
+    showInformation: true,
+  });
 });
 
 test('block actions update roles, education details, and list items', () => {
@@ -413,6 +445,28 @@ test('sample placeholder resolver mirrors sample preview fields without mutating
   assert.equal(placeholderForSecondRole(`sections.experience.${secondExperienceEntryId}.role`, 'Role'), 'Board Member / 10% Stakeholder');
 });
 
+test('mixed sample preview uses real user fields over sample fields', () => {
+  let resume = createEmptyResume();
+  const experienceEntryId = getSection(resume, 'experience').entries[0].id;
+
+  resume = updateSampleDisplay(resume, { hasStarted: true, showInformation: true });
+  resume = updatePersonalField(resume, 'name', 'Real Person');
+  resume = updateRoleBlockEntry(resume, 'experience', experienceEntryId, 'company', 'Real Company');
+  resume = updateRoleBlockActivity(resume, 'experience', experienceEntryId, 0, 'Shipped a real accomplishment.');
+
+  const realPreview = getPreviewModel(resume);
+  const mixedPreview = createMixedSamplePreviewModel(resume, 'resume-5', realPreview);
+  const roleEntry = mixedPreview.sectionBlocks.find((section) => section.id === 'experience').entries[0];
+
+  assert.equal(realPreview.personal.name, 'Real Person');
+  assert.equal(mixedPreview.personal.name, 'Real Person');
+  assert.equal(mixedPreview.personal.headline, 'Startup Visionary');
+  assert.equal(roleEntry.company, 'Real Company');
+  assert.equal(roleEntry.role, 'Founder & CEO');
+  assert.equal(roleEntry.activities[0].text, 'Shipped a real accomplishment.');
+  assert.equal(roleEntry.activities[1].text.includes('Leveraged a seven-figure liquidity event'), true);
+});
+
 test('each fictional sample renders multiple complete experience entries', () => {
   const previewsBySampleId = new Map();
 
@@ -554,6 +608,29 @@ test('login merge restores cloud resumes into blank local workspaces', () => {
   assert.equal(result.draftsByResumeId.get('cloud-1').resume.personal.name, 'Cloud One');
 });
 
+test('login merge treats sample-only local state as blank when restoring cloud resumes', () => {
+  const localWorkspace = createWorkspace(['local-blank']);
+  const localBlankDraft = {
+    ...createDraft('', '2026-02-01T00:00:00.000Z'),
+    resume: updateSampleDisplay(createEmptyResume(), {
+      hasStarted: true,
+      showInformation: false,
+    }),
+  };
+  const cloudWorkspace = createWorkspace(['cloud-1'], { activeResumeId: 'cloud-1' });
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace,
+    localDraftsByResumeId: new Map([['local-blank', localBlankDraft]]),
+    cloudWorkspace,
+    cloudDraftsByResumeId: new Map([['cloud-1', createDraft('Cloud Resume')]]),
+  });
+
+  assert.deepEqual(result.workspace.resumeIds, ['cloud-1']);
+  assert.equal(result.activeResumeId, 'cloud-1');
+  assert.equal(result.localHasContent, false);
+  assert.deepEqual(result.syncPlan.upsertResumeIds, []);
+});
+
 test('login merge preserves local and cloud content without dropping either side', () => {
   const result = mergeLocalAndCloudWorkspaces({
     localWorkspace: createWorkspace(['local-1']),
@@ -565,6 +642,35 @@ test('login merge preserves local and cloud content without dropping either side
   assert.deepEqual(result.workspace.resumeIds, ['local-1', 'cloud-1']);
   assert.equal(result.syncPlan.workspaceNeedsSync, true);
   assert.deepEqual(result.syncPlan.upsertResumeIds, ['local-1']);
+});
+
+test('login merge syncs sample display preference without duplicating identical content', () => {
+  const baseResume = createDraft('Same Resume').resume;
+  const localDraft = {
+    ...createDraft('Same Resume', '2026-02-01T00:00:00.000Z'),
+    resume: updateSampleDisplay(baseResume, {
+      hasStarted: true,
+      showInformation: false,
+    }),
+  };
+  const cloudDraft = {
+    ...createDraft('Same Resume', '2026-01-01T00:00:00.000Z'),
+    resume: updateSampleDisplay(baseResume, {
+      hasStarted: true,
+      showInformation: true,
+    }),
+  };
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace: createWorkspace(['resume-1'], { activeResumeId: 'resume-1' }),
+    localDraftsByResumeId: new Map([['resume-1', localDraft]]),
+    cloudWorkspace: createWorkspace(['resume-1'], { activeResumeId: 'resume-1' }),
+    cloudDraftsByResumeId: new Map([['resume-1', cloudDraft]]),
+  });
+
+  assert.deepEqual(result.workspace.resumeIds, ['resume-1']);
+  assert.equal(result.draftsByResumeId.get('resume-1').resume.sampleDisplay.showInformation, false);
+  assert.equal(result.syncPlan.workspaceNeedsSync, true);
+  assert.deepEqual(result.syncPlan.upsertResumeIds, ['resume-1']);
 });
 
 test('outbox acknowledgement matching requires the exact operation version and revision', () => {
@@ -771,6 +877,26 @@ test('PDF text assessment accepts resume-like text and rejects empty extraction'
   assert.equal(assessExtractedResumeText('').isTrustworthy, false);
 });
 
+test('readable resume text keeps line breaks for source section detection', () => {
+  const sourceDocument = createSourceDocumentFromText([
+    'Jane Doe',
+    'jane@example.com | 555-555-5555 | linkedin.com/in/janedoe',
+    'EDUCATION',
+    'Example University',
+    'B.S. Computer Science',
+    'EXPERIENCE',
+    'Acme | Software Engineer',
+    '2022 - Present',
+    '- Built internal tools',
+    'SKILLS',
+    'React, TypeScript, SQL',
+  ].join('\n'));
+
+  assert.deepEqual(sourceDocument.sections.map((section) => section.title), ['EDUCATION', 'EXPERIENCE', 'SKILLS']);
+  assert.equal(sourceDocument.sections[1].lines.includes('Acme | Software Engineer'), true);
+  assert.equal(sourceDocument.sections[1].lines.includes('- Built internal tools'), true);
+});
+
 test('source document compiler preserves section order and block kinds', () => {
   const source = {
     personalLines: ['Jane Doe', 'jane@example.com', 'linkedin.com/in/janedoe'],
@@ -841,6 +967,52 @@ test('source role compiler maps image-style company/date/role hierarchy into rol
   assert.equal(roles[1].company, 'Pied Piper');
   assert.equal(roles[1].role, 'Board Member / 10% Stakeholder');
   assert.equal(roles[1].yearsExp, '2020-2022');
+});
+
+test('source role compiler merges organization location lines with following role date lines', () => {
+  const source = {
+    personalLines: ['Example Person'],
+    sections: [
+      {
+        id: 'source-work-1',
+        title: 'RELEVANT WORK EXPERIENCE',
+        lines: [
+          'ABC Pollution Control Miami, FL',
+          'Environmental Engineering Intern June 2022 – August 2022',
+          'Developed remediation plans for field projects',
+          'Golob & Legion Engineers Athens, GA',
+          'Intern May 2021 – August 2021',
+          'Prepared technical documentation for senior engineers',
+        ],
+      },
+    ],
+  };
+  const result = compileSourceDocumentToImportedDraft(source, null, { sourceFileName: 'engineering.docx' });
+  const entries = result.draft.resume.sections[0].entries;
+
+  assert.equal(entries.length, 2);
+  assert.deepEqual(entries.map((entry) => ({
+    company: entry.company,
+    role: entry.role,
+    location: entry.location,
+    yearsExp: entry.yearsExp,
+    activities: entry.activities,
+  })), [
+    {
+      company: 'ABC Pollution Control',
+      role: 'Environmental Engineering Intern',
+      location: 'Miami, FL',
+      yearsExp: 'June 2022 – August 2022',
+      activities: ['Developed remediation plans for field projects'],
+    },
+    {
+      company: 'Golob & Legion Engineers',
+      role: 'Intern',
+      location: 'Athens, GA',
+      yearsExp: 'May 2021 – August 2021',
+      activities: ['Prepared technical documentation for senior engineers'],
+    },
+  ]);
 });
 
 test('source role compiler promotes title-like first activities as a safety fallback', () => {

@@ -261,14 +261,17 @@ export async function verifyFirebaseIdToken(authorizationHeader) {
 
 async function extractDocxText(file) {
   const result = await mammoth.extractRawText({ buffer: file.buffer });
-  return trimText(result.value);
+  return normalizeExtractedResumeText(result.value);
 }
 
 function normalizeExtractedResumeText(value) {
-  return trimText(value)
+  return (typeof value === 'string' ? value : '')
     .split('\u0000').join('')
+    .replace(/\r\n?/g, '\n')
     .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\n{3,}/g, '\n\n');
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function countWords(value) {
@@ -1482,6 +1485,24 @@ function splitLocationFromTitleLine(line) {
   };
 }
 
+function splitTrailingLocationFromTitleText(line) {
+  const text = trimText(line);
+  const match = text.match(/^(.+)\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)*,\s*(?:[A-Z]{2}|[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)*))$/);
+
+  if (!match) {
+    return { titleText: text, location: '' };
+  }
+
+  const titleText = trimText(match[1]);
+  const location = trimText(match[2]);
+
+  if (!titleText || !isLikelyLocationText(location)) {
+    return { titleText: text, location: '' };
+  }
+
+  return { titleText, location };
+}
+
 function parseRoleEntryLine(line) {
   const { beforeDate, dateText } = extractEndingDateText(line);
   const pipeParts = beforeDate.split('|').map(trimText).filter(Boolean);
@@ -1507,6 +1528,12 @@ function parseRoleEntryLine(line) {
     const splitTitle = splitLocationFromTitleLine(beforeDate);
     titleText = splitTitle.titleText;
     location = splitTitle.location;
+  }
+
+  if (!location && !pipeRole) {
+    const splitTrailingLocation = splitTrailingLocationFromTitleText(titleText);
+    titleText = splitTrailingLocation.titleText;
+    location = splitTrailingLocation.location;
   }
 
   const commaParts = titleText.split(',').map(trimText).filter(Boolean);
@@ -1561,6 +1588,17 @@ function isLikelyRoleHeaderLine(line, nextLine = '', followingLine = '') {
   }
 
   if (isLikelyRoleEntryLine(text)) {
+    return true;
+  }
+
+  const splitTrailingLocation = splitTrailingLocationFromTitleText(text);
+  const nextLineRoleDate = extractEndingDateText(nextLine);
+
+  if (
+    splitTrailingLocation.location &&
+    nextLineRoleDate.dateText &&
+    hasRoleTitleSignal(nextLineRoleDate.beforeDate)
+  ) {
     return true;
   }
 
@@ -1633,6 +1671,22 @@ function buildSourceRoleEntries(lines) {
     if (isDateOnlyLine(text) && currentEntry && !currentEntry.dateLine) {
       currentEntry.dateLine = text;
       return;
+    }
+
+    if (
+      currentEntry &&
+      currentEntry.titleLine &&
+      !currentEntry.roleLine &&
+      !currentEntry.dateLine &&
+      currentEntry.bullets.length === 0
+    ) {
+      const { beforeDate, dateText } = extractEndingDateText(text);
+
+      if (dateText && hasRoleTitleSignal(beforeDate)) {
+        currentEntry.roleLine = beforeDate;
+        currentEntry.dateLine = dateText;
+        return;
+      }
     }
 
     if (!currentEntry || isLikelyRoleHeaderLine(text, nextLine, followingLine)) {
