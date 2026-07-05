@@ -86,7 +86,7 @@ function App() {
   const [previewEditTarget, setPreviewEditTarget] = useState(null);
   const [previewPulseTarget, setPreviewPulseTarget] = useState(null);
   const [editorCaretTarget, setEditorCaretTarget] = useState(null);
-  const [previewLayout, setPreviewLayout] = useState({ mode: 'fitWidth', width: 0 });
+  const [previewLayout, setPreviewLayout] = useState({ mode: 'fitPage', width: 0 });
   const [sampleOrderOverridesByResumeId, setSampleOrderOverridesByResumeId] = useState({});
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') {

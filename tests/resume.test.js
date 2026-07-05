@@ -575,9 +575,29 @@ test('preview page break helper moves marker before fitting cut-through entries'
     contentHeight: 1300,
     printableHeight: 900,
     breakCandidates: [
-      { top: 820, bottom: 980, priority: 2 },
+      { top: 884, bottom: 980, priority: 2 },
     ],
-  }), [820]);
+  }), [884]);
+});
+
+test('preview page break helper does not jump to the top of long entries', () => {
+  assert.deepEqual(calculatePreviewPageBreaks({
+    contentHeight: 1300,
+    printableHeight: 900,
+    breakCandidates: [
+      { top: 760, bottom: 980, priority: 2 },
+    ],
+  }), [900]);
+});
+
+test('preview page break helper can snap first section entries farther', () => {
+  assert.deepEqual(calculatePreviewPageBreaks({
+    contentHeight: 1300,
+    printableHeight: 900,
+    breakCandidates: [
+      { top: 780, bottom: 980, priority: 2, snapDistance: 144 },
+    ],
+  }), [780]);
 });
 
 test('preview page break helper does not move marker above oversized sections', () => {
@@ -596,9 +616,9 @@ test('preview page break helper falls back to bullet candidates for oversized en
     printableHeight: 900,
     breakCandidates: [
       { top: 300, bottom: 1250, priority: 2 },
-      { top: 860, bottom: 930, priority: 3 },
+      { top: 884, bottom: 930, priority: 3 },
     ],
-  }), [860]);
+  }), [884]);
 });
 
 test('preview page break helper keeps raw marker when no clean candidate is valid', () => {

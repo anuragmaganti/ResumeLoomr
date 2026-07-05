@@ -151,46 +151,6 @@ html[data-theme="dark"] .resumePage {
   white-space: nowrap;
 }
 
-.previewZoomControl {
-  display: inline-grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-surface-muted) 76%, var(--color-surface-elevated));
-}
-
-.previewZoomButton {
-  min-height: 24px;
-  padding: 0 9px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--color-text-muted);
-  font-size: 0.625rem;
-  font-weight: 800;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    background-color var(--transition-base),
-    color var(--transition-base),
-    box-shadow var(--transition-base);
-}
-
-.previewZoomButton.isActive {
-  background: var(--color-surface-elevated);
-  color: var(--color-text);
-  box-shadow: var(--shadow-xs);
-}
-
-.previewZoomButton:not(.isActive):hover,
-.previewZoomButton:focus-visible {
-  color: var(--color-text);
-  outline: none;
-}
-
 .previewPageViewport {
   display: grid;
   justify-items: start;

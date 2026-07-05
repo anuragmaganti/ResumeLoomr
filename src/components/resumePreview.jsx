@@ -44,15 +44,8 @@ const personalLinkFieldMap = {
 };
 
 const DRAG_ID_SEPARATOR = '::';
-const PREVIEW_ZOOM_MODES = {
-    FIT_PAGE: 'fitPage',
-    FIT_WIDTH: 'fitWidth',
-};
 const DEFAULT_PREVIEW_PAGE_MIN_HEIGHT = PRINT_PAGE_HEIGHT_PX;
-
-function getDefaultPreviewZoomMode() {
-    return PREVIEW_ZOOM_MODES.FIT_PAGE;
-}
+const FIRST_SECTION_ENTRY_SNAP_DISTANCE_PX = 144;
 
 function parseCssPixelValue(value, fallback = 0) {
     const parsed = Number.parseFloat(value);
@@ -89,7 +82,6 @@ function metricsAreEqual(current, next) {
         current.contentHeight === next.contentHeight &&
         current.pageCount === next.pageCount &&
         current.layoutWidth === next.layoutWidth &&
-        current.hasDistinctZoomModes === next.hasDistinctZoomModes &&
         Math.abs(current.scale - next.scale) < 0.001 &&
         current.pageBreaks.length === next.pageBreaks.length &&
         current.pageBreaks.every((pageBreak, index) => pageBreak === next.pageBreaks[index])
@@ -387,26 +379,15 @@ function collectPreviewBreakCandidates(resumeElement, paddingTop) {
     const previewScale = getPreviewScaleFromElement(resumeElement);
     const candidates = [];
 
-    resumeElement.querySelectorAll('[data-page-break-kind="section"]').forEach((sectionElement) => {
-        const heading = sectionElement.querySelector('[data-page-break-kind="heading"]');
-        const firstEntry = sectionElement.querySelector('[data-page-break-kind="entry"]');
-
-        if (heading && firstEntry) {
-            const headingBounds = getCandidateBounds(heading, resumeRect, previewScale, paddingTop);
-            const entryBounds = getCandidateBounds(firstEntry, resumeRect, previewScale, paddingTop);
-
-            candidates.push({
-                top: headingBounds.top,
-                bottom: entryBounds.bottom,
-                priority: 1,
-            });
-        }
-    });
-
     resumeElement.querySelectorAll('[data-page-break-kind="entry"]').forEach((entryElement) => {
+        const sectionElement = entryElement.closest('[data-page-break-kind="section"]');
+        const firstSectionEntry = sectionElement?.querySelector('[data-page-break-kind="entry"]');
+        const isFirstSectionEntry = firstSectionEntry === entryElement;
+
         candidates.push({
             ...getCandidateBounds(entryElement, resumeRect, previewScale, paddingTop),
             priority: 2,
+            snapDistance: isFirstSectionEntry ? FIRST_SECTION_ENTRY_SNAP_DISTANCE_PX : undefined,
         });
     });
 
@@ -447,8 +428,6 @@ export default function ResumePreview({
     const activeDragScrollRef = useRef({ x: 0, y: 0, capturedAt: 0 });
     const [activeDragMeta, setActiveDragMeta] = useState(null);
     const [activeDragRect, setActiveDragRect] = useState(null);
-    const [previewZoomMode, setPreviewZoomMode] = useState(getDefaultPreviewZoomMode);
-    const [hasSelectedPreviewZoom, setHasSelectedPreviewZoom] = useState(false);
     const [pageMetrics, setPageMetrics] = useState({
         pageWidth: 0,
         pageHeight: 0,
@@ -457,7 +436,6 @@ export default function ResumePreview({
         pageBreaks: [],
         scale: 1,
         layoutWidth: 0,
-        hasDistinctZoomModes: false,
     });
     const presentationVars = useMemo(() => getResumePresentationVars(settings, template), [settings, template]);
     const printPageRule = useMemo(() => getResumePrintPageRule(settings, template), [settings, template]);
@@ -484,21 +462,6 @@ export default function ResumePreview({
     }
 
     useEffect(() => {
-        if (hasSelectedPreviewZoom || typeof window === 'undefined') {
-            return undefined;
-        }
-
-        function updateDefaultZoomMode() {
-            setPreviewZoomMode(getDefaultPreviewZoomMode());
-        }
-
-        updateDefaultZoomMode();
-        window.addEventListener('resize', updateDefaultZoomMode);
-
-        return () => window.removeEventListener('resize', updateDefaultZoomMode);
-    }, [hasSelectedPreviewZoom]);
-
-    useEffect(() => {
         if (typeof window === 'undefined') {
             return undefined;
         }
@@ -519,7 +482,6 @@ export default function ResumePreview({
                         pageBreaks: [],
                         scale: 1,
                         layoutWidth: 0,
-                        hasDistinctZoomModes: false,
                     };
 
                     return metricsAreEqual(current, next) ? current : next;
@@ -549,15 +511,10 @@ export default function ResumePreview({
                 window.innerHeight - getPreviewStickyTop(frameElement) - 24,
             );
             const fitPageHeightScale = Math.min(availableHeight / pageHeight, 1);
-            const fitWidthScale = Math.min(availableWidth / pageWidth, 1);
-            const fitPageScale = Math.min(fitWidthScale, fitPageHeightScale, 1);
-            const hasDistinctZoomModes = Math.abs(fitWidthScale - fitPageScale) > 0.005;
-            const scale = previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE
-                ? Math.max(0.35, fitPageScale)
-                : Math.max(0.35, fitWidthScale);
-            const layoutScale = previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE
-                ? Math.max(0.35, fitPageHeightScale)
-                : Math.max(0.35, fitWidthScale);
+            const widthScale = Math.min(availableWidth / pageWidth, 1);
+            const fullPageScale = Math.min(widthScale, fitPageHeightScale, 1);
+            const scale = Math.max(0.35, fullPageScale);
+            const layoutScale = Math.max(0.35, fitPageHeightScale);
             const nextMetrics = {
                 pageWidth: Math.round(pageWidth),
                 pageHeight: Math.round(pageHeight),
@@ -566,7 +523,6 @@ export default function ResumePreview({
                 pageBreaks: markerBreaks,
                 scale: Number(scale.toFixed(4)),
                 layoutWidth: Math.round(pageWidth * layoutScale),
-                hasDistinctZoomModes,
             };
 
             setPageMetrics((current) => (metricsAreEqual(current, nextMetrics) ? current : nextMetrics));
@@ -599,7 +555,7 @@ export default function ResumePreview({
             window.removeEventListener('resize', scheduleRead);
             resizeObserver?.disconnect();
         };
-    }, [previewModel, presentationVars, previewZoomMode]);
+    }, [previewModel, presentationVars]);
 
     useEffect(() => {
         if (!onLayoutChange) {
@@ -607,23 +563,22 @@ export default function ResumePreview({
         }
 
         const isFitPageLayout = previewModel.hasContent
-            && previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE
             && pageMetrics.pageWidth > 0
             && pageMetrics.layoutWidth > 0;
         const nextLayout = isFitPageLayout
             ? {
-                mode: PREVIEW_ZOOM_MODES.FIT_PAGE,
+                mode: 'fitPage',
                 width: pageMetrics.layoutWidth,
             }
             : {
-                mode: previewZoomMode,
+                mode: 'fitPage',
                 width: 0,
             };
 
         onLayoutChange(nextLayout);
 
         return undefined;
-    }, [onLayoutChange, pageMetrics.layoutWidth, pageMetrics.pageWidth, previewModel.hasContent, previewZoomMode]);
+    }, [onLayoutChange, pageMetrics.layoutWidth, pageMetrics.pageWidth, previewModel.hasContent]);
 
     function personalTarget(field) {
         const path = personalEditorPath(field);
@@ -1745,12 +1700,6 @@ export default function ResumePreview({
         ),
     ].filter(Boolean);
     const pageLabel = pageMetrics.pageCount === 1 ? '1 page' : `${pageMetrics.pageCount} pages`;
-    const showPreviewZoomControl = previewModel.hasContent && pageMetrics.hasDistinctZoomModes;
-
-    function handlePreviewZoomChange(mode) {
-        setHasSelectedPreviewZoom(true);
-        setPreviewZoomMode(mode);
-    }
 
     function renderPageMarkers() {
         if (!previewModel.hasContent || pageMetrics.pageBreaks.length === 0) {
@@ -1833,26 +1782,6 @@ export default function ResumePreview({
                     {previewModel.hasContent && (
                         <div className="previewToolbar">
                             <span className="previewPageCount">{pageLabel}</span>
-                            {showPreviewZoomControl && (
-                                <div className="previewZoomControl" role="group" aria-label="Preview zoom mode">
-                                    <button
-                                        type="button"
-                                        className={`previewZoomButton${previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE ? ' isActive' : ''}`}
-                                        onClick={() => handlePreviewZoomChange(PREVIEW_ZOOM_MODES.FIT_PAGE)}
-                                        aria-pressed={previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE}
-                                    >
-                                        Full page
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`previewZoomButton${previewZoomMode === PREVIEW_ZOOM_MODES.FIT_WIDTH ? ' isActive' : ''}`}
-                                        onClick={() => handlePreviewZoomChange(PREVIEW_ZOOM_MODES.FIT_WIDTH)}
-                                        aria-pressed={previewZoomMode === PREVIEW_ZOOM_MODES.FIT_WIDTH}
-                                    >
-                                        Large view
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     )}
 

@@ -3,6 +3,7 @@ export const PRINT_PAGE_HEIGHT_PX = 1056;
 export const CSS_PIXELS_PER_INCH = 96;
 
 const MIN_BREAK_PROGRESS_PX = 1;
+const MAX_CLEAN_BREAK_SNAP_DISTANCE_PX = 24;
 
 function asFiniteNumber(value, fallback = 0) {
   return Number.isFinite(value) ? value : fallback;
@@ -12,12 +13,13 @@ function normalizeCandidate(candidate) {
   const top = asFiniteNumber(candidate?.top);
   const bottom = asFiniteNumber(candidate?.bottom);
   const priority = asFiniteNumber(candidate?.priority, 99);
+  const snapDistance = asFiniteNumber(candidate?.snapDistance, MAX_CLEAN_BREAK_SNAP_DISTANCE_PX);
 
   if (bottom <= top) {
     return null;
   }
 
-  return { top, bottom, priority };
+  return { top, bottom, priority, snapDistance };
 }
 
 function findCleanBreak(rawBreak, pageStart, printableHeight, candidates) {
@@ -26,6 +28,7 @@ function findCleanBreak(rawBreak, pageStart, printableHeight, candidates) {
       candidate.top < rawBreak &&
       candidate.bottom > rawBreak &&
       candidate.top > pageStart + MIN_BREAK_PROGRESS_PX &&
+      rawBreak - candidate.top <= candidate.snapDistance &&
       candidate.bottom - candidate.top <= printableHeight
     ))
     .sort((first, second) => {
