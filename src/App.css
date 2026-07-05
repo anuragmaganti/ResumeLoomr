@@ -248,7 +248,6 @@ html[data-theme="dark"] .brandLogo--dark {
 .resumePillLabel {
   min-width: 0;
   overflow: hidden;
-  max-width: 19ch;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

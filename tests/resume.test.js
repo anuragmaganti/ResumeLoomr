@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_TEMPLATE,
   MAX_RESUME_SECTIONS,
+  MAX_WORKSPACE_RESUME_NAME_LENGTH,
   MAX_WORKSPACE_RESUMES,
   SECTION_TEMPLATE_GROUPS,
   UNTITLED_SECTION_TITLE,
@@ -534,7 +535,7 @@ test('workspace helpers support local-first resume ordering and naming', () => {
   assert.equal(workspace.workspace.meta[workspace.activeResumeId].name, 'Resume 1');
   assert.equal(createNextResumeName(['Resume 1', 'Resume 3']), 'Resume 2');
   assert.equal(createDuplicateResumeName('Resume no skills', ['Resume no skills']), 'Resume no skills copy');
-  assert.ok(createDuplicateResumeName('abcdefghijklmnopqrstuvwxyz', []).length <= 25);
+  assert.ok(createDuplicateResumeName('abcdefghijklmnopqrstuvwxyz'.repeat(2), []).length <= MAX_WORKSPACE_RESUME_NAME_LENGTH);
 });
 
 test('workspace reorder helper preserves active resume and exact rail order', () => {

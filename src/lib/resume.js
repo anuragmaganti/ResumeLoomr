@@ -6,7 +6,7 @@ import {
 export const DRAFT_STORAGE_KEY = 'resumeloomr:draft:v2';
 export const WORKSPACE_INDEX_STORAGE_KEY = 'resumeloomr:index:v1';
 export const RESUME_STORAGE_KEY_PREFIX = 'resumeloomr:resume:';
-export const MAX_WORKSPACE_RESUME_NAME_LENGTH = 25;
+export const MAX_WORKSPACE_RESUME_NAME_LENGTH = 50;
 export const MAX_WORKSPACE_RESUMES = 100;
 export const MAX_RESUME_SECTIONS = 100;
 export const UNTITLED_SECTION_TITLE = 'Untitled section';

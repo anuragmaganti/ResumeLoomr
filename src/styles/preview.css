@@ -809,6 +809,12 @@ html[data-theme="dark"] .resumePage {
   border-bottom-width: 2px;
 }
 
+.resumePage--executive .aboutMe {
+  width: 100%;
+  margin-right: 0;
+  margin-left: 0;
+}
+
 .resumePage--compact {
   --resume-page-margin-inline: 0.4375in;
   --resume-page-margin-top: 0.4375in;

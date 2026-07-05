@@ -147,7 +147,7 @@ service cloud.firestore {
       data.resumeId == resumeId &&
       isString(data.name) &&
       data.name.size() > 0 &&
-      data.name.size() <= 25 &&
+      data.name.size() <= 50 &&
       isValidTemplate(data.template) &&
       isValidResumeShape(data.resume) &&
       isString(data.savedAt) &&
