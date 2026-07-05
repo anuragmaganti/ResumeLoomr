@@ -1575,6 +1575,8 @@ html[data-theme="dark"] .brandLogo--dark {
 }
 
 .editorStage {
+  container-type: inline-size;
+  container-name: editor-stage;
   position: sticky;
   top: var(--workspace-sticky-top);
   display: flex;

@@ -390,30 +390,11 @@ form {
   }
 }
 
-@media (max-width: 1660px) and (min-width: 861px) {
-  .editorStage {
-    --editor-field-max-width: 190px;
-  }
-
-  .editorStage .field,
-  .editorStage .fieldGrid {
-    width: 100%;
-    max-width: var(--editor-field-max-width);
-  }
-
+@container editor-stage (max-width: 280px) {
   .editorStage .fieldGridTwo {
-    grid-template-columns: 1fr;
-    justify-items: start;
-  }
-
-  .editorStage .fieldGridTwo > .field {
     max-width: none;
-  }
-}
-
-@media (max-width: 860px) {
-  .fieldGridTwo {
     grid-template-columns: 1fr;
+    justify-items: stretch;
   }
 }
 
@@ -425,7 +406,9 @@ form {
   }
 
   .editorStage .fieldGridTwo {
-    grid-template-columns: 1fr;
+    width: 100%;
+    max-width: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     justify-items: stretch;
   }
 
@@ -435,6 +418,11 @@ form {
 }
 
 @media (max-width: 720px) {
+  .fieldGridTwo,
+  .editorStage .fieldGridTwo {
+    grid-template-columns: 1fr;
+  }
+
   .formSection {
     padding: var(--space-4);
   }
