@@ -89,6 +89,12 @@ export const RESUME_SETTINGS_DEFAULTS = {
   headingSize: 0,
   nameSize: 0,
   summaryWidthPercent: 100,
+  personalSeparatorTone: 50,
+  sectionSeparatorTone: 50,
+  personalSeparatorWeight: 2,
+  sectionSeparatorWeight: 2,
+  personalSeparatorGap: 0,
+  sectionSeparatorGap: 0,
 };
 export const SAMPLE_DISPLAY_DEFAULTS = {
   hasStarted: false,
@@ -99,6 +105,12 @@ const RESUME_SETTINGS_MIN = -5;
 const RESUME_SETTINGS_MAX = 5;
 const SUMMARY_WIDTH_MIN = 75;
 const SUMMARY_WIDTH_MAX = 100;
+const SEPARATOR_TONE_MIN = 0;
+const SEPARATOR_TONE_MAX = 100;
+const SEPARATOR_WEIGHT_MIN = 1;
+const SEPARATOR_WEIGHT_MAX = 5;
+const SEPARATOR_GAP_MIN = -5;
+const SEPARATOR_GAP_MAX = 5;
 const DEFAULT_RESUME_LABEL = 'Resume';
 const TEXT_SIZE_STEP = 0.03;
 const HEADING_SIZE_STEP = 0.05;
@@ -107,6 +119,16 @@ const MARGIN_STEP_IN = 0.04;
 const LINE_SPACING_STEP = 0.04;
 const SECTION_SPACING_STEP = 4;
 const ENTRY_SPACING_STEP = 3;
+const SEPARATOR_GAP_STEP = 2;
+const SETTING_RANGES = {
+  summaryWidthPercent: [SUMMARY_WIDTH_MIN, SUMMARY_WIDTH_MAX],
+  personalSeparatorTone: [SEPARATOR_TONE_MIN, SEPARATOR_TONE_MAX],
+  sectionSeparatorTone: [SEPARATOR_TONE_MIN, SEPARATOR_TONE_MAX],
+  personalSeparatorWeight: [SEPARATOR_WEIGHT_MIN, SEPARATOR_WEIGHT_MAX],
+  sectionSeparatorWeight: [SEPARATOR_WEIGHT_MIN, SEPARATOR_WEIGHT_MAX],
+  personalSeparatorGap: [SEPARATOR_GAP_MIN, SEPARATOR_GAP_MAX],
+  sectionSeparatorGap: [SEPARATOR_GAP_MIN, SEPARATOR_GAP_MAX],
+};
 const DEFAULT_SECTION_BLOCKS = [
   { id: 'education', kind: 'education', title: 'Education' },
   { id: 'experience', kind: 'roles', title: 'Experience' },
@@ -537,8 +559,7 @@ function normalizeSectionBlock(section, index, usedIds) {
 export function normalizeResumeSettings(settings) {
   return Object.fromEntries(
     Object.keys(RESUME_SETTINGS_DEFAULTS).map((key) => {
-      const min = key === 'summaryWidthPercent' ? SUMMARY_WIDTH_MIN : RESUME_SETTINGS_MIN;
-      const max = key === 'summaryWidthPercent' ? SUMMARY_WIDTH_MAX : RESUME_SETTINGS_MAX;
+      const [min, max] = SETTING_RANGES[key] || [RESUME_SETTINGS_MIN, RESUME_SETTINGS_MAX];
 
       return [
         key,
@@ -819,7 +840,7 @@ export function updateResumeSetting(resume, settingId, delta) {
   const normalizedResume = normalizeResume(resume);
   const currentValue = normalizedResume.settings[settingId] ?? 0;
 
-  if (!Object.hasOwn(RESUME_SETTINGS_DEFAULTS, settingId) || settingId === 'summaryWidthPercent') {
+  if (!Object.hasOwn(RESUME_SETTINGS_DEFAULTS, settingId) || SETTING_RANGES[settingId]) {
     return normalizedResume;
   }
 
@@ -840,6 +861,24 @@ export function setResumeSummaryWidthPercent(resume, widthPercent) {
     settings: {
       ...normalizedResume.settings,
       summaryWidthPercent: clampInteger(widthPercent, SUMMARY_WIDTH_MIN, SUMMARY_WIDTH_MAX),
+    },
+  };
+}
+
+export function setResumeSettingValue(resume, settingId, value) {
+  const normalizedResume = normalizeResume(resume);
+
+  if (!Object.hasOwn(RESUME_SETTINGS_DEFAULTS, settingId)) {
+    return normalizedResume;
+  }
+
+  const [min, max] = SETTING_RANGES[settingId] || [RESUME_SETTINGS_MIN, RESUME_SETTINGS_MAX];
+
+  return {
+    ...normalizedResume,
+    settings: {
+      ...normalizedResume.settings,
+      [settingId]: clampInteger(value, min, max),
     },
   };
 }
@@ -1567,6 +1606,29 @@ function formatUnitless(value) {
   return `${Number(value.toFixed(3))}`;
 }
 
+function formatSeparatorColor(tone) {
+  const normalizedTone = clampInteger(tone, SEPARATOR_TONE_MIN, SEPARATOR_TONE_MAX);
+
+  if (normalizedTone <= 0) {
+    return 'transparent';
+  }
+
+  return `rgba(0, 0, 0, ${Number((normalizedTone / 100).toFixed(2))})`;
+}
+
+function formatSeparatorWeight(weight) {
+  const normalizedWeight = clampInteger(weight, SEPARATOR_WEIGHT_MIN, SEPARATOR_WEIGHT_MAX);
+  const weightMap = {
+    1: 0.5,
+    2: 1,
+    3: 1.5,
+    4: 2,
+    5: 3,
+  };
+
+  return formatPx(weightMap[normalizedWeight] || 1);
+}
+
 export function getResumePresentationVars(settings, template) {
   const normalizedSettings = normalizeResumeSettings(settings);
   const base = resolvePresentationBase(template);
@@ -1578,6 +1640,8 @@ export function getResumePresentationVars(settings, template) {
   const listLineHeight = clampNumber(base.listLineHeight + (normalizedSettings.lineSpacing * LINE_SPACING_STEP), 1, 2.3);
   const sectionGap = Math.max(0, base.sectionGapPx + (normalizedSettings.sectionSpacing * SECTION_SPACING_STEP));
   const sectionHeadingGap = Math.max(0, base.sectionHeadingGapPx + (normalizedSettings.sectionSpacing * SECTION_SPACING_STEP));
+  const personalSeparatorGap = Math.max(0, sectionGap + (normalizedSettings.personalSeparatorGap * SEPARATOR_GAP_STEP));
+  const sectionSeparatorGap = Math.max(0, sectionGap + (normalizedSettings.sectionSeparatorGap * SEPARATOR_GAP_STEP));
   const entryGap = Math.max(0, base.entryGapPx + (normalizedSettings.entrySpacing * ENTRY_SPACING_STEP));
   const repeatedEntryGap = Math.max(0, base.repeatedEntryGapPx + (normalizedSettings.entrySpacing * ENTRY_SPACING_STEP));
   const detailGap = Math.max(0, base.detailGapPx + (normalizedSettings.entrySpacing * ENTRY_SPACING_STEP));
@@ -1604,6 +1668,12 @@ export function getResumePresentationVars(settings, template) {
     '--resume-detail-line-height': formatUnitless(detailLineHeight),
     '--resume-list-line-height': formatUnitless(listLineHeight),
     '--resume-section-gap': formatPx(sectionGap),
+    '--resume-personal-separator-gap': formatPx(personalSeparatorGap),
+    '--resume-section-separator-gap': formatPx(sectionSeparatorGap),
+    '--resume-personal-separator-color': formatSeparatorColor(normalizedSettings.personalSeparatorTone),
+    '--resume-section-separator-color': formatSeparatorColor(normalizedSettings.sectionSeparatorTone),
+    '--resume-personal-separator-weight': formatSeparatorWeight(normalizedSettings.personalSeparatorWeight),
+    '--resume-section-separator-weight': formatSeparatorWeight(normalizedSettings.sectionSeparatorWeight),
     '--resume-section-heading-gap': formatPx(sectionHeadingGap),
     '--resume-entry-gap': formatPx(entryGap),
     '--resume-repeated-entry-gap': formatPx(repeatedEntryGap),

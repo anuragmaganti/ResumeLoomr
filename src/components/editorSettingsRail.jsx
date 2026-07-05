@@ -8,7 +8,6 @@ const settingOptions = [
 
 const advancedSettingOptions = [
   { id: "lineSpacing", label: "Line spacing", shortLabel: "Line gap" },
-  { id: "sectionSpacing", label: "Section spacing", shortLabel: "Section gap" },
   { id: "entrySpacing", label: "Entry spacing", shortLabel: "Entry gap" },
   { id: "headingSize", label: "Heading size", shortLabel: "Headings" },
   { id: "nameSize", label: "Name size", shortLabel: "Name size" }

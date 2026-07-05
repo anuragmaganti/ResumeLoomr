@@ -15,6 +15,12 @@
   --resume-detail-line-height: 1.45;
   --resume-list-line-height: 1.4;
   --resume-section-gap: 12px;
+  --resume-personal-separator-gap: 12px;
+  --resume-section-separator-gap: 12px;
+  --resume-personal-separator-color: var(--resume-page-divider);
+  --resume-section-separator-color: var(--resume-page-divider);
+  --resume-personal-separator-weight: 1px;
+  --resume-section-separator-weight: 1px;
   --resume-section-heading-gap: 8px;
   --resume-entry-gap: 6px;
   --resume-repeated-entry-gap: 8px;
@@ -408,9 +414,18 @@ html[data-theme="dark"] .resumePage {
 
 .resumeSection {
   position: relative;
-  margin-bottom: var(--resume-section-gap);
-  padding-bottom: var(--resume-section-gap);
-  border-bottom: 1px solid var(--resume-page-divider);
+  --resume-active-separator-gap: var(--resume-section-separator-gap, var(--resume-section-gap));
+  --resume-active-separator-color: var(--resume-section-separator-color, var(--resume-page-divider));
+  --resume-active-separator-weight: var(--resume-section-separator-weight, 1px);
+  margin-bottom: var(--resume-active-separator-gap);
+  padding-bottom: var(--resume-active-separator-gap);
+  border-bottom: var(--resume-active-separator-weight) solid var(--resume-active-separator-color);
+}
+
+.personalSection {
+  --resume-active-separator-gap: var(--resume-personal-separator-gap, var(--resume-section-gap));
+  --resume-active-separator-color: var(--resume-personal-separator-color, var(--resume-page-divider));
+  --resume-active-separator-weight: var(--resume-personal-separator-weight, 1px);
 }
 
 .resumeSection:last-child {
@@ -428,10 +443,10 @@ html[data-theme="dark"] .resumePage {
 .sectionSeparatorControl {
   position: absolute;
   right: 0;
-  bottom: calc(var(--resume-section-gap) * -0.5);
+  bottom: calc(var(--resume-active-separator-gap) * -0.5);
   left: 0;
   z-index: 4;
-  height: max(12px, var(--resume-section-gap));
+  height: max(12px, var(--resume-active-separator-gap));
   padding: 0;
   border: 0;
   background: transparent;
@@ -458,8 +473,8 @@ html[data-theme="dark"] .resumePage {
 .sectionSeparatorControl[data-separator-scope="personal"]:focus-visible::before,
 .resumePage:has(.sectionSeparatorControl[data-separator-scope="section"]:hover) .sectionSeparatorControl[data-separator-scope="section"]::before,
 .resumePage:has(.sectionSeparatorControl[data-separator-scope="section"]:focus-visible) .sectionSeparatorControl[data-separator-scope="section"]::before {
-  height: 3px;
-  background: color-mix(in srgb, var(--color-accent) 52%, var(--resume-page-divider));
+  height: max(3px, var(--resume-active-separator-weight));
+  background: color-mix(in srgb, var(--color-accent) 52%, var(--resume-active-separator-color));
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 14%, transparent);
 }
 

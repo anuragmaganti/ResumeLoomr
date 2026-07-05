@@ -1538,6 +1538,88 @@ html[data-theme="dark"] .brandLogo--dark {
   background: transparent;
 }
 
+.separatorSettingsPopup {
+  position: fixed;
+  z-index: 1000;
+  width: min(280px, calc(100vw - 24px));
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface) 96%, var(--color-bg));
+  color: var(--color-text);
+  box-shadow:
+    0 18px 44px color-mix(in srgb, #020617 18%, transparent),
+    0 2px 8px color-mix(in srgb, #020617 10%, transparent);
+  outline: none;
+}
+
+.separatorSettingsTitle {
+  padding: 6px 8px 7px;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.separatorSettingsControls {
+  display: grid;
+  gap: 3px;
+}
+
+.separatorSliderControl {
+  display: grid;
+  gap: 6px;
+  padding: 9px 8px 8px;
+  border-radius: 10px;
+  cursor: default;
+}
+
+.separatorSliderControl:hover,
+.separatorSliderControl:focus-within {
+  background: color-mix(in srgb, var(--color-accent-soft) 38%, transparent);
+}
+
+.separatorSliderHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.75rem;
+  font-weight: 760;
+}
+
+.separatorSliderHeader span:last-child {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.separatorSliderControl input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.separatorSliderMarks {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  color: var(--color-text-subtle);
+  font-size: 0.5625rem;
+  font-weight: 720;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.separatorSliderMarks span:first-child {
+  text-align: left;
+}
+
+.separatorSliderMarks span:last-child {
+  text-align: right;
+}
+
 .button.settingsAdjustButton:not(:disabled):hover {
   border-color: var(--color-border-strong);
   background: var(--color-surface-muted);
@@ -2343,6 +2425,7 @@ html[data-theme="dark"] .sectionAddDialog {
   .floatingSaveStatus,
   .floatingThemeToggle,
   .accountSettingsOverlay,
+  .separatorSettingsPopup,
   .mobileWorkspaceToggle,
   .workspaceColumnEditor,
   .editorPanel {

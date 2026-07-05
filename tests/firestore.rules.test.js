@@ -65,6 +65,12 @@ function createResumeDoc(overrides = {}) {
         headingSize: 0,
         nameSize: 0,
         summaryWidthPercent: 100,
+        personalSeparatorTone: 50,
+        sectionSeparatorTone: 50,
+        personalSeparatorWeight: 2,
+        sectionSeparatorWeight: 2,
+        personalSeparatorGap: 0,
+        sectionSeparatorGap: 0,
       },
       sampleDisplay: {
         hasStarted: false,
@@ -125,6 +131,14 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
         ),
       },
     })));
+    await assertSucceeds(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        settings: Object.fromEntries(
+          Object.entries(createResumeDoc().resume.settings).filter(([key]) => !key.includes('Separator')),
+        ),
+      },
+    })));
     await assertFails(otherDb.doc('users/user-a/resumes/resume-1').get());
     await assertFails(anonDb.doc('users/user-a/workspace/main').get());
     await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set({
@@ -137,6 +151,12 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
         settings: {
           ...createResumeDoc().resume.settings,
           summaryWidthPercent: 75,
+          personalSeparatorTone: 0,
+          sectionSeparatorTone: 100,
+          personalSeparatorWeight: 1,
+          sectionSeparatorWeight: 5,
+          personalSeparatorGap: -5,
+          sectionSeparatorGap: 5,
         },
       },
     })));
@@ -146,6 +166,33 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
         settings: {
           ...createResumeDoc().resume.settings,
           summaryWidthPercent: 74,
+        },
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        settings: {
+          ...createResumeDoc().resume.settings,
+          sectionSeparatorTone: 101,
+        },
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        settings: {
+          ...createResumeDoc().resume.settings,
+          personalSeparatorWeight: 0,
+        },
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        settings: {
+          ...createResumeDoc().resume.settings,
+          sectionSeparatorGap: 6,
         },
       },
     })));

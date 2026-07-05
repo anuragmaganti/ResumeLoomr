@@ -11,6 +11,7 @@ import SignedOutEditingPrompt from './components/signedOutEditingPrompt';
 import AccountSwitchPrompt from './components/accountSwitchPrompt';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/editorPanel';
+import SeparatorSettingsPopup from './components/separatorSettingsPopup';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
 import { importResumeFile } from './lib/importResume.js';
@@ -88,6 +89,7 @@ function App() {
   const [editorCaretTarget, setEditorCaretTarget] = useState(null);
   const [previewLayout, setPreviewLayout] = useState({ mode: 'fitPage', width: 0 });
   const [sampleOrderOverridesByResumeId, setSampleOrderOverridesByResumeId] = useState({});
+  const [separatorSettingsAnchor, setSeparatorSettingsAnchor] = useState(null);
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') {
       return 'light';
@@ -175,6 +177,27 @@ function App() {
   const displayPreviewModel = samplePreviewModel || previewModel;
   const isSamplePreview = Boolean(samplePreviewModel);
   const isImportingResume = importState.status === 'processing';
+
+  const closeSeparatorSettings = useCallback(() => {
+    const triggerElement = separatorSettingsAnchor?.triggerElement;
+
+    setSeparatorSettingsAnchor(null);
+    window.requestAnimationFrame(() => {
+      triggerElement?.focus?.();
+    });
+  }, [separatorSettingsAnchor]);
+
+  const handleSeparatorSettingsOpen = useCallback((anchor) => {
+    setSeparatorSettingsAnchor(anchor);
+  }, []);
+
+  const handleSeparatorSettingChange = useCallback((settingId, value) => {
+    actions.setResumeSettingValue(settingId, value);
+  }, [actions]);
+
+  useEffect(() => {
+    setSeparatorSettingsAnchor(null);
+  }, [activeResumeId]);
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -630,6 +653,15 @@ function App() {
           onUpload={handleImportResumeUpload}
         />
 
+        {separatorSettingsAnchor && (
+          <SeparatorSettingsPopup
+            anchor={separatorSettingsAnchor}
+            settings={resume.settings}
+            onChange={handleSeparatorSettingChange}
+            onClose={closeSeparatorSettings}
+          />
+        )}
+
         <SignedOutEditingPrompt
           isOpen={isSignedOutPromptOpen}
           busy={auth.authBusy || isSignOutInProgress}
@@ -761,6 +793,7 @@ function App() {
               onReorderSectionEntries={handlePreviewReorderSectionEntries}
               onReorderSectionTextList={handlePreviewReorderSectionTextList}
               onSummaryWidthChange={actions.setSummaryWidthPercent}
+              onSeparatorSettingsOpen={handleSeparatorSettingsOpen}
               activeEditorCaret={editorCaretTarget}
               previewPulseTarget={previewPulseTarget}
               showEmptyResumeChoice={shouldShowEmptyResumeChoice}

@@ -194,7 +194,26 @@ function previewSectionClassName(className, showSeparator) {
     return `${className}${showSeparator ? '' : ' resumeSection--lastVisible'}`;
 }
 
-function SortablePreviewSection({ blockId, className, previewScale, showSeparator = true, children }) {
+function openSeparatorSettings(event, onSeparatorSettingsOpen, scope, sectionId) {
+    event.preventDefault();
+    event.stopPropagation();
+    onSeparatorSettingsOpen?.({
+        scope,
+        sectionId,
+        x: event.clientX,
+        y: event.clientY,
+        triggerElement: event.currentTarget,
+    });
+}
+
+function SortablePreviewSection({
+    blockId,
+    className,
+    previewScale,
+    showSeparator = true,
+    onSeparatorSettingsOpen,
+    children,
+}) {
     const sortableId = sectionDragId(blockId);
     const {
         attributes,
@@ -230,13 +249,15 @@ function SortablePreviewSection({ blockId, className, previewScale, showSeparato
                     data-separator-scope="section"
                     data-separator-section-id={blockId}
                     aria-label="Section separator settings"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'section', blockId)}
                 />
             )}
         </div>
     );
 }
 
-function StaticPreviewSection({ blockId, className, showSeparator = true, children }) {
+function StaticPreviewSection({ blockId, className, showSeparator = true, onSeparatorSettingsOpen, children }) {
     return (
         <div className={previewSectionClassName(className, showSeparator)} data-page-break-kind="section">
             {children({})}
@@ -247,6 +268,8 @@ function StaticPreviewSection({ blockId, className, showSeparator = true, childr
                     data-separator-scope="section"
                     data-separator-section-id={blockId}
                     aria-label="Section separator settings"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'section', blockId)}
                 />
             )}
         </div>
@@ -447,6 +470,7 @@ export default function ResumePreview({
     onReorderSectionEntries,
     onReorderSectionTextList,
     onSummaryWidthChange,
+    onSeparatorSettingsOpen,
     activeEditorCaret,
     previewPulseTarget,
     showEmptyResumeChoice = false,
@@ -1110,6 +1134,7 @@ export default function ResumePreview({
                 className={`resumeSection ${sectionClassName}`}
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
+                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
             >
                 {(sectionHandleProps) => (
                     <>
@@ -1180,6 +1205,8 @@ export default function ResumePreview({
                         data-separator-scope="personal"
                         data-separator-section-id="personal"
                         aria-label="Personal separator settings"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'personal', 'personal')}
                     />
                 )}
             </div>
@@ -1350,6 +1377,7 @@ export default function ResumePreview({
                 className="resumeSection educationDiv"
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
+                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
             >
                 {(sectionHandleProps) => (
                     <>
@@ -1440,6 +1468,7 @@ export default function ResumePreview({
                 className="resumeSection experienceDiv"
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
+                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
             >
                 {(sectionHandleProps) => (
                     <>
@@ -1504,6 +1533,7 @@ export default function ResumePreview({
                 className="resumeSection skillsDiv"
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
+                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
             >
                 {(sectionHandleProps) => (
                     <>
@@ -1578,6 +1608,7 @@ export default function ResumePreview({
                 className="resumeSection projectsDiv"
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
+                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
             >
                 {(sectionHandleProps) => (
                     <>
@@ -1633,6 +1664,7 @@ export default function ResumePreview({
                 className="resumeSection languagesDiv"
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
+                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
             >
                 {(sectionHandleProps) => (
                     <>
@@ -1724,6 +1756,7 @@ export default function ResumePreview({
                 className="resumeSection customDiv"
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
+                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
             >
                 {(sectionHandleProps) => (
                     <>

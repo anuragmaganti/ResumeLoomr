@@ -30,6 +30,18 @@ service cloud.firestore {
       return value is int && value >= 75 && value <= 100;
     }
 
+    function isValidSeparatorTone(value) {
+      return value is int && value >= 0 && value <= 100;
+    }
+
+    function isValidSeparatorWeight(value) {
+      return value is int && value >= 1 && value <= 5;
+    }
+
+    function isValidSeparatorGap(value) {
+      return value is int && value >= -5 && value <= 5;
+    }
+
     function isValidSettings(settings) {
       return settings is map &&
         settings.keys().hasOnly([
@@ -41,7 +53,13 @@ service cloud.firestore {
           'entrySpacing',
           'headingSize',
           'nameSize',
-          'summaryWidthPercent'
+          'summaryWidthPercent',
+          'personalSeparatorTone',
+          'sectionSeparatorTone',
+          'personalSeparatorWeight',
+          'sectionSeparatorWeight',
+          'personalSeparatorGap',
+          'sectionSeparatorGap'
         ]) &&
         isValidSetting(settings.textSize) &&
         isValidSetting(settings.horizontalMargins) &&
@@ -54,6 +72,30 @@ service cloud.firestore {
         (
           !settings.keys().hasAny(['summaryWidthPercent']) ||
           isValidSummaryWidth(settings.summaryWidthPercent)
+        ) &&
+        (
+          !settings.keys().hasAny(['personalSeparatorTone']) ||
+          isValidSeparatorTone(settings.personalSeparatorTone)
+        ) &&
+        (
+          !settings.keys().hasAny(['sectionSeparatorTone']) ||
+          isValidSeparatorTone(settings.sectionSeparatorTone)
+        ) &&
+        (
+          !settings.keys().hasAny(['personalSeparatorWeight']) ||
+          isValidSeparatorWeight(settings.personalSeparatorWeight)
+        ) &&
+        (
+          !settings.keys().hasAny(['sectionSeparatorWeight']) ||
+          isValidSeparatorWeight(settings.sectionSeparatorWeight)
+        ) &&
+        (
+          !settings.keys().hasAny(['personalSeparatorGap']) ||
+          isValidSeparatorGap(settings.personalSeparatorGap)
+        ) &&
+        (
+          !settings.keys().hasAny(['sectionSeparatorGap']) ||
+          isValidSeparatorGap(settings.sectionSeparatorGap)
         );
     }
 

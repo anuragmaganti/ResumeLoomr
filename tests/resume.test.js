@@ -30,6 +30,7 @@ import {
   reorderSectionBlockTextListItem,
   reorderResumeSectionBlocksToMatch,
   reorderWorkspaceResumesToMatch,
+  setResumeSettingValue,
   setResumeSummaryWidthPercent,
   updatePersonalField,
   updateRoleBlockActivity,
@@ -126,6 +127,12 @@ test('createEmptyResume returns the block-first resume shape', () => {
     headingSize: 0,
     nameSize: 0,
     summaryWidthPercent: 100,
+    personalSeparatorTone: 50,
+    sectionSeparatorTone: 50,
+    personalSeparatorWeight: 2,
+    sectionSeparatorWeight: 2,
+    personalSeparatorGap: 0,
+    sectionSeparatorGap: 0,
   });
   assert.deepEqual(
     resume.sections.map((section) => [section.id, section.kind, section.title]),
@@ -559,8 +566,12 @@ test('resume settings produce bounded preview and print variables', () => {
   assert.equal(settings.textSize, 5);
   assert.equal(settings.horizontalMargins, -5);
   assert.equal(settings.summaryWidthPercent, 100);
+  assert.equal(settings.personalSeparatorTone, 50);
+  assert.equal(settings.sectionSeparatorWeight, 2);
   assert.match(vars['--resume-page-margin-inline'], /in$/);
   assert.equal(vars['--resume-summary-width-percent'], '100%');
+  assert.equal(vars['--resume-section-separator-color'], 'rgba(0, 0, 0, 0.5)');
+  assert.equal(vars['--resume-section-separator-weight'], '1px');
   assert.match(getResumePrintPageRule(settings, 'compact'), /^@page/);
 
   const updatedResume = updateResumeSetting(createEmptyResume(), 'textSize', 1);
@@ -571,6 +582,15 @@ test('resume settings produce bounded preview and print variables', () => {
 
   const wideSummary = setResumeSummaryWidthPercent(createEmptyResume(), 110);
   assert.equal(wideSummary.settings.summaryWidthPercent, 100);
+
+  const hiddenPersonalSeparator = setResumeSettingValue(createEmptyResume(), 'personalSeparatorTone', -20);
+  assert.equal(hiddenPersonalSeparator.settings.personalSeparatorTone, 0);
+
+  const thickSectionSeparator = setResumeSettingValue(createEmptyResume(), 'sectionSeparatorWeight', 99);
+  assert.equal(thickSectionSeparator.settings.sectionSeparatorWeight, 5);
+
+  const compactSectionGap = setResumeSettingValue(createEmptyResume(), 'sectionSeparatorGap', -99);
+  assert.equal(compactSectionGap.settings.sectionSeparatorGap, -5);
 });
 
 test('preview page break helper uses printable height for raw markers', () => {
