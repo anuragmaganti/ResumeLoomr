@@ -30,6 +30,7 @@ import {
   reorderSectionBlockTextListItem,
   reorderResumeSectionBlocksToMatch,
   reorderWorkspaceResumesToMatch,
+  setResumeSummaryWidthPercent,
   updatePersonalField,
   updateRoleBlockActivity,
   updateRoleBlockEntry,
@@ -124,6 +125,7 @@ test('createEmptyResume returns the block-first resume shape', () => {
     entrySpacing: 0,
     headingSize: 0,
     nameSize: 0,
+    summaryWidthPercent: 100,
   });
   assert.deepEqual(
     resume.sections.map((section) => [section.id, section.kind, section.title]),
@@ -556,11 +558,19 @@ test('resume settings produce bounded preview and print variables', () => {
 
   assert.equal(settings.textSize, 5);
   assert.equal(settings.horizontalMargins, -5);
+  assert.equal(settings.summaryWidthPercent, 100);
   assert.match(vars['--resume-page-margin-inline'], /in$/);
+  assert.equal(vars['--resume-summary-width-percent'], '100%');
   assert.match(getResumePrintPageRule(settings, 'compact'), /^@page/);
 
   const updatedResume = updateResumeSetting(createEmptyResume(), 'textSize', 1);
   assert.equal(updatedResume.settings.textSize, 1);
+
+  const narrowSummary = setResumeSummaryWidthPercent(createEmptyResume(), 10);
+  assert.equal(narrowSummary.settings.summaryWidthPercent, 75);
+
+  const wideSummary = setResumeSummaryWidthPercent(createEmptyResume(), 110);
+  assert.equal(wideSummary.settings.summaryWidthPercent, 100);
 });
 
 test('preview page break helper uses printable height for raw markers', () => {

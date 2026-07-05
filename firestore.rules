@@ -26,6 +26,10 @@ service cloud.firestore {
       return value is int && value >= -5 && value <= 5;
     }
 
+    function isValidSummaryWidth(value) {
+      return value is int && value >= 75 && value <= 100;
+    }
+
     function isValidSettings(settings) {
       return settings is map &&
         settings.keys().hasOnly([
@@ -36,7 +40,8 @@ service cloud.firestore {
           'sectionSpacing',
           'entrySpacing',
           'headingSize',
-          'nameSize'
+          'nameSize',
+          'summaryWidthPercent'
         ]) &&
         isValidSetting(settings.textSize) &&
         isValidSetting(settings.horizontalMargins) &&
@@ -45,7 +50,11 @@ service cloud.firestore {
         isValidSetting(settings.sectionSpacing) &&
         isValidSetting(settings.entrySpacing) &&
         isValidSetting(settings.headingSize) &&
-        isValidSetting(settings.nameSize);
+        isValidSetting(settings.nameSize) &&
+        (
+          !settings.keys().hasAny(['summaryWidthPercent']) ||
+          isValidSummaryWidth(settings.summaryWidthPercent)
+        );
     }
 
     function isValidSampleDisplay(sampleDisplay) {

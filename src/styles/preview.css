@@ -407,6 +407,7 @@ html[data-theme="dark"] .resumePage {
 }
 
 .resumeSection {
+  position: relative;
   margin-bottom: var(--resume-section-gap);
   padding-bottom: var(--resume-section-gap);
   border-bottom: 1px solid var(--resume-page-divider);
@@ -416,6 +417,62 @@ html[data-theme="dark"] .resumePage {
   margin-bottom: 0;
   padding-bottom: 0;
   border-bottom: none;
+}
+
+.resumeSection.resumeSection--lastVisible {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.sectionSeparatorControl {
+  position: absolute;
+  right: 0;
+  bottom: calc(var(--resume-section-gap) * -0.5);
+  left: 0;
+  z-index: 4;
+  height: max(12px, var(--resume-section-gap));
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sectionSeparatorControl::before {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  border-radius: 999px;
+  background: transparent;
+  content: "";
+  transform: translateY(-50%);
+  transition:
+    height var(--transition-fast),
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.sectionSeparatorControl[data-separator-scope="personal"]:hover::before,
+.sectionSeparatorControl[data-separator-scope="personal"]:focus-visible::before,
+.resumePage:has(.sectionSeparatorControl[data-separator-scope="section"]:hover) .sectionSeparatorControl[data-separator-scope="section"]::before,
+.resumePage:has(.sectionSeparatorControl[data-separator-scope="section"]:focus-visible) .sectionSeparatorControl[data-separator-scope="section"]::before {
+  height: 3px;
+  background: color-mix(in srgb, var(--color-accent) 52%, var(--resume-page-divider));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+.sectionSeparatorControl:focus-visible {
+  outline: none;
+}
+
+.resumeSection:last-child .sectionSeparatorControl {
+  display: none;
+}
+
+.resumeSection.resumeSection--lastVisible .sectionSeparatorControl {
+  display: none;
 }
 
 .personalDetails {
@@ -448,13 +505,110 @@ html[data-theme="dark"] .resumePage {
 }
 
 .aboutMe {
-  width: min(100%, 660px);
+  position: relative;
+  width: var(--resume-summary-active-width, var(--resume-summary-width-percent, 100%));
+  max-width: 100%;
   margin: var(--resume-detail-gap) auto 0;
   color: var(--resume-page-heading);
   font-size: var(--resume-body-size);
   line-height: var(--resume-detail-line-height);
   text-align: justify;
   text-align-last: left;
+}
+
+.aboutMe::after {
+  position: absolute;
+  inset: -14px;
+  z-index: -1;
+  content: "";
+}
+
+.summaryResizeHandle {
+  position: absolute;
+  z-index: 3;
+  width: 6px;
+  height: 6px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 62%, #ffffff);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-accent) 72%, var(--resume-page-bg));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  touch-action: none;
+  user-select: none;
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.summaryResizeHandle::before {
+  position: absolute;
+  inset: -8px;
+  content: "";
+}
+
+.summaryResizeHandle--topLeft {
+  top: -5px;
+  left: -5px;
+  cursor: ew-resize;
+}
+
+.summaryResizeHandle--topRight {
+  top: -5px;
+  right: -5px;
+  cursor: ew-resize;
+}
+
+.summaryResizeHandle--bottomLeft {
+  bottom: -5px;
+  left: -5px;
+  cursor: ew-resize;
+}
+
+.summaryResizeHandle--bottomRight {
+  right: -5px;
+  bottom: -5px;
+  cursor: ew-resize;
+}
+
+.summaryResizeEdge {
+  position: absolute;
+  top: -10px;
+  bottom: -10px;
+  z-index: 2;
+  width: 18px;
+  cursor: ew-resize;
+  opacity: 0;
+  pointer-events: none;
+  touch-action: none;
+  user-select: none;
+}
+
+.summaryResizeEdge--left {
+  left: -18px;
+}
+
+.summaryResizeEdge--right {
+  right: -18px;
+}
+
+.aboutMe:hover .summaryResizeHandle,
+.aboutMe:hover .summaryResizeEdge,
+.aboutMe.isSummaryWidthDragging .summaryResizeEdge,
+.aboutMe.isSummaryWidthDragging .summaryResizeHandle {
+  pointer-events: auto;
+}
+
+.aboutMe:hover .summaryResizeHandle,
+.aboutMe.isSummaryWidthDragging .summaryResizeHandle {
+  opacity: 1;
+}
+
+.summaryResizeHandle:hover,
+.aboutMe.isSummaryWidthDragging .summaryResizeHandle {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 24%, transparent);
 }
 
 .educationSection,
@@ -826,6 +980,7 @@ html[data-theme="dark"] .resumePage {
   .previewToolbar,
   .resumePageMarkers,
   .sampleInformationToggle,
+  .sectionSeparatorControl,
   .resumeEmptyState {
     display: none !important;
   }
@@ -880,6 +1035,11 @@ html[data-theme="dark"] .resumePage {
 
   .resumePage [data-preview-drag-handle] {
     cursor: default;
+  }
+
+  .summaryResizeHandle,
+  .summaryResizeEdge {
+    display: none !important;
   }
 
   .previewTextCaret {

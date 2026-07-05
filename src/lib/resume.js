@@ -88,6 +88,7 @@ export const RESUME_SETTINGS_DEFAULTS = {
   entrySpacing: 0,
   headingSize: 0,
   nameSize: 0,
+  summaryWidthPercent: 100,
 };
 export const SAMPLE_DISPLAY_DEFAULTS = {
   hasStarted: false,
@@ -96,6 +97,8 @@ export const SAMPLE_DISPLAY_DEFAULTS = {
 
 const RESUME_SETTINGS_MIN = -5;
 const RESUME_SETTINGS_MAX = 5;
+const SUMMARY_WIDTH_MIN = 75;
+const SUMMARY_WIDTH_MAX = 100;
 const DEFAULT_RESUME_LABEL = 'Resume';
 const TEXT_SIZE_STEP = 0.03;
 const HEADING_SIZE_STEP = 0.05;
@@ -533,10 +536,15 @@ function normalizeSectionBlock(section, index, usedIds) {
 
 export function normalizeResumeSettings(settings) {
   return Object.fromEntries(
-    Object.keys(RESUME_SETTINGS_DEFAULTS).map((key) => [
-      key,
-      clampInteger(settings?.[key] ?? RESUME_SETTINGS_DEFAULTS[key], RESUME_SETTINGS_MIN, RESUME_SETTINGS_MAX),
-    ]),
+    Object.keys(RESUME_SETTINGS_DEFAULTS).map((key) => {
+      const min = key === 'summaryWidthPercent' ? SUMMARY_WIDTH_MIN : RESUME_SETTINGS_MIN;
+      const max = key === 'summaryWidthPercent' ? SUMMARY_WIDTH_MAX : RESUME_SETTINGS_MAX;
+
+      return [
+        key,
+        clampInteger(settings?.[key] ?? RESUME_SETTINGS_DEFAULTS[key], min, max),
+      ];
+    }),
   );
 }
 
@@ -811,7 +819,7 @@ export function updateResumeSetting(resume, settingId, delta) {
   const normalizedResume = normalizeResume(resume);
   const currentValue = normalizedResume.settings[settingId] ?? 0;
 
-  if (!Object.hasOwn(RESUME_SETTINGS_DEFAULTS, settingId)) {
+  if (!Object.hasOwn(RESUME_SETTINGS_DEFAULTS, settingId) || settingId === 'summaryWidthPercent') {
     return normalizedResume;
   }
 
@@ -820,6 +828,18 @@ export function updateResumeSetting(resume, settingId, delta) {
     settings: {
       ...normalizedResume.settings,
       [settingId]: clampInteger(currentValue + delta, RESUME_SETTINGS_MIN, RESUME_SETTINGS_MAX),
+    },
+  };
+}
+
+export function setResumeSummaryWidthPercent(resume, widthPercent) {
+  const normalizedResume = normalizeResume(resume);
+
+  return {
+    ...normalizedResume,
+    settings: {
+      ...normalizedResume.settings,
+      summaryWidthPercent: clampInteger(widthPercent, SUMMARY_WIDTH_MIN, SUMMARY_WIDTH_MAX),
     },
   };
 }
@@ -1589,6 +1609,7 @@ export function getResumePresentationVars(settings, template) {
     '--resume-repeated-entry-gap': formatPx(repeatedEntryGap),
     '--resume-detail-gap': formatPx(detailGap),
     '--resume-list-gap': formatPx(listGap),
+    '--resume-summary-width-percent': `${normalizedSettings.summaryWidthPercent}%`,
     '--resume-print-min-height': formatInches(printMinHeight),
   };
 }

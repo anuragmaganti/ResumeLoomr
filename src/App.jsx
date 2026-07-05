@@ -760,6 +760,7 @@ function App() {
               onReorderSections={reorderSections}
               onReorderSectionEntries={handlePreviewReorderSectionEntries}
               onReorderSectionTextList={handlePreviewReorderSectionTextList}
+              onSummaryWidthChange={actions.setSummaryWidthPercent}
               activeEditorCaret={editorCaretTarget}
               previewPulseTarget={previewPulseTarget}
               showEmptyResumeChoice={shouldShowEmptyResumeChoice}

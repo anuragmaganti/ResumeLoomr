@@ -41,6 +41,7 @@ import {
   reorderWorkspaceResumes,
   reorderWorkspaceResumesToMatch,
   sanitizeWorkspaceResumeName,
+  setResumeSummaryWidthPercent,
   updatePersonalField,
   updateResumeSetting as updateResumeSettingValue,
   updateSampleDisplay,
@@ -981,6 +982,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     },
     updateResumeSetting(settingId, delta) {
       updateResume((currentResume) => updateResumeSettingValue(currentResume, settingId, delta));
+    },
+    setSummaryWidthPercent(widthPercent) {
+      updateResume((currentResume) => setResumeSummaryWidthPercent(currentResume, widthPercent));
     },
     startFromScratch() {
       updateResume((currentResume) => updateSampleDisplay(currentResume, { hasStarted: true }));

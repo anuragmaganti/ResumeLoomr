@@ -64,6 +64,7 @@ function createResumeDoc(overrides = {}) {
         entrySpacing: 0,
         headingSize: 0,
         nameSize: 0,
+        summaryWidthPercent: 100,
       },
       sampleDisplay: {
         hasStarted: false,
@@ -116,12 +117,38 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
         Object.entries(createResumeDoc().resume).filter(([key]) => key !== 'sampleDisplay'),
       ),
     })));
+    await assertSucceeds(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        settings: Object.fromEntries(
+          Object.entries(createResumeDoc().resume.settings).filter(([key]) => key !== 'summaryWidthPercent'),
+        ),
+      },
+    })));
     await assertFails(otherDb.doc('users/user-a/resumes/resume-1').get());
     await assertFails(anonDb.doc('users/user-a/workspace/main').get());
     await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set({
       ...createResumeDoc(),
       template: 'unknown',
     }));
+    await assertSucceeds(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        settings: {
+          ...createResumeDoc().resume.settings,
+          summaryWidthPercent: 75,
+        },
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        settings: {
+          ...createResumeDoc().resume.settings,
+          summaryWidthPercent: 74,
+        },
+      },
+    })));
     await assertSucceeds(ownerDb.doc('users/user-a/resumes/resume-1').delete());
     await assertSucceeds(ownerDb.doc('users/user-a/resumes/missing-resume').delete());
     await assertFails(otherDb.doc('users/user-a/resumes/resume-2').delete());

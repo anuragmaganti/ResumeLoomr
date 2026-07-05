@@ -46,11 +46,23 @@ const personalLinkFieldMap = {
 const DRAG_ID_SEPARATOR = '::';
 const DEFAULT_PREVIEW_PAGE_MIN_HEIGHT = PRINT_PAGE_HEIGHT_PX;
 const FIRST_SECTION_ENTRY_SNAP_DISTANCE_PX = 144;
+const SUMMARY_WIDTH_MIN_PERCENT = 75;
+const SUMMARY_WIDTH_MAX_PERCENT = 100;
 
 function parseCssPixelValue(value, fallback = 0) {
     const parsed = Number.parseFloat(value);
 
     return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clampSummaryWidthPercent(value) {
+    const numericValue = Number(value);
+
+    if (!Number.isFinite(numericValue)) {
+        return 100;
+    }
+
+    return Math.max(SUMMARY_WIDTH_MIN_PERCENT, Math.min(SUMMARY_WIDTH_MAX_PERCENT, Math.round(numericValue)));
 }
 
 function parseCssLengthToPixels(value, fallback = 0) {
@@ -178,7 +190,11 @@ function normalizePreviewSortableTransform(transform, previewScale) {
     };
 }
 
-function SortablePreviewSection({ blockId, className, previewScale, children }) {
+function previewSectionClassName(className, showSeparator) {
+    return `${className}${showSeparator ? '' : ' resumeSection--lastVisible'}`;
+}
+
+function SortablePreviewSection({ blockId, className, previewScale, showSeparator = true, children }) {
     const sortableId = sectionDragId(blockId);
     const {
         attributes,
@@ -203,18 +219,36 @@ function SortablePreviewSection({ blockId, className, previewScale, children }) 
             ref={setNodeRef}
             data-preview-sortable-id={sortableId}
             data-page-break-kind="section"
-            className={`${className} previewSortableItem previewSortableSection ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
+            className={`${previewSectionClassName(className, showSeparator)} previewSortableItem previewSortableSection ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
             style={style}
         >
             {children(handleProps)}
+            {showSeparator && (
+                <button
+                    type="button"
+                    className="sectionSeparatorControl"
+                    data-separator-scope="section"
+                    data-separator-section-id={blockId}
+                    aria-label="Section separator settings"
+                />
+            )}
         </div>
     );
 }
 
-function StaticPreviewSection({ className, children }) {
+function StaticPreviewSection({ blockId, className, showSeparator = true, children }) {
     return (
-        <div className={className} data-page-break-kind="section">
+        <div className={previewSectionClassName(className, showSeparator)} data-page-break-kind="section">
             {children({})}
+            {blockId && showSeparator && (
+                <button
+                    type="button"
+                    className="sectionSeparatorControl"
+                    data-separator-scope="section"
+                    data-separator-section-id={blockId}
+                    aria-label="Section separator settings"
+                />
+            )}
         </div>
     );
 }
@@ -412,6 +446,7 @@ export default function ResumePreview({
     onReorderSections,
     onReorderSectionEntries,
     onReorderSectionTextList,
+    onSummaryWidthChange,
     activeEditorCaret,
     previewPulseTarget,
     showEmptyResumeChoice = false,
@@ -425,9 +460,11 @@ export default function ResumePreview({
     const resumeRef = useRef(null);
     const previewFrameRef = useRef(null);
     const suppressPreviewClickRef = useRef(false);
-    const activeDragScrollRef = useRef({ x: 0, y: 0, capturedAt: 0 });
+    const activeDragScrollRef = useRef({ x: 0, y: 0, captured: false });
+    const summaryWidthDragRef = useRef(null);
     const [activeDragMeta, setActiveDragMeta] = useState(null);
     const [activeDragRect, setActiveDragRect] = useState(null);
+    const [summaryWidthDrag, setSummaryWidthDrag] = useState(null);
     const [pageMetrics, setPageMetrics] = useState({
         pageWidth: 0,
         pageHeight: 0,
@@ -439,6 +476,9 @@ export default function ResumePreview({
     });
     const presentationVars = useMemo(() => getResumePresentationVars(settings, template), [settings, template]);
     const printPageRule = useMemo(() => getResumePrintPageRule(settings, template), [settings, template]);
+    const summaryWidthPercent = clampSummaryWidthPercent(settings?.summaryWidthPercent);
+    const renderedSummaryWidthPercent = summaryWidthDrag?.percent || summaryWidthPercent;
+    const canResizeSummary = template !== 'executive' && typeof onSummaryWidthChange === 'function';
     const sensors = useSensors(
         useSensor(ResumeLoomrPointerSensor, { activationConstraint: { distance: 6 } }),
         useSensor(ResumeLoomrKeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -725,11 +765,101 @@ export default function ResumePreview({
         }, 200);
     }
 
+    function handleSummaryResizePointerDown(event, side) {
+        if (!canResizeSummary) {
+            return;
+        }
+
+        const summaryElement = event.currentTarget.closest('.aboutMe');
+        const containerElement = summaryElement?.parentElement;
+        const containerWidth = containerElement?.getBoundingClientRect().width || 0;
+
+        if (!summaryElement || containerWidth <= 0) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        suppressNextPreviewClick();
+
+        const startPercent = clampSummaryWidthPercent(summaryWidthDrag?.percent || summaryWidthPercent);
+        summaryWidthDragRef.current = {
+            pointerId: event.pointerId,
+            side,
+            startX: event.clientX,
+            startPercent,
+            currentPercent: startPercent,
+            containerWidth,
+        };
+        setSummaryWidthDrag({ percent: startPercent });
+    }
+
+    function handleSummaryResizePointerMove(event) {
+        const drag = summaryWidthDragRef.current;
+
+        if (!drag || drag.pointerId !== event.pointerId) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const direction = drag.side === 'left' ? -1 : 1;
+        const deltaPercent = ((event.clientX - drag.startX) * direction * 2 * 100) / drag.containerWidth;
+        const nextPercent = clampSummaryWidthPercent(drag.startPercent + deltaPercent);
+
+        drag.currentPercent = nextPercent;
+        setSummaryWidthDrag((current) => (current?.percent === nextPercent ? current : { percent: nextPercent }));
+    }
+
+    function finishSummaryResize(event) {
+        const drag = summaryWidthDragRef.current;
+
+        if (!drag || drag.pointerId !== event.pointerId) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        suppressNextPreviewClick();
+        summaryWidthDragRef.current = null;
+        setSummaryWidthDrag(null);
+        onSummaryWidthChange?.(drag.currentPercent);
+    }
+
+    function renderSummaryResizeHandle(corner, side) {
+        return (
+            <span
+                aria-hidden="true"
+                className={`summaryResizeHandle summaryResizeHandle--${corner}`}
+                onPointerDown={(event) => handleSummaryResizePointerDown(event, side)}
+                onPointerMove={handleSummaryResizePointerMove}
+                onPointerUp={finishSummaryResize}
+                onPointerCancel={finishSummaryResize}
+            />
+        );
+    }
+
+    function renderSummaryResizeEdge(side) {
+        return (
+            <span
+                aria-hidden="true"
+                className={`summaryResizeEdge summaryResizeEdge--${side}`}
+                onPointerDown={(event) => handleSummaryResizePointerDown(event, side)}
+                onPointerMove={handleSummaryResizePointerMove}
+                onPointerUp={finishSummaryResize}
+                onPointerCancel={finishSummaryResize}
+            />
+        );
+    }
+
     function capturePreviewDragScroll() {
         activeDragScrollRef.current = {
             x: window.scrollX,
             y: window.scrollY,
-            capturedAt: Date.now(),
+            captured: true,
         };
     }
 
@@ -740,9 +870,7 @@ export default function ResumePreview({
     }
 
     function getPreviewDragScrollTarget() {
-        const hasFreshScrollCapture = Date.now() - activeDragScrollRef.current.capturedAt < 1000;
-
-        return hasFreshScrollCapture
+        return activeDragScrollRef.current.captured
             ? {
                 scrollX: activeDragScrollRef.current.x,
                 scrollY: activeDragScrollRef.current.y,
@@ -753,11 +881,11 @@ export default function ResumePreview({
             };
     }
 
-    function openPreviewEditTarget(target) {
+    function openPreviewEditTarget(target, scrollTarget = getPreviewDragScrollTarget()) {
         if (target?.path) {
             onEditTarget?.({
                 ...target,
-                ...getPreviewDragScrollTarget(),
+                ...scrollTarget,
             });
         }
     }
@@ -771,9 +899,7 @@ export default function ResumePreview({
     }
 
     function handlePreviewDragStart(event) {
-        const hasFreshScrollCapture = Date.now() - activeDragScrollRef.current.capturedAt < 1000;
-
-        if (!hasFreshScrollCapture) {
+        if (!activeDragScrollRef.current.captured) {
             capturePreviewDragScroll();
         }
 
@@ -786,14 +912,16 @@ export default function ResumePreview({
     function handlePreviewDragCancel() {
         setActiveDragMeta(null);
         setActiveDragRect(null);
-        activeDragScrollRef.current = { x: 0, y: 0, capturedAt: 0 };
+        activeDragScrollRef.current = { x: 0, y: 0, captured: false };
     }
 
     function handlePreviewDragEnd(event) {
         const activeMeta = parsePreviewDragId(event.active.id);
         const overMeta = event.over ? parsePreviewDragId(event.over.id) : null;
+        const scrollTarget = getPreviewDragScrollTarget();
         setActiveDragMeta(null);
         setActiveDragRect(null);
+        activeDragScrollRef.current = { x: 0, y: 0, captured: false };
 
         if (!overMeta || !areCompatiblePreviewDragItems(activeMeta, overMeta)) {
             return;
@@ -815,7 +943,7 @@ export default function ResumePreview({
                 sectionId: activeMeta.sectionId,
                 field: '__title',
                 path: sectionTitleEditorPath(activeMeta.sectionId),
-            });
+            }, scrollTarget);
             return;
         }
 
@@ -842,7 +970,7 @@ export default function ResumePreview({
                 entryId: activeMeta.entryId,
                 field,
                 path: sectionEntryEditorPath(activeMeta.sectionId, activeMeta.entryId, field),
-            });
+            }, scrollTarget);
             return;
         }
 
@@ -861,7 +989,7 @@ export default function ResumePreview({
                 field: activeMeta.field,
                 itemIndex: overMeta.itemIndex,
                 path: sectionEntryListEditorPath(activeMeta.sectionId, activeMeta.entryId, activeMeta.field, overMeta.itemIndex),
-            });
+            }, scrollTarget);
         }
     }
 
@@ -924,6 +1052,7 @@ export default function ResumePreview({
         dateKey = 'years',
         titleKey = 'title',
         sortable = true,
+        showSeparator = true,
     }) {
         const entries = block.entries;
         const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
@@ -975,7 +1104,13 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className={`resumeSection ${sectionClassName}`} previewScale={pageMetrics.scale}>
+            <SectionShell
+                key={block.id}
+                blockId={block.id}
+                className={`resumeSection ${sectionClassName}`}
+                previewScale={pageMetrics.scale}
+                showSeparator={showSeparator}
+            >
                 {(sectionHandleProps) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -992,13 +1127,13 @@ export default function ResumePreview({
         );
     }
 
-    function renderPersonalSection() {
+    function renderPersonalSection({ showSeparator = true } = {}) {
         if (!previewModel.showPersonal) {
             return null;
         }
 
         return (
-            <div className="resumeSection personalSection" key="personal">
+            <div className={previewSectionClassName('resumeSection personalSection', showSeparator)} key="personal">
                 <h1 {...personalTarget('name')}>
                     {renderTextWithCaret(previewModel.personal.name, personalEditorPath('name'), { fallback: "Your Name" })}
                 </h1>
@@ -1020,15 +1155,38 @@ export default function ResumePreview({
                 )}
 
                 {previewModel.personal.aboutMe && (
-                    <div className="aboutMe" {...personalTarget('aboutMe')}>
+                    <div
+                        className={`aboutMe${summaryWidthDrag ? ' isSummaryWidthDragging' : ''}`}
+                        style={canResizeSummary ? { '--resume-summary-active-width': `${renderedSummaryWidthPercent}%` } : undefined}
+                        {...personalTarget('aboutMe')}
+                    >
                         {renderTextWithCaret(previewModel.personal.aboutMe, personalEditorPath('aboutMe'))}
+                        {canResizeSummary && (
+                            <>
+                                {renderSummaryResizeEdge('left')}
+                                {renderSummaryResizeEdge('right')}
+                                {renderSummaryResizeHandle('topLeft', 'left')}
+                                {renderSummaryResizeHandle('topRight', 'right')}
+                                {renderSummaryResizeHandle('bottomLeft', 'left')}
+                                {renderSummaryResizeHandle('bottomRight', 'right')}
+                            </>
+                        )}
                     </div>
+                )}
+                {showSeparator && (
+                    <button
+                        type="button"
+                        className="sectionSeparatorControl"
+                        data-separator-scope="personal"
+                        data-separator-section-id="personal"
+                        aria-label="Personal separator settings"
+                    />
                 )}
             </div>
         );
     }
 
-    function renderEducationSection(block, { sortable = true } = {}) {
+    function renderEducationSection(block, { sortable = true, showSeparator = true } = {}) {
         const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
@@ -1186,7 +1344,13 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className="resumeSection educationDiv" previewScale={pageMetrics.scale}>
+            <SectionShell
+                key={block.id}
+                blockId={block.id}
+                className="resumeSection educationDiv"
+                previewScale={pageMetrics.scale}
+                showSeparator={showSeparator}
+            >
                 {(sectionHandleProps) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -1203,7 +1367,7 @@ export default function ResumePreview({
         );
     }
 
-    function renderRolesSection(block, { sortable = true } = {}) {
+    function renderRolesSection(block, { sortable = true, showSeparator = true } = {}) {
         const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
@@ -1270,7 +1434,13 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className="resumeSection experienceDiv" previewScale={pageMetrics.scale}>
+            <SectionShell
+                key={block.id}
+                blockId={block.id}
+                className="resumeSection experienceDiv"
+                previewScale={pageMetrics.scale}
+                showSeparator={showSeparator}
+            >
                 {(sectionHandleProps) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -1287,7 +1457,7 @@ export default function ResumePreview({
         );
     }
 
-    function renderSkillsSection(block, { sortable = true } = {}) {
+    function renderSkillsSection(block, { sortable = true, showSeparator = true } = {}) {
         const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
@@ -1328,7 +1498,13 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className="resumeSection skillsDiv" previewScale={pageMetrics.scale}>
+            <SectionShell
+                key={block.id}
+                blockId={block.id}
+                className="resumeSection skillsDiv"
+                previewScale={pageMetrics.scale}
+                showSeparator={showSeparator}
+            >
                 {(sectionHandleProps) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -1345,7 +1521,7 @@ export default function ResumePreview({
         );
     }
 
-    function renderProjectsSection(block, { sortable = true } = {}) {
+    function renderProjectsSection(block, { sortable = true, showSeparator = true } = {}) {
         const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
@@ -1396,7 +1572,13 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className="resumeSection projectsDiv" previewScale={pageMetrics.scale}>
+            <SectionShell
+                key={block.id}
+                blockId={block.id}
+                className="resumeSection projectsDiv"
+                previewScale={pageMetrics.scale}
+                showSeparator={showSeparator}
+            >
                 {(sectionHandleProps) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -1413,7 +1595,7 @@ export default function ResumePreview({
         );
     }
 
-    function renderLanguagesSection(block, { sortable = true } = {}) {
+    function renderLanguagesSection(block, { sortable = true, showSeparator = true } = {}) {
         const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
@@ -1445,7 +1627,13 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className="resumeSection languagesDiv" previewScale={pageMetrics.scale}>
+            <SectionShell
+                key={block.id}
+                blockId={block.id}
+                className="resumeSection languagesDiv"
+                previewScale={pageMetrics.scale}
+                showSeparator={showSeparator}
+            >
                 {(sectionHandleProps) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -1462,7 +1650,7 @@ export default function ResumePreview({
         );
     }
 
-    function renderCustomSection(block, { sortable = true } = {}) {
+    function renderCustomSection(block, { sortable = true, showSeparator = true } = {}) {
         const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
@@ -1530,7 +1718,13 @@ export default function ResumePreview({
         ));
 
         return (
-            <SectionShell key={block.id} blockId={block.id} className="resumeSection customDiv" previewScale={pageMetrics.scale}>
+            <SectionShell
+                key={block.id}
+                blockId={block.id}
+                className="resumeSection customDiv"
+                previewScale={pageMetrics.scale}
+                showSeparator={showSeparator}
+            >
                 {(sectionHandleProps) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
@@ -1612,7 +1806,7 @@ export default function ResumePreview({
 
             return block ? (
                 <div className="previewDragOverlay previewDragOverlay--section">
-                    {renderSectionBlock(block, { sortable: false })}
+                    {renderSectionBlock(block, { sortable: false, showSeparator: false })}
                 </div>
             ) : null;
         }
@@ -1623,7 +1817,7 @@ export default function ResumePreview({
 
             return block && entry ? (
                 <div className="previewDragOverlay previewDragOverlay--entry">
-                    {renderSectionBlock({ ...block, entries: [entry] }, { sortable: false })}
+                    {renderSectionBlock({ ...block, entries: [entry] }, { sortable: false, showSeparator: false })}
                 </div>
             ) : null;
         }
@@ -1691,11 +1885,14 @@ export default function ResumePreview({
             </div>
         </DragOverlay>
     );
+    const visibleSectionBlocks = previewModel.sectionBlocks;
     const orderedSections = [
-        renderPersonalSection(),
+        renderPersonalSection({ showSeparator: visibleSectionBlocks.length > 0 }),
         (
             <SortableContext key="preview-sections" items={sectionDragItems} strategy={verticalListSortingStrategy}>
-                {previewModel.sectionBlocks.map((block) => renderSectionBlock(block))}
+                {visibleSectionBlocks.map((block, index) => (
+                    renderSectionBlock(block, { showSeparator: index < visibleSectionBlocks.length - 1 })
+                ))}
             </SortableContext>
         ),
     ].filter(Boolean);
