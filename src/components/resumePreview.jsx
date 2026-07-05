@@ -231,6 +231,7 @@ function SortablePreviewSection({
         ...attributes,
         ...listeners,
         'data-preview-drag-handle': 'true',
+        'data-preview-drag-scope': 'section',
     };
 
     return (
@@ -294,6 +295,7 @@ function SortablePreviewEntry({ sectionId, entryId, className, previewScale, chi
         ...attributes,
         ...listeners,
         'data-preview-drag-handle': 'true',
+        'data-preview-drag-scope': 'entry',
     };
 
     return (
@@ -335,6 +337,7 @@ function SortablePreviewBullet({ sectionId, entryId, field, itemIndex, editProps
         ...attributes,
         ...listeners,
         'data-preview-drag-handle': 'true',
+        'data-preview-drag-scope': 'bullet',
     };
 
     return (
@@ -718,8 +721,9 @@ export default function ResumePreview({
     function renderTextWithCaret(value, path, { prefix = '', suffix = '', fallback = '' } = {}) {
         const text = value === undefined || value === null ? '' : String(value);
         const displayText = text || fallback;
+        const hasUserCaretValue = typeof activeEditorCaret?.value === 'string' && activeEditorCaret.value.length > 0;
         const shouldShowCaret = (
-            !isSamplePreview &&
+            (!isSamplePreview || hasUserCaretValue) &&
             !activeDragMeta?.type &&
             activeEditorCaret?.path === path &&
             Number.isFinite(activeEditorCaret.offset)
