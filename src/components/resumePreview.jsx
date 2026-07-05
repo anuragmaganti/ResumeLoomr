@@ -17,6 +17,12 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { getResumePresentationVars, getResumePrintPageRule } from '../lib/resume.js';
 import {
+    CSS_PIXELS_PER_INCH,
+    PRINT_PAGE_HEIGHT_PX,
+    PRINT_PAGE_WIDTH_PX,
+    calculatePreviewPageBreaks,
+} from '../lib/previewPagination.js';
+import {
     createPreviewEditAttributes,
     personalEditorPath,
     sectionEntryEditorPath,
@@ -42,8 +48,7 @@ const PREVIEW_ZOOM_MODES = {
     FIT_PAGE: 'fitPage',
     FIT_WIDTH: 'fitWidth',
 };
-const DEFAULT_PREVIEW_PAGE_MAX_WIDTH = 952;
-const DEFAULT_PREVIEW_PAGE_MIN_HEIGHT = 1090;
+const DEFAULT_PREVIEW_PAGE_MIN_HEIGHT = PRINT_PAGE_HEIGHT_PX;
 
 function getDefaultPreviewZoomMode() {
     return PREVIEW_ZOOM_MODES.FIT_PAGE;
@@ -53,6 +58,21 @@ function parseCssPixelValue(value, fallback = 0) {
     const parsed = Number.parseFloat(value);
 
     return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseCssLengthToPixels(value, fallback = 0) {
+    const text = String(value || '').trim().toLowerCase();
+    const parsed = Number.parseFloat(text);
+
+    if (!Number.isFinite(parsed)) {
+        return fallback;
+    }
+
+    if (text.endsWith('in')) {
+        return parsed * CSS_PIXELS_PER_INCH;
+    }
+
+    return parsed;
 }
 
 function getPreviewStickyTop(frameElement) {
@@ -70,7 +90,9 @@ function metricsAreEqual(current, next) {
         current.pageCount === next.pageCount &&
         current.layoutWidth === next.layoutWidth &&
         current.hasDistinctZoomModes === next.hasDistinctZoomModes &&
-        Math.abs(current.scale - next.scale) < 0.001
+        Math.abs(current.scale - next.scale) < 0.001 &&
+        current.pageBreaks.length === next.pageBreaks.length &&
+        current.pageBreaks.every((pageBreak, index) => pageBreak === next.pageBreaks[index])
     );
 }
 
@@ -188,6 +210,7 @@ function SortablePreviewSection({ blockId, className, previewScale, children }) 
         <div
             ref={setNodeRef}
             data-preview-sortable-id={sortableId}
+            data-page-break-kind="section"
             className={`${className} previewSortableItem previewSortableSection ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
             style={style}
         >
@@ -198,7 +221,7 @@ function SortablePreviewSection({ blockId, className, previewScale, children }) 
 
 function StaticPreviewSection({ className, children }) {
     return (
-        <div className={className}>
+        <div className={className} data-page-break-kind="section">
             {children({})}
         </div>
     );
@@ -228,6 +251,7 @@ function SortablePreviewEntry({ sectionId, entryId, className, previewScale, chi
         <div
             ref={setNodeRef}
             data-preview-sortable-id={sortableId}
+            data-page-break-kind="entry"
             className={`${className} previewSortableItem previewSortableEntry ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
             style={style}
         >
@@ -238,7 +262,7 @@ function SortablePreviewEntry({ sectionId, entryId, className, previewScale, chi
 
 function StaticPreviewEntry({ className, children }) {
     return (
-        <div className={className}>
+        <div className={className} data-page-break-kind="entry">
             {children({})}
         </div>
     );
@@ -268,6 +292,7 @@ function SortablePreviewBullet({ sectionId, entryId, field, itemIndex, editProps
         <li
             ref={setNodeRef}
             data-preview-sortable-id={sortableId}
+            data-page-break-kind="item"
             className={`previewSortableItem previewSortableBullet ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
             style={style}
             {...editProps}
@@ -279,7 +304,7 @@ function SortablePreviewBullet({ sectionId, entryId, field, itemIndex, editProps
 }
 
 function StaticPreviewBullet({ editProps, children }) {
-    return <li {...editProps}>{children}</li>;
+    return <li data-page-break-kind="item" {...editProps}>{children}</li>;
 }
 
 function getPrimaryEntryField(block, entry) {
@@ -341,6 +366,60 @@ function getPreviewBulletSourceIndex(item, fallbackIndex) {
     return fallbackIndex;
 }
 
+function getPreviewScaleFromElement(resumeElement) {
+    const shellElement = resumeElement.closest('.previewPageScaleShell');
+    const shellStyles = shellElement ? window.getComputedStyle(shellElement) : null;
+    const scale = parseCssPixelValue(shellStyles?.getPropertyValue('--preview-page-scale'), 1);
+
+    return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
+function getCandidateBounds(element, resumeRect, previewScale, paddingTop) {
+    const rect = element.getBoundingClientRect();
+    const top = ((rect.top - resumeRect.top) / previewScale) - paddingTop;
+    const bottom = ((rect.bottom - resumeRect.top) / previewScale) - paddingTop;
+
+    return { top, bottom };
+}
+
+function collectPreviewBreakCandidates(resumeElement, paddingTop) {
+    const resumeRect = resumeElement.getBoundingClientRect();
+    const previewScale = getPreviewScaleFromElement(resumeElement);
+    const candidates = [];
+
+    resumeElement.querySelectorAll('[data-page-break-kind="section"]').forEach((sectionElement) => {
+        const heading = sectionElement.querySelector('[data-page-break-kind="heading"]');
+        const firstEntry = sectionElement.querySelector('[data-page-break-kind="entry"]');
+
+        if (heading && firstEntry) {
+            const headingBounds = getCandidateBounds(heading, resumeRect, previewScale, paddingTop);
+            const entryBounds = getCandidateBounds(firstEntry, resumeRect, previewScale, paddingTop);
+
+            candidates.push({
+                top: headingBounds.top,
+                bottom: entryBounds.bottom,
+                priority: 1,
+            });
+        }
+    });
+
+    resumeElement.querySelectorAll('[data-page-break-kind="entry"]').forEach((entryElement) => {
+        candidates.push({
+            ...getCandidateBounds(entryElement, resumeRect, previewScale, paddingTop),
+            priority: 2,
+        });
+    });
+
+    resumeElement.querySelectorAll('[data-page-break-kind="item"]').forEach((itemElement) => {
+        candidates.push({
+            ...getCandidateBounds(itemElement, resumeRect, previewScale, paddingTop),
+            priority: 3,
+        });
+    });
+
+    return candidates;
+}
+
 export default function ResumePreview({
     previewModel,
     template,
@@ -375,6 +454,7 @@ export default function ResumePreview({
         pageHeight: 0,
         contentHeight: 0,
         pageCount: 1,
+        pageBreaks: [],
         scale: 1,
         layoutWidth: 0,
         hasDistinctZoomModes: false,
@@ -436,6 +516,7 @@ export default function ResumePreview({
                         pageHeight: 0,
                         contentHeight: 0,
                         pageCount: 1,
+                        pageBreaks: [],
                         scale: 1,
                         layoutWidth: 0,
                         hasDistinctZoomModes: false,
@@ -447,48 +528,42 @@ export default function ResumePreview({
             }
 
             const styles = window.getComputedStyle(resumeElement);
-            const appElement = document.querySelector('.app');
-            const appStyles = appElement ? window.getComputedStyle(appElement) : null;
-            const maxPageWidth = parseCssPixelValue(
-                appStyles?.getPropertyValue('--workspace-preview-max-width'),
-                DEFAULT_PREVIEW_PAGE_MAX_WIDTH,
-            );
             const frameRect = frameElement.getBoundingClientRect();
             const availableWidth = Math.max(240, frameElement.clientWidth || frameRect.width);
-            const fitPageWidth = maxPageWidth;
-            const fitWidthPageWidth = Math.max(1, Math.min(availableWidth, maxPageWidth));
-            const pageWidth = previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE
-                ? fitPageWidth
-                : fitWidthPageWidth;
-            const pageContentHeight = parseCssPixelValue(styles.getPropertyValue('--resume-page-min-height'), resumeElement.offsetHeight);
-            const verticalBorder = parseCssPixelValue(styles.borderTopWidth) + parseCssPixelValue(styles.borderBottomWidth);
-            const usesBorderBox = styles.boxSizing === 'border-box';
-            const pageHeight = Math.max(
-                1,
-                usesBorderBox
-                    ? pageContentHeight
-                    : pageContentHeight + parseCssPixelValue(styles.paddingTop) + parseCssPixelValue(styles.paddingBottom) + verticalBorder,
-            );
-            const contentHeight = Math.max(pageHeight, resumeElement.scrollHeight + verticalBorder);
-            const pageCount = Math.max(1, Math.ceil((contentHeight - 1) / pageHeight));
+            const pageWidth = PRINT_PAGE_WIDTH_PX;
+            const pageHeight = PRINT_PAGE_HEIGHT_PX;
+            const paddingTop = parseCssLengthToPixels(styles.paddingTop);
+            const paddingBottom = parseCssLengthToPixels(styles.paddingBottom);
+            const printableHeight = Math.max(1, pageHeight - paddingTop - paddingBottom);
+            const contentFlowHeight = Math.max(printableHeight, resumeElement.scrollHeight - paddingTop - paddingBottom);
+            const pageBreaks = calculatePreviewPageBreaks({
+                contentHeight: contentFlowHeight,
+                printableHeight,
+                breakCandidates: collectPreviewBreakCandidates(resumeElement, paddingTop),
+            });
+            const markerBreaks = pageBreaks.map((pageBreak) => Math.round(paddingTop + pageBreak));
+            const pageCount = markerBreaks.length + 1;
+            const contentHeight = Math.max(pageHeight, paddingTop + contentFlowHeight + paddingBottom);
             const availableHeight = Math.max(
                 320,
                 window.innerHeight - getPreviewStickyTop(frameElement) - 24,
             );
             const fitPageHeightScale = Math.min(availableHeight / pageHeight, 1);
-            const fitPageScale = Math.min(availableWidth / fitPageWidth, fitPageHeightScale, 1);
-            const hasDistinctZoomModes = fitPageScale < 0.995;
+            const fitWidthScale = Math.min(availableWidth / pageWidth, 1);
+            const fitPageScale = Math.min(fitWidthScale, fitPageHeightScale, 1);
+            const hasDistinctZoomModes = Math.abs(fitWidthScale - fitPageScale) > 0.005;
             const scale = previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE
                 ? Math.max(0.35, fitPageScale)
-                : 1;
+                : Math.max(0.35, fitWidthScale);
             const layoutScale = previewZoomMode === PREVIEW_ZOOM_MODES.FIT_PAGE
                 ? Math.max(0.35, fitPageHeightScale)
-                : 1;
+                : Math.max(0.35, fitWidthScale);
             const nextMetrics = {
                 pageWidth: Math.round(pageWidth),
                 pageHeight: Math.round(pageHeight),
                 contentHeight: Math.round(contentHeight),
                 pageCount,
+                pageBreaks: markerBreaks,
                 scale: Number(scale.toFixed(4)),
                 layoutWidth: Math.round(pageWidth * layoutScale),
                 hasDistinctZoomModes,
@@ -948,7 +1023,7 @@ export default function ResumePreview({
             <SectionShell key={block.id} blockId={block.id} className={`resumeSection ${sectionClassName}`} previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
-                        <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
+                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
                         {sortable ? (
@@ -1159,7 +1234,7 @@ export default function ResumePreview({
             <SectionShell key={block.id} blockId={block.id} className="resumeSection educationDiv" previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
-                        <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
+                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
                         {sortable ? (
@@ -1243,7 +1318,7 @@ export default function ResumePreview({
             <SectionShell key={block.id} blockId={block.id} className="resumeSection experienceDiv" previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
-                        <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
+                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
                         {sortable ? (
@@ -1301,7 +1376,7 @@ export default function ResumePreview({
             <SectionShell key={block.id} blockId={block.id} className="resumeSection skillsDiv" previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
-                        <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
+                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
                         {sortable ? (
@@ -1369,7 +1444,7 @@ export default function ResumePreview({
             <SectionShell key={block.id} blockId={block.id} className="resumeSection projectsDiv" previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
-                        <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
+                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
                         {sortable ? (
@@ -1418,7 +1493,7 @@ export default function ResumePreview({
             <SectionShell key={block.id} blockId={block.id} className="resumeSection languagesDiv" previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
-                        <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
+                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
                         {sortable ? (
@@ -1503,7 +1578,7 @@ export default function ResumePreview({
             <SectionShell key={block.id} blockId={block.id} className="resumeSection customDiv" previewScale={pageMetrics.scale}>
                 {(sectionHandleProps) => (
                     <>
-                        <h2 {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
+                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
                         {sortable ? (
@@ -1678,20 +1753,20 @@ export default function ResumePreview({
     }
 
     function renderPageMarkers() {
-        if (!previewModel.hasContent || pageMetrics.pageCount <= 1 || pageMetrics.pageHeight <= 0) {
+        if (!previewModel.hasContent || pageMetrics.pageBreaks.length === 0) {
             return null;
         }
 
         return (
             <div className="resumePageMarkers" aria-hidden="true">
-                {Array.from({ length: pageMetrics.pageCount - 1 }, (_, index) => {
+                {pageMetrics.pageBreaks.map((pageBreak, index) => {
                     const pageNumber = index + 2;
 
                     return (
                         <div
                             className="resumePageMarker"
                             key={`page-marker-${pageNumber}`}
-                            style={{ top: `${pageMetrics.pageHeight * (index + 1)}px` }}
+                            style={{ top: `${pageBreak}px` }}
                         >
                             <span>Page {pageNumber}</span>
                         </div>

@@ -1,3 +1,8 @@
+import {
+  PRINT_PAGE_HEIGHT_PX,
+  PRINT_PAGE_WIDTH_PX,
+} from './previewPagination.js';
+
 export const DRAFT_STORAGE_KEY = 'resumeloomr:draft:v2';
 export const WORKSPACE_INDEX_STORAGE_KEY = 'resumeloomr:index:v1';
 export const RESUME_STORAGE_KEY_PREFIX = 'resumeloomr:resume:';
@@ -111,7 +116,6 @@ const SECTION_TEMPLATE_MAP = new Map(
 );
 const RESUME_PRESENTATION_BASES = {
   executive: {
-    pageMinHeightPx: 1090,
     pageMarginInlineIn: 0.5,
     pageMarginTopIn: 0.5,
     pageMarginBottomIn: 0.5,
@@ -132,7 +136,6 @@ const RESUME_PRESENTATION_BASES = {
     listGapPx: 4,
   },
   compact: {
-    pageMinHeightPx: 1021,
     pageMarginInlineIn: 0.4375,
     pageMarginTopIn: 0.4375,
     pageMarginBottomIn: 0.4375,
@@ -1565,7 +1568,9 @@ export function getResumePresentationVars(settings, template) {
   const printMinHeight = Math.max(0, 11 - pageMarginTop - pageMarginBottom);
 
   return {
-    '--resume-page-min-height': `${base.pageMinHeightPx}px`,
+    '--resume-page-width': `${PRINT_PAGE_WIDTH_PX}px`,
+    '--resume-page-height': `${PRINT_PAGE_HEIGHT_PX}px`,
+    '--resume-page-min-height': `${PRINT_PAGE_HEIGHT_PX}px`,
     '--resume-page-margin-inline': formatInches(pageMarginInline),
     '--resume-page-margin-top': formatInches(pageMarginTop),
     '--resume-page-margin-bottom': formatInches(pageMarginBottom),

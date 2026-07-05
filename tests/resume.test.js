@@ -41,6 +41,7 @@ import {
   updateSectionTitle,
   validateResume,
 } from '../src/lib/resume.js';
+import { calculatePreviewPageBreaks } from '../src/lib/previewPagination.js';
 import {
   createOutboxAckDescriptor,
   createDraftContentHash,
@@ -559,6 +560,54 @@ test('resume settings produce bounded preview and print variables', () => {
 
   const updatedResume = updateResumeSetting(createEmptyResume(), 'textSize', 1);
   assert.equal(updatedResume.settings.textSize, 1);
+});
+
+test('preview page break helper uses printable height for raw markers', () => {
+  assert.deepEqual(calculatePreviewPageBreaks({
+    contentHeight: 2200,
+    printableHeight: 900,
+  }), [900, 1800]);
+});
+
+test('preview page break helper moves marker before fitting cut-through entries', () => {
+  assert.deepEqual(calculatePreviewPageBreaks({
+    contentHeight: 1300,
+    printableHeight: 900,
+    breakCandidates: [
+      { top: 820, bottom: 980, priority: 2 },
+    ],
+  }), [820]);
+});
+
+test('preview page break helper does not move marker above oversized sections', () => {
+  assert.deepEqual(calculatePreviewPageBreaks({
+    contentHeight: 1800,
+    printableHeight: 900,
+    breakCandidates: [
+      { top: 200, bottom: 1300, priority: 1 },
+    ],
+  }), [900]);
+});
+
+test('preview page break helper falls back to bullet candidates for oversized entries', () => {
+  assert.deepEqual(calculatePreviewPageBreaks({
+    contentHeight: 1600,
+    printableHeight: 900,
+    breakCandidates: [
+      { top: 300, bottom: 1250, priority: 2 },
+      { top: 860, bottom: 930, priority: 3 },
+    ],
+  }), [860]);
+});
+
+test('preview page break helper keeps raw marker when no clean candidate is valid', () => {
+  assert.deepEqual(calculatePreviewPageBreaks({
+    contentHeight: 1100,
+    printableHeight: 900,
+    breakCandidates: [
+      { top: 920, bottom: 1020, priority: 2 },
+    ],
+  }), [900]);
 });
 
 test('draft content hashes ignore saved time but track content', () => {

@@ -83,9 +83,9 @@
   position: relative;
   z-index: 40;
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: min(100%, var(--workspace-content-max-width));
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
   min-width: 0;
 }
 
@@ -94,9 +94,10 @@
   z-index: 30;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-5);
+  gap: var(--space-3);
   align-items: center;
-  padding: 17.75px var(--space-6);
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
 }
 
 .brand {
@@ -108,7 +109,7 @@
 .brandLogo {
   display: block;
   width: auto;
-  height: 65px;
+  height: 48px;
   object-fit: contain;
 }
 
@@ -139,6 +140,7 @@ html[data-theme="dark"] .brandLogo--dark {
   width: 100%;
   min-width: 0;
   padding: 10px 12px;
+  border-radius: var(--radius-lg);
 }
 
 .resumePillStrip {
@@ -2253,8 +2255,9 @@ html[data-theme="dark"] .sectionAddDialog {
     padding: var(--space-4);
   }
 
-  .topbar {
-    padding: 9.75px var(--space-4);
+  .topbar,
+  .resumeSubbar {
+    padding: 10px 12px;
   }
 
   .topbarMeta {

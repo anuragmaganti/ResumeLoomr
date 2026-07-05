@@ -1,5 +1,7 @@
 .resumePage {
-  --resume-page-min-height: 1090px;
+  --resume-page-width: 816px;
+  --resume-page-height: 1056px;
+  --resume-page-min-height: 1056px;
   --resume-page-margin-inline: 0.5in;
   --resume-page-margin-top: 0.5in;
   --resume-page-margin-bottom: 0.5in;
@@ -25,8 +27,8 @@
   --preview-edit-pulse-bg: color-mix(in srgb, var(--color-accent-soft) 74%, transparent);
   --preview-edit-pulse-ring: color-mix(in srgb, var(--color-accent) 30%, transparent);
   position: relative;
-  width: min(100%, 952px);
-  min-height: var(--resume-page-min-height);
+  width: var(--resume-page-width);
+  min-height: var(--resume-page-height);
   margin: 0 auto 0 0;
   padding:
     var(--resume-page-margin-top)
@@ -437,19 +439,9 @@ html[data-theme="dark"] .resumePage {
   }
 }
 
-.personalSection,
-.educationDiv,
-.experienceDiv,
-.skillsDiv,
-.projectsDiv,
-.certificationsDiv,
-.languagesDiv,
-.awardsDiv,
-.publicationsDiv,
-.educationSection,
-.experienceSection,
 .previewEntry,
-.skillGroup {
+.skillGroup,
+.previewEntryList li {
   break-inside: avoid;
   page-break-inside: avoid;
 }
@@ -742,7 +734,9 @@ html[data-theme="dark"] .resumePage {
 }
 
 .resumeEmptyState--choice {
+  align-content: start;
   gap: 18px;
+  padding-top: clamp(96px, 25%, 260px);
 }
 
 .resumeEmptyState--blank {
@@ -816,7 +810,6 @@ html[data-theme="dark"] .resumePage {
 }
 
 .resumePage--compact {
-  --resume-page-min-height: 1021px;
   --resume-page-margin-inline: 0.4375in;
   --resume-page-margin-top: 0.4375in;
   --resume-page-margin-bottom: 0.4375in;
