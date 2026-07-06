@@ -473,8 +473,14 @@ html[data-theme="dark"] .resumePage {
 }
 
 .resumeSection--separatorBelowHeading {
+  margin-bottom: var(--resume-section-gap);
   padding-bottom: 0;
   border-bottom: none;
+}
+
+.resumeSection--separatorBelowHeading:last-child,
+.resumeSection--separatorBelowHeading.resumeSection--lastVisible {
+  margin-bottom: 0;
 }
 
 .resumeSection--separatorBelowHeading h2 {
@@ -499,14 +505,18 @@ html[data-theme="dark"] .resumePage {
 }
 
 .sectionSeparatorControl--belowHeading {
-  position: relative;
-  right: auto;
+  position: absolute;
+  top: 50%;
+  right: 0;
   bottom: auto;
-  left: auto;
+  left: 0;
+  z-index: 4;
   display: block;
   width: 100%;
-  height: max(10px, var(--resume-active-separator-gap));
-  margin: 0 0 var(--resume-section-heading-gap);
+  height: 100%;
+  min-height: 12px;
+  margin: 0;
+  transform: translateY(-50%);
 }
 
 .sectionSeparatorControl::before {
@@ -525,9 +535,31 @@ html[data-theme="dark"] .resumePage {
     box-shadow var(--transition-fast);
 }
 
-.sectionSeparatorControl--belowHeading::before {
+.sectionSeparatorBelowHeading {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: calc((var(--resume-active-separator-gap) * 2) + var(--resume-active-separator-weight));
+  margin: 0 0 var(--resume-section-heading-gap);
+}
+
+.sectionSeparatorPrintLine {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
   height: var(--resume-active-separator-weight);
+  border-radius: 999px;
   background: var(--resume-active-separator-color);
+  transform: translateY(-50%);
+  transition:
+    height var(--transition-fast),
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.sectionSeparatorControl--belowHeading::before {
+  display: none;
 }
 
 .sectionSeparatorControl[data-separator-scope="personal"]:hover::before,
@@ -539,15 +571,26 @@ html[data-theme="dark"] .resumePage {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 14%, transparent);
 }
 
+.sectionSeparatorBelowHeading:hover .sectionSeparatorPrintLine,
+.sectionSeparatorBelowHeading:focus-within .sectionSeparatorPrintLine,
+.resumePage:has(.sectionSeparatorControl[data-separator-scope="section"]:hover) .sectionSeparatorBelowHeading .sectionSeparatorPrintLine,
+.resumePage:has(.sectionSeparatorControl[data-separator-scope="section"]:focus-visible) .sectionSeparatorBelowHeading .sectionSeparatorPrintLine {
+  height: max(3px, var(--resume-active-separator-weight));
+  background: color-mix(in srgb, var(--color-accent) 52%, var(--resume-active-separator-color));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
 .sectionSeparatorControl:focus-visible {
   outline: none;
 }
 
-.resumeSection:last-child .sectionSeparatorControl {
+.resumeSection:last-child .sectionSeparatorControl,
+.resumeSection:last-child .sectionSeparatorBelowHeading {
   display: none;
 }
 
-.resumeSection.resumeSection--lastVisible .sectionSeparatorControl {
+.resumeSection.resumeSection--lastVisible .sectionSeparatorControl,
+.resumeSection.resumeSection--lastVisible .sectionSeparatorBelowHeading {
   display: none;
 }
 

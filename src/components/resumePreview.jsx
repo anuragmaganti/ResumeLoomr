@@ -195,10 +195,31 @@ function previewSectionClassName(className, showSeparator) {
 }
 
 function renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position = 'aboveSectionName' }) {
+    if (position === 'belowSectionName') {
+        return (
+            <span
+                className="sectionSeparatorBelowHeading"
+                data-separator-scope="section"
+                data-separator-section-id={blockId}
+            >
+                <span className="sectionSeparatorPrintLine" aria-hidden="true" />
+                <button
+                    type="button"
+                    className="sectionSeparatorControl sectionSeparatorControl--belowHeading"
+                    data-separator-scope="section"
+                    data-separator-section-id={blockId}
+                    aria-label="Section separator settings"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'section', blockId)}
+                />
+            </span>
+        );
+    }
+
     return (
         <button
             type="button"
-            className={`sectionSeparatorControl${position === 'belowSectionName' ? ' sectionSeparatorControl--belowHeading' : ''}`}
+            className="sectionSeparatorControl"
             data-separator-scope="section"
             data-separator-section-id={blockId}
             aria-label="Section separator settings"
