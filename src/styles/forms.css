@@ -28,11 +28,11 @@ form {
 }
 
 .editorStage form {
-  gap: var(--space-3);
+  gap: 10px;
 }
 
 .editorStage .formStack {
-  gap: var(--space-2);
+  gap: 8px;
 }
 
 .entryCard {
@@ -74,8 +74,8 @@ form {
 }
 
 .editorStage .entryHeader {
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .entryHeaderActionsOnly {
@@ -97,11 +97,11 @@ form {
 }
 
 .editorStage .entryCard {
-  padding: 10px 14px 12px;
+  padding: 8px 12px 10px;
 }
 
 .editorStage .entryCard.isCollapsed {
-  padding: 8px 14px;
+  padding: 7px 12px;
 }
 
 .entrySummaryButton {
@@ -153,11 +153,11 @@ form {
 }
 
 .editorStage .entrySummaryText {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
 .editorStage .entrySummaryHint {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
 }
 
 .entryActions {
@@ -204,7 +204,7 @@ form {
 }
 
 .editorStage .fieldGrid {
-  gap: var(--space-3);
+  gap: 9px;
 }
 
 .fieldGridTwo {
@@ -218,11 +218,11 @@ form {
 }
 
 .editorStage .field {
-  gap: 6px;
+  gap: 4px;
 }
 
 .editorSectionTitleField {
-  margin-bottom: var(--space-3);
+  margin-bottom: 9px;
 }
 
 .field label {
@@ -232,7 +232,8 @@ form {
 }
 
 .editorStage .field label {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
+  line-height: 1.1;
 }
 
 .field input,
@@ -252,13 +253,13 @@ form {
 
 .editorStage .field input,
 .editorStage .field textarea {
-  padding: 7px 10px;
-  font-size: 0.875rem;
-  line-height: 1.32;
+  padding: 5px 9px;
+  font-size: 0.8125rem;
+  line-height: 1.25;
 }
 
 .editorStage .field input {
-  min-height: 36px;
+  min-height: 30px;
 }
 
 .field input::placeholder,
@@ -284,7 +285,7 @@ form {
 }
 
 .editorStage .field textarea {
-  min-height: 76px;
+  min-height: 62px;
 }
 
 .field textarea.autoResizeTextarea {
@@ -301,11 +302,12 @@ form {
 }
 
 .editorStage .fieldError {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
+  line-height: 1.3;
 }
 
 .editorStage .button {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
 .nestedEntryStack {
@@ -314,7 +316,7 @@ form {
 }
 
 .editorStage .nestedEntryStack {
-  gap: var(--space-2);
+  gap: 7px;
 }
 
 .nestedEntryCard {
@@ -325,7 +327,7 @@ form {
 }
 
 .editorStage .nestedEntryCard {
-  padding: var(--space-2);
+  padding: 8px;
 }
 
 .nestedEntryRow {
@@ -342,7 +344,7 @@ form {
 }
 
 .editorStage .nestedEntryContent {
-  gap: var(--space-2);
+  gap: 7px;
 }
 
 .activityRow {

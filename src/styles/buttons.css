@@ -236,6 +236,14 @@
   width: 100%;
 }
 
+.editorStage .addEntryButton,
+.editorStage .addInlineButton {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+}
+
 .addInlineButton {
   justify-content: flex-start;
 }
