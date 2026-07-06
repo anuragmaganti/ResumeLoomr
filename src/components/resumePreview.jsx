@@ -539,7 +539,7 @@ export default function ResumePreview({
             const resumeElement = resumeRef.current;
             const frameElement = previewFrameRef.current;
 
-            if (!resumeElement || !frameElement || !previewModel.hasContent) {
+            if (!resumeElement || !frameElement) {
                 setPageMetrics((current) => {
                     const next = {
                         pageWidth: 0,
@@ -564,12 +564,16 @@ export default function ResumePreview({
             const paddingTop = parseCssLengthToPixels(styles.paddingTop);
             const paddingBottom = parseCssLengthToPixels(styles.paddingBottom);
             const printableHeight = Math.max(1, pageHeight - paddingTop - paddingBottom);
-            const contentFlowHeight = Math.max(printableHeight, resumeElement.scrollHeight - paddingTop - paddingBottom);
-            const pageBreaks = calculatePreviewPageBreaks({
-                contentHeight: contentFlowHeight,
-                printableHeight,
-                breakCandidates: collectPreviewBreakCandidates(resumeElement, paddingTop),
-            });
+            const contentFlowHeight = previewModel.hasContent
+                ? Math.max(printableHeight, resumeElement.scrollHeight - paddingTop - paddingBottom)
+                : printableHeight;
+            const pageBreaks = previewModel.hasContent
+                ? calculatePreviewPageBreaks({
+                    contentHeight: contentFlowHeight,
+                    printableHeight,
+                    breakCandidates: collectPreviewBreakCandidates(resumeElement, paddingTop),
+                })
+                : [];
             const markerBreaks = pageBreaks.map((pageBreak) => Math.round(paddingTop + pageBreak));
             const pageCount = markerBreaks.length + 1;
             const contentHeight = Math.max(pageHeight, paddingTop + contentFlowHeight + paddingBottom);
@@ -629,8 +633,7 @@ export default function ResumePreview({
             return undefined;
         }
 
-        const isFitPageLayout = previewModel.hasContent
-            && pageMetrics.pageWidth > 0
+        const isFitPageLayout = pageMetrics.pageWidth > 0
             && pageMetrics.layoutWidth > 0;
         const nextLayout = isFitPageLayout
             ? {
@@ -1883,7 +1886,7 @@ export default function ResumePreview({
         DEFAULT_PREVIEW_PAGE_MIN_HEIGHT,
     );
     const scaledPageHeight = Math.max(pageMetrics.pageHeight, pageMetrics.contentHeight) * pageMetrics.scale;
-    const pageShellStyle = previewModel.hasContent && pageMetrics.pageWidth > 0
+    const pageShellStyle = pageMetrics.pageWidth > 0
         ? {
             '--preview-page-scale': pageMetrics.scale,
             '--preview-page-width': `${pageMetrics.pageWidth}px`,

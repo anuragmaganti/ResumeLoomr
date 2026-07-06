@@ -772,6 +772,7 @@ function App() {
               getFieldError={getFieldError}
               markTouched={markTouched}
               maxHeight={editorStageMaxHeight}
+              isStartPending={shouldShowEmptyResumeChoice}
               previewEditTarget={previewEditTarget}
               placeholderFor={samplePlaceholderFor}
               onClearPreviewEditTarget={clearPreviewEditTarget}

@@ -133,6 +133,7 @@ export default function EditorPanel({
     getFieldError,
     markTouched,
     maxHeight,
+    isStartPending = false,
     previewEditTarget,
     placeholderFor,
     onClearPreviewEditTarget,
@@ -388,7 +389,11 @@ export default function EditorPanel({
         <section className="editorPanel">
             <div className="editorWorkspace" style={editorWorkspaceStyle}>
                 <div className="editorSidebar">
-                    <aside className="settingsRail panel">
+                    <aside
+                        className={`settingsRail panel${isStartPending ? " isStartPending" : ""}`}
+                        aria-disabled={isStartPending}
+                        inert={isStartPending ? true : undefined}
+                    >
                         <EditorSettingsRail
                             settings={resume.settings}
                             onAdjustSetting={actions.updateResumeSetting}
@@ -413,7 +418,9 @@ export default function EditorPanel({
                 </div>
 
                 <div
-                    className="editorStage panel"
+                    className={`editorStage panel${isStartPending ? " isStartPending" : ""}`}
+                    aria-disabled={isStartPending}
+                    inert={isStartPending ? true : undefined}
                     onFocus={handleEditorFocus}
                     onPointerUpCapture={pulsePreviewFromEditorEvent}
                     onInput={syncEditorCaretFromEvent}
