@@ -487,10 +487,6 @@ html[data-theme="dark"] .resumePage {
   margin-bottom: 0;
 }
 
-.resumeSection--separatorBelowHeading.resumeSection--lastVisible h2 {
-  margin-bottom: var(--resume-section-heading-gap);
-}
-
 .sectionSeparatorControl {
   position: absolute;
   right: 0;
@@ -584,13 +580,11 @@ html[data-theme="dark"] .resumePage {
   outline: none;
 }
 
-.resumeSection:last-child .sectionSeparatorControl,
-.resumeSection:last-child .sectionSeparatorBelowHeading {
+.resumeSection:last-child > .sectionSeparatorControl {
   display: none;
 }
 
-.resumeSection.resumeSection--lastVisible .sectionSeparatorControl,
-.resumeSection.resumeSection--lastVisible .sectionSeparatorBelowHeading {
+.resumeSection.resumeSection--lastVisible > .sectionSeparatorControl {
   display: none;
 }
 

@@ -280,7 +280,7 @@ function SortablePreviewSection({
         >
             {children(
                 handleProps,
-                showSeparator && separatorPosition === 'belowSectionName'
+                separatorPosition === 'belowSectionName'
                     ? renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })
                     : null,
             )}
@@ -304,7 +304,7 @@ function StaticPreviewSection({
         >
             {children(
                 {},
-                blockId && showSeparator && separatorPosition === 'belowSectionName'
+                blockId && separatorPosition === 'belowSectionName'
                     ? renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })
                     : null,
             )}
