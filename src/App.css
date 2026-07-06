@@ -1256,6 +1256,10 @@ html[data-theme="dark"] .brandLogo--dark {
   user-select: none;
 }
 
+.settingsRail.isStartPending {
+  position: relative;
+}
+
 .settingsRail.isStartPending:hover,
 .editorStage.isStartPending:hover {
   transform: none;
@@ -1270,6 +1274,25 @@ html[data-theme="dark"] .brandLogo--dark {
 .settingsRail.isStartPending :is(button, input, textarea, select),
 .editorStage.isStartPending :is(button, input, textarea, select) {
   pointer-events: none;
+}
+
+.startPendingOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: not-allowed;
+  appearance: none;
+}
+
+.startPendingOverlay:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 72%, white);
+  outline-offset: -6px;
 }
 
 .settingsRail {

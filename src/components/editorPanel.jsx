@@ -247,15 +247,37 @@ export default function EditorPanel({
         syncEditorCaretFromEvent(event);
         pulsePreviewFromEditorEvent(event);
     };
-    const handleStartPendingPointerDown = (event) => {
+    const handleStartPendingInteraction = (event) => {
         if (!isStartPending) {
             return;
         }
 
         event.preventDefault();
         event.stopPropagation();
-        onStartPendingInteraction?.();
+
+        if (event.type === "pointerdown") {
+            onStartPendingInteraction?.();
+        }
     };
+    const handleStartPendingFocus = (event) => {
+        if (!isStartPending) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.target?.blur?.();
+    };
+    const renderStartPendingOverlay = () => (
+        isStartPending ? (
+            <button
+                type="button"
+                className="startPendingOverlay"
+                aria-label="Choose Import your resume or Start from scratch first"
+                onClick={onStartPendingInteraction}
+            />
+        ) : null
+    );
     const clearEditorCaretAfterBlur = (event) => {
         const editorStageElement = event.currentTarget;
 
@@ -402,7 +424,9 @@ export default function EditorPanel({
                     <aside
                         className={`settingsRail panel${isStartPending ? " isStartPending" : ""}`}
                         aria-disabled={isStartPending}
-                        onPointerDownCapture={handleStartPendingPointerDown}
+                        onPointerDownCapture={handleStartPendingInteraction}
+                        onClickCapture={handleStartPendingInteraction}
+                        onFocusCapture={handleStartPendingFocus}
                     >
                         <EditorSettingsRail
                             settings={resume.settings}
@@ -411,6 +435,7 @@ export default function EditorPanel({
                             templateOptions={templateOptions}
                             onTemplateChange={onTemplateChange}
                         />
+                        {renderStartPendingOverlay()}
                     </aside>
 
                     <aside className="editorRail panel">
@@ -430,7 +455,9 @@ export default function EditorPanel({
                 <div
                     className={`editorStage panel${isStartPending ? " isStartPending" : ""}`}
                     aria-disabled={isStartPending}
-                    onPointerDownCapture={handleStartPendingPointerDown}
+                    onPointerDownCapture={handleStartPendingInteraction}
+                    onClickCapture={handleStartPendingInteraction}
+                    onFocusCapture={handleStartPendingFocus}
                     onFocus={handleEditorFocus}
                     onPointerUpCapture={pulsePreviewFromEditorEvent}
                     onInput={syncEditorCaretFromEvent}
@@ -502,6 +529,7 @@ export default function EditorPanel({
                             />
                         )}
                     </div>
+                    {renderStartPendingOverlay()}
                 </div>
             </div>
         </section>
