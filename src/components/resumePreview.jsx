@@ -477,6 +477,7 @@ export default function ResumePreview({
     activeEditorCaret,
     previewPulseTarget,
     showEmptyResumeChoice = false,
+    emptyChoiceNudgeCount = 0,
     isImportingResume = false,
     showSampleInformationToggle = false,
     showSampleInformation = true,
@@ -1985,9 +1986,17 @@ export default function ResumePreview({
             return <div className="resumeEmptyState resumeEmptyState--blank" aria-hidden="true" />;
         }
 
+        const nudgeAttributes = emptyChoiceNudgeCount > 0
+            ? { 'data-empty-choice-nudge': emptyChoiceNudgeCount % 2 === 0 ? 'even' : 'odd' }
+            : {};
+
         return (
             <div className="resumeEmptyState resumeEmptyState--choice">
-                <div className="resumeEmptyActions" aria-label="Choose how to start this resume">
+                <div
+                    className="resumeEmptyActions"
+                    aria-label="Choose how to start this resume"
+                    {...nudgeAttributes}
+                >
                     <button
                         type="button"
                         className="button buttonPrimary emptyImportButton"

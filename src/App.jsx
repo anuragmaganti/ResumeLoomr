@@ -88,6 +88,7 @@ function App() {
   const [previewPulseTarget, setPreviewPulseTarget] = useState(null);
   const [editorCaretTarget, setEditorCaretTarget] = useState(null);
   const [previewLayout, setPreviewLayout] = useState({ mode: 'fitPage', width: 0 });
+  const [emptyChoiceNudgeCount, setEmptyChoiceNudgeCount] = useState(0);
   const [sampleOrderOverridesByResumeId, setSampleOrderOverridesByResumeId] = useState({});
   const [separatorSettingsAnchor, setSeparatorSettingsAnchor] = useState(null);
   const [theme, setTheme] = useState(() => {
@@ -394,6 +395,9 @@ function App() {
         ? currentLayout
         : nextLayout
     ));
+  }, []);
+  const handleStartPendingInteraction = useCallback(() => {
+    setEmptyChoiceNudgeCount((count) => count + 1);
   }, []);
 
   const clearPreviewEditTarget = useCallback((requestId) => {
@@ -773,6 +777,7 @@ function App() {
               markTouched={markTouched}
               maxHeight={editorStageMaxHeight}
               isStartPending={shouldShowEmptyResumeChoice}
+              onStartPendingInteraction={handleStartPendingInteraction}
               previewEditTarget={previewEditTarget}
               placeholderFor={samplePlaceholderFor}
               onClearPreviewEditTarget={clearPreviewEditTarget}
@@ -798,6 +803,7 @@ function App() {
               activeEditorCaret={editorCaretTarget}
               previewPulseTarget={previewPulseTarget}
               showEmptyResumeChoice={shouldShowEmptyResumeChoice}
+              emptyChoiceNudgeCount={emptyChoiceNudgeCount}
               isImportingResume={isImportingResume}
               showSampleInformationToggle={Boolean(sampleDisplay.hasStarted)}
               showSampleInformation={shouldShowSampleInformation}

@@ -134,6 +134,7 @@ export default function EditorPanel({
     markTouched,
     maxHeight,
     isStartPending = false,
+    onStartPendingInteraction,
     previewEditTarget,
     placeholderFor,
     onClearPreviewEditTarget,
@@ -245,6 +246,15 @@ export default function EditorPanel({
     const handleEditorMouseUp = (event) => {
         syncEditorCaretFromEvent(event);
         pulsePreviewFromEditorEvent(event);
+    };
+    const handleStartPendingPointerDown = (event) => {
+        if (!isStartPending) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        onStartPendingInteraction?.();
     };
     const clearEditorCaretAfterBlur = (event) => {
         const editorStageElement = event.currentTarget;
@@ -392,7 +402,7 @@ export default function EditorPanel({
                     <aside
                         className={`settingsRail panel${isStartPending ? " isStartPending" : ""}`}
                         aria-disabled={isStartPending}
-                        inert={isStartPending ? true : undefined}
+                        onPointerDownCapture={handleStartPendingPointerDown}
                     >
                         <EditorSettingsRail
                             settings={resume.settings}
@@ -420,7 +430,7 @@ export default function EditorPanel({
                 <div
                     className={`editorStage panel${isStartPending ? " isStartPending" : ""}`}
                     aria-disabled={isStartPending}
-                    inert={isStartPending ? true : undefined}
+                    onPointerDownCapture={handleStartPendingPointerDown}
                     onFocus={handleEditorFocus}
                     onPointerUpCapture={pulsePreviewFromEditorEvent}
                     onInput={syncEditorCaretFromEvent}

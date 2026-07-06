@@ -1250,10 +1250,9 @@ html[data-theme="dark"] .brandLogo--dark {
 .settingsRail.isStartPending,
 .editorStage.isStartPending {
   cursor: not-allowed;
-  opacity: 0.48;
-  filter: grayscale(0.35) saturate(0.6);
+  opacity: 0.82;
+  filter: grayscale(0.14) saturate(0.82);
   box-shadow: none;
-  pointer-events: none;
   user-select: none;
 }
 
@@ -1266,6 +1265,11 @@ html[data-theme="dark"] .brandLogo--dark {
 .settingsRail.isStartPending *,
 .editorStage.isStartPending * {
   cursor: not-allowed;
+}
+
+.settingsRail.isStartPending :is(button, input, textarea, select),
+.editorStage.isStartPending :is(button, input, textarea, select) {
+  pointer-events: none;
 }
 
 .settingsRail {
