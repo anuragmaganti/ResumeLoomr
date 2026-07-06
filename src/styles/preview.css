@@ -65,20 +65,23 @@ html[data-theme="dark"] .resumePage {
   left: 12px;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   max-width: calc(100% - 24px);
-  padding: 6px 9px 6px 7px;
+  padding: 7px 10px 7px 8px;
   border: 1px solid color-mix(in srgb, var(--resume-page-heading) 16%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--resume-page-bg) 88%, transparent);
   color: var(--resume-page-muted);
-  font-size: calc(var(--resume-meta-size) * 0.94);
+  font-size: calc(var(--resume-meta-size) * 1.034);
   font-weight: 700;
   line-height: 1;
-  box-shadow: 0 10px 24px color-mix(in srgb, #0f172a 10%, transparent);
+  box-shadow: 0 11px 26px color-mix(in srgb, #0f172a 10%, transparent);
   cursor: pointer;
   user-select: none;
   z-index: 5;
+  transition:
+    opacity var(--transition-base),
+    transform var(--transition-base);
 }
 
 .sampleInformationToggle input {
@@ -89,8 +92,8 @@ html[data-theme="dark"] .resumePage {
 
 .sampleInformationSwitch {
   position: relative;
-  width: 28px;
-  height: 16px;
+  width: 31px;
+  height: 18px;
   flex: 0 0 auto;
   border-radius: 999px;
   background: color-mix(in srgb, var(--resume-page-muted) 28%, transparent);
@@ -99,10 +102,10 @@ html[data-theme="dark"] .resumePage {
 
 .sampleInformationSwitch::after {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 12px;
-  height: 12px;
+  top: 2.5px;
+  left: 2.5px;
+  width: 13px;
+  height: 13px;
   border-radius: 999px;
   background: var(--resume-page-bg);
   box-shadow: 0 1px 3px color-mix(in srgb, #0f172a 24%, transparent);
@@ -115,7 +118,28 @@ html[data-theme="dark"] .resumePage {
 }
 
 .sampleInformationToggle input:checked + .sampleInformationSwitch::after {
-  transform: translateX(12px);
+  transform: translateX(13px);
+}
+
+.sampleInformationToggle--hiddenUntilHover {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+}
+
+.resumePage:hover .sampleInformationToggle--hiddenUntilHover,
+.resumePage:focus-within .sampleInformationToggle--hiddenUntilHover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+@media (hover: none) {
+  .sampleInformationToggle--hiddenUntilHover {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
 }
 
 .previewToolbar {

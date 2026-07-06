@@ -1969,7 +1969,7 @@ export default function ResumePreview({
         }
 
         return (
-            <label className="sampleInformationToggle">
+            <label className={`sampleInformationToggle${showSampleInformation ? "" : " sampleInformationToggle--hiddenUntilHover"}`}>
                 <input
                     type="checkbox"
                     checked={showSampleInformation}
