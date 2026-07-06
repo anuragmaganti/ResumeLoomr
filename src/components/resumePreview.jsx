@@ -194,6 +194,20 @@ function previewSectionClassName(className, showSeparator) {
     return `${className}${showSeparator ? '' : ' resumeSection--lastVisible'}`;
 }
 
+function renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position = 'aboveSectionName' }) {
+    return (
+        <button
+            type="button"
+            className={`sectionSeparatorControl${position === 'belowSectionName' ? ' sectionSeparatorControl--belowHeading' : ''}`}
+            data-separator-scope="section"
+            data-separator-section-id={blockId}
+            aria-label="Section separator settings"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'section', blockId)}
+        />
+    );
+}
+
 function openSeparatorSettings(event, onSeparatorSettingsOpen, scope, sectionId) {
     event.preventDefault();
     event.stopPropagation();
@@ -211,6 +225,7 @@ function SortablePreviewSection({
     className,
     previewScale,
     showSeparator = true,
+    separatorPosition = 'aboveSectionName',
     onSeparatorSettingsOpen,
     children,
 }) {
@@ -239,40 +254,40 @@ function SortablePreviewSection({
             ref={setNodeRef}
             data-preview-sortable-id={sortableId}
             data-page-break-kind="section"
-            className={`${previewSectionClassName(className, showSeparator)} previewSortableItem previewSortableSection ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
+            className={`${previewSectionClassName(className, showSeparator)}${separatorPosition === 'belowSectionName' ? ' resumeSection--separatorBelowHeading' : ''} previewSortableItem previewSortableSection ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
             style={style}
         >
-            {children(handleProps)}
-            {showSeparator && (
-                <button
-                    type="button"
-                    className="sectionSeparatorControl"
-                    data-separator-scope="section"
-                    data-separator-section-id={blockId}
-                    aria-label="Section separator settings"
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'section', blockId)}
-                />
+            {children(
+                handleProps,
+                showSeparator && separatorPosition === 'belowSectionName'
+                    ? renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })
+                    : null,
             )}
+            {showSeparator && separatorPosition !== 'belowSectionName' && renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })}
         </div>
     );
 }
 
-function StaticPreviewSection({ blockId, className, showSeparator = true, onSeparatorSettingsOpen, children }) {
+function StaticPreviewSection({
+    blockId,
+    className,
+    showSeparator = true,
+    separatorPosition = 'aboveSectionName',
+    onSeparatorSettingsOpen,
+    children,
+}) {
     return (
-        <div className={previewSectionClassName(className, showSeparator)} data-page-break-kind="section">
-            {children({})}
-            {blockId && showSeparator && (
-                <button
-                    type="button"
-                    className="sectionSeparatorControl"
-                    data-separator-scope="section"
-                    data-separator-section-id={blockId}
-                    aria-label="Section separator settings"
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'section', blockId)}
-                />
+        <div
+            className={`${previewSectionClassName(className, showSeparator)}${separatorPosition === 'belowSectionName' ? ' resumeSection--separatorBelowHeading' : ''}`}
+            data-page-break-kind="section"
+        >
+            {children(
+                {},
+                blockId && showSeparator && separatorPosition === 'belowSectionName'
+                    ? renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })
+                    : null,
             )}
+            {blockId && showSeparator && separatorPosition !== 'belowSectionName' && renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })}
         </div>
     );
 }
@@ -507,6 +522,9 @@ export default function ResumePreview({
     const summaryWidthPercent = clampSummaryWidthPercent(settings?.summaryWidthPercent);
     const renderedSummaryWidthPercent = summaryWidthDrag?.percent || summaryWidthPercent;
     const canResizeSummary = template !== 'executive' && typeof onSummaryWidthChange === 'function';
+    const sectionSeparatorPosition = settings?.sectionSeparatorPosition === 'belowSectionName'
+        ? 'belowSectionName'
+        : 'aboveSectionName';
     const sensors = useSensors(
         useSensor(ResumeLoomrPointerSensor, { activationConstraint: { distance: 6 } }),
         useSensor(ResumeLoomrKeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -1143,12 +1161,14 @@ export default function ResumePreview({
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
                 onSeparatorSettingsOpen={onSeparatorSettingsOpen}
+                separatorPosition={sectionSeparatorPosition}
             >
-                {(sectionHandleProps) => (
+                {(sectionHandleProps, sectionSeparatorElement) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
+                        {sectionSeparatorElement}
                         {sortable ? (
                             <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
                                 {entryList}
@@ -1386,12 +1406,14 @@ export default function ResumePreview({
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
                 onSeparatorSettingsOpen={onSeparatorSettingsOpen}
+                separatorPosition={sectionSeparatorPosition}
             >
-                {(sectionHandleProps) => (
+                {(sectionHandleProps, sectionSeparatorElement) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
+                        {sectionSeparatorElement}
                         {sortable ? (
                             <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
                                 {entries}
@@ -1477,12 +1499,14 @@ export default function ResumePreview({
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
                 onSeparatorSettingsOpen={onSeparatorSettingsOpen}
+                separatorPosition={sectionSeparatorPosition}
             >
-                {(sectionHandleProps) => (
+                {(sectionHandleProps, sectionSeparatorElement) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
+                        {sectionSeparatorElement}
                         {sortable ? (
                             <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
                                 {entries}
@@ -1542,12 +1566,14 @@ export default function ResumePreview({
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
                 onSeparatorSettingsOpen={onSeparatorSettingsOpen}
+                separatorPosition={sectionSeparatorPosition}
             >
-                {(sectionHandleProps) => (
+                {(sectionHandleProps, sectionSeparatorElement) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
+                        {sectionSeparatorElement}
                         {sortable ? (
                             <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
                                 {entries}
@@ -1617,12 +1643,14 @@ export default function ResumePreview({
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
                 onSeparatorSettingsOpen={onSeparatorSettingsOpen}
+                separatorPosition={sectionSeparatorPosition}
             >
-                {(sectionHandleProps) => (
+                {(sectionHandleProps, sectionSeparatorElement) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
+                        {sectionSeparatorElement}
                         {sortable ? (
                             <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
                                 {entries}
@@ -1673,12 +1701,14 @@ export default function ResumePreview({
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
                 onSeparatorSettingsOpen={onSeparatorSettingsOpen}
+                separatorPosition={sectionSeparatorPosition}
             >
-                {(sectionHandleProps) => (
+                {(sectionHandleProps, sectionSeparatorElement) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
+                        {sectionSeparatorElement}
                         {sortable ? (
                             <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
                                 {entries}
@@ -1765,12 +1795,14 @@ export default function ResumePreview({
                 previewScale={pageMetrics.scale}
                 showSeparator={showSeparator}
                 onSeparatorSettingsOpen={onSeparatorSettingsOpen}
+                separatorPosition={sectionSeparatorPosition}
             >
-                {(sectionHandleProps) => (
+                {(sectionHandleProps, sectionSeparatorElement) => (
                     <>
                         <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
                         </h2>
+                        {sectionSeparatorElement}
                         {sortable ? (
                             <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
                                 {entries}

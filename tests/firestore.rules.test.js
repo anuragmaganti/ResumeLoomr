@@ -71,6 +71,7 @@ function createResumeDoc(overrides = {}) {
         sectionSeparatorWeight: 2,
         personalSeparatorGap: 0,
         sectionSeparatorGap: 0,
+        sectionSeparatorPosition: 'aboveSectionName',
       },
       sampleDisplay: {
         hasStarted: false,
@@ -157,6 +158,7 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
           sectionSeparatorWeight: 5,
           personalSeparatorGap: -5,
           sectionSeparatorGap: 5,
+          sectionSeparatorPosition: 'belowSectionName',
         },
       },
     })));
@@ -193,6 +195,15 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
         settings: {
           ...createResumeDoc().resume.settings,
           sectionSeparatorGap: 6,
+        },
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        settings: {
+          ...createResumeDoc().resume.settings,
+          sectionSeparatorPosition: 'middle',
         },
       },
     })));

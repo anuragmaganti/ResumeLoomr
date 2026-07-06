@@ -472,6 +472,19 @@ html[data-theme="dark"] .resumePage {
   border-bottom: none;
 }
 
+.resumeSection--separatorBelowHeading {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.resumeSection--separatorBelowHeading h2 {
+  margin-bottom: 0;
+}
+
+.resumeSection--separatorBelowHeading.resumeSection--lastVisible h2 {
+  margin-bottom: var(--resume-section-heading-gap);
+}
+
 .sectionSeparatorControl {
   position: absolute;
   right: 0;
@@ -483,6 +496,17 @@ html[data-theme="dark"] .resumePage {
   border: 0;
   background: transparent;
   cursor: pointer;
+}
+
+.sectionSeparatorControl--belowHeading {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  display: block;
+  width: 100%;
+  height: max(10px, var(--resume-active-separator-gap));
+  margin: 0 0 var(--resume-section-heading-gap);
 }
 
 .sectionSeparatorControl::before {
@@ -499,6 +523,11 @@ html[data-theme="dark"] .resumePage {
     height var(--transition-fast),
     background-color var(--transition-fast),
     box-shadow var(--transition-fast);
+}
+
+.sectionSeparatorControl--belowHeading::before {
+  height: var(--resume-active-separator-weight);
+  background: var(--resume-active-separator-color);
 }
 
 .sectionSeparatorControl[data-separator-scope="personal"]:hover::before,

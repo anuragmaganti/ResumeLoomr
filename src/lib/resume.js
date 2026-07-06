@@ -95,6 +95,7 @@ export const RESUME_SETTINGS_DEFAULTS = {
   sectionSeparatorWeight: 2,
   personalSeparatorGap: 0,
   sectionSeparatorGap: 0,
+  sectionSeparatorPosition: 'aboveSectionName',
 };
 export const SAMPLE_DISPLAY_DEFAULTS = {
   hasStarted: false,
@@ -111,6 +112,8 @@ const SEPARATOR_WEIGHT_MIN = 1;
 const SEPARATOR_WEIGHT_MAX = 5;
 const SEPARATOR_GAP_MIN = -5;
 const SEPARATOR_GAP_MAX = 5;
+const SECTION_SEPARATOR_POSITION_DEFAULT = 'aboveSectionName';
+const SECTION_SEPARATOR_POSITIONS = new Set(['aboveSectionName', 'belowSectionName']);
 const DEFAULT_RESUME_LABEL = 'Resume';
 const TEXT_SIZE_STEP = 0.03;
 const HEADING_SIZE_STEP = 0.05;
@@ -129,6 +132,10 @@ const SETTING_RANGES = {
   personalSeparatorGap: [SEPARATOR_GAP_MIN, SEPARATOR_GAP_MAX],
   sectionSeparatorGap: [SEPARATOR_GAP_MIN, SEPARATOR_GAP_MAX],
 };
+
+function normalizeSectionSeparatorPosition(value) {
+  return SECTION_SEPARATOR_POSITIONS.has(value) ? value : SECTION_SEPARATOR_POSITION_DEFAULT;
+}
 const DEFAULT_SECTION_BLOCKS = [
   { id: 'education', kind: 'education', title: 'Education' },
   { id: 'experience', kind: 'roles', title: 'Experience' },
@@ -559,6 +566,13 @@ function normalizeSectionBlock(section, index, usedIds) {
 export function normalizeResumeSettings(settings) {
   return Object.fromEntries(
     Object.keys(RESUME_SETTINGS_DEFAULTS).map((key) => {
+      if (key === 'sectionSeparatorPosition') {
+        return [
+          key,
+          normalizeSectionSeparatorPosition(settings?.[key] ?? RESUME_SETTINGS_DEFAULTS[key]),
+        ];
+      }
+
       const [min, max] = SETTING_RANGES[key] || [RESUME_SETTINGS_MIN, RESUME_SETTINGS_MAX];
 
       return [
@@ -840,7 +854,11 @@ export function updateResumeSetting(resume, settingId, delta) {
   const normalizedResume = normalizeResume(resume);
   const currentValue = normalizedResume.settings[settingId] ?? 0;
 
-  if (!Object.hasOwn(RESUME_SETTINGS_DEFAULTS, settingId) || SETTING_RANGES[settingId]) {
+  if (
+    !Object.hasOwn(RESUME_SETTINGS_DEFAULTS, settingId) ||
+    SETTING_RANGES[settingId] ||
+    settingId === 'sectionSeparatorPosition'
+  ) {
     return normalizedResume;
   }
 
@@ -870,6 +888,16 @@ export function setResumeSettingValue(resume, settingId, value) {
 
   if (!Object.hasOwn(RESUME_SETTINGS_DEFAULTS, settingId)) {
     return normalizedResume;
+  }
+
+  if (settingId === 'sectionSeparatorPosition') {
+    return {
+      ...normalizedResume,
+      settings: {
+        ...normalizedResume.settings,
+        sectionSeparatorPosition: normalizeSectionSeparatorPosition(value),
+      },
+    };
   }
 
   const [min, max] = SETTING_RANGES[settingId] || [RESUME_SETTINGS_MIN, RESUME_SETTINGS_MAX];

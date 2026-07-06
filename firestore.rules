@@ -42,6 +42,10 @@ service cloud.firestore {
       return value is int && value >= -5 && value <= 5;
     }
 
+    function isValidSectionSeparatorPosition(value) {
+      return value is string && value in ['aboveSectionName', 'belowSectionName'];
+    }
+
     function isValidSettings(settings) {
       return settings is map &&
         settings.keys().hasOnly([
@@ -59,7 +63,8 @@ service cloud.firestore {
           'personalSeparatorWeight',
           'sectionSeparatorWeight',
           'personalSeparatorGap',
-          'sectionSeparatorGap'
+          'sectionSeparatorGap',
+          'sectionSeparatorPosition'
         ]) &&
         isValidSetting(settings.textSize) &&
         isValidSetting(settings.horizontalMargins) &&
@@ -96,6 +101,10 @@ service cloud.firestore {
         (
           !settings.keys().hasAny(['sectionSeparatorGap']) ||
           isValidSeparatorGap(settings.sectionSeparatorGap)
+        ) &&
+        (
+          !settings.keys().hasAny(['sectionSeparatorPosition']) ||
+          isValidSectionSeparatorPosition(settings.sectionSeparatorPosition)
         );
     }
 

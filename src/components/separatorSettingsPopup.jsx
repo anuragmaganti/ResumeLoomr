@@ -72,6 +72,11 @@ const defaultValues = {
   Gap: 0,
 };
 
+const sectionSeparatorPositionOptions = [
+  { value: 'aboveSectionName', label: 'Above section name' },
+  { value: 'belowSectionName', label: 'Below section name' },
+];
+
 function settingIdFor(scope, key) {
   const prefix = scope === 'personal' ? 'personalSeparator' : 'sectionSeparator';
   return `${prefix}${key}`;
@@ -188,6 +193,30 @@ export default function SeparatorSettingsPopup({
             </label>
           );
         })}
+        {anchor.scope === 'section' && (
+          <div className="separatorPositionControl">
+            <span className="separatorSliderHeader">
+              <span>Position</span>
+              <span>
+                {settings?.sectionSeparatorPosition === 'belowSectionName'
+                  ? 'Below'
+                  : 'Above'}
+              </span>
+            </span>
+            <div className="separatorPositionSegment" role="group" aria-label="Section separator position">
+              {sectionSeparatorPositionOptions.map((option) => (
+                <button
+                  type="button"
+                  className={`separatorPositionOption${settings?.sectionSeparatorPosition === option.value ? ' isActive' : ''}`}
+                  key={option.value}
+                  onClick={() => onChange('sectionSeparatorPosition', option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

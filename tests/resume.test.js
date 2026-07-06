@@ -134,6 +134,7 @@ test('createEmptyResume returns the block-first resume shape', () => {
     sectionSeparatorWeight: 2,
     personalSeparatorGap: 0,
     sectionSeparatorGap: 0,
+    sectionSeparatorPosition: 'aboveSectionName',
   });
   assert.deepEqual(
     resume.sections.map((section) => [section.id, section.kind, section.title]),
@@ -569,6 +570,7 @@ test('resume settings produce bounded preview and print variables', () => {
   assert.equal(settings.summaryWidthPercent, 100);
   assert.equal(settings.personalSeparatorTone, 50);
   assert.equal(settings.sectionSeparatorWeight, 2);
+  assert.equal(settings.sectionSeparatorPosition, 'aboveSectionName');
   assert.match(vars['--resume-page-margin-inline'], /in$/);
   assert.equal(vars['--resume-summary-width-percent'], '100%');
   assert.equal(vars['--resume-section-separator-color'], 'rgba(0, 0, 0, 0.5)');
@@ -592,6 +594,12 @@ test('resume settings produce bounded preview and print variables', () => {
 
   const compactSectionGap = setResumeSettingValue(createEmptyResume(), 'sectionSeparatorGap', -99);
   assert.equal(compactSectionGap.settings.sectionSeparatorGap, -5);
+
+  const belowHeadingSeparator = setResumeSettingValue(createEmptyResume(), 'sectionSeparatorPosition', 'belowSectionName');
+  assert.equal(belowHeadingSeparator.settings.sectionSeparatorPosition, 'belowSectionName');
+
+  const invalidSeparatorPosition = setResumeSettingValue(createEmptyResume(), 'sectionSeparatorPosition', 'sideways');
+  assert.equal(invalidSeparatorPosition.settings.sectionSeparatorPosition, 'aboveSectionName');
 });
 
 test('preview page break helper uses printable height for raw markers', () => {

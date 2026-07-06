@@ -1623,8 +1623,17 @@ html[data-theme="dark"] .brandLogo--dark {
   cursor: default;
 }
 
+.separatorPositionControl {
+  display: grid;
+  gap: 7px;
+  padding: 9px 8px 8px;
+  border-radius: 10px;
+}
+
 .separatorSliderControl:hover,
-.separatorSliderControl:focus-within {
+.separatorSliderControl:focus-within,
+.separatorPositionControl:hover,
+.separatorPositionControl:focus-within {
   background: color-mix(in srgb, var(--color-accent-soft) 38%, transparent);
 }
 
@@ -1666,6 +1675,39 @@ html[data-theme="dark"] .brandLogo--dark {
 
 .separatorSliderMarks span:last-child {
   text-align: right;
+}
+
+.separatorPositionSegment {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.separatorPositionOption {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--color-surface-muted) 74%, transparent);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 760;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+}
+
+.separatorPositionOption:hover,
+.separatorPositionOption:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  outline: none;
+}
+
+.separatorPositionOption.isActive {
+  border-color: color-mix(in srgb, var(--color-accent) 58%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent-soft) 72%, var(--color-surface));
+  color: var(--color-text);
 }
 
 .button.settingsAdjustButton:not(:disabled):hover {
