@@ -44,7 +44,10 @@
   border-radius: 22px;
   background: var(--resume-page-bg);
   color: var(--resume-page-text);
+  font-family: Arial, Helvetica, sans-serif;
   box-shadow: var(--resume-page-shadow);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   transition:
     background-color var(--transition-base),
     border-color var(--transition-base),
@@ -250,6 +253,7 @@ html[data-theme="dark"] .resumePage {
   color: var(--resume-page-heading);
   font-size: var(--resume-heading-size);
   font-weight: 700;
+  line-height: 1.1;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -580,11 +584,11 @@ html[data-theme="dark"] .resumePage {
   outline: none;
 }
 
-.resumeSection:last-child > .sectionSeparatorControl {
+.resumeSection:not(.resumeSection--separatorBelowHeading):last-child > .sectionSeparatorControl {
   display: none;
 }
 
-.resumeSection.resumeSection--lastVisible > .sectionSeparatorControl {
+.resumeSection:not(.resumeSection--separatorBelowHeading).resumeSection--lastVisible > .sectionSeparatorControl {
   display: none;
 }
 
@@ -1113,30 +1117,9 @@ html[data-theme="dark"] .resumePage {
   --resume-section-gap: 10px;
 }
 
-@media (max-width: 720px) {
+@media screen and (max-width: 720px) {
   .resumePage {
     border-radius: 18px;
-  }
-
-  .degreeYearsEduFlex,
-  .companyYearsExpFlex,
-  .schoolLocation,
-  .schoolLocationRow,
-  .previewEntryHeader {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-  }
-
-  .previewEntryMetaStack {
-    align-items: flex-start;
-    text-align: left;
-    min-width: 0;
-  }
-
-  .personalDetails {
-    flex-wrap: wrap;
-    gap: 10px;
   }
 
   .resumeEmptyState {
@@ -1162,9 +1145,12 @@ html[data-theme="dark"] .resumePage {
   .previewPageScaleShell,
   .previewPageScaleLayer {
     display: block;
+    position: static !important;
     width: 100% !important;
+    height: auto !important;
     max-width: none !important;
     min-height: 0 !important;
+    overflow: visible !important;
     transform: none !important;
   }
 
@@ -1180,9 +1166,10 @@ html[data-theme="dark"] .resumePage {
     --resume-page-subtle: #64748b;
     --resume-page-divider: #e2e8f0;
     --resume-page-body: #1f2937;
-    width: 100%;
+    width: calc(8.5in - var(--resume-page-margin-inline) - var(--resume-page-margin-inline));
+    max-width: none;
     min-height: var(--resume-print-min-height);
-    margin: 0;
+    margin: 0 auto;
     padding: 0;
     border: none;
     border-radius: 0;

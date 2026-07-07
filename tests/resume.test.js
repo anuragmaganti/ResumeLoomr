@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 import {
   DEFAULT_TEMPLATE,
@@ -600,6 +601,33 @@ test('resume settings produce bounded preview and print variables', () => {
 
   const invalidSeparatorPosition = setResumeSettingValue(createEmptyResume(), 'sectionSeparatorPosition', 'sideways');
   assert.equal(invalidSeparatorPosition.settings.sectionSeparatorPosition, 'aboveSectionName');
+});
+
+test('preview mobile chrome rules do not reflow printable resume content', () => {
+  const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
+
+  assert.match(previewCss, /@media screen and \(max-width: 720px\)/);
+  assert.match(previewCss, /-webkit-text-size-adjust:\s*100%/);
+  assert.match(previewCss, /\.resumePage\s*\{[\s\S]*?font-family:\s*Arial,\s*Helvetica,\s*sans-serif/);
+  assert.match(previewCss, /\.resumePage h2\s*\{[\s\S]*?line-height:\s*1\.1/);
+  assert.doesNotMatch(previewCss, /@media \(max-width: 720px\)[\s\S]*?\.previewEntryHeader[\s\S]*?flex-direction:\s*column/);
+  assert.doesNotMatch(previewCss, /@media \(max-width: 720px\)[\s\S]*?\.personalDetails[\s\S]*?flex-wrap:\s*wrap/);
+});
+
+test('preview print CSS uses physical page geometry instead of mobile viewport geometry', () => {
+  const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
+  const previewComponent = fs.readFileSync('src/components/resumePreview.jsx', 'utf8');
+  const printStart = previewCss.indexOf('@media print');
+  const pageRuleStart = previewCss.indexOf('@page', printStart);
+  const printCss = printStart >= 0 && pageRuleStart > printStart
+    ? previewCss.slice(printStart, pageRuleStart)
+    : '';
+
+  assert.match(printCss, /\.previewPageViewport,\s*\.previewPageScaleShell,\s*\.previewPageScaleLayer\s*\{[\s\S]*?position:\s*static !important/);
+  assert.match(printCss, /\.previewPageViewport,\s*\.previewPageScaleShell,\s*\.previewPageScaleLayer\s*\{[\s\S]*?height:\s*auto !important/);
+  assert.match(printCss, /\.resumePage\s*\{[\s\S]*?width:\s*calc\(8\.5in - var\(--resume-page-margin-inline\) - var\(--resume-page-margin-inline\)\)/);
+  assert.match(previewComponent, /document\.head\.appendChild\(styleElement\)/);
+  assert.doesNotMatch(previewComponent, /<style media="print">/);
 });
 
 test('preview page break helper uses printable height for raw markers', () => {

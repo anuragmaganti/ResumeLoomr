@@ -669,6 +669,30 @@ export default function ResumePreview({
     }, [previewModel, presentationVars]);
 
     useEffect(() => {
+        if (typeof document === 'undefined') {
+            return undefined;
+        }
+
+        const styleId = 'resumeloomr-print-page-rule';
+        let styleElement = document.getElementById(styleId);
+
+        if (!styleElement) {
+            styleElement = document.createElement('style');
+            styleElement.id = styleId;
+            styleElement.media = 'print';
+            document.head.appendChild(styleElement);
+        }
+
+        styleElement.textContent = printPageRule;
+
+        return () => {
+            if (styleElement?.parentNode && styleElement.textContent === printPageRule) {
+                styleElement.parentNode.removeChild(styleElement);
+            }
+        };
+    }, [printPageRule]);
+
+    useEffect(() => {
         if (!onLayoutChange) {
             return undefined;
         }
@@ -1984,9 +2008,13 @@ export default function ResumePreview({
         renderPersonalSection({ showSeparator: visibleSectionBlocks.length > 0 }),
         (
             <SortableContext key="preview-sections" items={sectionDragItems} strategy={verticalListSortingStrategy}>
-                {visibleSectionBlocks.map((block, index) => (
-                    renderSectionBlock(block, { showSeparator: index < visibleSectionBlocks.length - 1 })
-                ))}
+                {visibleSectionBlocks.map((block, index) => {
+                    const showSeparator = sectionSeparatorPosition === 'belowSectionName'
+                        ? true
+                        : index < visibleSectionBlocks.length - 1;
+
+                    return renderSectionBlock(block, { showSeparator });
+                })}
             </SortableContext>
         ),
     ].filter(Boolean);
@@ -2075,7 +2103,6 @@ export default function ResumePreview({
 
     return (
         <>
-            <style media="print">{printPageRule}</style>
             <section ref={panelRef} className="previewPanel">
                 <div ref={previewFrameRef} className="previewFrame">
                     {previewModel.hasContent && (
