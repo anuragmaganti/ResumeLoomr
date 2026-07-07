@@ -118,6 +118,7 @@ const DEFAULT_RESUME_LABEL = 'Resume';
 const TEXT_SIZE_STEP = 0.03;
 const HEADING_SIZE_STEP = 0.05;
 const NAME_SIZE_STEP = 0.05;
+const RESUME_FONT_ROOT_PX = 16;
 const MARGIN_STEP_IN = 0.04;
 const LINE_SPACING_STEP = 0.04;
 const SECTION_SPACING_STEP = 4;
@@ -1618,8 +1619,8 @@ function resolvePresentationBase(template) {
   return RESUME_PRESENTATION_BASES[template] || RESUME_PRESENTATION_BASES[DEFAULT_TEMPLATE];
 }
 
-function formatRem(value) {
-  return `${Number(value.toFixed(4))}rem`;
+function formatFontPxFromRem(value) {
+  return formatPx(value * RESUME_FONT_ROOT_PX);
 }
 
 function formatPx(value) {
@@ -1677,6 +1678,7 @@ export function getResumePresentationVars(settings, template) {
   const pageMarginInline = Math.max(0.2, base.pageMarginInlineIn + (normalizedSettings.horizontalMargins * MARGIN_STEP_IN));
   const pageMarginTop = Math.max(0.2, base.pageMarginTopIn + (normalizedSettings.verticalMargins * MARGIN_STEP_IN));
   const pageMarginBottom = Math.max(0.2, base.pageMarginBottomIn + (normalizedSettings.verticalMargins * MARGIN_STEP_IN));
+  const printContentWidth = Math.max(0, 8.5 - (pageMarginInline * 2));
   const printMinHeight = Math.max(0, 11 - pageMarginTop - pageMarginBottom);
 
   return {
@@ -1686,12 +1688,13 @@ export function getResumePresentationVars(settings, template) {
     '--resume-page-margin-inline': formatInches(pageMarginInline),
     '--resume-page-margin-top': formatInches(pageMarginTop),
     '--resume-page-margin-bottom': formatInches(pageMarginBottom),
-    '--resume-name-size': formatRem(base.nameSizeRem * nameScale),
-    '--resume-heading-size': formatRem(base.headingSizeRem * headingScale),
-    '--resume-body-size': formatRem(base.bodySizeRem * textScale),
-    '--resume-detail-size': formatRem(base.detailSizeRem * textScale),
-    '--resume-meta-size': formatRem(base.metaSizeRem * textScale),
-    '--resume-headline-size': formatRem(base.headlineSizeRem * textScale),
+    '--resume-print-content-width': formatInches(printContentWidth),
+    '--resume-name-size': formatFontPxFromRem(base.nameSizeRem * nameScale),
+    '--resume-heading-size': formatFontPxFromRem(base.headingSizeRem * headingScale),
+    '--resume-body-size': formatFontPxFromRem(base.bodySizeRem * textScale),
+    '--resume-detail-size': formatFontPxFromRem(base.detailSizeRem * textScale),
+    '--resume-meta-size': formatFontPxFromRem(base.metaSizeRem * textScale),
+    '--resume-headline-size': formatFontPxFromRem(base.headlineSizeRem * textScale),
     '--resume-body-line-height': formatUnitless(bodyLineHeight),
     '--resume-detail-line-height': formatUnitless(detailLineHeight),
     '--resume-list-line-height': formatUnitless(listLineHeight),
@@ -1718,5 +1721,5 @@ export function getResumePrintPageRule(settings, template) {
   const horizontalMargin = Math.max(0.2, base.pageMarginInlineIn + (normalizedSettings.horizontalMargins * MARGIN_STEP_IN));
   const verticalMargin = Math.max(0.2, base.pageMarginTopIn + (normalizedSettings.verticalMargins * MARGIN_STEP_IN));
 
-  return `@page { margin: ${formatInches(verticalMargin)} ${formatInches(horizontalMargin)} ${formatInches(verticalMargin)} ${formatInches(horizontalMargin)}; }`;
+  return `@page { size: letter; margin: ${formatInches(verticalMargin)} ${formatInches(horizontalMargin)} ${formatInches(verticalMargin)} ${formatInches(horizontalMargin)}; }`;
 }

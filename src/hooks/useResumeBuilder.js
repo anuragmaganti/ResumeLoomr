@@ -210,6 +210,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   const activeResumeIdRef = useRef(initialWorkspaceState.workspace.activeResumeId);
   const userRef = useRef(user);
   const printViewRef = useRef(null);
+  const mobileViewRef = useRef('editor');
   const syncTimerRef = useRef(null);
   const bootstrapRunIdRef = useRef(0);
   const isCloudMode = Boolean(authReady && user);
@@ -247,6 +248,10 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  useEffect(() => {
+    mobileViewRef.current = mobileView;
+  }, [mobileView]);
 
   useEffect(() => {
     registerResumeSyncWorker();
@@ -384,6 +389,10 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   }, [authReady, localReady, user?.uid]);
 
   useEffect(() => {
+    function handleBeforePrint() {
+      preparePrintView();
+    }
+
     function handleAfterPrint() {
       if (printViewRef.current !== null) {
         const previousView = printViewRef.current;
@@ -392,8 +401,12 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       }
     }
 
+    window.addEventListener('beforeprint', handleBeforePrint);
     window.addEventListener('afterprint', handleAfterPrint);
-    return () => window.removeEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
   }, []);
 
   useEffect(() => {
@@ -696,15 +709,21 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     return errors[path] && (showAllErrors || touched[path]) ? errors[path] : '';
   }
 
-  function printResume() {
-    revealAllErrors();
-    printViewRef.current = mobileView;
-    persistCurrentEditorDraft({ reason: 'print' });
-    flushCloudQueue({ reason: 'print' });
-
+  function preparePrintView() {
+    if (printViewRef.current === null) {
+      printViewRef.current = mobileViewRef.current;
+    }
     flushSync(() => {
       setMobileView('preview');
     });
+  }
+
+  function printResume() {
+    revealAllErrors();
+    printViewRef.current = mobileViewRef.current;
+    persistCurrentEditorDraft({ reason: 'print' });
+    flushCloudQueue({ reason: 'print' });
+    preparePrintView();
 
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {

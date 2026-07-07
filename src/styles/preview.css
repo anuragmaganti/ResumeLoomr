@@ -5,12 +5,12 @@
   --resume-page-margin-inline: 0.5in;
   --resume-page-margin-top: 0.5in;
   --resume-page-margin-bottom: 0.5in;
-  --resume-name-size: 1.5rem;
-  --resume-heading-size: 0.625rem;
-  --resume-body-size: 0.75rem;
-  --resume-detail-size: 0.6875rem;
-  --resume-meta-size: 0.6875rem;
-  --resume-headline-size: 0.8125rem;
+  --resume-name-size: 24px;
+  --resume-heading-size: 10px;
+  --resume-body-size: 12px;
+  --resume-detail-size: 11px;
+  --resume-meta-size: 11px;
+  --resume-headline-size: 13px;
   --resume-body-line-height: 1.3;
   --resume-detail-line-height: 1.45;
   --resume-list-line-height: 1.4;
@@ -240,6 +240,14 @@ html[data-theme="dark"] .resumePage {
   margin: 0;
 }
 
+.resumePage a[x-apple-data-detectors],
+.resumePage a[href^="tel"],
+.resumePage a[href^="mailto"] {
+  color: inherit !important;
+  font: inherit !important;
+  text-decoration: none !important;
+}
+
 .resumePage h1 {
   font-size: var(--resume-name-size);
   font-weight: 700;
@@ -374,7 +382,7 @@ html[data-theme="dark"] .resumePage {
 .previewDragOverlay h2 {
   margin: 0 0 var(--resume-section-heading-gap, 8px);
   color: var(--resume-page-heading, var(--text-primary));
-  font-size: var(--resume-heading-size, 0.625rem);
+  font-size: var(--resume-heading-size, 10px);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1110,7 +1118,7 @@ html[data-theme="dark"] .resumePage {
   --resume-page-margin-inline: 0.4375in;
   --resume-page-margin-top: 0.4375in;
   --resume-page-margin-bottom: 0.4375in;
-  --resume-name-size: 1.3125rem;
+  --resume-name-size: 21px;
   --resume-body-line-height: 1.4;
   --resume-detail-line-height: 1.4;
   --resume-list-line-height: 1.4;
@@ -1146,11 +1154,14 @@ html[data-theme="dark"] .resumePage {
   .previewPageScaleLayer {
     display: block;
     position: static !important;
-    width: 100% !important;
+    width: var(--resume-print-content-width) !important;
     height: auto !important;
     max-width: none !important;
     min-height: 0 !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
     overflow: visible !important;
+    -webkit-transform: none !important;
     transform: none !important;
   }
 
@@ -1166,7 +1177,7 @@ html[data-theme="dark"] .resumePage {
     --resume-page-subtle: #64748b;
     --resume-page-divider: #e2e8f0;
     --resume-page-body: #1f2937;
-    width: calc(8.5in - var(--resume-page-margin-inline) - var(--resume-page-margin-inline));
+    width: var(--resume-print-content-width);
     max-width: none;
     min-height: var(--resume-print-min-height);
     margin: 0 auto;
@@ -1176,7 +1187,9 @@ html[data-theme="dark"] .resumePage {
     background: var(--resume-page-bg) !important;
     color: var(--resume-page-text) !important;
     box-shadow: none !important;
+    -webkit-filter: none !important;
     filter: none !important;
+    -webkit-transform: none !important;
     transform: none !important;
     overflow: visible !important;
     -webkit-print-color-adjust: exact;
@@ -1224,5 +1237,6 @@ html[data-theme="dark"] .resumePage {
 }
 
 @page {
+  size: letter;
   margin: 0.5in;
 }

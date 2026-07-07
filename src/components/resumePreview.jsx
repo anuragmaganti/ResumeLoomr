@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
     closestCenter,
@@ -668,7 +668,7 @@ export default function ResumePreview({
         };
     }, [previewModel, presentationVars]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (typeof document === 'undefined') {
             return undefined;
         }
@@ -2111,7 +2111,7 @@ export default function ResumePreview({
                         </div>
                     )}
 
-                    <div className="previewPageViewport">
+                    <div className="previewPageViewport" style={presentationVars}>
                         <div className="previewPageScaleShell" style={pageShellStyle}>
                             <div className="previewPageScaleLayer">
                                 <div

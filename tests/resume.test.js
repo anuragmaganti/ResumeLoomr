@@ -573,10 +573,18 @@ test('resume settings produce bounded preview and print variables', () => {
   assert.equal(settings.sectionSeparatorWeight, 2);
   assert.equal(settings.sectionSeparatorPosition, 'aboveSectionName');
   assert.match(vars['--resume-page-margin-inline'], /in$/);
+  assert.match(vars['--resume-print-content-width'], /in$/);
+  assert.match(vars['--resume-name-size'], /px$/);
+  assert.match(vars['--resume-heading-size'], /px$/);
+  assert.match(vars['--resume-body-size'], /px$/);
+  assert.match(vars['--resume-detail-size'], /px$/);
+  assert.match(vars['--resume-meta-size'], /px$/);
+  assert.match(vars['--resume-headline-size'], /px$/);
+  assert.doesNotMatch(vars['--resume-body-size'], /rem$/);
   assert.equal(vars['--resume-summary-width-percent'], '100%');
   assert.equal(vars['--resume-section-separator-color'], 'rgba(0, 0, 0, 0.5)');
   assert.equal(vars['--resume-section-separator-weight'], '1px');
-  assert.match(getResumePrintPageRule(settings, 'compact'), /^@page/);
+  assert.match(getResumePrintPageRule(settings, 'compact'), /^@page \{ size: letter;/);
 
   const updatedResume = updateResumeSetting(createEmptyResume(), 'textSize', 1);
   assert.equal(updatedResume.settings.textSize, 1);
@@ -605,10 +613,19 @@ test('resume settings produce bounded preview and print variables', () => {
 
 test('preview mobile chrome rules do not reflow printable resume content', () => {
   const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
+  const appCss = fs.readFileSync('src/App.css', 'utf8');
+  const indexHtml = fs.readFileSync('index.html', 'utf8');
 
+  assert.match(indexHtml, /<meta name="format-detection" content="telephone=no, email=no, address=no, date=no" \/>/);
   assert.match(previewCss, /@media screen and \(max-width: 720px\)/);
+  assert.doesNotMatch(appCss, /@media \((?:max|min)-width/);
+  assert.doesNotMatch(previewCss, /@media \((?:max|min)-width/);
   assert.match(previewCss, /-webkit-text-size-adjust:\s*100%/);
   assert.match(previewCss, /\.resumePage\s*\{[\s\S]*?font-family:\s*Arial,\s*Helvetica,\s*sans-serif/);
+  assert.match(previewCss, /--resume-name-size:\s*24px/);
+  assert.match(previewCss, /--resume-body-size:\s*12px/);
+  assert.match(previewCss, /\.previewDragOverlay h2\s*\{[\s\S]*?font-size:\s*var\(--resume-heading-size,\s*10px\)/);
+  assert.match(previewCss, /\.resumePage a\[x-apple-data-detectors\],\s*\.resumePage a\[href\^="tel"\],\s*\.resumePage a\[href\^="mailto"\]\s*\{[\s\S]*?font:\s*inherit !important/);
   assert.match(previewCss, /\.resumePage h2\s*\{[\s\S]*?line-height:\s*1\.1/);
   assert.doesNotMatch(previewCss, /@media \(max-width: 720px\)[\s\S]*?\.previewEntryHeader[\s\S]*?flex-direction:\s*column/);
   assert.doesNotMatch(previewCss, /@media \(max-width: 720px\)[\s\S]*?\.personalDetails[\s\S]*?flex-wrap:\s*wrap/);
@@ -616,18 +633,48 @@ test('preview mobile chrome rules do not reflow printable resume content', () =>
 
 test('preview print CSS uses physical page geometry instead of mobile viewport geometry', () => {
   const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
+  const appCss = fs.readFileSync('src/App.css', 'utf8');
   const previewComponent = fs.readFileSync('src/components/resumePreview.jsx', 'utf8');
+  const builderHook = fs.readFileSync('src/hooks/useResumeBuilder.js', 'utf8');
   const printStart = previewCss.indexOf('@media print');
   const pageRuleStart = previewCss.indexOf('@page', printStart);
   const printCss = printStart >= 0 && pageRuleStart > printStart
     ? previewCss.slice(printStart, pageRuleStart)
     : '';
+  const appPrintStart = appCss.indexOf('@media print');
+  const appPrintCss = appPrintStart >= 0 ? appCss.slice(appPrintStart) : '';
 
   assert.match(printCss, /\.previewPageViewport,\s*\.previewPageScaleShell,\s*\.previewPageScaleLayer\s*\{[\s\S]*?position:\s*static !important/);
+  assert.match(printCss, /\.previewPageViewport,\s*\.previewPageScaleShell,\s*\.previewPageScaleLayer\s*\{[\s\S]*?width:\s*var\(--resume-print-content-width\) !important/);
   assert.match(printCss, /\.previewPageViewport,\s*\.previewPageScaleShell,\s*\.previewPageScaleLayer\s*\{[\s\S]*?height:\s*auto !important/);
-  assert.match(printCss, /\.resumePage\s*\{[\s\S]*?width:\s*calc\(8\.5in - var\(--resume-page-margin-inline\) - var\(--resume-page-margin-inline\)\)/);
+  assert.match(printCss, /\.previewPageViewport,\s*\.previewPageScaleShell,\s*\.previewPageScaleLayer\s*\{[\s\S]*?-webkit-transform:\s*none !important/);
+  assert.match(printCss, /\.resumePage\s*\{[\s\S]*?width:\s*var\(--resume-print-content-width\)/);
+  assert.match(printCss, /\.resumePage\s*\{[\s\S]*?-webkit-filter:\s*none !important/);
+  assert.match(printCss, /\.resumePage\s*\{[\s\S]*?-webkit-transform:\s*none !important/);
+  assert.match(previewCss, /@page\s*\{\s*size:\s*letter;\s*margin:\s*0\.5in;/);
+  assert.match(appPrintCss, /\.app::before\s*\{[\s\S]*?display:\s*none !important/);
+  assert.match(appPrintCss, /\.sectionAddDialogLayer,\s*\.resumePillOverlay,\s*\.tabButtonOverlay,\s*\.previewDragOverlayFrame,\s*\.mobileWorkspaceToggle/);
+  assert.match(appPrintCss, /\.appShell\s*\{[\s\S]*?width:\s*auto/);
+  assert.match(appPrintCss, /\.workspace\s*\{[\s\S]*?max-width:\s*none/);
+  assert.match(appPrintCss, /html,\s*body,\s*#root,\s*\.app\s*\{[\s\S]*?-webkit-text-size-adjust:\s*100% !important/);
+  assert.match(appPrintCss, /html,\s*body\s*\{[\s\S]*?font-size:\s*16px !important/);
+  assert.match(appPrintCss, /\.workspaceColumnPreview,\s*\.previewPanel,\s*\.previewFrame\s*\{[\s\S]*?width:\s*auto/);
+  assert.match(builderHook, /window\.addEventListener\('beforeprint', handleBeforePrint\)/);
+  assert.match(builderHook, /function preparePrintView\(\)\s*\{[\s\S]*?setMobileView\('preview'\)/);
+  assert.match(previewComponent, /className="previewPageViewport" style=\{presentationVars\}/);
+  assert.match(previewComponent, /useLayoutEffect\(\(\) => \{\s*if \(typeof document === 'undefined'\)/);
   assert.match(previewComponent, /document\.head\.appendChild\(styleElement\)/);
   assert.doesNotMatch(previewComponent, /<style media="print">/);
+});
+
+test('below-heading section separators render on the final visible section', () => {
+  const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
+  const previewComponent = fs.readFileSync('src/components/resumePreview.jsx', 'utf8');
+
+  assert.match(previewComponent, /const showSeparator = sectionSeparatorPosition === 'belowSectionName'\s*\?\s*true\s*:\s*index < visibleSectionBlocks\.length - 1/);
+  assert.match(previewComponent, /separatorPosition === 'belowSectionName'\s*\?\s*renderSectionSeparatorControl/);
+  assert.match(previewCss, /\.resumeSection:not\(\.resumeSection--separatorBelowHeading\):last-child > \.sectionSeparatorControl/);
+  assert.match(previewCss, /\.resumeSection:not\(\.resumeSection--separatorBelowHeading\)\.resumeSection--lastVisible > \.sectionSeparatorControl/);
 });
 
 test('preview page break helper uses printable height for raw markers', () => {
