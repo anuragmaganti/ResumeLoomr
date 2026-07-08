@@ -538,6 +538,76 @@ function HeaderLayoutSlot({
     );
 }
 
+function composeEventHandlers(primaryHandler, secondaryHandler) {
+    return (event) => {
+        primaryHandler?.(event);
+
+        if (!event.defaultPrevented) {
+            secondaryHandler?.(event);
+        }
+    };
+}
+
+function HeaderLayoutField({
+    id,
+    className,
+    editProps,
+    children,
+    dragEnabled = false,
+}) {
+    const {
+        setNodeRef: setDroppableNodeRef,
+        isOver,
+    } = useDroppable({ id, disabled: !dragEnabled });
+    const {
+        listeners,
+        setNodeRef: setDraggableNodeRef,
+        isDragging,
+    } = useDraggable({ id, disabled: !dragEnabled });
+    const setNodeRef = (node) => {
+        setDroppableNodeRef(node);
+        setDraggableNodeRef(node);
+    };
+    const dragProps = dragEnabled
+        ? {
+            'data-preview-sortable-id': id,
+            'data-preview-drag-handle': 'true',
+            'data-preview-drag-scope': 'header-layout',
+        }
+        : {};
+
+    return (
+        <span
+            ref={setNodeRef}
+            className={`${className} entryHeaderLayoutField${dragEnabled ? ' entryHeaderLayoutField--draggable' : ''}${isDragging ? ' isHeaderLayoutSource' : ''}${isOver && !isDragging ? ' isHeaderLayoutDropTarget' : ''}`}
+            {...dragProps}
+            {...editProps}
+            onPointerDown={dragEnabled
+                ? composeEventHandlers(editProps?.onPointerDown, listeners?.onPointerDown)
+                : editProps?.onPointerDown}
+            onKeyDown={editProps?.onKeyDown}
+        >
+            {children}
+        </span>
+    );
+}
+
+function HeaderLayoutHoverSlot({ id, label }) {
+    const {
+        setNodeRef,
+        isOver,
+    } = useDroppable({ id });
+
+    return (
+        <span
+            ref={setNodeRef}
+            className={`entryHeaderHoverSlot${isOver ? ' isHeaderLayoutDropTarget' : ''}`}
+            aria-label={label}
+            data-header-hover-slot="true"
+        />
+    );
+}
+
 function getPrimaryEntryField(block, entry) {
     if (block.kind === 'education') {
         return entry.school ? 'school' : 'degree';
@@ -675,6 +745,7 @@ export default function ResumePreview({
     const [activeDragMeta, setActiveDragMeta] = useState(null);
     const [activeDragRect, setActiveDragRect] = useState(null);
     const [activeHeaderLayout, setActiveHeaderLayout] = useState(null);
+    const [hoverHeaderLayout, setHoverHeaderLayout] = useState(null);
     const [summaryWidthDrag, setSummaryWidthDrag] = useState(null);
     const [pageMetrics, setPageMetrics] = useState({
         pageWidth: 0,
@@ -1342,15 +1413,22 @@ export default function ResumePreview({
     function handlePreviewDragCancel() {
         setActiveDragMeta(null);
         setActiveDragRect(null);
+        setHoverHeaderLayout(null);
         activeDragScrollRef.current = { x: 0, y: 0, captured: false };
     }
 
     function handlePreviewDragEnd(event) {
         const activeMeta = parsePreviewDragId(event.active.id);
         const overMeta = event.over ? parsePreviewDragId(event.over.id) : null;
+        const keepHeaderLayoutModeOpen = (
+            activeMeta.type === 'headerSlot' &&
+            activeHeaderLayout?.sectionId === activeMeta.sectionId &&
+            activeHeaderLayout?.entryId === activeMeta.entryId
+        );
         const scrollTarget = getPreviewDragScrollTarget();
         setActiveDragMeta(null);
         setActiveDragRect(null);
+        setHoverHeaderLayout(null);
         activeDragScrollRef.current = { x: 0, y: 0, captured: false };
 
         if (!overMeta || !areCompatiblePreviewDragItems(activeMeta, overMeta)) {
@@ -1366,10 +1444,13 @@ export default function ResumePreview({
 
             if (nextLayout) {
                 onSetSectionEntryHeaderLayout?.(activeMeta.sectionId, nextLayout);
-                setActiveHeaderLayout({
-                    sectionId: activeMeta.sectionId,
-                    entryId: activeMeta.entryId,
-                });
+
+                if (keepHeaderLayoutModeOpen) {
+                    setActiveHeaderLayout({
+                        sectionId: activeMeta.sectionId,
+                        entryId: activeMeta.entryId,
+                    });
+                }
             }
 
             return;
@@ -1785,9 +1866,9 @@ export default function ResumePreview({
         return renderTextWithCaret(value, path, caretOptions);
     }
 
-    function entryHeaderFieldProps(block, entry, field, entryHandleProps = {}) {
+    function entryHeaderFieldProps(block, entry, field, entryHandleProps = {}, useEntryDragHandle = true) {
         const path = sectionEntryEditorPath(block.id, entry.id, field);
-        const dragProps = getEntryHeaderPrimaryDragField(block, entry) === field && !activeHeaderLayout?.sectionId
+        const dragProps = useEntryDragHandle && getEntryHeaderPrimaryDragField(block, entry) === field && !activeHeaderLayout?.sectionId
             ? entryHandleProps
             : {};
 
@@ -1822,21 +1903,24 @@ export default function ResumePreview({
         };
     }
 
-    function renderNormalHeaderField(block, entry, field, entryHandleProps = {}) {
+    function renderNormalHeaderField(block, entry, field, slot, entryHandleProps = {}, headerDragEnabled = false) {
         if (!entry[field]) {
             return null;
         }
 
         const meta = getEntryHeaderFieldMeta(block.kind, field);
+        const slotId = headerSlotDragId(block.id, entry.id, slot.lineIndex, slot.side, slot.slotIndex);
 
         return (
-            <span
+            <HeaderLayoutField
                 key={field}
+                id={slotId}
                 className={meta.className}
-                {...entryHeaderFieldProps(block, entry, field, entryHandleProps)}
+                editProps={entryHeaderFieldProps(block, entry, field, entryHandleProps, !headerDragEnabled)}
+                dragEnabled={headerDragEnabled}
             >
                 {renderHeaderFieldText(block, entry, field)}
-            </span>
+            </HeaderLayoutField>
         );
     }
 
@@ -1855,13 +1939,13 @@ export default function ResumePreview({
         ));
     }
 
-    function renderEntryHeaderLine(block, entry, layout, lineIndex, entryHandleProps) {
+    function renderEntryHeaderLine(block, entry, layout, lineIndex, entryHandleProps, headerDragEnabled) {
         const line = layout?.lines?.[lineIndex];
-        const leftNodes = renderHeaderSide((line?.left || []).map((field) => (
-            field ? renderNormalHeaderField(block, entry, field, entryHandleProps) : null
+        const leftNodes = renderHeaderSide((line?.left || []).map((field, slotIndex) => (
+            field ? renderNormalHeaderField(block, entry, field, { lineIndex, side: 'left', slotIndex }, entryHandleProps, headerDragEnabled) : null
         )));
-        const rightNodes = renderHeaderSide((line?.right || []).map((field) => (
-            field ? renderNormalHeaderField(block, entry, field, entryHandleProps) : null
+        const rightNodes = renderHeaderSide((line?.right || []).map((field, slotIndex) => (
+            field ? renderNormalHeaderField(block, entry, field, { lineIndex, side: 'right', slotIndex }, entryHandleProps, headerDragEnabled) : null
         )));
 
         if (!leftNodes && !rightNodes) {
@@ -1876,10 +1960,87 @@ export default function ResumePreview({
         );
     }
 
+    function isHoverHeaderLayoutActive(blockId, entryId) {
+        return hoverHeaderLayout?.sectionId === blockId && hoverHeaderLayout?.entryId === entryId;
+    }
+
+    function isHeaderSlotDragActiveForEntry(blockId, entryId) {
+        return activeDragMeta?.type === 'headerSlot' && activeDragMeta.sectionId === blockId && activeDragMeta.entryId === entryId;
+    }
+
+    function clearHoverHeaderLayout(blockId, entryId) {
+        setHoverHeaderLayout((current) => (
+            current?.sectionId === blockId && current?.entryId === entryId
+                ? null
+                : current
+        ));
+    }
+
+    function renderHoverHeaderSlotLayer(block, entry, layout) {
+        return (
+            <div className={`entryHeaderHoverSlotLayer entryHeaderHoverSlotLayer--${block.kind}`} aria-hidden="true">
+                {layout.lines.map((line, lineIndex) => (
+                    <div className="entryHeaderHoverSlotLine" key={`hover-slot-line-${lineIndex}`}>
+                        {['left', 'right'].map((side) => (
+                            <div className={`entryHeaderHoverSlotSide entryHeaderHoverSlotSide--${side}`} key={`${lineIndex}-${side}`}>
+                                {(line[side] || []).map((field, slotIndex) => {
+                                    const slotId = headerSlotDragId(block.id, entry.id, lineIndex, side, slotIndex);
+                                    const meta = field
+                                        ? getEntryHeaderFieldMeta(block.kind, field)
+                                        : { label: 'Layout slot' };
+
+                                    return field ? (
+                                        <span
+                                            className="entryHeaderHoverSlotPlaceholder"
+                                            key={slotId}
+                                        />
+                                    ) : (
+                                        <HeaderLayoutHoverSlot
+                                            key={slotId}
+                                            id={slotId}
+                                            label={meta.label}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
     function renderEntryHeaderNormal(block, entry, entryHandleProps) {
         const layout = getEntryHeaderLayout(block);
+        const showHoverSlots = (
+            !activeHeaderLayout?.sectionId &&
+            (isHoverHeaderLayoutActive(block.id, entry.id) || isHeaderSlotDragActiveForEntry(block.id, entry.id))
+        );
+        const headerDragEnabled = showHoverSlots;
+        const lines = layout?.lines
+            ?.map((_, lineIndex) => renderEntryHeaderLine(block, entry, layout, lineIndex, entryHandleProps, headerDragEnabled))
+            .filter(Boolean);
 
-        return layout?.lines?.map((_, lineIndex) => renderEntryHeaderLine(block, entry, layout, lineIndex, entryHandleProps)).filter(Boolean);
+        return (
+            <div
+                className={`entryHeaderLayoutInteractive${showHoverSlots ? ' entryHeaderLayoutInteractive--showSlots' : ''}`}
+                onPointerEnter={() => setHoverHeaderLayout({ sectionId: block.id, entryId: entry.id })}
+                onPointerLeave={(event) => {
+                    if (event.buttons === 0 && !isHeaderSlotDragActiveForEntry(block.id, entry.id)) {
+                        clearHoverHeaderLayout(block.id, entry.id);
+                    }
+                }}
+                onFocus={() => setHoverHeaderLayout({ sectionId: block.id, entryId: entry.id })}
+                onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) {
+                        clearHoverHeaderLayout(block.id, entry.id);
+                    }
+                }}
+            >
+                {lines}
+                {showHoverSlots ? renderHoverHeaderSlotLayer(block, entry, layout) : null}
+            </div>
+        );
     }
 
     function renderHeaderLayoutSlotChip(block, entry, field) {

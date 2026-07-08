@@ -777,6 +777,106 @@ html[data-theme="dark"] .resumePage {
   margin-top: max(0px, calc(var(--resume-detail-gap) - 2px));
 }
 
+.entryHeaderLayoutInteractive {
+  position: relative;
+  z-index: 0;
+}
+
+.entryHeaderLayoutField {
+  display: inline;
+}
+
+.entryHeaderLayoutField--draggable {
+  cursor: grab;
+}
+
+.entryHeaderLayoutField--draggable:active {
+  cursor: grabbing;
+}
+
+.entryHeaderLayoutField.isHeaderLayoutDropTarget {
+  background: var(--preview-edit-highlight-bg);
+  box-shadow: 0 0 0 2px var(--preview-edit-highlight-ring);
+}
+
+.entryHeaderLayoutField.isHeaderLayoutSource {
+  background: color-mix(in srgb, var(--color-accent-soft) 18%, transparent 82%);
+  box-shadow: 0 0 0 1px var(--color-accent-strong);
+}
+
+.entryHeaderHoverSlotLayer {
+  position: absolute;
+  inset: -2px 0;
+  z-index: 3;
+  display: grid;
+  gap: max(2px, calc(var(--resume-detail-gap) - 2px));
+  pointer-events: none;
+}
+
+.entryHeaderHoverSlotLine {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.entryHeaderHoverSlotSide {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  pointer-events: none;
+}
+
+.entryHeaderHoverSlotSide--left {
+  justify-content: flex-start;
+  margin-right: auto;
+}
+
+.entryHeaderHoverSlotSide--right {
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.entryHeaderHoverSlot,
+.entryHeaderHoverSlotPlaceholder {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 48px;
+  min-height: 1.2em;
+  border-radius: 5px;
+}
+
+.entryHeaderHoverSlotLayer--education .entryHeaderHoverSlot,
+.entryHeaderHoverSlotLayer--education .entryHeaderHoverSlotPlaceholder {
+  width: 38px;
+}
+
+.entryHeaderHoverSlot {
+  border: 1px dotted var(--preview-edit-highlight-ring);
+  background: var(--preview-edit-highlight-bg);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--preview-edit-highlight-ring) 18%, transparent 82%);
+  opacity: 0.86;
+  pointer-events: auto;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.entryHeaderHoverSlot.isHeaderLayoutDropTarget,
+.entryHeaderHoverSlot:hover {
+  border-color: var(--color-accent-strong);
+  background: color-mix(in srgb, var(--preview-edit-highlight-bg) 72%, var(--color-accent-soft) 28%);
+  box-shadow:
+    inset 0 0 0 1px var(--color-accent-strong),
+    0 0 0 3px color-mix(in srgb, var(--color-accent) 16%, transparent);
+  opacity: 1;
+}
+
 .entryHeaderLayoutSide {
   display: flex;
   flex: 0 1 auto;
@@ -1435,6 +1535,10 @@ html[data-theme="dark"] .resumePage {
   }
 
   .entryHeaderLayoutMode {
+    display: none !important;
+  }
+
+  .entryHeaderHoverSlotLayer {
     display: none !important;
   }
 
