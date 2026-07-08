@@ -874,6 +874,7 @@ function App() {
               onReorderSections={handlePreviewReorderSections}
               onReorderSectionEntries={handlePreviewReorderSectionEntries}
               onReorderSectionTextList={handlePreviewReorderSectionTextList}
+              onReorderPersonalContact={actions.setPersonalContactOrder}
               onSetSectionEntryHeaderLayout={actions.setSectionEntryHeaderLayout}
               onSummaryWidthChange={actions.setSummaryWidthPercent}
               onSeparatorSettingsOpen={handleSeparatorSettingsOpen}

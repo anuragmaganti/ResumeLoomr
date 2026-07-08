@@ -14,6 +14,7 @@ import {
 } from '@dnd-kit/core';
 import {
     arrayMove,
+    rectSortingStrategy,
     SortableContext,
     sortableKeyboardCoordinates,
     useSortable,
@@ -22,11 +23,13 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
     ENTRY_HEADER_LAYOUT_FIELDS,
+    PERSONAL_CONTACT_FIELDS,
     getDefaultEntryHeaderLayout,
     getResumePresentationVars,
     getResumePrintPageRule,
     moveSectionHeaderField,
     normalizeEntryHeaderLayout,
+    normalizePersonalContactOrder,
 } from '../lib/resume.js';
 import {
     CSS_PIXELS_PER_INCH,
@@ -143,6 +146,10 @@ function sectionDragId(sectionId) {
     return ['section', sectionId].join(DRAG_ID_SEPARATOR);
 }
 
+function personalContactDragId(field) {
+    return ['personalContact', field].join(DRAG_ID_SEPARATOR);
+}
+
 function entryDragId(sectionId, entryId) {
     return ['entry', sectionId, entryId].join(DRAG_ID_SEPARATOR);
 }
@@ -183,6 +190,10 @@ function getEntryHeaderLayoutSlotField(layout, slot) {
 function parsePreviewDragId(id) {
     const parts = String(id || '').split(DRAG_ID_SEPARATOR);
     const [type, sectionId, entryId, field, itemIndex] = parts;
+
+    if (type === 'personalContact' && sectionId) {
+        return { type, field: sectionId };
+    }
 
     if (type === 'section' && sectionId) {
         return { type, sectionId };
@@ -228,6 +239,10 @@ function areCompatiblePreviewDragItems(activeMeta, overMeta) {
     }
 
     if (activeMeta.type === 'section') {
+        return true;
+    }
+
+    if (activeMeta.type === 'personalContact') {
         return true;
     }
 
@@ -509,6 +524,41 @@ function SortablePreviewBullet({ sectionId, entryId, field, itemIndex, editProps
     );
 }
 
+function SortablePersonalContact({ field, editProps, previewScale, children }) {
+    const sortableId = personalContactDragId(field);
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: sortableId });
+    const style = {
+        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
+        transition,
+    };
+    const handleProps = {
+        ...attributes,
+        ...listeners,
+        'data-preview-drag-handle': 'true',
+        'data-preview-drag-scope': 'personal-contact',
+    };
+
+    return (
+        <span
+            ref={setNodeRef}
+            data-preview-sortable-id={sortableId}
+            className={`previewSortableItem previewSortablePersonalContact ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
+            style={style}
+            {...editProps}
+            {...handleProps}
+        >
+            {children}
+        </span>
+    );
+}
+
 function StaticPreviewBullet({ editProps, children }) {
     return <li data-page-break-kind="item" {...editProps}>{children}</li>;
 }
@@ -749,6 +799,7 @@ export default function ResumePreview({
     onReorderSections,
     onReorderSectionEntries,
     onReorderSectionTextList,
+    onReorderPersonalContact,
     onSetSectionEntryHeaderLayout,
     onSummaryWidthChange,
     onSeparatorSettingsOpen,
@@ -802,17 +853,23 @@ export default function ResumePreview({
             frequency: MeasuringFrequency.Optimized,
         },
     }), []);
-    const personalDetails = useMemo(() => (
-        [
-            { text: previewModel.personal.location, field: 'location' },
-            { text: previewModel.personal.phone, field: 'phone' },
-            { text: previewModel.personal.email, field: 'email' },
-            ...previewModel.personal.links.map((link) => ({
-                text: link.text,
-                field: personalLinkFieldMap[link.id] || 'customField'
-            }))
-        ].filter((item) => item.text)
-    ), [previewModel.personal]);
+    const personalDetails = useMemo(() => {
+        const detailByField = new Map(
+            [
+                { text: previewModel.personal.location, field: 'location' },
+                { text: previewModel.personal.phone, field: 'phone' },
+                { text: previewModel.personal.email, field: 'email' },
+                ...previewModel.personal.links.map((link) => ({
+                    text: link.text,
+                    field: personalLinkFieldMap[link.id] || 'customField'
+                }))
+            ].filter((item) => PERSONAL_CONTACT_FIELDS.includes(item.field) && item.text)
+                .map((item) => [item.field, item]),
+        );
+        const orderedFields = normalizePersonalContactOrder(settings?.personalContactOrder);
+
+        return orderedFields.map((field) => detailByField.get(field)).filter(Boolean);
+    }, [previewModel.personal, settings?.personalContactOrder]);
 
     useEffect(() => {
         if (!activeHeaderLayout?.sectionId || typeof document === 'undefined') {
@@ -1064,6 +1121,12 @@ export default function ResumePreview({
             }),
             ...previewPulseAttributes(path),
         };
+    }
+
+    function personalContactRowTarget() {
+        const field = personalDetails[0]?.field || 'location';
+
+        return personalTarget(field);
     }
 
     function sectionTitleTarget(sectionId) {
@@ -1493,6 +1556,22 @@ export default function ResumePreview({
 
         suppressNextPreviewClick();
 
+        if (activeMeta.type === 'personalContact') {
+            const contactFields = personalDetails.map((detail) => detail.field);
+            const nextContactFields = moveIdWithinOrder(contactFields, activeMeta.field, overMeta.field);
+
+            if (nextContactFields !== contactFields) {
+                onReorderPersonalContact?.(nextContactFields);
+            }
+
+            openPreviewEditTarget({
+                sectionId: 'personal',
+                field: activeMeta.field,
+                path: personalEditorPath(activeMeta.field),
+            }, scrollTarget);
+            return;
+        }
+
         if (activeMeta.type === 'headerSlot') {
             const block = findBlock(activeMeta.sectionId);
             const layout = block ? getEntryHeaderLayout(block) : null;
@@ -1732,12 +1811,25 @@ export default function ResumePreview({
                 )}
 
                 {personalDetails.length > 0 && (
-                    <div className={`personalDetails ${personalDetails.length >= 4 ? 'personalDetails--wrap' : ''}`}>
-                        {personalDetails.map((detail, index) => (
-                            <span key={`${detail.text}-${index}`} {...personalTarget(detail.field)}>
-                                {renderTextWithCaret(detail.text, personalEditorPath(detail.field))}
-                            </span>
-                        ))}
+                    <div
+                        className={`personalDetails ${personalDetails.length >= 4 ? 'personalDetails--wrap' : ''}`}
+                        {...personalContactRowTarget()}
+                    >
+                        <SortableContext
+                            items={personalDetails.map((detail) => personalContactDragId(detail.field))}
+                            strategy={rectSortingStrategy}
+                        >
+                            {personalDetails.map((detail, index) => (
+                                <SortablePersonalContact
+                                    key={`${detail.field}-${detail.text}-${index}`}
+                                    field={detail.field}
+                                    editProps={personalTarget(detail.field)}
+                                    previewScale={pageMetrics.scale}
+                                >
+                                    {renderTextWithCaret(detail.text, personalEditorPath(detail.field))}
+                                </SortablePersonalContact>
+                            ))}
+                        </SortableContext>
                     </div>
                 )}
 
@@ -2695,6 +2787,16 @@ export default function ResumePreview({
                 <ul className="previewEntryList previewDragOverlay previewDragOverlay--bullet">
                     <li>{text}</li>
                 </ul>
+            ) : null;
+        }
+
+        if (activeDragMeta.type === 'personalContact') {
+            const detail = personalDetails.find((item) => item.field === activeDragMeta.field);
+
+            return detail?.text ? (
+                <div className="previewDragOverlay previewDragOverlay--personalContact">
+                    {detail.text}
+                </div>
             ) : null;
         }
 

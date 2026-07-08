@@ -42,6 +42,7 @@ import {
   reorderWorkspaceResumes,
   reorderWorkspaceResumesToMatch,
   sanitizeWorkspaceResumeName,
+  setPersonalContactOrder,
   setResumeSettingValue,
   setResumeSummaryWidthPercent,
   setSectionEntryHeaderLayout,
@@ -1010,6 +1011,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     },
     setResumeSettingValue(settingId, value) {
       updateResume((currentResume) => setResumeSettingValue(currentResume, settingId, value));
+    },
+    setPersonalContactOrder(orderedFields) {
+      updateResume((currentResume) => setPersonalContactOrder(currentResume, orderedFields));
     },
     setSectionEntryHeaderLayout(sectionId, layout) {
       updateResume((currentResume) => setSectionEntryHeaderLayout(currentResume, sectionId, layout));

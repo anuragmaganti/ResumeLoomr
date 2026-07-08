@@ -7,6 +7,7 @@ import {
   MAX_RESUME_SECTIONS,
   MAX_WORKSPACE_RESUME_NAME_LENGTH,
   MAX_WORKSPACE_RESUMES,
+  PERSONAL_CONTACT_FIELDS,
   SECTION_TEMPLATE_GROUPS,
   UNTITLED_SECTION_TITLE,
   addResumeSectionBlock,
@@ -28,6 +29,7 @@ import {
   getResumePrintPageRule,
   moveResumeSectionBlock,
   normalizeDraftPayload,
+  normalizePersonalContactOrder,
   normalizeResumeSettings,
   normalizeWorkspaceIndex,
   removeResumeSectionBlock,
@@ -35,6 +37,7 @@ import {
   reorderSectionBlockTextListItem,
   reorderResumeSectionBlocksToMatch,
   reorderWorkspaceResumesToMatch,
+  setPersonalContactOrder,
   setResumeSettingValue,
   setResumeSummaryWidthPercent,
   setSectionEntryHeaderLayout,
@@ -144,6 +147,7 @@ test('createEmptyResume returns the block-first resume shape', () => {
     personalSeparatorGap: 0,
     sectionSeparatorGap: 0,
     sectionSeparatorPosition: 'aboveSectionName',
+    personalContactOrder: PERSONAL_CONTACT_FIELDS,
   });
   assert.deepEqual(
     resume.sections.map((section) => [section.id, section.kind, section.title]),
@@ -949,11 +953,21 @@ test('resume settings produce bounded preview and print variables', () => {
     textSize: 99,
     horizontalMargins: -99,
     verticalMargins: 2,
+    personalContactOrder: ['email', 'email', 'unknown', 'phone'],
   });
   const vars = getResumePresentationVars(settings, 'compact');
 
   assert.equal(settings.textSize, 5);
   assert.equal(settings.horizontalMargins, -5);
+  assert.deepEqual(settings.personalContactOrder, [
+    'email',
+    'phone',
+    'location',
+    'linkedinUrl',
+    'githubUrl',
+    'portfolioUrl',
+    'customField',
+  ]);
   assert.equal(settings.summaryWidthPercent, 100);
   assert.equal(settings.personalSeparatorTone, 50);
   assert.equal(settings.sectionSeparatorWeight, 2);
@@ -995,6 +1009,32 @@ test('resume settings produce bounded preview and print variables', () => {
 
   const invalidSeparatorPosition = setResumeSettingValue(createEmptyResume(), 'sectionSeparatorPosition', 'sideways');
   assert.equal(invalidSeparatorPosition.settings.sectionSeparatorPosition, 'aboveSectionName');
+});
+
+test('personal contact order is display-only metadata for sample and real fields', () => {
+  const normalizedOrder = normalizePersonalContactOrder(['githubUrl', 'email', 'githubUrl', 'bad-field']);
+
+  assert.deepEqual(normalizedOrder, [
+    'githubUrl',
+    'email',
+    'location',
+    'phone',
+    'linkedinUrl',
+    'portfolioUrl',
+    'customField',
+  ]);
+
+  let resume = createEmptyResume();
+  resume = updatePersonalField(resume, 'email', 'person@example.com');
+  resume = updatePersonalField(resume, 'phone', '(555) 111-2222');
+  resume = setPersonalContactOrder(resume, ['email', 'phone']);
+
+  assert.deepEqual(resume.settings.personalContactOrder.slice(0, 2), ['email', 'phone']);
+  assert.equal(resume.personal.email, 'person@example.com');
+  assert.equal(resume.personal.phone, '(555) 111-2222');
+
+  const rejected = setPersonalContactOrder(resume, ['email', 'email']);
+  assert.deepEqual(rejected.settings.personalContactOrder, resume.settings.personalContactOrder);
 });
 
 test('preview mobile chrome rules do not reflow printable resume content', () => {

@@ -26,6 +26,15 @@ export const SECTION_BLOCK_KINDS = [
   'publications',
   'custom',
 ];
+export const PERSONAL_CONTACT_FIELDS = [
+  'location',
+  'phone',
+  'email',
+  'linkedinUrl',
+  'githubUrl',
+  'portfolioUrl',
+  'customField',
+];
 export const ENTRY_HEADER_LAYOUT_FIELDS = {
   education: ['school', 'degree', 'location', 'yearsEdu', 'gpa', 'honors'],
   roles: ['company', 'role', 'location', 'yearsExp'],
@@ -101,6 +110,7 @@ export const RESUME_SETTINGS_DEFAULTS = {
   personalSeparatorGap: 0,
   sectionSeparatorGap: 0,
   sectionSeparatorPosition: 'aboveSectionName',
+  personalContactOrder: PERSONAL_CONTACT_FIELDS,
 };
 export const SAMPLE_DISPLAY_DEFAULTS = {
   hasStarted: false,
@@ -142,6 +152,26 @@ const SETTING_RANGES = {
 function normalizeSectionSeparatorPosition(value) {
   return SECTION_SEPARATOR_POSITIONS.has(value) ? value : SECTION_SEPARATOR_POSITION_DEFAULT;
 }
+
+export function normalizePersonalContactOrder(order) {
+  const requestedFields = Array.isArray(order) ? order.map(trimText).filter(Boolean) : [];
+  const nextFields = [];
+
+  requestedFields.forEach((field) => {
+    if (PERSONAL_CONTACT_FIELDS.includes(field) && !nextFields.includes(field)) {
+      nextFields.push(field);
+    }
+  });
+
+  PERSONAL_CONTACT_FIELDS.forEach((field) => {
+    if (!nextFields.includes(field)) {
+      nextFields.push(field);
+    }
+  });
+
+  return nextFields;
+}
+
 const DEFAULT_SECTION_BLOCKS = [
   { id: 'education', kind: 'education', title: 'Education' },
   { id: 'experience', kind: 'roles', title: 'Experience' },
@@ -771,6 +801,13 @@ function normalizeSectionBlock(section, index, usedIds) {
 export function normalizeResumeSettings(settings) {
   return Object.fromEntries(
     Object.keys(RESUME_SETTINGS_DEFAULTS).map((key) => {
+      if (key === 'personalContactOrder') {
+        return [
+          key,
+          normalizePersonalContactOrder(settings?.[key] ?? RESUME_SETTINGS_DEFAULTS[key]),
+        ];
+      }
+
       if (key === 'sectionSeparatorPosition') {
         return [
           key,
@@ -1062,7 +1099,8 @@ export function updateResumeSetting(resume, settingId, delta) {
   if (
     !Object.hasOwn(RESUME_SETTINGS_DEFAULTS, settingId) ||
     SETTING_RANGES[settingId] ||
-    settingId === 'sectionSeparatorPosition'
+    settingId === 'sectionSeparatorPosition' ||
+    settingId === 'personalContactOrder'
   ) {
     return normalizedResume;
   }
@@ -1095,6 +1133,10 @@ export function setResumeSettingValue(resume, settingId, value) {
     return normalizedResume;
   }
 
+  if (settingId === 'personalContactOrder') {
+    return setPersonalContactOrder(normalizedResume, value);
+  }
+
   if (settingId === 'sectionSeparatorPosition') {
     return {
       ...normalizedResume,
@@ -1112,6 +1154,35 @@ export function setResumeSettingValue(resume, settingId, value) {
     settings: {
       ...normalizedResume.settings,
       [settingId]: clampInteger(value, min, max),
+    },
+  };
+}
+
+export function setPersonalContactOrder(resume, orderedFields) {
+  const normalizedResume = normalizeResume(resume);
+  const requestedFields = Array.isArray(orderedFields)
+    ? orderedFields.map(trimText).filter(Boolean)
+    : [];
+  const requestedFieldSet = new Set(requestedFields);
+
+  if (
+    requestedFields.length === 0 ||
+    requestedFieldSet.size !== requestedFields.length ||
+    requestedFields.some((field) => !PERSONAL_CONTACT_FIELDS.includes(field))
+  ) {
+    return normalizedResume;
+  }
+
+  const nextOrder = normalizePersonalContactOrder([
+    ...requestedFields,
+    ...normalizedResume.settings.personalContactOrder.filter((field) => !requestedFieldSet.has(field)),
+  ]);
+
+  return {
+    ...normalizedResume,
+    settings: {
+      ...normalizedResume.settings,
+      personalContactOrder: nextOrder,
     },
   };
 }

@@ -72,6 +72,15 @@ function createResumeDoc(overrides = {}) {
         personalSeparatorGap: 0,
         sectionSeparatorGap: 0,
         sectionSeparatorPosition: 'aboveSectionName',
+        personalContactOrder: [
+          'location',
+          'phone',
+          'email',
+          'linkedinUrl',
+          'githubUrl',
+          'portfolioUrl',
+          'customField',
+        ],
       },
       sampleDisplay: {
         hasStarted: false,
@@ -159,6 +168,15 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
           personalSeparatorGap: -5,
           sectionSeparatorGap: 5,
           sectionSeparatorPosition: 'belowSectionName',
+          personalContactOrder: [
+            'email',
+            'phone',
+            'location',
+            'linkedinUrl',
+            'githubUrl',
+            'portfolioUrl',
+            'customField',
+          ],
         },
       },
     })));
@@ -204,6 +222,40 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
         settings: {
           ...createResumeDoc().resume.settings,
           sectionSeparatorPosition: 'middle',
+        },
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        settings: {
+          ...createResumeDoc().resume.settings,
+          personalContactOrder: [
+            'email',
+            'email',
+            'location',
+            'linkedinUrl',
+            'githubUrl',
+            'portfolioUrl',
+            'customField',
+          ],
+        },
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        settings: {
+          ...createResumeDoc().resume.settings,
+          personalContactOrder: [
+            'email',
+            'phone',
+            'location',
+            'linkedinUrl',
+            'githubUrl',
+            'portfolioUrl',
+            'website',
+          ],
         },
       },
     })));
