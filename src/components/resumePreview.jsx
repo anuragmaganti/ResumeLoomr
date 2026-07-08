@@ -1778,8 +1778,8 @@ export default function ResumePreview({
 
         return visibleNodes.map((node, index) => (
             <span className="entryHeaderFieldGroupItem" key={node.key || index}>
-                {index > 0 && <span className="entryHeaderFieldSeparator">, </span>}
                 {node}
+                {index < visibleNodes.length - 1 && <span className="entryHeaderFieldSeparator">, </span>}
             </span>
         ));
     }

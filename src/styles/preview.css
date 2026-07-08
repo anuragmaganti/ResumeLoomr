@@ -779,20 +779,29 @@ html[data-theme="dark"] .resumePage {
 
 .entryHeaderLayoutSide {
   display: flex;
-  flex: 1 1 0;
+  flex: 0 1 auto;
   flex-wrap: wrap;
   align-items: baseline;
   min-width: 0;
+  max-width: 100%;
+}
+
+.entryHeaderLayoutSide--left {
+  margin-right: auto;
 }
 
 .entryHeaderLayoutSide--right {
   justify-content: flex-end;
+  margin-left: auto;
   text-align: right;
 }
 
 .entryHeaderFieldGroupItem {
+  flex: 0 1 auto;
   min-width: 0;
-  overflow-wrap: anywhere;
+  max-width: 100%;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .entryHeaderFieldSeparator {
@@ -808,8 +817,8 @@ html[data-theme="dark"] .resumePage {
 .entryHeaderLayoutLine .previewEntryLocation,
 .entryHeaderLayoutLine .yearsExp,
 .entryHeaderLayoutLine .previewEntryMeta {
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 .entryHeaderLayoutMode {
@@ -859,18 +868,20 @@ html[data-theme="dark"] .resumePage {
 .entryHeaderLayoutGridSide {
   display: flex;
   align-items: stretch;
-  flex: 1 1 0;
+  flex: 0 1 auto;
   gap: 6px;
   min-width: 0;
-  max-width: calc(50% - 9px);
+  max-width: 100%;
 }
 
 .entryHeaderLayoutGridSide--left {
   justify-content: flex-start;
+  margin-right: auto;
 }
 
 .entryHeaderLayoutGridSide--right {
   justify-content: flex-end;
+  margin-left: auto;
 }
 
 .entryHeaderLayoutSlot {
