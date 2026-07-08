@@ -413,7 +413,10 @@ html[data-theme="dark"] .resumePage {
     box-shadow: 0 0 0 2px var(--preview-edit-highlight-ring);
   }
 
-  .previewSortableEntry:has([data-preview-drag-scope="header-layout"]:hover) {
+  .previewSortableEntry:has([data-edit-section-id]:hover),
+  .previewSortableEntry:has([data-preview-drag-scope="header-layout"]:hover),
+  .previewSortableEntry:has([data-preview-drag-scope="bullet"]:hover),
+  .previewSortableEntry:has([data-header-hover-slot]:hover) {
     background: transparent;
     box-shadow: none;
   }

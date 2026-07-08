@@ -572,6 +572,7 @@ function HeaderLayoutField({
     children,
     dragEnabled = false,
     onFieldHover,
+    onFieldLeave,
 }) {
     const {
         setNodeRef: setDroppableNodeRef,
@@ -601,7 +602,9 @@ function HeaderLayoutField({
             {...dragProps}
             {...editProps}
             onPointerEnter={onFieldHover}
+            onPointerLeave={onFieldLeave}
             onFocus={onFieldHover}
+            onBlur={onFieldLeave}
             onPointerDown={dragEnabled
                 ? composeEventHandlers(editProps?.onPointerDown, listeners?.onPointerDown)
                 : editProps?.onPointerDown}
@@ -1954,6 +1957,11 @@ export default function ResumePreview({
                     field,
                     ...slot,
                 })}
+                onFieldLeave={(event) => {
+                    if (event?.buttons === 0 && !isHeaderSlotDragActiveForEntry(block.id, entry.id)) {
+                        clearHoverHeaderLayout(block.id, entry.id);
+                    }
+                }}
             >
                 {renderHeaderFieldText(block, entry, field)}
             </HeaderLayoutField>
