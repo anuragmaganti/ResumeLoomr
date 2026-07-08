@@ -4,6 +4,8 @@ import {
     closestCenter,
     DndContext,
     DragOverlay,
+    MeasuringFrequency,
+    MeasuringStrategy,
     pointerWithin,
     useDraggable,
     useDroppable,
@@ -235,12 +237,10 @@ function previewCollisionDetection(args) {
         areCompatiblePreviewDragItems(activeMeta, parsePreviewDragId(container.id))
     ));
 
-    if (activeMeta.type === 'headerSlot') {
-        const pointerCollisions = pointerWithin({ ...args, droppableContainers });
+    const pointerCollisions = pointerWithin({ ...args, droppableContainers });
 
-        if (pointerCollisions.length > 0) {
-            return pointerCollisions;
-        }
+    if (pointerCollisions.length > 0) {
+        return pointerCollisions;
     }
 
     return closestCenter({ ...args, droppableContainers });
@@ -677,6 +677,12 @@ export default function ResumePreview({
         useSensor(ResumeLoomrPointerSensor, { activationConstraint: { distance: 6 } }),
         useSensor(ResumeLoomrKeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
+    const previewDragMeasuring = useMemo(() => ({
+        droppable: {
+            strategy: MeasuringStrategy.Always,
+            frequency: MeasuringFrequency.Optimized,
+        },
+    }), []);
     const personalDetails = useMemo(() => (
         [
             { text: previewModel.personal.location, field: 'location' },
@@ -2543,6 +2549,7 @@ export default function ResumePreview({
                                     {previewModel.hasContent ? (
                                         <DndContext
                                             sensors={sensors}
+                                            measuring={previewDragMeasuring}
                                             collisionDetection={previewCollisionDetection}
                                             onDragStart={handlePreviewDragStart}
                                             onDragCancel={handlePreviewDragCancel}
