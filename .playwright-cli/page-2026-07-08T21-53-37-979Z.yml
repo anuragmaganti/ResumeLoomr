@@ -1,0 +1,247 @@
+- generic [ref=e302]:
+  - generic [ref=e303]:
+    - banner [ref=e304]:
+      - generic [ref=e305]:
+        - generic [ref=e306]: ResumeLoomr
+        - img [ref=e307]
+      - generic [ref=e309]:
+        - button "Print/Save" [ref=e310] [cursor=pointer]
+        - button "Sign in" [ref=e311] [cursor=pointer]
+    - region "Resume versions" [ref=e312]:
+      - generic "Resumes" [ref=e313]:
+        - generic [ref=e314]:
+          - button "Resume 1 Resume 1 actions" [ref=e315]:
+            - button "Resume 1" [pressed] [ref=e316] [cursor=pointer]:
+              - generic [ref=e317]: Resume 1
+            - button "Resume 1 actions" [ref=e320] [cursor=pointer]: •••
+          - button "+ New" [ref=e321] [cursor=pointer]
+        - status [ref=e322]
+  - status: Saved locally 5:46 PM
+  - button "Switch to dark theme" [ref=e323] [cursor=pointer]:
+    - img [ref=e324]
+  - button "Open account and browser settings" [ref=e332] [cursor=pointer]:
+    - img [ref=e333]
+  - main [ref=e336]:
+    - generic [ref=e339]:
+      - generic [ref=e340]:
+        - complementary [ref=e341]:
+          - generic [ref=e342]:
+            - heading "Settings" [level=2] [ref=e344]
+            - generic [ref=e345]:
+              - generic [ref=e346]:
+                - generic [ref=e347]: Template
+                - group "Choose resume template" [ref=e348]:
+                  - button "Compact" [pressed] [ref=e349] [cursor=pointer]
+                  - button "Executive" [ref=e350] [cursor=pointer]
+              - generic [ref=e351]:
+                - generic [ref=e352]: Text
+                - group "Text size" [ref=e353]:
+                  - button "Decrease Text size" [ref=e354] [cursor=pointer]: "-"
+                  - generic [ref=e355]: "0"
+                  - button "Increase Text size" [ref=e356] [cursor=pointer]: +
+              - generic [ref=e357]:
+                - generic [ref=e358]: Side margin
+                - group "Horizontal margins" [ref=e359]:
+                  - button "Decrease Horizontal margins" [ref=e360] [cursor=pointer]: "-"
+                  - generic [ref=e361]: "0"
+                  - button "Increase Horizontal margins" [ref=e362] [cursor=pointer]: +
+              - generic [ref=e363]:
+                - generic [ref=e364]: Top margin
+                - group "Vertical margins" [ref=e365]:
+                  - button "Decrease Vertical margins" [ref=e366] [cursor=pointer]: "-"
+                  - generic [ref=e367]: "0"
+                  - button "Increase Vertical margins" [ref=e368] [cursor=pointer]: +
+              - button "Advanced" [ref=e369] [cursor=pointer]:
+                - generic [ref=e370]: Advanced
+                - generic [ref=e371]: ▾
+              - generic:
+                - generic:
+                  - generic [ref=e372]:
+                    - generic [ref=e373]: Line gap
+                    - group "Line spacing" [ref=e374]:
+                      - button "Decrease Line spacing" [ref=e375] [cursor=pointer]: "-"
+                      - generic [ref=e376]: "0"
+                      - button "Increase Line spacing" [ref=e377] [cursor=pointer]: +
+                  - generic [ref=e378]:
+                    - generic [ref=e379]: Entry gap
+                    - group "Entry spacing" [ref=e380]:
+                      - button "Decrease Entry spacing" [ref=e381] [cursor=pointer]: "-"
+                      - generic [ref=e382]: "0"
+                      - button "Increase Entry spacing" [ref=e383] [cursor=pointer]: +
+                  - generic [ref=e384]:
+                    - generic [ref=e385]: Headings
+                    - group "Heading size" [ref=e386]:
+                      - button "Decrease Heading size" [ref=e387] [cursor=pointer]: "-"
+                      - generic [ref=e388]: "0"
+                      - button "Increase Heading size" [ref=e389] [cursor=pointer]: +
+                  - generic [ref=e390]:
+                    - generic [ref=e391]: Name size
+                    - group "Name size" [ref=e392]:
+                      - button "Decrease Name size" [ref=e393] [cursor=pointer]: "-"
+                      - generic [ref=e394]: "0"
+                      - button "Increase Name size" [ref=e395] [cursor=pointer]: +
+        - complementary [ref=e396]:
+          - tablist "Resume sections" [ref=e397]:
+            - button "Personal" [disabled] [ref=e398]:
+              - generic [ref=e400]: Personal
+            - button "Education" [ref=e401]:
+              - generic [ref=e403]: Education
+            - button "Experience" [ref=e404]:
+              - generic [ref=e406]: Experience
+            - button "Internships" [ref=e407]:
+              - generic [ref=e409]: Internships
+            - button "Projects" [ref=e410]:
+              - generic [ref=e412]: Projects
+            - button "Skills" [ref=e413]:
+              - generic [ref=e415]: Skills
+            - button "Add section" [ref=e417]:
+              - generic [ref=e418]: +
+          - status [ref=e419]
+      - generic [ref=e420]:
+        - generic [ref=e421]:
+          - heading "Personal details" [level=3] [ref=e423]
+          - generic [ref=e425]:
+            - generic [ref=e426]: Section order
+            - button "Personal details section order actions" [ref=e428] [cursor=pointer]: •••
+        - group [ref=e430]:
+          - generic [ref=e431]:
+            - generic [ref=e432]:
+              - generic [ref=e433]: Full name
+              - textbox "Full name" [ref=e434]:
+                - /placeholder: Dwight Schrute
+            - generic [ref=e435]:
+              - generic [ref=e436]:
+                - generic [ref=e437]: Professional headline
+                - textbox "Professional headline" [ref=e438]:
+                  - /placeholder: Sales Leader, Beet Farmer & Preparedness Specialist
+              - generic [ref=e439]:
+                - generic [ref=e440]: Location
+                - textbox "Location" [ref=e441]:
+                  - /placeholder: Scranton, PA
+            - generic [ref=e442]:
+              - generic [ref=e443]:
+                - generic [ref=e444]: Phone number
+                - textbox "Phone number" [ref=e445]:
+                  - /placeholder: (570) 555-0199
+              - generic [ref=e446]:
+                - generic [ref=e447]: Email address
+                - textbox "Email address" [ref=e448]:
+                  - /placeholder: d.schrute@dundermifflin.com
+            - generic [ref=e449]:
+              - generic [ref=e450]:
+                - generic [ref=e451]: LinkedIn URL
+                - textbox "LinkedIn URL" [ref=e452]:
+                  - /placeholder: linkedin.com/in/dwightkschrute
+              - generic [ref=e453]:
+                - generic [ref=e454]: GitHub URL
+                - textbox "GitHub URL" [ref=e455]:
+                  - /placeholder: github.com/jordanlee
+            - generic [ref=e456]:
+              - generic [ref=e457]:
+                - generic [ref=e458]: Portfolio or website
+                - textbox "Portfolio or website" [ref=e459]:
+                  - /placeholder: jordanlee.com
+              - generic [ref=e460]:
+                - generic [ref=e461]: Custom field
+                - textbox "Custom field" [ref=e462]:
+                  - /placeholder: "Behance: behance.net/jordanlee"
+            - generic [ref=e463]:
+              - generic [ref=e464]: Professional summary
+              - textbox "Professional summary" [ref=e465]:
+                - /placeholder: Disciplined sales professional with parallel expertise in paper, beet agriculture, bed-and-breakfast operations, and threat readiness. Consistently operates as if every client call, farm chore, and conference-room meeting could become a test of loyalty, preparedness, or hand-to-hand capability. Long-term objective is clear authority, correct title usage, and a workplace where emergency protocols are treated with the seriousness they deserve.
+    - generic [ref=e468]:
+      - generic [ref=e469]: 2 pages
+      - generic [ref=e472]:
+        - generic [ref=e473]:
+          - generic [ref=e474] [cursor=pointer]:
+            - checkbox "Show sample information" [checked]
+            - generic [ref=e476]: Show sample information
+          - generic [ref=e477]:
+            - heading "Dwight Schrute" [level=1] [ref=e478] [cursor=pointer]
+            - generic [ref=e479] [cursor=pointer]: Sales Leader, Beet Farmer & Preparedness Specialist
+            - generic [ref=e480]:
+              - generic [ref=e481] [cursor=pointer]: Scranton, PA
+              - generic [ref=e482] [cursor=pointer]: (570) 555-0199
+              - generic [ref=e483] [cursor=pointer]: d.schrute@dundermifflin.com
+              - generic [ref=e484] [cursor=pointer]: linkedin.com/in/dwightkschrute
+            - generic [ref=e485] [cursor=pointer]: Disciplined sales professional with parallel expertise in paper, beet agriculture, bed-and-breakfast operations, and threat readiness. Consistently operates as if every client call, farm chore, and conference-room meeting could become a test of loyalty, preparedness, or hand-to-hand capability. Long-term objective is clear authority, correct title usage, and a workplace where emergency protocols are treated with the seriousness they deserve.
+            - button "Personal separator settings" [ref=e486] [cursor=pointer]
+          - generic [ref=e487]:
+            - button "Education" [ref=e488]
+            - 'button "Schrute Family Training Honesdale, PA Applied Beet Agriculture & Authority Studies 1970-Present Relevant coursework: Sales Combat, Farm Accounting, Emergency Protocols, Karate, Surveillance Awareness Certifications: Volunteer sheriff deputy experience, notary public, beet-based operational discipline." [ref=e489]':
+              - generic [ref=e490]:
+                - generic [ref=e491]:
+                  - button "Schrute Family Training" [ref=e494]
+                  - generic [ref=e496]: Honesdale, PA
+                - generic [ref=e497]:
+                  - generic [ref=e499]: Applied Beet Agriculture & Authority Studies
+                  - generic [ref=e501]: 1970-Present
+              - generic [ref=e502] [cursor=pointer]: "Relevant coursework: Sales Combat, Farm Accounting, Emergency Protocols, Karate, Surveillance Awareness"
+              - generic [ref=e503]: "Certifications: Volunteer sheriff deputy experience, notary public, beet-based operational discipline."
+            - button "Section separator settings" [ref=e504] [cursor=pointer]
+          - generic [ref=e505]:
+            - button "Experience" [ref=e506]
+            - button "Dunder Mifflin Paper Company Scranton, PA Top Salesman / Assistant to the Regional Manager 2005-2013 Generated elite paper sales through discipline, client memory, aggressive follow-through, and total belief in paper as a product, identity, and battlefield. Supported branch operations with security drills, loyalty checks, emergency protocols, desk surveillance, and structured authority under the Assistant to the Regional Manager title. Converted temporary leadership opportunities, sales awards, and crisis moments into proof that Regional Manager was always the correct destiny." [ref=e507]:
+              - generic [ref=e508]:
+                - generic [ref=e509]:
+                  - button "Dunder Mifflin Paper Company" [ref=e512]
+                  - generic [ref=e514]: Scranton, PA
+                - generic [ref=e515]:
+                  - generic [ref=e517]: Top Salesman / Assistant to the Regional Manager
+                  - generic [ref=e519]: 2005-2013
+              - list [ref=e520]:
+                - button "Generated elite paper sales through discipline, client memory, aggressive follow-through, and total belief in paper as a product, identity, and battlefield." [ref=e521]
+                - button "Supported branch operations with security drills, loyalty checks, emergency protocols, desk surveillance, and structured authority under the Assistant to the Regional Manager title." [ref=e522]
+                - button "Converted temporary leadership opportunities, sales awards, and crisis moments into proof that Regional Manager was always the correct destiny." [ref=e523]
+            - button "Schrute Farms Honesdale, PA Owner / Beet Farmer / Bed-and-Breakfast Proprietor 1970-Present Operated beet production and rustic lodging with Mose Schrute, strict rules, family labor, and guest experiences no algorithm could replicate. Balanced crop planning, agri-tourism, table-making, manure-adjacent authenticity, and wedding logistics on a working family property." [ref=e524]:
+              - generic [ref=e525]:
+                - generic [ref=e526]:
+                  - button "Schrute Farms" [ref=e529]
+                  - generic [ref=e531]: Honesdale, PA
+                - generic [ref=e532]:
+                  - generic [ref=e534]: Owner / Beet Farmer / Bed-and-Breakfast Proprietor
+                  - generic [ref=e536]: 1970-Present
+              - list [ref=e537]:
+                - button "Operated beet production and rustic lodging with Mose Schrute, strict rules, family labor, and guest experiences no algorithm could replicate." [ref=e538]
+                - button "Balanced crop planning, agri-tourism, table-making, manure-adjacent authenticity, and wedding logistics on a working family property." [ref=e539]
+            - button "Lackawanna County Sheriff's Department Lackawanna County, PA Volunteer Sheriff Deputy 2006-2006 Applied surveillance, preparedness, and procedural enthusiasm to public-safety-adjacent responsibilities with the intensity of a full-time lawman. Stepped away after a drug-testing incident, then retained the mindset, situational awareness, and pepper-spray readiness of a deputy indefinitely." [ref=e540]:
+              - generic [ref=e541]:
+                - generic [ref=e542]:
+                  - button "Lackawanna County Sheriff's Department" [ref=e545]
+                  - generic [ref=e547]: Lackawanna County, PA
+                - generic [ref=e548]:
+                  - generic [ref=e550]: Volunteer Sheriff Deputy
+                  - generic [ref=e552]: 2006-2006
+              - list [ref=e553]:
+                - button "Applied surveillance, preparedness, and procedural enthusiasm to public-safety-adjacent responsibilities with the intensity of a full-time lawman." [ref=e554]
+                - button "Stepped away after a drug-testing incident, then retained the mindset, situational awareness, and pepper-spray readiness of a deputy indefinitely." [ref=e555]
+            - button "Scranton Business Park Scranton, PA Co-Owner / Property Operator 2011-2013 Managed property interests around the office park where Dunder Mifflin operated, expanding authority beyond paper sales and into the literal walls around coworkers. Balanced tenant expectations, building logistics, lease leverage, and the strategic advantage of owning part of the workplace ecosystem." [ref=e556]:
+              - generic [ref=e557]:
+                - generic [ref=e558]:
+                  - button "Scranton Business Park" [ref=e561]
+                  - generic [ref=e563]: Scranton, PA
+                - generic [ref=e564]:
+                  - generic [ref=e566]: Co-Owner / Property Operator
+                  - generic [ref=e568]: 2011-2013
+              - list [ref=e569]:
+                - button "Managed property interests around the office park where Dunder Mifflin operated, expanding authority beyond paper sales and into the literal walls around coworkers." [active] [ref=e570]
+                - button "Balanced tenant expectations, building logistics, lease leverage, and the strategic advantage of owning part of the workplace ecosystem." [ref=e571]
+            - button "Section separator settings" [ref=e572] [cursor=pointer]
+          - generic [ref=e573]:
+            - button "Projects" [ref=e574]
+            - button "Schrute Farms 1970-Present Operated Honesdale beet farm and agri-tourism lodging with rustic authenticity, strict house rules, and a historically confident sales pitch. Balanced crop production, guest experience, cousin-based labor coordination, and Civil War storytelling while keeping Schrute Farms operational year-round." [ref=e575]:
+              - generic [ref=e576]:
+                - button "Schrute Farms" [ref=e577]
+                - generic [ref=e578] [cursor=pointer]: 1970-Present
+              - generic [ref=e579] [cursor=pointer]: Operated Honesdale beet farm and agri-tourism lodging with rustic authenticity, strict house rules, and a historically confident sales pitch.
+              - list [ref=e580]:
+                - button "Balanced crop production, guest experience, cousin-based labor coordination, and Civil War storytelling while keeping Schrute Farms operational year-round." [ref=e581]
+            - button "Section separator settings" [ref=e582] [cursor=pointer]
+          - generic [ref=e583]:
+            - button "Skills" [ref=e584]
+            - 'button "Operations: Paper sales, Beet farming, Emergency preparedness, Surveillance awareness, Karate, Rule enforcement, Bed-and-breakfast operations, Pepper-spray readiness, Property management, Sales discipline" [ref=e585]':
+              - button "Operations" [ref=e586]
+              - text: ": Paper sales, Beet farming, Emergency preparedness, Surveillance awareness, Karate, Rule enforcement, Bed-and-breakfast operations, Pepper-spray readiness, Property management, Sales discipline"
+          - status [ref=e587]: Draggable item bullet::experience::experience-sample-entry-4::activities::0 was dropped over droppable area bullet::experience::experience-sample-entry-4::activities::0
+        - generic:
+          - generic: Page 2

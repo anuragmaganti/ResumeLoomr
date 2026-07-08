@@ -719,6 +719,49 @@ test('sample-only entry reorders materialize blank editor rows that preserve ord
   ]);
 });
 
+test('two sample-only entries can reorder into persistent blank editor rows', () => {
+  const resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  const mixedPreview = createMixedSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
+  const experiencePreview = mixedPreview.sectionBlocks.find((section) => section.id === 'experience');
+  const realEntryIds = new Set(getSection(resume, 'experience').entries.map((entry) => entry.id));
+  const sampleOnlyEntryIds = experiencePreview.entryOrder.filter((entryId) => !realEntryIds.has(entryId));
+  const nextPreviewOrder = [
+    experiencePreview.entryOrder[0],
+    sampleOnlyEntryIds[1],
+    sampleOnlyEntryIds[0],
+    ...experiencePreview.entryOrder.filter((entryId) => (
+      entryId !== experiencePreview.entryOrder[0] &&
+      entryId !== sampleOnlyEntryIds[0] &&
+      entryId !== sampleOnlyEntryIds[1]
+    )),
+  ];
+
+  const materializedResume = materializeAndReorderSectionBlockEntries(resume, 'experience', nextPreviewOrder);
+  const materializedEntries = getSection(materializedResume, 'experience').entries;
+  const reloadedPreview = createMixedSamplePreviewModel(materializedResume, 'resume-5', getPreviewModel(materializedResume));
+  const reloadedExperience = reloadedPreview.sectionBlocks.find((section) => section.id === 'experience');
+
+  assert.deepEqual(materializedEntries.map((entry) => entry.id), nextPreviewOrder);
+  assert.deepEqual(materializedEntries.map((entry) => entry.company), ['', '', '', '']);
+  assert.deepEqual(reloadedExperience.entries.map((entry) => entry.id), nextPreviewOrder);
+  assert.equal(new Set(reloadedExperience.entries.map((entry) => entry.id)).size, reloadedExperience.entries.length);
+});
+
+test('sample preview section reorders persist real section order without sample content', () => {
+  const resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  const preview = createMixedSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
+  const nextPreviewSectionOrder = [
+    'projects',
+    ...preview.sectionOrder.filter((sectionId) => sectionId !== 'projects'),
+  ];
+  const reorderedResume = reorderResumeSectionBlocksToMatch(resume, nextPreviewSectionOrder);
+  const reorderedPreview = createMixedSamplePreviewModel(reorderedResume, 'resume-5', getPreviewModel(reorderedResume));
+
+  assert.equal(reorderedResume.sections[0].id, 'projects');
+  assert.equal(reorderedPreview.sectionOrder[0], 'projects');
+  assert.equal(getPreviewModel(reorderedResume).hasContent, false);
+});
+
 test('sample preview bullet reorders persist only when source indexes map to real bullets', () => {
   let resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
   const experienceEntryId = getSection(resume, 'experience').entries[0].id;

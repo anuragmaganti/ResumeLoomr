@@ -48,6 +48,16 @@ function getPreviewEntryOrder(previewModel, sectionId) {
   return entries.map((entry) => entry.id).filter(Boolean);
 }
 
+function getPreviewSectionOrder(previewModel) {
+  if (Array.isArray(previewModel?.sectionOrder) && previewModel.sectionOrder.length > 0) {
+    return previewModel.sectionOrder.filter(Boolean);
+  }
+
+  return Array.isArray(previewModel?.sectionBlocks)
+    ? previewModel.sectionBlocks.map((section) => section.id).filter(Boolean)
+    : [];
+}
+
 function getPreviewTextListOrder(previewModel, sectionId, entryId, field) {
   const block = previewModel?.sectionBlocks?.find((section) => section.id === sectionId);
   const entry = block?.entries?.find((sectionEntry) => sectionEntry.id === entryId);
@@ -429,6 +439,31 @@ function App() {
       removeSampleOrderOverride(currentOverrides, activeResumeId, sampleEntryOrderKey(sectionId))
     ));
   }, [actions, activeResumeId, displayPreviewModel, isSamplePreview]);
+
+  const handlePreviewReorderSections = useCallback((nextSectionIds) => {
+    if (!isSamplePreview) {
+      reorderSections(nextSectionIds);
+      return;
+    }
+
+    const currentOrder = getPreviewSectionOrder(displayPreviewModel);
+    const nextOrder = Array.isArray(nextSectionIds) ? nextSectionIds.filter(Boolean) : [];
+
+    if (
+      currentOrder.length === 0 ||
+      currentOrder.length !== nextOrder.length ||
+      currentOrder.every((sectionId, index) => sectionId === nextOrder[index])
+    ) {
+      return;
+    }
+
+    const currentIdSet = new Set(currentOrder);
+    if (!nextOrder.every((sectionId) => currentIdSet.has(sectionId))) {
+      return;
+    }
+
+    reorderSections(nextOrder);
+  }, [displayPreviewModel, isSamplePreview, reorderSections]);
 
   const handlePreviewLayoutChange = useCallback((nextLayout) => {
     setPreviewLayout((currentLayout) => (
@@ -836,7 +871,7 @@ function App() {
               panelRef={previewPanelRef}
               onEditTarget={handlePreviewEditTarget}
               onLayoutChange={handlePreviewLayoutChange}
-              onReorderSections={reorderSections}
+              onReorderSections={handlePreviewReorderSections}
               onReorderSectionEntries={handlePreviewReorderSectionEntries}
               onReorderSectionTextList={handlePreviewReorderSectionTextList}
               onSetSectionEntryHeaderLayout={actions.setSectionEntryHeaderLayout}
