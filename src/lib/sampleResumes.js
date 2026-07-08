@@ -1,6 +1,14 @@
 import {
+  awardEntryHasContent,
+  certificationEntryHasContent,
+  educationEntryHasContent,
   getPreviewModel,
+  languageEntryHasContent,
   normalizeResume,
+  projectEntryHasContent,
+  publicationEntryHasContent,
+  roleEntryHasContent,
+  skillsEntryHasContent,
   trimText,
 } from './resume.js';
 
@@ -752,11 +760,46 @@ function toSamplePreviewTextList(items, order) {
 }
 
 function firstEntryId(section) {
-  return trimText(section?.entries?.[0]?.id) || `${section.id}-sample-entry`;
+  const existingEntryId = (Array.isArray(section?.entries) ? section.entries : [])
+    .map((entry) => trimText(entry.id))
+    .find((entryId) => entryId && sampleEntrySourceIndex(section, entryId) === null);
+
+  return existingEntryId || `${section.id}-sample-entry`;
+}
+
+function generatedSampleEntryId(section, index) {
+  return `${section.id}-sample-entry-${index + 1}`;
+}
+
+function sampleEntrySourceIndex(section, entryId) {
+  const prefix = `${section?.id}-sample-entry-`;
+  const id = trimText(entryId);
+
+  if (!id.startsWith(prefix)) {
+    return null;
+  }
+
+  const sourceIndex = Number(id.slice(prefix.length)) - 1;
+
+  return Number.isInteger(sourceIndex) && sourceIndex >= 0 ? sourceIndex : null;
 }
 
 function sampleEntryId(section, index) {
-  return trimText(section?.entries?.[index]?.id) || `${section.id}-sample-entry-${index + 1}`;
+  const generatedId = generatedSampleEntryId(section, index);
+  const entries = Array.isArray(section?.entries) ? section.entries : [];
+  const existingGeneratedId = entries
+    .map((entry) => trimText(entry.id))
+    .find((entryId) => entryId === generatedId);
+
+  if (existingGeneratedId) {
+    return existingGeneratedId;
+  }
+
+  const positionalRealEntryId = entries
+    .map((entry) => trimText(entry.id))
+    .filter((entryId) => entryId && sampleEntrySourceIndex(section, entryId) === null)[index];
+
+  return positionalRealEntryId || generatedId;
 }
 
 function createSampleEducationEntry(section, sample) {
@@ -764,6 +807,7 @@ function createSampleEducationEntry(section, sample) {
 
   return {
     id: entryId,
+    isSamplePlaceholderEntry: true,
     school: sample.education.school,
     degree: sample.education.degree,
     yearsEdu: sample.education.yearsEdu,
@@ -797,6 +841,7 @@ function createSampleRoleEntries(section, sample, orderOverrides) {
 
     return {
       id: entryId,
+      isSamplePlaceholderEntry: true,
       company: experience.company,
       role: experience.role,
       location: experience.location,
@@ -804,8 +849,16 @@ function createSampleRoleEntries(section, sample, orderOverrides) {
       activities: toSamplePreviewTextList(experience.activities, orderOverrides?.[`${section.id}.${entryId}.activities`]),
     };
   });
+  const storedEntryOrder = (Array.isArray(section?.entries) ? section.entries : [])
+    .map((entry) => trimText(entry.id))
+    .filter(Boolean);
+  const entryIds = new Set(entries.map((entry) => entry.id));
+  const completeStoredEntryOrder = storedEntryOrder.length === entries.length &&
+    storedEntryOrder.every((entryId) => entryIds.has(entryId))
+    ? storedEntryOrder
+    : null;
 
-  return applySampleEntryOrder(entries, orderOverrides?.[`${section.id}.entries`]);
+  return applySampleEntryOrder(entries, orderOverrides?.[`${section.id}.entries`] || completeStoredEntryOrder);
 }
 
 function createSampleProjectEntry(section, sample, orderOverrides) {
@@ -813,6 +866,7 @@ function createSampleProjectEntry(section, sample, orderOverrides) {
 
   return {
     id: entryId,
+    isSamplePlaceholderEntry: true,
     name: sample.projects.name,
     subtitle: '',
     years: sample.projects.years,
@@ -824,6 +878,7 @@ function createSampleProjectEntry(section, sample, orderOverrides) {
 function createSampleSkillsEntry(section, sample) {
   return {
     id: firstEntryId(section),
+    isSamplePlaceholderEntry: true,
     category: sample.skills.category,
     items: sample.skills.items,
   };
@@ -987,6 +1042,52 @@ function mergePreviewTextList(sampleItems, realItems) {
   return mergedItems;
 }
 
+function sampleEntryUsesOnlyPlaceholderText(kind, realEntry) {
+  if (!realEntry) {
+    return true;
+  }
+
+  if (kind === 'education') {
+    return !educationEntryHasContent(realEntry);
+  }
+
+  if (kind === 'roles') {
+    return !roleEntryHasContent(realEntry);
+  }
+
+  if (kind === 'skills') {
+    return !skillsEntryHasContent(realEntry);
+  }
+
+  if (kind === 'projects') {
+    return !projectEntryHasContent(realEntry);
+  }
+
+  if (kind === 'certifications') {
+    return !certificationEntryHasContent(realEntry);
+  }
+
+  if (kind === 'languages') {
+    return !languageEntryHasContent(realEntry);
+  }
+
+  if (kind === 'awards') {
+    return !awardEntryHasContent(realEntry);
+  }
+
+  if (kind === 'publications') {
+    return !publicationEntryHasContent(realEntry);
+  }
+
+  return ![
+    realEntry.title,
+    realEntry.subtitle,
+    realEntry.location,
+    realEntry.years,
+    realEntry.details,
+  ].some((value) => trimText(value)) && !(Array.isArray(realEntry.highlights) && realEntry.highlights.some((item) => trimText(item)));
+}
+
 function mergeIndexedObjects(sampleItems, realItems, fields) {
   const mergedItems = [];
   const maxLength = Math.max(
@@ -1017,6 +1118,7 @@ function mergeIndexedObjects(sampleItems, realItems, fields) {
 function mergeEducationEntry(sampleEntry, realEntry) {
   return {
     ...sampleEntry,
+    isSamplePlaceholderEntry: sampleEntryUsesOnlyPlaceholderText('education', realEntry),
     id: realEntry?.id || sampleEntry.id,
     school: mergePreviewText(realEntry?.school, sampleEntry.school),
     degree: mergePreviewText(realEntry?.degree, sampleEntry.degree),
@@ -1039,6 +1141,7 @@ function mergeEntryByKind(kind, sampleEntry, realEntry) {
   if (kind === 'roles') {
     return {
       ...sampleEntry,
+      isSamplePlaceholderEntry: sampleEntryUsesOnlyPlaceholderText(kind, realEntry),
       id: realEntry?.id || sampleEntry.id,
       company: mergePreviewText(realEntry?.company, sampleEntry.company),
       role: mergePreviewText(realEntry?.role, sampleEntry.role),
@@ -1051,6 +1154,7 @@ function mergeEntryByKind(kind, sampleEntry, realEntry) {
   if (kind === 'skills') {
     return {
       ...sampleEntry,
+      isSamplePlaceholderEntry: sampleEntryUsesOnlyPlaceholderText(kind, realEntry),
       id: realEntry?.id || sampleEntry.id,
       category: mergePreviewText(realEntry?.category, sampleEntry.category),
       items: mergePreviewText(realEntry?.items, sampleEntry.items),
@@ -1060,6 +1164,7 @@ function mergeEntryByKind(kind, sampleEntry, realEntry) {
   if (kind === 'projects') {
     return {
       ...sampleEntry,
+      isSamplePlaceholderEntry: sampleEntryUsesOnlyPlaceholderText(kind, realEntry),
       id: realEntry?.id || sampleEntry.id,
       name: mergePreviewText(realEntry?.name, sampleEntry.name),
       subtitle: mergePreviewText(realEntry?.subtitle, sampleEntry.subtitle),
@@ -1071,8 +1176,9 @@ function mergeEntryByKind(kind, sampleEntry, realEntry) {
 
   return {
     ...sampleEntry,
+    isSamplePlaceholderEntry: sampleEntryUsesOnlyPlaceholderText(kind, realEntry),
     ...Object.fromEntries(
-      Object.keys(sampleEntry || {}).map((field) => [
+      Object.keys(sampleEntry || {}).filter((field) => field !== 'isSamplePlaceholderEntry').map((field) => [
         field,
         field === 'id' ? (realEntry?.id || sampleEntry.id) : mergePreviewText(realEntry?.[field], sampleEntry[field]),
       ])

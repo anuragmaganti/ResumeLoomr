@@ -409,7 +409,7 @@ function StaticPreviewSection({
     );
 }
 
-function SortablePreviewEntry({ sectionId, entryId, className, previewScale, entryEditProps = {}, children }) {
+function SortablePreviewEntry({ sectionId, entryId, className, previewScale, entryEditProps = {}, preferEntryDrag = false, children }) {
     const sortableId = entryDragId(sectionId, entryId);
     const {
         attributes,
@@ -439,7 +439,10 @@ function SortablePreviewEntry({ sectionId, entryId, className, previewScale, ent
             );
             const shouldLetChildHandleDrag = childInteractiveTarget && childInteractiveTarget !== event.currentTarget;
 
-            if (shouldLetChildHandleDrag) {
+            if (
+                shouldLetChildHandleDrag &&
+                !(preferEntryDrag && !event.target.closest('[data-preview-drag-scope="header-layout"], [data-header-hover-slot], input, textarea, select'))
+            ) {
                 return;
             }
 
@@ -1784,6 +1787,7 @@ export default function ResumePreview({
                 className="educationSection"
                 previewScale={pageMetrics.scale}
                 entryEditProps={entryContainerTarget(block, institution, 'school')}
+                preferEntryDrag={institution.isSamplePlaceholderEntry}
             >
                 {(entryHandleProps) => (
                     <>
@@ -2285,6 +2289,7 @@ export default function ResumePreview({
                 className={`experienceSection${activeHeaderLayout?.sectionId === block.id ? ' experienceSection--layoutActiveSection' : ''}${activeHeaderLayout?.sectionId === block.id && activeHeaderLayout?.entryId === job.id ? ' experienceSection--layoutActiveEntry' : ''}`}
                 previewScale={pageMetrics.scale}
                 entryEditProps={entryContainerTarget(block, job, 'company')}
+                preferEntryDrag={job.isSamplePlaceholderEntry}
             >
                 {(entryHandleProps) => (
                     <>
@@ -2294,7 +2299,7 @@ export default function ResumePreview({
                             entryId: job.id,
                             field: 'activities',
                             createTarget: (activityIndex) => listTarget(block.id, job.id, 'activities', activityIndex),
-                            sortable,
+                            sortable: sortable && !job.isSamplePlaceholderEntry,
                         })}
                     </>
                 )}
@@ -2340,6 +2345,7 @@ export default function ResumePreview({
                 className="skillGroup"
                 previewScale={pageMetrics.scale}
                 entryEditProps={entryContainerTarget(block, entry, 'items')}
+                preferEntryDrag={entry.isSamplePlaceholderEntry}
             >
                 {(entryHandleProps) => (
                     <>
@@ -2408,6 +2414,7 @@ export default function ResumePreview({
                 className={`previewEntry${activeHeaderLayout?.sectionId === block.id ? ' previewEntry--layoutActiveSection' : ''}${activeHeaderLayout?.sectionId === block.id && activeHeaderLayout?.entryId === entry.id ? ' previewEntry--layoutActiveEntry' : ''}`}
                 previewScale={pageMetrics.scale}
                 entryEditProps={entryContainerTarget(block, entry, 'name')}
+                preferEntryDrag={entry.isSamplePlaceholderEntry}
             >
                 {(entryHandleProps) => (
                     <>
@@ -2486,6 +2493,7 @@ export default function ResumePreview({
                 className="previewEntry previewEntry--tight"
                 previewScale={pageMetrics.scale}
                 entryEditProps={entryContainerTarget(block, entry, 'language')}
+                preferEntryDrag={entry.isSamplePlaceholderEntry}
             >
                 {(entryHandleProps) => (
                     <div className="previewInlineHeader">
@@ -2545,6 +2553,7 @@ export default function ResumePreview({
                 className="previewEntry"
                 previewScale={pageMetrics.scale}
                 entryEditProps={entryContainerTarget(block, entry, 'title')}
+                preferEntryDrag={entry.isSamplePlaceholderEntry}
             >
                 {(entryHandleProps) => (
                     <>
@@ -2559,7 +2568,7 @@ export default function ResumePreview({
                             entryId: entry.id,
                             field: 'highlights',
                             createTarget: (highlightIndex) => listTarget(block.id, entry.id, 'highlights', highlightIndex),
-                            sortable,
+                            sortable: sortable && !entry.isSamplePlaceholderEntry,
                         })}
                     </>
                 )}

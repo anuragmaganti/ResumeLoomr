@@ -553,6 +553,12 @@ test('Erlich sample uses reference content and supports preview-only entry order
     ['Hacker Hostel', 'Founder / Resident Mentor'],
     ['Bachmanity Capital', 'Co-Founder / General Partner'],
   ]);
+  assert.deepEqual(roleBlock.entries.map((entry) => entry.isSamplePlaceholderEntry), [
+    true,
+    true,
+    true,
+    true,
+  ]);
   assert.deepEqual(roleBlock.entries.map((entry) => [entry.location, entry.yearsExp]), [
     ['San Francisco, CA', '2018-2020'],
     ['Palo Alto, CA', '2020-2022'],
@@ -745,6 +751,27 @@ test('two sample-only entries can reorder into persistent blank editor rows', ()
   assert.deepEqual(materializedEntries.map((entry) => entry.company), ['', '', '', '']);
   assert.deepEqual(reloadedExperience.entries.map((entry) => entry.id), nextPreviewOrder);
   assert.equal(new Set(reloadedExperience.entries.map((entry) => entry.id)).size, reloadedExperience.entries.length);
+  assert.deepEqual(reloadedExperience.entries.map((entry) => entry.isSamplePlaceholderEntry), [true, true, true, true]);
+});
+
+test('sample entry ids stay bound to their original sample content after materialized reorder', () => {
+  const resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  const mixedPreview = createMixedSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
+  const experiencePreview = mixedPreview.sectionBlocks.find((section) => section.id === 'experience');
+  const lastSampleEntryId = experiencePreview.entryOrder.at(-1);
+  const nextPreviewOrder = [
+    lastSampleEntryId,
+    ...experiencePreview.entryOrder.filter((entryId) => entryId !== lastSampleEntryId),
+  ];
+
+  const materializedResume = materializeAndReorderSectionBlockEntries(resume, 'experience', nextPreviewOrder);
+  const reloadedPreview = createMixedSamplePreviewModel(materializedResume, 'resume-5', getPreviewModel(materializedResume));
+  const reloadedExperience = reloadedPreview.sectionBlocks.find((section) => section.id === 'experience');
+
+  assert.deepEqual(getSection(materializedResume, 'experience').entries.map((entry) => entry.id), nextPreviewOrder);
+  assert.equal(reloadedExperience.entries[0].id, lastSampleEntryId);
+  assert.equal(reloadedExperience.entries[0].company, 'Bachmanity Capital');
+  assert.equal(reloadedExperience.entries[0].role, 'Co-Founder / General Partner');
 });
 
 test('sample preview section reorders persist real section order without sample content', () => {
