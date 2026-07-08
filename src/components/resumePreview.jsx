@@ -409,7 +409,7 @@ function StaticPreviewSection({
     );
 }
 
-function SortablePreviewEntry({ sectionId, entryId, className, previewScale, children }) {
+function SortablePreviewEntry({ sectionId, entryId, className, previewScale, entryEditProps = {}, children }) {
     const sortableId = entryDragId(sectionId, entryId);
     const {
         attributes,
@@ -434,9 +434,10 @@ function SortablePreviewEntry({ sectionId, entryId, className, previewScale, chi
         'data-preview-drag-handle': 'true',
         'data-preview-drag-scope': 'entry-empty-space',
         onPointerDown: (event) => {
-            const shouldLetChildHandleDrag = event.target.closest(
+            const childInteractiveTarget = event.target.closest(
                 '[data-edit-section-id], [data-preview-drag-scope="header-layout"], [data-preview-drag-scope="bullet"], [data-header-hover-slot], button, input, textarea, select, a',
             );
+            const shouldLetChildHandleDrag = childInteractiveTarget && childInteractiveTarget !== event.currentTarget;
 
             if (shouldLetChildHandleDrag) {
                 return;
@@ -453,6 +454,7 @@ function SortablePreviewEntry({ sectionId, entryId, className, previewScale, chi
             data-page-break-kind="entry"
             className={`${className} previewSortableItem previewSortableEntry ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
             style={style}
+            {...entryEditProps}
             {...containerEntryDragProps}
         >
             {children(handleProps)}
@@ -460,9 +462,9 @@ function SortablePreviewEntry({ sectionId, entryId, className, previewScale, chi
     );
 }
 
-function StaticPreviewEntry({ className, children }) {
+function StaticPreviewEntry({ className, entryEditProps = {}, children }) {
     return (
-        <div className={className} data-page-break-kind="entry">
+        <div className={className} data-page-break-kind="entry" {...entryEditProps}>
             {children({})}
         </div>
     );
@@ -1119,6 +1121,34 @@ export default function ResumePreview({
         };
     }
 
+    function getEntryContainerField(block, entry, fallbackField = 'title') {
+        if (block.kind === 'education' || block.kind === 'roles' || block.kind === 'custom') {
+            return getEntryHeaderPrimaryDragField(block, entry) || fallbackField;
+        }
+
+        if (block.kind === 'skills') {
+            return entry.category ? 'category' : 'items';
+        }
+
+        if (block.kind === 'projects') {
+            return 'name';
+        }
+
+        if (block.kind === 'languages') {
+            return 'language';
+        }
+
+        if (block.kind === 'certifications') {
+            return 'name';
+        }
+
+        return fallbackField;
+    }
+
+    function entryContainerTarget(block, entry, fallbackField = 'title') {
+        return entryTarget(block.id, entry.id, getEntryContainerField(block, entry, fallbackField));
+    }
+
     function renderTextWithCaret(value, path, { prefix = '', suffix = '', fallback = '' } = {}) {
         const text = value === undefined || value === null ? '' : String(value);
         const displayText = text || fallback;
@@ -1620,6 +1650,7 @@ export default function ResumePreview({
                 entryId={entry.id}
                 className="previewEntry"
                 previewScale={pageMetrics.scale}
+                entryEditProps={entryContainerTarget(block, entry, titleKey)}
             >
                 {(entryHandleProps) => (
                     <>
@@ -1752,6 +1783,7 @@ export default function ResumePreview({
                 entryId={institution.id}
                 className="educationSection"
                 previewScale={pageMetrics.scale}
+                entryEditProps={entryContainerTarget(block, institution, 'school')}
             >
                 {(entryHandleProps) => (
                     <>
@@ -2252,6 +2284,7 @@ export default function ResumePreview({
                 entryId={job.id}
                 className={`experienceSection${activeHeaderLayout?.sectionId === block.id ? ' experienceSection--layoutActiveSection' : ''}${activeHeaderLayout?.sectionId === block.id && activeHeaderLayout?.entryId === job.id ? ' experienceSection--layoutActiveEntry' : ''}`}
                 previewScale={pageMetrics.scale}
+                entryEditProps={entryContainerTarget(block, job, 'company')}
             >
                 {(entryHandleProps) => (
                     <>
@@ -2306,6 +2339,7 @@ export default function ResumePreview({
                 entryId={entry.id}
                 className="skillGroup"
                 previewScale={pageMetrics.scale}
+                entryEditProps={entryContainerTarget(block, entry, 'items')}
             >
                 {(entryHandleProps) => (
                     <>
@@ -2373,6 +2407,7 @@ export default function ResumePreview({
                 entryId={entry.id}
                 className={`previewEntry${activeHeaderLayout?.sectionId === block.id ? ' previewEntry--layoutActiveSection' : ''}${activeHeaderLayout?.sectionId === block.id && activeHeaderLayout?.entryId === entry.id ? ' previewEntry--layoutActiveEntry' : ''}`}
                 previewScale={pageMetrics.scale}
+                entryEditProps={entryContainerTarget(block, entry, 'name')}
             >
                 {(entryHandleProps) => (
                     <>
@@ -2450,6 +2485,7 @@ export default function ResumePreview({
                 entryId={entry.id}
                 className="previewEntry previewEntry--tight"
                 previewScale={pageMetrics.scale}
+                entryEditProps={entryContainerTarget(block, entry, 'language')}
             >
                 {(entryHandleProps) => (
                     <div className="previewInlineHeader">
@@ -2508,6 +2544,7 @@ export default function ResumePreview({
                 entryId={entry.id}
                 className="previewEntry"
                 previewScale={pageMetrics.scale}
+                entryEditProps={entryContainerTarget(block, entry, 'title')}
             >
                 {(entryHandleProps) => (
                     <>
