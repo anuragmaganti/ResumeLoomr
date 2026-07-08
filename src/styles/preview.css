@@ -765,6 +765,195 @@ html[data-theme="dark"] .resumePage {
   align-items: baseline;
 }
 
+.entryHeaderLayoutLine {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.entryHeaderLayoutLine + .entryHeaderLayoutLine {
+  margin-top: max(0px, calc(var(--resume-detail-gap) - 2px));
+}
+
+.entryHeaderLayoutSide {
+  display: flex;
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.entryHeaderLayoutSide--right {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.entryHeaderFieldGroupItem {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.entryHeaderFieldSeparator {
+  color: var(--resume-page-subtle);
+  font-weight: 500;
+}
+
+.entryHeaderLayoutLine .role,
+.entryHeaderLayoutLine .previewEntrySubtitle {
+  margin-top: 0;
+}
+
+.entryHeaderLayoutLine .previewEntryLocation,
+.entryHeaderLayoutLine .yearsExp,
+.entryHeaderLayoutLine .previewEntryMeta {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.entryHeaderLayoutMode {
+  display: grid;
+  gap: 6px;
+  border-radius: 10px;
+  outline: 1px solid var(--color-accent-strong);
+  outline-offset: 4px;
+  background: color-mix(in srgb, var(--color-accent-soft) 14%, transparent 86%);
+}
+
+.entryHeaderLayoutModeBar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  color: var(--resume-page-subtle);
+  font-size: var(--resume-meta-size);
+  line-height: var(--resume-detail-line-height);
+}
+
+.entryHeaderLayoutReset {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent-soft) 48%, transparent 52%);
+  color: var(--color-accent-strong);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.entryHeaderLayoutGrid {
+  display: grid;
+  gap: 6px;
+}
+
+.entryHeaderLayoutGridLine {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.entryHeaderLayoutGridSide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+
+.entryHeaderLayoutSlot {
+  min-width: 0;
+  min-height: 22px;
+  border-radius: 7px;
+  transition:
+    transform var(--transition-fast),
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.entryHeaderLayoutSlot--empty {
+  border: 1px dashed color-mix(in srgb, var(--color-accent-strong) 42%, transparent 58%);
+  background: color-mix(in srgb, var(--color-accent-soft) 13%, transparent 87%);
+}
+
+.entryHeaderLayoutSlot--filled {
+  border: 1px solid color-mix(in srgb, var(--color-accent-strong) 26%, transparent 74%);
+  background: color-mix(in srgb, var(--resume-page-bg, #fff) 76%, var(--color-accent-soft) 24%);
+}
+
+.entryHeaderLayoutSlot.isHeaderLayoutSource {
+  border-color: color-mix(in srgb, var(--resume-page-subtle) 28%, transparent 72%);
+  background: color-mix(in srgb, var(--resume-page-bg, #fff) 82%, transparent 18%);
+  box-shadow: none;
+}
+
+.entryHeaderLayoutSlot.isHeaderLayoutSource > * {
+  opacity: 0.28;
+}
+
+.entryHeaderLayoutSlot.isHeaderLayoutDropTarget,
+.resumePage--headerLayoutMode .entryHeaderLayoutSlot:hover:not(.isHeaderLayoutSource) {
+  border-color: var(--color-accent-strong);
+  background: color-mix(in srgb, var(--color-accent-soft) 36%, var(--resume-page-bg, #fff) 64%);
+  box-shadow:
+    inset 0 0 0 1px var(--color-accent-strong),
+    0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.entryHeaderLayoutChip,
+.entryHeaderLayoutEmpty {
+  display: block;
+  min-width: 0;
+  padding: 3px 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entryHeaderLayoutChip {
+  cursor: grab;
+}
+
+.entryHeaderLayoutChip:active {
+  cursor: grabbing;
+}
+
+.entryHeaderLayoutEmpty {
+  color: var(--resume-page-subtle);
+  font-size: var(--resume-meta-size);
+  font-style: italic;
+}
+
+.entryHeaderLayoutChipText {
+  min-width: 0;
+}
+
+.entryHeaderLayoutChipText--empty {
+  color: var(--resume-page-subtle);
+  font-style: italic;
+}
+
+.previewDragOverlay--headerField {
+  display: flex;
+  align-items: center;
+  min-height: 100%;
+  padding: 3px 7px;
+  border-radius: 7px;
+}
+
+.experienceSection--layoutActiveSection,
+.previewEntry--layoutActiveSection {
+  border-radius: 10px;
+}
+
+.experienceSection--layoutActiveEntry,
+.previewEntry--layoutActiveEntry {
+  background: color-mix(in srgb, var(--color-accent-soft) 12%, transparent 88%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-strong) 54%, transparent 46%);
+}
+
 .companyRoleLine,
 .previewEntryTitleLine {
   min-width: 0;
@@ -1213,6 +1402,16 @@ html[data-theme="dark"] .resumePage {
   .summaryResizeHandle,
   .summaryResizeEdge {
     display: none !important;
+  }
+
+  .entryHeaderLayoutMode {
+    display: none !important;
+  }
+
+  .experienceSection--layoutActiveEntry,
+  .previewEntry--layoutActiveEntry {
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   .previewTextCaret {

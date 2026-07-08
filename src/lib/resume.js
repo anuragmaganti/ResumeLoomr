@@ -26,6 +26,10 @@ export const SECTION_BLOCK_KINDS = [
   'publications',
   'custom',
 ];
+export const ENTRY_HEADER_LAYOUT_FIELDS = {
+  roles: ['company', 'role', 'location', 'yearsExp'],
+  custom: ['title', 'subtitle', 'location', 'years'],
+};
 export const SECTION_TEMPLATE_GROUPS = [
   {
     id: 'common',
@@ -147,6 +151,23 @@ const DEFAULT_SECTION_BLOCKS = [
 const SECTION_TEMPLATE_MAP = new Map(
   SECTION_TEMPLATE_GROUPS.flatMap((group) => group.templates.map((template) => [template.id, template])),
 );
+const ENTRY_HEADER_LAYOUT_VERSION = 1;
+const ENTRY_HEADER_LAYOUT_DEFAULTS = {
+  roles: {
+    version: ENTRY_HEADER_LAYOUT_VERSION,
+    lines: [
+      { left: ['company', null], right: [null, 'location'] },
+      { left: ['role', null], right: [null, 'yearsExp'] },
+    ],
+  },
+  custom: {
+    version: ENTRY_HEADER_LAYOUT_VERSION,
+    lines: [
+      { left: ['title', null], right: [null, 'location'] },
+      { left: ['subtitle', null], right: [null, 'years'] },
+    ],
+  },
+};
 const RESUME_PRESENTATION_BASES = {
   executive: {
     pageMarginInlineIn: 0.5,
@@ -487,6 +508,148 @@ function normalizeSectionKind(kind) {
   return SECTION_BLOCK_KINDS.includes(kind) ? kind : 'custom';
 }
 
+function cloneEntryHeaderLayout(layout) {
+  return {
+    version: ENTRY_HEADER_LAYOUT_VERSION,
+    lines: [0, 1].map((lineIndex) => ({
+      left: [0, 1].map((slotIndex) => layout?.lines?.[lineIndex]?.left?.[slotIndex] ?? null),
+      right: [0, 1].map((slotIndex) => layout?.lines?.[lineIndex]?.right?.[slotIndex] ?? null),
+    })),
+  };
+}
+
+export function getDefaultEntryHeaderLayout(sectionKind) {
+  const kind = normalizeSectionKind(sectionKind);
+  const defaultLayout = ENTRY_HEADER_LAYOUT_DEFAULTS[kind];
+
+  return defaultLayout ? cloneEntryHeaderLayout(defaultLayout) : null;
+}
+
+function getEntryHeaderLayoutFields(sectionKind) {
+  return ENTRY_HEADER_LAYOUT_FIELDS[normalizeSectionKind(sectionKind)] || [];
+}
+
+function getEntryHeaderLayoutSlot(layout, slot) {
+  const lineIndex = Number(slot?.lineIndex);
+  const slotIndex = Number(slot?.slotIndex);
+  const side = slot?.side === 'right' ? 'right' : 'left';
+
+  if (!Number.isInteger(lineIndex) || !Number.isInteger(slotIndex) || lineIndex < 0 || lineIndex > 1 || slotIndex < 0 || slotIndex > 1) {
+    return undefined;
+  }
+
+  return layout?.lines?.[lineIndex]?.[side]?.[slotIndex];
+}
+
+function setEntryHeaderLayoutSlot(layout, slot, value) {
+  const lineIndex = Number(slot?.lineIndex);
+  const slotIndex = Number(slot?.slotIndex);
+  const side = slot?.side === 'right' ? 'right' : 'left';
+
+  if (!Number.isInteger(lineIndex) || !Number.isInteger(slotIndex) || lineIndex < 0 || lineIndex > 1 || slotIndex < 0 || slotIndex > 1) {
+    return layout;
+  }
+
+  const nextLayout = cloneEntryHeaderLayout(layout);
+  nextLayout.lines[lineIndex][side][slotIndex] = value || null;
+  return nextLayout;
+}
+
+export function normalizeEntryHeaderLayout(sectionKind, layout) {
+  const fields = getEntryHeaderLayoutFields(sectionKind);
+  const defaultLayout = getDefaultEntryHeaderLayout(sectionKind);
+
+  if (!defaultLayout) {
+    return null;
+  }
+
+  const fieldSet = new Set(fields);
+  const usedFields = new Set();
+  let normalizedLayout = {
+    version: ENTRY_HEADER_LAYOUT_VERSION,
+    lines: [0, 1].map((lineIndex) => ({
+      left: [0, 1].map((slotIndex) => {
+        const field = layout?.lines?.[lineIndex]?.left?.[slotIndex];
+
+        if (!fieldSet.has(field) || usedFields.has(field)) {
+          return null;
+        }
+
+        usedFields.add(field);
+        return field;
+      }),
+      right: [0, 1].map((slotIndex) => {
+        const field = layout?.lines?.[lineIndex]?.right?.[slotIndex];
+
+        if (!fieldSet.has(field) || usedFields.has(field)) {
+          return null;
+        }
+
+        usedFields.add(field);
+        return field;
+      }),
+    })),
+  };
+
+  fields
+    .filter((field) => !usedFields.has(field))
+    .forEach((field) => {
+      const defaultSlot = findEntryHeaderFieldSlot(defaultLayout, field);
+      const targetSlot = defaultSlot && getEntryHeaderLayoutSlot(normalizedLayout, defaultSlot) === null
+        ? defaultSlot
+        : findEmptyEntryHeaderSlot(normalizedLayout);
+
+      if (targetSlot) {
+        normalizedLayout = setEntryHeaderLayoutSlot(normalizedLayout, targetSlot, field);
+        usedFields.add(field);
+      }
+    });
+
+  return normalizedLayout;
+}
+
+export function findEntryHeaderFieldSlot(layout, field) {
+  for (let lineIndex = 0; lineIndex < 2; lineIndex += 1) {
+    for (const side of ['left', 'right']) {
+      for (let slotIndex = 0; slotIndex < 2; slotIndex += 1) {
+        if (layout?.lines?.[lineIndex]?.[side]?.[slotIndex] === field) {
+          return { lineIndex, side, slotIndex };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+function findEmptyEntryHeaderSlot(layout) {
+  for (let lineIndex = 0; lineIndex < 2; lineIndex += 1) {
+    for (const side of ['left', 'right']) {
+      for (let slotIndex = 0; slotIndex < 2; slotIndex += 1) {
+        if (!layout?.lines?.[lineIndex]?.[side]?.[slotIndex]) {
+          return { lineIndex, side, slotIndex };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+export function moveSectionHeaderField(layout, fromSlot, toSlot) {
+  const fromField = getEntryHeaderLayoutSlot(layout, fromSlot);
+
+  if (!fromField) {
+    return cloneEntryHeaderLayout(layout);
+  }
+
+  const toField = getEntryHeaderLayoutSlot(layout, toSlot) || null;
+  let nextLayout = setEntryHeaderLayoutSlot(layout, fromSlot, toField);
+  nextLayout = setEntryHeaderLayoutSlot(nextLayout, toSlot, fromField);
+
+  return nextLayout;
+}
+
 function createSectionId(kind, title, index = 0) {
   const base = trimText(title)
     .toLowerCase()
@@ -556,12 +719,21 @@ function normalizeSectionBlock(section, index, usedIds) {
   );
   const entries = Array.isArray(section?.entries) ? section.entries : [];
 
-  return {
+  const normalizedSection = {
     id: uniqueSectionId(section?.id, usedIds, kind, title, index),
     kind,
     title,
     entries: entries.length > 0 ? entries.map((entry) => createEntryForKind(kind, entry)) : [createEntryForKind(kind)],
   };
+
+  const entryHeaderLayout = normalizeEntryHeaderLayout(kind, section?.entryHeaderLayout);
+
+  return entryHeaderLayout
+    ? {
+      ...normalizedSection,
+      entryHeaderLayout,
+    }
+    : normalizedSection;
 }
 
 export function normalizeResumeSettings(settings) {
@@ -910,6 +1082,19 @@ export function setResumeSettingValue(resume, settingId, value) {
       [settingId]: clampInteger(value, min, max),
     },
   };
+}
+
+export function setSectionEntryHeaderLayout(resume, sectionId, layout) {
+  return updateSection(resume, sectionId, (section) => {
+    const entryHeaderLayout = normalizeEntryHeaderLayout(section.kind, layout);
+
+    return entryHeaderLayout
+      ? {
+        ...section,
+        entryHeaderLayout,
+      }
+      : section;
+  });
 }
 
 export function updateSampleDisplay(resume, updates = {}) {
@@ -1479,6 +1664,7 @@ export function getPreviewModel(candidateResume) {
       id: section.id,
       kind: section.kind,
       title: trimText(section.title),
+      entryHeaderLayout: normalizeEntryHeaderLayout(section.kind, section.entryHeaderLayout),
       entryOrder: section.entries.map((entry) => entry.id),
       entries: toPreviewEntries(section),
     }))

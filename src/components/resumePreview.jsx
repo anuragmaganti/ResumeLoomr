@@ -4,6 +4,9 @@ import {
     closestCenter,
     DndContext,
     DragOverlay,
+    pointerWithin,
+    useDraggable,
+    useDroppable,
     useSensor,
     useSensors,
 } from '@dnd-kit/core';
@@ -15,7 +18,14 @@ import {
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { getResumePresentationVars, getResumePrintPageRule } from '../lib/resume.js';
+import {
+    ENTRY_HEADER_LAYOUT_FIELDS,
+    getDefaultEntryHeaderLayout,
+    getResumePresentationVars,
+    getResumePrintPageRule,
+    moveSectionHeaderField,
+    normalizeEntryHeaderLayout,
+} from '../lib/resume.js';
 import {
     CSS_PIXELS_PER_INCH,
     PRINT_PAGE_HEIGHT_PX,
@@ -48,6 +58,23 @@ const DEFAULT_PREVIEW_PAGE_MIN_HEIGHT = PRINT_PAGE_HEIGHT_PX;
 const FIRST_SECTION_ENTRY_SNAP_DISTANCE_PX = 144;
 const SUMMARY_WIDTH_MIN_PERCENT = 75;
 const SUMMARY_WIDTH_MAX_PERCENT = 100;
+const HEADER_LAYOUT_LONG_PRESS_MS = 520;
+const HEADER_LAYOUT_LONG_PRESS_MOVE_TOLERANCE_PX = 8;
+
+const ENTRY_HEADER_FIELD_META = {
+    roles: {
+        company: { label: 'Organization', className: 'company' },
+        role: { label: 'Role', className: 'role' },
+        location: { label: 'Location', className: 'previewEntryLocation' },
+        yearsExp: { label: 'Dates', className: 'yearsExp' },
+    },
+    custom: {
+        title: { label: 'Title', className: 'previewEntryTitle' },
+        subtitle: { label: 'Subtitle', className: 'previewEntrySubtitle' },
+        location: { label: 'Location', className: 'previewEntryLocation' },
+        years: { label: 'Date', className: 'previewEntryMeta' },
+    },
+};
 
 function parseCssPixelValue(value, fallback = 0) {
     const parsed = Number.parseFloat(value);
@@ -112,8 +139,29 @@ function bulletDragId(sectionId, entryId, field, itemIndex) {
     return ['bullet', sectionId, entryId, field, itemIndex].join(DRAG_ID_SEPARATOR);
 }
 
+function headerSlotDragId(sectionId, entryId, lineIndex, side, slotIndex) {
+    return ['headerSlot', sectionId, entryId, lineIndex, side, slotIndex].join(DRAG_ID_SEPARATOR);
+}
+
+function getEntryHeaderFieldMeta(sectionKind, field) {
+    return ENTRY_HEADER_FIELD_META[sectionKind]?.[field] || { label: field, className: 'previewEntryTitle' };
+}
+
+function getEntryHeaderLayoutSlotField(layout, slot) {
+    const lineIndex = Number(slot?.lineIndex);
+    const slotIndex = Number(slot?.slotIndex);
+    const side = slot?.side === 'right' ? 'right' : 'left';
+
+    if (!Number.isInteger(lineIndex) || !Number.isInteger(slotIndex) || lineIndex < 0 || lineIndex > 1 || slotIndex < 0 || slotIndex > 1) {
+        return null;
+    }
+
+    return layout?.lines?.[lineIndex]?.[side]?.[slotIndex] || null;
+}
+
 function parsePreviewDragId(id) {
-    const [type, sectionId, entryId, field, itemIndex] = String(id || '').split(DRAG_ID_SEPARATOR);
+    const parts = String(id || '').split(DRAG_ID_SEPARATOR);
+    const [type, sectionId, entryId, field, itemIndex] = parts;
 
     if (type === 'section' && sectionId) {
         return { type, sectionId };
@@ -131,6 +179,23 @@ function parsePreviewDragId(id) {
             field,
             itemIndex: Number(itemIndex),
         };
+    }
+
+    if (type === 'headerSlot' && sectionId && entryId && field !== undefined && itemIndex && parts[5] !== undefined) {
+        const lineIndex = Number(field);
+        const slotIndex = Number(parts[5]);
+        const side = itemIndex === 'right' ? 'right' : 'left';
+
+        if (Number.isInteger(lineIndex) && Number.isInteger(slotIndex)) {
+            return {
+                type,
+                sectionId,
+                entryId,
+                lineIndex,
+                side,
+                slotIndex,
+            };
+        }
     }
 
     return { type: '' };
@@ -157,6 +222,10 @@ function areCompatiblePreviewDragItems(activeMeta, overMeta) {
         );
     }
 
+    if (activeMeta.type === 'headerSlot') {
+        return activeMeta.sectionId === overMeta.sectionId && activeMeta.entryId === overMeta.entryId;
+    }
+
     return false;
 }
 
@@ -165,6 +234,14 @@ function previewCollisionDetection(args) {
     const droppableContainers = args.droppableContainers.filter((container) => (
         areCompatiblePreviewDragItems(activeMeta, parsePreviewDragId(container.id))
     ));
+
+    if (activeMeta.type === 'headerSlot') {
+        const pointerCollisions = pointerWithin({ ...args, droppableContainers });
+
+        if (pointerCollisions.length > 0) {
+            return pointerCollisions;
+        }
+    }
 
     return closestCenter({ ...args, droppableContainers });
 }
@@ -395,6 +472,53 @@ function StaticPreviewBullet({ editProps, children }) {
     return <li data-page-break-kind="item" {...editProps}>{children}</li>;
 }
 
+function HeaderLayoutSlot({
+    id,
+    field,
+    label,
+    renderChip,
+}) {
+    const {
+        setNodeRef: setDroppableNodeRef,
+        isOver,
+    } = useDroppable({ id });
+    const {
+        attributes,
+        listeners,
+        setNodeRef: setDraggableNodeRef,
+        isDragging,
+    } = useDraggable({ id, disabled: !field });
+    const dragProps = field
+        ? {
+            ...attributes,
+            ...listeners,
+            'data-preview-drag-handle': 'true',
+            'data-preview-drag-scope': 'header-layout',
+        }
+        : {};
+
+    return (
+        <div
+            ref={setDroppableNodeRef}
+            className={`entryHeaderLayoutSlot${field ? ' entryHeaderLayoutSlot--filled' : ' entryHeaderLayoutSlot--empty'}${isDragging ? ' isHeaderLayoutSource' : ''}${isOver && !isDragging ? ' isHeaderLayoutDropTarget' : ''}`}
+            data-header-layout-slot="true"
+        >
+            {field ? (
+                <span
+                    ref={setDraggableNodeRef}
+                    className="entryHeaderLayoutChip"
+                    data-preview-sortable-id={id}
+                    {...dragProps}
+                >
+                    {renderChip(field)}
+                </span>
+            ) : (
+                <span className="entryHeaderLayoutEmpty">{label}</span>
+            )}
+        </div>
+    );
+}
+
 function getPrimaryEntryField(block, entry) {
     if (block.kind === 'education') {
         return entry.school ? 'school' : 'degree';
@@ -508,6 +632,7 @@ export default function ResumePreview({
     onReorderSections,
     onReorderSectionEntries,
     onReorderSectionTextList,
+    onSetSectionEntryHeaderLayout,
     onSummaryWidthChange,
     onSeparatorSettingsOpen,
     activeEditorCaret,
@@ -526,8 +651,10 @@ export default function ResumePreview({
     const suppressPreviewClickRef = useRef(false);
     const activeDragScrollRef = useRef({ x: 0, y: 0, captured: false });
     const summaryWidthDragRef = useRef(null);
+    const headerLayoutLongPressRef = useRef(null);
     const [activeDragMeta, setActiveDragMeta] = useState(null);
     const [activeDragRect, setActiveDragRect] = useState(null);
+    const [activeHeaderLayout, setActiveHeaderLayout] = useState(null);
     const [summaryWidthDrag, setSummaryWidthDrag] = useState(null);
     const [pageMetrics, setPageMetrics] = useState({
         pageWidth: 0,
@@ -561,6 +688,37 @@ export default function ResumePreview({
             }))
         ].filter((item) => item.text)
     ), [previewModel.personal]);
+
+    useEffect(() => {
+        if (!activeHeaderLayout?.sectionId || typeof document === 'undefined') {
+            return undefined;
+        }
+
+        function handleDocumentPointerDown(event) {
+            if (
+                event.target.closest('[data-header-layout-mode="true"]') ||
+                event.target.closest('[data-header-layout-trigger="true"]')
+            ) {
+                return;
+            }
+
+            setActiveHeaderLayout(null);
+        }
+
+        function handleDocumentKeyDown(event) {
+            if (event.key === 'Escape') {
+                setActiveHeaderLayout(null);
+            }
+        }
+
+        document.addEventListener('pointerdown', handleDocumentPointerDown, true);
+        document.addEventListener('keydown', handleDocumentKeyDown);
+
+        return () => {
+            document.removeEventListener('pointerdown', handleDocumentPointerDown, true);
+            document.removeEventListener('keydown', handleDocumentKeyDown);
+        };
+    }, [activeHeaderLayout]);
 
     function previewPulseAttributes(path) {
         return previewPulseTarget?.path === path && previewPulseTarget?.requestId
@@ -824,6 +982,54 @@ export default function ResumePreview({
         );
     }
 
+    function clearHeaderLayoutLongPress() {
+        if (headerLayoutLongPressRef.current?.timerId) {
+            window.clearTimeout(headerLayoutLongPressRef.current.timerId);
+        }
+
+        headerLayoutLongPressRef.current = null;
+    }
+
+    function openHeaderLayoutMode(event, sectionId, entryId) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressNextPreviewClick();
+        clearHeaderLayoutLongPress();
+        setActiveHeaderLayout({ sectionId, entryId });
+    }
+
+    function handleHeaderLayoutPointerDown(event, sectionId, entryId) {
+        if (event.pointerType === 'mouse') {
+            return;
+        }
+
+        clearHeaderLayoutLongPress();
+        headerLayoutLongPressRef.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            timerId: window.setTimeout(() => {
+                suppressNextPreviewClick();
+                setActiveHeaderLayout({ sectionId, entryId });
+                headerLayoutLongPressRef.current = null;
+            }, HEADER_LAYOUT_LONG_PRESS_MS),
+        };
+    }
+
+    function handleHeaderLayoutPointerMove(event) {
+        const longPress = headerLayoutLongPressRef.current;
+
+        if (!longPress || longPress.pointerId !== event.pointerId) {
+            return;
+        }
+
+        const distance = Math.hypot(event.clientX - longPress.startX, event.clientY - longPress.startY);
+
+        if (distance > HEADER_LAYOUT_LONG_PRESS_MOVE_TOLERANCE_PX) {
+            clearHeaderLayoutLongPress();
+        }
+    }
+
     function handlePreviewClick(event) {
         if (suppressPreviewClickRef.current) {
             return;
@@ -831,6 +1037,15 @@ export default function ResumePreview({
 
         if (!onEditTarget) {
             return;
+        }
+
+        if (activeHeaderLayout?.sectionId) {
+            if (event.target.closest('[data-header-layout-mode="true"]')) {
+                event.preventDefault();
+                return;
+            }
+
+            setActiveHeaderLayout(null);
         }
 
         const targetElement = event.target.closest('[data-edit-section-id][data-edit-path]');
@@ -1023,6 +1238,22 @@ export default function ResumePreview({
         }
 
         suppressNextPreviewClick();
+
+        if (activeMeta.type === 'headerSlot') {
+            const block = findBlock(activeMeta.sectionId);
+            const layout = block ? getEntryHeaderLayout(block) : null;
+            const nextLayout = layout ? moveSectionHeaderField(layout, activeMeta, overMeta) : null;
+
+            if (nextLayout) {
+                onSetSectionEntryHeaderLayout?.(activeMeta.sectionId, nextLayout);
+                setActiveHeaderLayout({
+                    sectionId: activeMeta.sectionId,
+                    entryId: activeMeta.entryId,
+                });
+            }
+
+            return;
+        }
 
         if (activeMeta.type === 'section') {
             const sectionIds = Array.isArray(previewModel.sectionOrder) && previewModel.sectionOrder.length > 0
@@ -1470,6 +1701,186 @@ export default function ResumePreview({
         );
     }
 
+    function getEntryHeaderLayout(block) {
+        return normalizeEntryHeaderLayout(block.kind, block.entryHeaderLayout) || getDefaultEntryHeaderLayout(block.kind);
+    }
+
+    function getEntryHeaderFields(block) {
+        return ENTRY_HEADER_LAYOUT_FIELDS[block.kind] || [];
+    }
+
+    function getEntryHeaderPrimaryDragField(block, entry) {
+        return getEntryHeaderFields(block).find((field) => entry[field]) || getEntryHeaderFields(block)[0];
+    }
+
+    function renderHeaderFieldText(block, entry, field) {
+        const path = sectionEntryEditorPath(block.id, entry.id, field);
+        const value = entry[field] || '';
+
+        return renderTextWithCaret(value, path);
+    }
+
+    function entryHeaderFieldProps(block, entry, field, entryHandleProps = {}) {
+        const path = sectionEntryEditorPath(block.id, entry.id, field);
+        const dragProps = getEntryHeaderPrimaryDragField(block, entry) === field && !activeHeaderLayout?.sectionId
+            ? entryHandleProps
+            : {};
+
+        return {
+            ...entryTarget(block.id, entry.id, field),
+            ...dragProps,
+            'data-header-layout-trigger': 'true',
+            onDoubleClick: (event) => openHeaderLayoutMode(event, block.id, entry.id),
+            onPointerDown: (event) => {
+                handleHeaderLayoutPointerDown(event, block.id, entry.id);
+                dragProps.onPointerDown?.(event);
+            },
+            onPointerMove: (event) => {
+                handleHeaderLayoutPointerMove(event);
+                dragProps.onPointerMove?.(event);
+            },
+            onPointerUp: (event) => {
+                clearHeaderLayoutLongPress();
+                dragProps.onPointerUp?.(event);
+            },
+            onPointerCancel: (event) => {
+                clearHeaderLayoutLongPress();
+                dragProps.onPointerCancel?.(event);
+            },
+            'data-entry-header-path': path,
+        };
+    }
+
+    function renderNormalHeaderField(block, entry, field, entryHandleProps = {}) {
+        if (!entry[field]) {
+            return null;
+        }
+
+        const meta = getEntryHeaderFieldMeta(block.kind, field);
+
+        return (
+            <span
+                key={field}
+                className={meta.className}
+                {...entryHeaderFieldProps(block, entry, field, entryHandleProps)}
+            >
+                {renderHeaderFieldText(block, entry, field)}
+            </span>
+        );
+    }
+
+    function renderHeaderSide(nodes) {
+        const visibleNodes = nodes.filter(Boolean);
+
+        if (visibleNodes.length === 0) {
+            return null;
+        }
+
+        return visibleNodes.map((node, index) => (
+            <span className="entryHeaderFieldGroupItem" key={node.key || index}>
+                {index > 0 && <span className="entryHeaderFieldSeparator">, </span>}
+                {node}
+            </span>
+        ));
+    }
+
+    function renderEntryHeaderLine(block, entry, layout, lineIndex, entryHandleProps) {
+        const line = layout?.lines?.[lineIndex];
+        const leftNodes = renderHeaderSide((line?.left || []).map((field) => (
+            field ? renderNormalHeaderField(block, entry, field, entryHandleProps) : null
+        )));
+        const rightNodes = renderHeaderSide((line?.right || []).map((field) => (
+            field ? renderNormalHeaderField(block, entry, field, entryHandleProps) : null
+        )));
+
+        if (!leftNodes && !rightNodes) {
+            return null;
+        }
+
+        return (
+            <div className={`entryHeaderLayoutLine ${lineIndex === 1 ? 'entryHeaderLayoutLine--secondary' : ''}`} key={`header-line-${lineIndex}`}>
+                <div className="entryHeaderLayoutSide entryHeaderLayoutSide--left">{leftNodes}</div>
+                <div className="entryHeaderLayoutSide entryHeaderLayoutSide--right">{rightNodes}</div>
+            </div>
+        );
+    }
+
+    function renderEntryHeaderNormal(block, entry, entryHandleProps) {
+        const layout = getEntryHeaderLayout(block);
+
+        return layout?.lines?.map((_, lineIndex) => renderEntryHeaderLine(block, entry, layout, lineIndex, entryHandleProps)).filter(Boolean);
+    }
+
+    function renderHeaderLayoutSlotChip(block, entry, field) {
+        const meta = getEntryHeaderFieldMeta(block.kind, field);
+        const value = entry[field] || '';
+
+        return (
+            <span className={`entryHeaderLayoutChipText ${meta.className}${value ? '' : ' entryHeaderLayoutChipText--empty'}`}>
+                {value || meta.label}
+            </span>
+        );
+    }
+
+    function renderHeaderLayoutMode(block, entry) {
+        const layout = getEntryHeaderLayout(block);
+
+        return (
+            <div className="entryHeaderLayoutMode" data-header-layout-mode="true">
+                <div className="entryHeaderLayoutModeBar">
+                    <span>Drag fields to rearrange this section.</span>
+                    <button
+                        type="button"
+                        className="entryHeaderLayoutReset"
+                        onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onSetSectionEntryHeaderLayout?.(block.id, getDefaultEntryHeaderLayout(block.kind));
+                        }}
+                    >
+                        Reset layout
+                    </button>
+                </div>
+                <div className="entryHeaderLayoutGrid">
+                    {layout.lines.map((line, lineIndex) => (
+                        <div className="entryHeaderLayoutGridLine" key={`layout-mode-line-${lineIndex}`}>
+                            {['left', 'right'].map((side) => (
+                                <div className={`entryHeaderLayoutGridSide entryHeaderLayoutGridSide--${side}`} key={`${lineIndex}-${side}`}>
+                                    {[0, 1].map((slotIndex) => {
+                                        const field = line[side][slotIndex];
+                                        const meta = field
+                                            ? getEntryHeaderFieldMeta(block.kind, field)
+                                            : { label: 'Empty slot' };
+
+                                        return (
+                                            <HeaderLayoutSlot
+                                                key={headerSlotDragId(block.id, entry.id, lineIndex, side, slotIndex)}
+                                                id={headerSlotDragId(block.id, entry.id, lineIndex, side, slotIndex)}
+                                                field={field}
+                                                label={meta.label}
+                                                renderChip={(slotField) => renderHeaderLayoutSlotChip(block, entry, slotField)}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    function renderEntryHeader(block, entry, entryHandleProps) {
+        const isLayoutMode = activeHeaderLayout?.sectionId === block.id && activeHeaderLayout?.entryId === entry.id;
+
+        if (isLayoutMode) {
+            return renderHeaderLayoutMode(block, entry);
+        }
+
+        return renderEntryHeaderNormal(block, entry, entryHandleProps);
+    }
+
     function renderRolesSection(block, { sortable = true, showSeparator = true } = {}) {
         const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
@@ -1479,51 +1890,12 @@ export default function ResumePreview({
                 key={job.id}
                 sectionId={block.id}
                 entryId={job.id}
-                className="experienceSection"
+                className={`experienceSection${activeHeaderLayout?.sectionId === block.id ? ' experienceSection--layoutActiveSection' : ''}${activeHeaderLayout?.sectionId === block.id && activeHeaderLayout?.entryId === job.id ? ' experienceSection--layoutActiveEntry' : ''}`}
                 previewScale={pageMetrics.scale}
             >
                 {(entryHandleProps) => (
                     <>
-                        {(job.company || job.location) && (
-                            <div className="companyYearsExpFlex">
-                                {job.company && (
-                                    <div className="companyRoleLine">
-                                        <span
-                                            className="company"
-                                            {...entryTarget(block.id, job.id, 'company')}
-                                            {...entryHandleProps}
-                                        >
-                                            {renderTextWithCaret(job.company, sectionEntryEditorPath(block.id, job.id, 'company'))}
-                                        </span>
-                                    </div>
-                                )}
-                                {job.location && (
-                                    <div className="previewEntryLocation" {...entryTarget(block.id, job.id, 'location')}>
-                                        {renderTextWithCaret(job.location, sectionEntryEditorPath(block.id, job.id, 'location'))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        {(job.role || job.yearsExp || (!job.company && !job.location)) && (
-                            <div className="companyYearsExpFlex roleYearsExpFlex">
-                                {job.role && (
-                                    <div className="companyRoleLine">
-                                        <span
-                                            className="role"
-                                            {...entryTarget(block.id, job.id, 'role')}
-                                            {...(!job.company ? entryHandleProps : {})}
-                                        >
-                                            {renderTextWithCaret(job.role, sectionEntryEditorPath(block.id, job.id, 'role'))}
-                                        </span>
-                                    </div>
-                                )}
-                                {job.yearsExp && (
-                                    <div className="yearsExp" {...entryTarget(block.id, job.id, 'yearsExp')}>
-                                        {renderTextWithCaret(job.yearsExp, sectionEntryEditorPath(block.id, job.id, 'yearsExp'))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        {renderEntryHeader(block, job, entryHandleProps)}
                         {renderBulletEntries(job.activities, {
                             sectionId: block.id,
                             entryId: job.id,
@@ -1639,7 +2011,7 @@ export default function ResumePreview({
                 key={entry.id}
                 sectionId={block.id}
                 entryId={entry.id}
-                className="previewEntry"
+                className={`previewEntry${activeHeaderLayout?.sectionId === block.id ? ' previewEntry--layoutActiveSection' : ''}${activeHeaderLayout?.sectionId === block.id && activeHeaderLayout?.entryId === entry.id ? ' previewEntry--layoutActiveEntry' : ''}`}
                 previewScale={pageMetrics.scale}
             >
                 {(entryHandleProps) => (
@@ -1779,42 +2151,7 @@ export default function ResumePreview({
             >
                 {(entryHandleProps) => (
                     <>
-                        <div className="previewEntryHeader">
-                            <div className="previewEntryTitleLine">
-                                <span
-                                    className="previewEntryTitle"
-                                    {...entryTarget(block.id, entry.id, 'title')}
-                                    {...entryHandleProps}
-                                >
-                                    {renderTextWithCaret(entry.title, sectionEntryEditorPath(block.id, entry.id, 'title'))}
-                                </span>
-                            </div>
-                            {entry.location && (
-                                <div className="previewEntryLocation" {...entryTarget(block.id, entry.id, 'location')}>
-                                    {renderTextWithCaret(entry.location, sectionEntryEditorPath(block.id, entry.id, 'location'))}
-                                </div>
-                            )}
-                        </div>
-                        {(entry.subtitle || entry.years) && (
-                            <div className="previewEntryHeader customSubtitleYearsRow">
-                                {entry.subtitle && (
-                                    <div className="previewEntryTitleLine">
-                                        <span
-                                            className="previewEntrySubtitle"
-                                            {...entryTarget(block.id, entry.id, 'subtitle')}
-                                            {...(!entry.title ? entryHandleProps : {})}
-                                        >
-                                            {renderTextWithCaret(entry.subtitle, sectionEntryEditorPath(block.id, entry.id, 'subtitle'))}
-                                        </span>
-                                    </div>
-                                )}
-                                {entry.years && (
-                                    <div className="previewEntryMeta" {...entryTarget(block.id, entry.id, 'years')}>
-                                        {renderTextWithCaret(entry.years, sectionEntryEditorPath(block.id, entry.id, 'years'))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        {renderEntryHeader(block, entry, entryHandleProps)}
                         {entry.details && (
                             <div className="previewEntryDetail" {...entryTarget(block.id, entry.id, 'details')}>
                                 {renderTextWithCaret(entry.details, sectionEntryEditorPath(block.id, entry.id, 'details'))}
@@ -1955,6 +2292,19 @@ export default function ResumePreview({
             ) : null;
         }
 
+        if (activeDragMeta.type === 'headerSlot') {
+            const block = findBlock(activeDragMeta.sectionId);
+            const entry = findEntry(block, activeDragMeta.entryId);
+            const layout = block ? getEntryHeaderLayout(block) : null;
+            const field = layout ? getEntryHeaderLayoutSlotField(layout, activeDragMeta) : null;
+
+            return block && entry && field ? (
+                <div className="previewDragOverlay previewDragOverlay--headerField">
+                    {renderHeaderLayoutSlotChip(block, entry, field)}
+                </div>
+            ) : null;
+        }
+
         return null;
     }
 
@@ -1994,6 +2344,11 @@ export default function ResumePreview({
             transform: `scale(${dragOverlayScale})`,
         }
         : undefined;
+    const visibleSectionBlocks = previewModel.sectionBlocks;
+    const isHeaderLayoutModeActive = Boolean(
+        activeHeaderLayout?.sectionId &&
+        visibleSectionBlocks.some((block) => block.id === activeHeaderLayout.sectionId),
+    );
     const previewDragOverlay = (
         <DragOverlay adjustScale={false} dropAnimation={null} zIndex={1000}>
             <div className={`previewDragOverlayFrame ${templateClassName(template)}`} style={dragOverlayStyle}>
@@ -2003,10 +2358,17 @@ export default function ResumePreview({
             </div>
         </DragOverlay>
     );
-    const visibleSectionBlocks = previewModel.sectionBlocks;
     const orderedSections = [
         renderPersonalSection({ showSeparator: visibleSectionBlocks.length > 0 }),
-        (
+        isHeaderLayoutModeActive ? (
+            visibleSectionBlocks.map((block, index) => {
+                const showSeparator = sectionSeparatorPosition === 'belowSectionName'
+                    ? true
+                    : index < visibleSectionBlocks.length - 1;
+
+                return renderSectionBlock(block, { sortable: false, showSeparator });
+            })
+        ) : (
             <SortableContext key="preview-sections" items={sectionDragItems} strategy={verticalListSortingStrategy}>
                 {visibleSectionBlocks.map((block, index) => {
                     const showSeparator = sectionSeparatorPosition === 'belowSectionName'
@@ -2116,7 +2478,7 @@ export default function ResumePreview({
                             <div className="previewPageScaleLayer">
                                 <div
                                     ref={resumeRef}
-                                    className={`resumePage ${templateClassName(template)}${isSamplePreview ? ' resumePage--sample' : ''}`}
+                                    className={`resumePage ${templateClassName(template)}${isSamplePreview ? ' resumePage--sample' : ''}${isHeaderLayoutModeActive ? ' resumePage--headerLayoutMode' : ''}`}
                                     style={presentationVars}
                                     onClick={handlePreviewClick}
                                     onPointerDownCapture={handlePreviewDragHandleCapture}

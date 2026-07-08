@@ -19,7 +19,9 @@ import {
   createResumeStorageKey,
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
+  getDefaultEntryHeaderLayout,
   getPreviewModel,
+  moveSectionHeaderField,
   getResumePresentationVars,
   getResumePrintPageRule,
   moveResumeSectionBlock,
@@ -33,6 +35,8 @@ import {
   reorderWorkspaceResumesToMatch,
   setResumeSettingValue,
   setResumeSummaryWidthPercent,
+  setSectionEntryHeaderLayout,
+  normalizeEntryHeaderLayout,
   updatePersonalField,
   updateRoleBlockActivity,
   updateRoleBlockEntry,
@@ -234,6 +238,90 @@ test('block actions update roles, education details, and list items', () => {
   assert.equal(getSection(resume, 'experience').entries[0].activities[0], 'Led redesign');
   assert.equal(getSection(resume, 'education').entries[0].school, 'Example University');
   assert.equal(getSection(resume, 'education').entries[0].customSections[0].label, 'Coursework');
+});
+
+test('entry header layouts normalize defaults for roles and custom sections', () => {
+  const resume = normalizeDraftPayload({
+    resume: {
+      sections: [
+        {
+          id: 'work',
+          kind: 'roles',
+          title: 'Work',
+          entries: [{ company: 'Acme' }],
+        },
+        {
+          id: 'affiliations',
+          kind: 'custom',
+          title: 'Affiliations',
+          entries: [{ title: 'Member' }],
+        },
+      ],
+    },
+  }).resume;
+
+  assert.deepEqual(getSection(resume, 'work').entryHeaderLayout, getDefaultEntryHeaderLayout('roles'));
+  assert.deepEqual(getSection(resume, 'affiliations').entryHeaderLayout, getDefaultEntryHeaderLayout('custom'));
+});
+
+test('entry header layout normalization repairs invalid and duplicate fields', () => {
+  const layout = normalizeEntryHeaderLayout('roles', {
+    lines: [
+      { left: ['company', 'company'], right: ['bad-field', null] },
+      { left: [null, null], right: [null, null] },
+    ],
+  });
+
+  const flattenedFields = layout.lines.flatMap((line) => [...line.left, ...line.right]).filter(Boolean);
+
+  assert.deepEqual([...new Set(flattenedFields)].sort(), ['company', 'location', 'role', 'yearsExp']);
+  assert.equal(flattenedFields.length, 4);
+});
+
+test('entry header layout helper swaps occupied slots and moves into empty slots', () => {
+  const defaultLayout = getDefaultEntryHeaderLayout('roles');
+  const swapped = moveSectionHeaderField(
+    defaultLayout,
+    { lineIndex: 0, side: 'left', slotIndex: 0 },
+    { lineIndex: 1, side: 'left', slotIndex: 0 },
+  );
+
+  assert.equal(swapped.lines[0].left[0], 'role');
+  assert.equal(swapped.lines[1].left[0], 'company');
+
+  const moved = moveSectionHeaderField(
+    swapped,
+    { lineIndex: 0, side: 'right', slotIndex: 1 },
+    { lineIndex: 0, side: 'left', slotIndex: 1 },
+  );
+
+  assert.equal(moved.lines[0].left[1], 'location');
+  assert.equal(moved.lines[0].right[1], null);
+});
+
+test('section entry header layout updates only the target section and reaches preview model', () => {
+  let resume = createEmptyResume();
+  const customResult = addResumeSectionBlock(resume, 'custom-section');
+  resume = customResult.resume;
+
+  const nextExperienceLayout = moveSectionHeaderField(
+    getDefaultEntryHeaderLayout('roles'),
+    { lineIndex: 1, side: 'left', slotIndex: 0 },
+    { lineIndex: 0, side: 'left', slotIndex: 1 },
+  );
+
+  resume = setSectionEntryHeaderLayout(resume, 'experience', nextExperienceLayout);
+
+  assert.deepEqual(getSection(resume, 'experience').entryHeaderLayout, nextExperienceLayout);
+  assert.deepEqual(getSection(resume, 'internships').entryHeaderLayout, getDefaultEntryHeaderLayout('roles'));
+  assert.deepEqual(getSection(resume, customResult.sectionId).entryHeaderLayout, getDefaultEntryHeaderLayout('custom'));
+
+  const experienceEntryId = getSection(resume, 'experience').entries[0].id;
+  resume = updateRoleBlockEntry(resume, 'experience', experienceEntryId, 'company', 'Acme');
+  resume = updateRoleBlockEntry(resume, 'experience', experienceEntryId, 'role', 'Engineer');
+
+  const preview = getPreviewModel(resume);
+  assert.deepEqual(preview.sectionBlocks.find((section) => section.id === 'experience').entryHeaderLayout, nextExperienceLayout);
 });
 
 test('generic block actions handle projects and section titles', () => {

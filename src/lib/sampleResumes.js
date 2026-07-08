@@ -847,6 +847,7 @@ function createSampleBlock(section, sample, orderOverrides) {
       id: section.id,
       kind: section.kind,
       title: section.title || 'Experience',
+      entryHeaderLayout: section.entryHeaderLayout,
       entryOrder: entries.map((entry) => entry.id),
       entries,
     };
@@ -1084,6 +1085,7 @@ function mergeSampleSection(sampleSection, realSection) {
   return {
     ...sampleSection,
     title: mergePreviewText(realSection?.title, sampleSection.title),
+    entryHeaderLayout: realSection?.entryHeaderLayout || sampleSection.entryHeaderLayout,
     entryOrder: entries.map((entry) => entry.id),
     entries,
   };

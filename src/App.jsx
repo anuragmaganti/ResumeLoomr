@@ -798,6 +798,7 @@ function App() {
               onReorderSections={reorderSections}
               onReorderSectionEntries={handlePreviewReorderSectionEntries}
               onReorderSectionTextList={handlePreviewReorderSectionTextList}
+              onSetSectionEntryHeaderLayout={actions.setSectionEntryHeaderLayout}
               onSummaryWidthChange={actions.setSummaryWidthPercent}
               onSeparatorSettingsOpen={handleSeparatorSettingsOpen}
               activeEditorCaret={editorCaretTarget}

@@ -43,6 +43,7 @@ import {
   sanitizeWorkspaceResumeName,
   setResumeSettingValue,
   setResumeSummaryWidthPercent,
+  setSectionEntryHeaderLayout,
   updatePersonalField,
   updateResumeSetting as updateResumeSettingValue,
   updateSampleDisplay,
@@ -1008,6 +1009,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     },
     setResumeSettingValue(settingId, value) {
       updateResume((currentResume) => setResumeSettingValue(currentResume, settingId, value));
+    },
+    setSectionEntryHeaderLayout(sectionId, layout) {
+      updateResume((currentResume) => setSectionEntryHeaderLayout(currentResume, sectionId, layout));
     },
     startFromScratch() {
       updateResume((currentResume) => updateSampleDisplay(currentResume, { hasStarted: true }));
