@@ -807,6 +807,11 @@ html[data-theme="dark"] .resumePage {
 .entryHeaderFieldSeparator {
   color: var(--resume-page-subtle);
   font-weight: 500;
+  margin-right: 0.28em;
+}
+
+.entryHeaderFieldSeparator--wrapped {
+  display: none;
 }
 
 .entryHeaderLayoutLine .role,

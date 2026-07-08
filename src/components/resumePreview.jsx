@@ -720,6 +720,62 @@ export default function ResumePreview({
         };
     }, [activeHeaderLayout]);
 
+    useLayoutEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        let frameId = 0;
+
+        function updateWrappedHeaderSeparators() {
+            const root = resumeRef.current;
+
+            if (!root) {
+                return;
+            }
+
+            root.querySelectorAll('[data-entry-header-side="true"]').forEach((sideElement) => {
+                const items = Array.from(sideElement.querySelectorAll('[data-entry-header-item="true"]'));
+
+                items.forEach((item, index) => {
+                    const separator = item.querySelector('.entryHeaderFieldSeparator');
+
+                    if (!separator) {
+                        return;
+                    }
+
+                    const nextItem = items[index + 1];
+                    const shouldHideSeparator = nextItem
+                        ? nextItem.getBoundingClientRect().top > item.getBoundingClientRect().top + 1
+                        : false;
+
+                    separator.classList.toggle('entryHeaderFieldSeparator--wrapped', shouldHideSeparator);
+                });
+            });
+        }
+
+        function scheduleUpdate() {
+            window.cancelAnimationFrame(frameId);
+            frameId = window.requestAnimationFrame(updateWrappedHeaderSeparators);
+        }
+
+        scheduleUpdate();
+        window.addEventListener('resize', scheduleUpdate);
+
+        let resizeObserver;
+
+        if (typeof ResizeObserver !== 'undefined' && resumeRef.current) {
+            resizeObserver = new ResizeObserver(scheduleUpdate);
+            resizeObserver.observe(resumeRef.current);
+        }
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+            window.removeEventListener('resize', scheduleUpdate);
+            resizeObserver?.disconnect();
+        };
+    }, [previewModel, presentationVars, activeHeaderLayout]);
+
     function previewPulseAttributes(path) {
         return previewPulseTarget?.path === path && previewPulseTarget?.requestId
             ? { 'data-preview-pulse': previewPulseTarget.requestId % 2 === 0 ? 'even' : 'odd' }
@@ -1777,9 +1833,9 @@ export default function ResumePreview({
         }
 
         return visibleNodes.map((node, index) => (
-            <span className="entryHeaderFieldGroupItem" key={node.key || index}>
+            <span className="entryHeaderFieldGroupItem" data-entry-header-item="true" key={node.key || index}>
                 {node}
-                {index < visibleNodes.length - 1 && <span className="entryHeaderFieldSeparator">, </span>}
+                {index < visibleNodes.length - 1 && <span className="entryHeaderFieldSeparator">,</span>}
             </span>
         ));
     }
@@ -1799,8 +1855,8 @@ export default function ResumePreview({
 
         return (
             <div className={`entryHeaderLayoutLine ${lineIndex === 1 ? 'entryHeaderLayoutLine--secondary' : ''}`} key={`header-line-${lineIndex}`}>
-                <div className="entryHeaderLayoutSide entryHeaderLayoutSide--left">{leftNodes}</div>
-                <div className="entryHeaderLayoutSide entryHeaderLayoutSide--right">{rightNodes}</div>
+                <div className="entryHeaderLayoutSide entryHeaderLayoutSide--left" data-entry-header-side="true">{leftNodes}</div>
+                <div className="entryHeaderLayoutSide entryHeaderLayoutSide--right" data-entry-header-side="true">{rightNodes}</div>
             </div>
         );
     }
