@@ -167,9 +167,11 @@ function App() {
   const shouldShowSampleInformation = Boolean(sampleDisplay.hasStarted && sampleDisplay.showInformation);
   const samplePreviewModel = useMemo(
     () => (shouldShowSampleInformation
-      ? createMixedSamplePreviewModel(resume, activeResumeId, previewModel, sampleOrderOverrides)
+      ? createMixedSamplePreviewModel(resume, activeResumeId, previewModel, sampleOrderOverrides, {
+        activeSectionId: activeTab,
+      })
       : null),
-    [activeResumeId, previewModel, resume, sampleOrderOverrides, shouldShowSampleInformation],
+    [activeResumeId, activeTab, previewModel, resume, sampleOrderOverrides, shouldShowSampleInformation],
   );
   const samplePlaceholderFor = useMemo(
     () => createSamplePlaceholderResolver(resume, samplePreviewModel),

@@ -569,6 +569,54 @@ test('mixed sample preview uses real user fields over sample fields', () => {
   assert.equal(roleEntry.activities[1].text.includes('Leveraged a seven-figure liquidity event'), true);
 });
 
+test('mixed sample preview keeps active empty added sections in resume order', () => {
+  let resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  let result = addResumeSectionBlock(resume, 'community-service');
+  resume = result.resume;
+  const communitySectionId = result.sectionId;
+
+  result = addResumeSectionBlock(resume, 'custom-section');
+  resume = result.resume;
+  const customSectionId = result.sectionId;
+
+  resume = reorderResumeSectionBlocksToMatch(resume, [
+    'education',
+    communitySectionId,
+    customSectionId,
+    'experience',
+    'internships',
+    'projects',
+    'skills',
+  ]);
+
+  const realPreview = getPreviewModel(resume);
+
+  assert.equal(realPreview.sectionBlocks.some((section) => section.id === communitySectionId), false);
+  assert.equal(realPreview.sectionBlocks.some((section) => section.id === customSectionId), false);
+
+  const communityPreview = createMixedSamplePreviewModel(resume, 'resume-5', realPreview, {}, {
+    activeSectionId: communitySectionId,
+  });
+
+  assert.deepEqual(
+    communityPreview.sectionBlocks.slice(0, 4).map((section) => section.id),
+    ['education', communitySectionId, 'experience', 'projects'],
+  );
+  assert.equal(communityPreview.sectionBlocks.find((section) => section.id === communitySectionId).kind, 'roles');
+  assert.equal(communityPreview.sectionBlocks.find((section) => section.id === communitySectionId).entries.length, 0);
+
+  const customPreview = createMixedSamplePreviewModel(resume, 'resume-5', realPreview, {}, {
+    activeSectionId: customSectionId,
+  });
+
+  assert.deepEqual(
+    customPreview.sectionBlocks.slice(0, 4).map((section) => section.id),
+    ['education', customSectionId, 'experience', 'projects'],
+  );
+  assert.equal(customPreview.sectionBlocks.find((section) => section.id === customSectionId).kind, 'custom');
+  assert.equal(customPreview.sectionBlocks.find((section) => section.id === customSectionId).entries.length, 0);
+});
+
 test('each fictional sample renders multiple complete experience entries', () => {
   const previewsBySampleId = new Map();
 

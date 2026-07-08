@@ -829,6 +829,21 @@ function createSampleSkillsEntry(section, sample) {
   };
 }
 
+function createSampleSectionShell(section) {
+  return {
+    id: section.id,
+    kind: section.kind,
+    title: section.title,
+    entryHeaderLayout: section.entryHeaderLayout,
+    entryOrder: [],
+    entries: [],
+  };
+}
+
+function shouldCreateSampleSectionShell(section, options = {}) {
+  return trimText(options.activeSectionId) === section.id;
+}
+
 function createSampleBlock(section, sample, orderOverrides) {
   if (section.kind === 'education') {
     return {
@@ -876,7 +891,7 @@ function createSampleBlock(section, sample, orderOverrides) {
   return null;
 }
 
-export function createSamplePreviewModel(resume, resumeId, realPreviewModel = getPreviewModel(resume), orderOverrides = {}) {
+export function createSamplePreviewModel(resume, resumeId, realPreviewModel = getPreviewModel(resume), orderOverrides = {}, options = {}) {
   if (realPreviewModel?.hasContent) {
     return null;
   }
@@ -902,7 +917,9 @@ export function createSamplePreviewModel(resume, resumeId, realPreviewModel = ge
     personal.customField ? { id: 'custom', text: personal.customField } : null,
   ].filter(Boolean);
   const sectionBlocks = normalizedResume.sections
-    .map((section) => createSampleBlock(section, sample, orderOverrides))
+    .map((section) => createSampleBlock(section, sample, orderOverrides) || (
+      shouldCreateSampleSectionShell(section, options) ? createSampleSectionShell(section) : null
+    ))
     .filter(Boolean);
 
   return {
@@ -1091,18 +1108,19 @@ function mergeSampleSection(sampleSection, realSection) {
   };
 }
 
-export function createMixedSamplePreviewModel(resume, resumeId, realPreviewModel = getPreviewModel(resume), orderOverrides = {}) {
-  const samplePreviewModel = createSamplePreviewModel(resume, resumeId, { hasContent: false }, orderOverrides);
+export function createMixedSamplePreviewModel(resume, resumeId, realPreviewModel = getPreviewModel(resume), orderOverrides = {}, options = {}) {
+  const samplePreviewModel = createSamplePreviewModel(resume, resumeId, { hasContent: false }, orderOverrides, options);
 
   if (!samplePreviewModel) {
     return null;
   }
 
+  const normalizedResume = normalizeResume(resume);
   const realSectionById = new Map(
     (Array.isArray(realPreviewModel?.sectionBlocks) ? realPreviewModel.sectionBlocks : [])
       .map((section) => [section.id, section])
   );
-  const sampleSectionIds = new Set(samplePreviewModel.sectionBlocks.map((section) => section.id));
+  const sampleSectionById = new Map(samplePreviewModel.sectionBlocks.map((section) => [section.id, section]));
   const mergedPersonal = {
     name: mergePreviewText(realPreviewModel?.personal?.name, samplePreviewModel.personal.name),
     headline: mergePreviewText(realPreviewModel?.personal?.headline, samplePreviewModel.personal.headline),
@@ -1115,12 +1133,18 @@ export function createMixedSamplePreviewModel(resume, resumeId, realPreviewModel
     customField: mergePreviewText(realPreviewModel?.personal?.customField, samplePreviewModel.personal.customField),
     aboutMe: mergePreviewText(realPreviewModel?.personal?.aboutMe, samplePreviewModel.personal.aboutMe),
   };
-  const mergedSampleSections = samplePreviewModel.sectionBlocks.map((sampleSection) => (
-    mergeSampleSection(sampleSection, realSectionById.get(sampleSection.id))
-  ));
-  const realOnlySections = (Array.isArray(realPreviewModel?.sectionBlocks) ? realPreviewModel.sectionBlocks : [])
-    .filter((section) => !sampleSectionIds.has(section.id));
-  const sectionBlocks = [...mergedSampleSections, ...realOnlySections];
+  const sectionBlocks = normalizedResume.sections
+    .map((section) => {
+      const sampleSection = sampleSectionById.get(section.id);
+      const realSection = realSectionById.get(section.id);
+
+      if (sampleSection) {
+        return mergeSampleSection(sampleSection, realSection);
+      }
+
+      return realSection || null;
+    })
+    .filter(Boolean);
 
   return {
     ...samplePreviewModel,
