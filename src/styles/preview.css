@@ -840,8 +840,7 @@ html[data-theme="dark"] .resumePage {
   margin-left: auto;
 }
 
-.entryHeaderHoverSlot,
-.entryHeaderHoverSlotPlaceholder {
+.entryHeaderHoverSlot {
   display: inline-flex;
   flex: 0 0 auto;
   width: 48px;
@@ -849,8 +848,22 @@ html[data-theme="dark"] .resumePage {
   border-radius: 5px;
 }
 
-.entryHeaderHoverSlotLayer--education .entryHeaderHoverSlot,
-.entryHeaderHoverSlotLayer--education .entryHeaderHoverSlotPlaceholder {
+.entryHeaderHoverSlotPlaceholderWrap {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.entryHeaderHoverSlotPlaceholder {
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.entryHeaderHoverSlotLayer--education .entryHeaderHoverSlot {
   width: 38px;
 }
 
