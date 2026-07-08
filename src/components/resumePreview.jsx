@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/core';
 import {
     arrayMove,
-    rectSortingStrategy,
+    horizontalListSortingStrategy,
     SortableContext,
     sortableKeyboardCoordinates,
     useSortable,
@@ -1817,7 +1817,7 @@ export default function ResumePreview({
                     >
                         <SortableContext
                             items={personalDetails.map((detail) => personalContactDragId(detail.field))}
-                            strategy={rectSortingStrategy}
+                            strategy={horizontalListSortingStrategy}
                         >
                             {personalDetails.map((detail, index) => (
                                 <SortablePersonalContact
