@@ -240,10 +240,16 @@ test('block actions update roles, education details, and list items', () => {
   assert.equal(getSection(resume, 'education').entries[0].customSections[0].label, 'Coursework');
 });
 
-test('entry header layouts normalize defaults for roles and custom sections', () => {
+test('entry header layouts normalize defaults for education roles and custom sections', () => {
   const resume = normalizeDraftPayload({
     resume: {
       sections: [
+        {
+          id: 'schooling',
+          kind: 'education',
+          title: 'Schooling',
+          entries: [{ school: 'Example University' }],
+        },
         {
           id: 'work',
           kind: 'roles',
@@ -260,22 +266,34 @@ test('entry header layouts normalize defaults for roles and custom sections', ()
     },
   }).resume;
 
+  assert.deepEqual(getSection(resume, 'schooling').entryHeaderLayout, getDefaultEntryHeaderLayout('education'));
   assert.deepEqual(getSection(resume, 'work').entryHeaderLayout, getDefaultEntryHeaderLayout('roles'));
   assert.deepEqual(getSection(resume, 'affiliations').entryHeaderLayout, getDefaultEntryHeaderLayout('custom'));
 });
 
 test('entry header layout normalization repairs invalid and duplicate fields', () => {
-  const layout = normalizeEntryHeaderLayout('roles', {
+  const rolesLayout = normalizeEntryHeaderLayout('roles', {
     lines: [
       { left: ['company', 'company'], right: ['bad-field', null] },
       { left: [null, null], right: [null, null] },
     ],
   });
+  const educationLayout = normalizeEntryHeaderLayout('education', {
+    lines: [
+      { left: ['school', 'school', 'degree'], right: ['bad-field', null, 'location'] },
+      { left: [null, 'gpa', null], right: [null, null, null] },
+    ],
+  });
 
-  const flattenedFields = layout.lines.flatMap((line) => [...line.left, ...line.right]).filter(Boolean);
+  const flattenedRoleFields = rolesLayout.lines.flatMap((line) => [...line.left, ...line.right]).filter(Boolean);
+  const flattenedEducationFields = educationLayout.lines.flatMap((line) => [...line.left, ...line.right]).filter(Boolean);
 
-  assert.deepEqual([...new Set(flattenedFields)].sort(), ['company', 'location', 'role', 'yearsExp']);
-  assert.equal(flattenedFields.length, 4);
+  assert.deepEqual([...new Set(flattenedRoleFields)].sort(), ['company', 'location', 'role', 'yearsExp']);
+  assert.equal(flattenedRoleFields.length, 4);
+  assert.deepEqual([...new Set(flattenedEducationFields)].sort(), ['degree', 'gpa', 'honors', 'location', 'school', 'yearsEdu']);
+  assert.equal(flattenedEducationFields.length, 6);
+  assert.equal(educationLayout.lines[0].left.length, 3);
+  assert.equal(educationLayout.lines[0].right.length, 3);
 });
 
 test('entry header layout helper swaps occupied slots and moves into empty slots', () => {
@@ -297,6 +315,15 @@ test('entry header layout helper swaps occupied slots and moves into empty slots
 
   assert.equal(moved.lines[0].left[1], 'location');
   assert.equal(moved.lines[0].right[1], null);
+
+  const educationMoved = moveSectionHeaderField(
+    getDefaultEntryHeaderLayout('education'),
+    { lineIndex: 1, side: 'right', slotIndex: 2 },
+    { lineIndex: 0, side: 'left', slotIndex: 2 },
+  );
+
+  assert.equal(educationMoved.lines[0].left[2], 'yearsEdu');
+  assert.equal(educationMoved.lines[1].right[2], null);
 });
 
 test('section entry header layout updates only the target section and reaches preview model', () => {
@@ -320,7 +347,23 @@ test('section entry header layout updates only the target section and reaches pr
   resume = updateRoleBlockEntry(resume, 'experience', experienceEntryId, 'company', 'Acme');
   resume = updateRoleBlockEntry(resume, 'experience', experienceEntryId, 'role', 'Engineer');
 
+  const nextEducationLayout = moveSectionHeaderField(
+    getDefaultEntryHeaderLayout('education'),
+    { lineIndex: 0, side: 'right', slotIndex: 2 },
+    { lineIndex: 0, side: 'left', slotIndex: 1 },
+  );
+  resume = setSectionEntryHeaderLayout(resume, 'education', nextEducationLayout);
+
+  const educationEntryId = getSection(resume, 'education').entries[0].id;
+  resume = updateSectionBlockEntry(resume, 'education', educationEntryId, 'school', 'Example University');
+  resume = updateSectionBlockEntry(resume, 'education', educationEntryId, 'degree', 'B.S. Computer Science');
+  resume = updateSectionBlockEntry(resume, 'education', educationEntryId, 'location', 'Athens, GA');
+  resume = updateSectionBlockEntry(resume, 'education', educationEntryId, 'yearsEdu', '2020 - 2024');
+  resume = updateSectionBlockEntry(resume, 'education', educationEntryId, 'gpa', '3.9');
+  resume = updateSectionBlockEntry(resume, 'education', educationEntryId, 'honors', 'Magna Cum Laude');
+
   const preview = getPreviewModel(resume);
+  assert.deepEqual(preview.sectionBlocks.find((section) => section.id === 'education').entryHeaderLayout, nextEducationLayout);
   assert.deepEqual(preview.sectionBlocks.find((section) => section.id === 'experience').entryHeaderLayout, nextExperienceLayout);
 });
 

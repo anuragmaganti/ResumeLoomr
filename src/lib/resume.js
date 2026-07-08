@@ -27,6 +27,7 @@ export const SECTION_BLOCK_KINDS = [
   'custom',
 ];
 export const ENTRY_HEADER_LAYOUT_FIELDS = {
+  education: ['school', 'degree', 'location', 'yearsEdu', 'gpa', 'honors'],
   roles: ['company', 'role', 'location', 'yearsExp'],
   custom: ['title', 'subtitle', 'location', 'years'],
 };
@@ -153,6 +154,13 @@ const SECTION_TEMPLATE_MAP = new Map(
 );
 const ENTRY_HEADER_LAYOUT_VERSION = 1;
 const ENTRY_HEADER_LAYOUT_DEFAULTS = {
+  education: {
+    version: ENTRY_HEADER_LAYOUT_VERSION,
+    lines: [
+      { left: ['school', null, null], right: [null, null, 'location'] },
+      { left: ['degree', 'gpa', 'honors'], right: [null, null, 'yearsEdu'] },
+    ],
+  },
   roles: {
     version: ENTRY_HEADER_LAYOUT_VERSION,
     lines: [
@@ -512,8 +520,10 @@ function cloneEntryHeaderLayout(layout) {
   return {
     version: ENTRY_HEADER_LAYOUT_VERSION,
     lines: [0, 1].map((lineIndex) => ({
-      left: [0, 1].map((slotIndex) => layout?.lines?.[lineIndex]?.left?.[slotIndex] ?? null),
-      right: [0, 1].map((slotIndex) => layout?.lines?.[lineIndex]?.right?.[slotIndex] ?? null),
+      left: (Array.isArray(layout?.lines?.[lineIndex]?.left) ? layout.lines[lineIndex].left : [null, null])
+        .map((field) => field ?? null),
+      right: (Array.isArray(layout?.lines?.[lineIndex]?.right) ? layout.lines[lineIndex].right : [null, null])
+        .map((field) => field ?? null),
     })),
   };
 }
@@ -533,20 +543,38 @@ function getEntryHeaderLayoutSlot(layout, slot) {
   const lineIndex = Number(slot?.lineIndex);
   const slotIndex = Number(slot?.slotIndex);
   const side = slot?.side === 'right' ? 'right' : 'left';
+  const slots = layout?.lines?.[lineIndex]?.[side];
 
-  if (!Number.isInteger(lineIndex) || !Number.isInteger(slotIndex) || lineIndex < 0 || lineIndex > 1 || slotIndex < 0 || slotIndex > 1) {
+  if (
+    !Number.isInteger(lineIndex) ||
+    !Number.isInteger(slotIndex) ||
+    lineIndex < 0 ||
+    lineIndex > 1 ||
+    !Array.isArray(slots) ||
+    slotIndex < 0 ||
+    slotIndex >= slots.length
+  ) {
     return undefined;
   }
 
-  return layout?.lines?.[lineIndex]?.[side]?.[slotIndex];
+  return slots[slotIndex];
 }
 
 function setEntryHeaderLayoutSlot(layout, slot, value) {
   const lineIndex = Number(slot?.lineIndex);
   const slotIndex = Number(slot?.slotIndex);
   const side = slot?.side === 'right' ? 'right' : 'left';
+  const slots = layout?.lines?.[lineIndex]?.[side];
 
-  if (!Number.isInteger(lineIndex) || !Number.isInteger(slotIndex) || lineIndex < 0 || lineIndex > 1 || slotIndex < 0 || slotIndex > 1) {
+  if (
+    !Number.isInteger(lineIndex) ||
+    !Number.isInteger(slotIndex) ||
+    lineIndex < 0 ||
+    lineIndex > 1 ||
+    !Array.isArray(slots) ||
+    slotIndex < 0 ||
+    slotIndex >= slots.length
+  ) {
     return layout;
   }
 
@@ -568,7 +596,7 @@ export function normalizeEntryHeaderLayout(sectionKind, layout) {
   let normalizedLayout = {
     version: ENTRY_HEADER_LAYOUT_VERSION,
     lines: [0, 1].map((lineIndex) => ({
-      left: [0, 1].map((slotIndex) => {
+      left: defaultLayout.lines[lineIndex].left.map((_, slotIndex) => {
         const field = layout?.lines?.[lineIndex]?.left?.[slotIndex];
 
         if (!fieldSet.has(field) || usedFields.has(field)) {
@@ -578,7 +606,7 @@ export function normalizeEntryHeaderLayout(sectionKind, layout) {
         usedFields.add(field);
         return field;
       }),
-      right: [0, 1].map((slotIndex) => {
+      right: defaultLayout.lines[lineIndex].right.map((_, slotIndex) => {
         const field = layout?.lines?.[lineIndex]?.right?.[slotIndex];
 
         if (!fieldSet.has(field) || usedFields.has(field)) {
@@ -611,7 +639,9 @@ export function normalizeEntryHeaderLayout(sectionKind, layout) {
 export function findEntryHeaderFieldSlot(layout, field) {
   for (let lineIndex = 0; lineIndex < 2; lineIndex += 1) {
     for (const side of ['left', 'right']) {
-      for (let slotIndex = 0; slotIndex < 2; slotIndex += 1) {
+      const slots = layout?.lines?.[lineIndex]?.[side] || [];
+
+      for (let slotIndex = 0; slotIndex < slots.length; slotIndex += 1) {
         if (layout?.lines?.[lineIndex]?.[side]?.[slotIndex] === field) {
           return { lineIndex, side, slotIndex };
         }
@@ -625,7 +655,9 @@ export function findEntryHeaderFieldSlot(layout, field) {
 function findEmptyEntryHeaderSlot(layout) {
   for (let lineIndex = 0; lineIndex < 2; lineIndex += 1) {
     for (const side of ['left', 'right']) {
-      for (let slotIndex = 0; slotIndex < 2; slotIndex += 1) {
+      const slots = layout?.lines?.[lineIndex]?.[side] || [];
+
+      for (let slotIndex = 0; slotIndex < slots.length; slotIndex += 1) {
         if (!layout?.lines?.[lineIndex]?.[side]?.[slotIndex]) {
           return { lineIndex, side, slotIndex };
         }

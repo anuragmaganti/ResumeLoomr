@@ -850,6 +850,7 @@ function createSampleBlock(section, sample, orderOverrides) {
       id: section.id,
       kind: section.kind,
       title: section.title || 'Education',
+      entryHeaderLayout: section.entryHeaderLayout,
       entryOrder: [firstEntryId(section)],
       entries: [createSampleEducationEntry(section, sample)],
     };

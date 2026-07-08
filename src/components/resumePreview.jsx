@@ -66,6 +66,14 @@ const HEADER_LAYOUT_LONG_PRESS_MS = 520;
 const HEADER_LAYOUT_LONG_PRESS_MOVE_TOLERANCE_PX = 8;
 
 const ENTRY_HEADER_FIELD_META = {
+    education: {
+        school: { label: 'Institution', className: 'school' },
+        degree: { label: 'Degree', className: 'degree' },
+        location: { label: 'Location', className: 'eduLocation previewEntryLocation' },
+        yearsEdu: { label: 'Dates', className: 'yearsEdu' },
+        gpa: { label: 'GPA', className: 'educationMeta educationGpaInline' },
+        honors: { label: 'Honors', className: 'educationMeta' },
+    },
     roles: {
         company: { label: 'Organization', className: 'company' },
         role: { label: 'Role', className: 'role' },
@@ -155,12 +163,21 @@ function getEntryHeaderLayoutSlotField(layout, slot) {
     const lineIndex = Number(slot?.lineIndex);
     const slotIndex = Number(slot?.slotIndex);
     const side = slot?.side === 'right' ? 'right' : 'left';
+    const slots = layout?.lines?.[lineIndex]?.[side];
 
-    if (!Number.isInteger(lineIndex) || !Number.isInteger(slotIndex) || lineIndex < 0 || lineIndex > 1 || slotIndex < 0 || slotIndex > 1) {
+    if (
+        !Number.isInteger(lineIndex) ||
+        !Number.isInteger(slotIndex) ||
+        lineIndex < 0 ||
+        lineIndex > 1 ||
+        !Array.isArray(slots) ||
+        slotIndex < 0 ||
+        slotIndex >= slots.length
+    ) {
         return null;
     }
 
-    return layout?.lines?.[lineIndex]?.[side]?.[slotIndex] || null;
+    return slots[slotIndex] || null;
 }
 
 function parsePreviewDragId(id) {
@@ -515,7 +532,7 @@ function HeaderLayoutSlot({
                     {renderChip(field)}
                 </span>
             ) : (
-                <span className="entryHeaderLayoutEmpty">{label}</span>
+                <span className="entryHeaderLayoutEmpty" aria-label={label} />
             )}
         </div>
     );
@@ -1634,42 +1651,15 @@ export default function ResumePreview({
             >
                 {(entryHandleProps) => (
                     <>
-                        {(institution.school || institution.location) && (
-                            <div className="degreeYearsEduFlex">
-                                {institution.school && (
-                                    <div className="schoolLocation">
-                                        <span
-                                            className="school"
-                                            {...entryTarget(block.id, institution.id, 'school')}
-                                            {...entryHandleProps}
-                                        >
-                                            {renderTextWithCaret(institution.school, sectionEntryEditorPath(block.id, institution.id, 'school'))}
-                                        </span>
-                                    </div>
-                                )}
-                                {institution.location && (
-                                    <div className="eduLocation previewEntryLocation" {...entryTarget(block.id, institution.id, 'location')}>
-                                        {renderTextWithCaret(institution.location, sectionEntryEditorPath(block.id, institution.id, 'location'))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        {institution.programs?.length > 0 ? (
+                        {renderEntryHeader(block, institution, entryHandleProps)}
+                        {institution.programs?.length > 0 && (
                             institution.programs.map((program, programIndex) => {
-                                const programYears = program.yearsEdu || (institution.programs.length === 1 ? institution.yearsEdu : '');
-                                const programYearsTarget = program.yearsEdu
-                                    ? nestedTarget(block.id, institution.id, `programs.${programIndex}.yearsEdu`)
-                                    : entryTarget(block.id, institution.id, 'yearsEdu');
-                                const programYearsPath = program.yearsEdu
-                                    ? sectionEntryNestedEditorPath(block.id, institution.id, `programs.${programIndex}.yearsEdu`)
-                                    : sectionEntryEditorPath(block.id, institution.id, 'yearsEdu');
-                                const programGpa = program.gpa || (institution.programs.length === 1 ? institution.gpa : '');
-                                const programGpaTarget = program.gpa
-                                    ? nestedTarget(block.id, institution.id, `programs.${programIndex}.gpa`)
-                                    : entryTarget(block.id, institution.id, 'gpa');
-                                const programGpaPath = program.gpa
-                                    ? sectionEntryNestedEditorPath(block.id, institution.id, `programs.${programIndex}.gpa`)
-                                    : sectionEntryEditorPath(block.id, institution.id, 'gpa');
+                                const programYears = program.yearsEdu || '';
+                                const programYearsTarget = nestedTarget(block.id, institution.id, `programs.${programIndex}.yearsEdu`);
+                                const programYearsPath = sectionEntryNestedEditorPath(block.id, institution.id, `programs.${programIndex}.yearsEdu`);
+                                const programGpa = program.gpa || '';
+                                const programGpaTarget = nestedTarget(block.id, institution.id, `programs.${programIndex}.gpa`);
+                                const programGpaPath = sectionEntryNestedEditorPath(block.id, institution.id, `programs.${programIndex}.gpa`);
 
                                 return (
                                     <div className="schoolLocationRow" key={program.id}>
@@ -1711,37 +1701,6 @@ export default function ResumePreview({
                                     </div>
                                 );
                             })
-                        ) : (
-                            (institution.degree || institution.honors || institution.gpa || institution.yearsEdu) && (
-                                <div className="schoolLocationRow">
-                                    <div className="educationDegreeRow">
-                                        {institution.degree && (
-                                            <span className="degree" {...entryTarget(block.id, institution.id, 'degree')}>
-                                                {renderTextWithCaret(institution.degree, sectionEntryEditorPath(block.id, institution.id, 'degree'))}
-                                            </span>
-                                        )}
-                                        {institution.gpa && (
-                                            <span className="educationMeta educationGpaInline" {...entryTarget(block.id, institution.id, 'gpa')}>
-                                                {renderTextWithCaret(institution.gpa, sectionEntryEditorPath(block.id, institution.id, 'gpa'), {
-                                                    prefix: institution.degree ? ', GPA: ' : 'GPA: ',
-                                                })}
-                                            </span>
-                                        )}
-                                        {institution.honors && (
-                                            <span className="educationMeta" {...entryTarget(block.id, institution.id, 'honors')}>
-                                                {renderTextWithCaret(institution.honors, sectionEntryEditorPath(block.id, institution.id, 'honors'), {
-                                                    prefix: (institution.degree || institution.gpa) ? ', ' : '',
-                                                })}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {institution.yearsEdu && (
-                                        <div className="yearsEdu" {...entryTarget(block.id, institution.id, 'yearsEdu')}>
-                                            {renderTextWithCaret(institution.yearsEdu, sectionEntryEditorPath(block.id, institution.id, 'yearsEdu'))}
-                                        </div>
-                                    )}
-                                </div>
-                            )
                         )}
                         {institution.coursework && (
                             <div className="educationDetail" {...entryTarget(block.id, institution.id, 'coursework')}>
@@ -1819,8 +1778,11 @@ export default function ResumePreview({
     function renderHeaderFieldText(block, entry, field) {
         const path = sectionEntryEditorPath(block.id, entry.id, field);
         const value = entry[field] || '';
+        const caretOptions = block.kind === 'education' && field === 'gpa' && value
+            ? { prefix: 'GPA: ' }
+            : {};
 
-        return renderTextWithCaret(value, path);
+        return renderTextWithCaret(value, path, caretOptions);
     }
 
     function entryHeaderFieldProps(block, entry, field, entryHandleProps = {}) {
@@ -1923,10 +1885,13 @@ export default function ResumePreview({
     function renderHeaderLayoutSlotChip(block, entry, field) {
         const meta = getEntryHeaderFieldMeta(block.kind, field);
         const value = entry[field] || '';
+        const displayValue = block.kind === 'education' && field === 'gpa' && value
+            ? `GPA: ${value}`
+            : value;
 
         return (
             <span className={`entryHeaderLayoutChipText ${meta.className}${value ? '' : ' entryHeaderLayoutChipText--empty'}`}>
-                {value || meta.label}
+                {displayValue || meta.label}
             </span>
         );
     }
@@ -1955,7 +1920,7 @@ export default function ResumePreview({
                         <div className="entryHeaderLayoutGridLine" key={`layout-mode-line-${lineIndex}`}>
                             {['left', 'right'].map((side) => (
                                 <div className={`entryHeaderLayoutGridSide entryHeaderLayoutGridSide--${side}`} key={`${lineIndex}-${side}`}>
-                                    {[0, 1].map((slotIndex) => {
+                                    {(line[side] || []).map((_, slotIndex) => {
                                         const field = line[side][slotIndex];
                                         const meta = field
                                             ? getEntryHeaderFieldMeta(block.kind, field)
