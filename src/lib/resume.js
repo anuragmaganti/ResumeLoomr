@@ -1207,6 +1207,37 @@ export function reorderSectionBlockEntriesToMatch(resume, sectionId, orderedEntr
   }));
 }
 
+export function materializeAndReorderSectionBlockEntries(resume, sectionId, orderedEntryIds) {
+  return updateSection(resume, sectionId, (section) => {
+    const requestedIds = Array.isArray(orderedEntryIds)
+      ? orderedEntryIds.map(trimText).filter(Boolean)
+      : [];
+    const requestedIdSet = new Set(requestedIds);
+
+    if (requestedIds.length === 0 || requestedIdSet.size !== requestedIds.length) {
+      return section;
+    }
+
+    const entryById = new Map(section.entries.map((entry) => [entry.id, entry]));
+    const nextEntries = [...section.entries];
+
+    requestedIds.forEach((entryId) => {
+      if (entryById.has(entryId)) {
+        return;
+      }
+
+      const entry = createEntryForKind(section.kind, { id: entryId });
+      entryById.set(entryId, entry);
+      nextEntries.push(entry);
+    });
+
+    return {
+      ...section,
+      entries: reorderItemSubsetById(nextEntries, requestedIds),
+    };
+  });
+}
+
 export function updateSectionBlockEntry(resume, sectionId, entryId, field, value) {
   return updateSection(resume, sectionId, (section) => ({
     ...section,

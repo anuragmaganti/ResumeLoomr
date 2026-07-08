@@ -10,6 +10,7 @@ import {
   SECTION_TEMPLATE_GROUPS,
   UNTITLED_SECTION_TITLE,
   addResumeSectionBlock,
+  addRoleBlockActivity,
   addRoleBlockEntry,
   commitSectionTitle,
   createDuplicateResumeName,
@@ -21,6 +22,7 @@ import {
   createWorkspaceResumeMeta,
   getDefaultEntryHeaderLayout,
   getPreviewModel,
+  materializeAndReorderSectionBlockEntries,
   moveSectionHeaderField,
   getResumePresentationVars,
   getResumePrintPageRule,
@@ -87,6 +89,8 @@ import {
   createMixedSamplePreviewModel,
   createSamplePlaceholderResolver,
   createSamplePreviewModel,
+  getPersistableSampleEntryOrder,
+  getPersistableSampleTextListMove,
   getSampleResumeIndex,
 } from '../src/lib/sampleResumes.js';
 
@@ -610,6 +614,139 @@ test('mixed sample preview uses real user fields over sample fields', () => {
   assert.equal(roleEntry.role, 'Founder & CEO');
   assert.equal(roleEntry.activities[0].text, 'Shipped a real accomplishment.');
   assert.equal(roleEntry.activities[1].text.includes('Leveraged a seven-figure liquidity event'), true);
+});
+
+test('sample preview entry reorders persist real editor entry order when IDs match', () => {
+  let resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  resume = addRoleBlockEntry(resume, 'experience');
+
+  const [firstEntry, secondEntry] = getSection(resume, 'experience').entries;
+  resume = updateRoleBlockEntry(resume, 'experience', firstEntry.id, 'company', 'ONE');
+  resume = updateRoleBlockEntry(resume, 'experience', secondEntry.id, 'company', 'TWO');
+
+  const mixedPreview = createMixedSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
+  const experiencePreview = mixedPreview.sectionBlocks.find((section) => section.id === 'experience');
+  const nextPreviewOrder = [
+    secondEntry.id,
+    firstEntry.id,
+    ...experiencePreview.entryOrder.filter((entryId) => entryId !== firstEntry.id && entryId !== secondEntry.id),
+  ];
+  const persistedOrder = getPersistableSampleEntryOrder(resume, 'experience', nextPreviewOrder);
+
+  assert.deepEqual(experiencePreview.entries.slice(0, 2).map((entry) => entry.company), ['ONE', 'TWO']);
+  assert.deepEqual(persistedOrder, [secondEntry.id, firstEntry.id]);
+
+  const reorderedResume = reorderSectionBlockEntriesToMatch(resume, 'experience', persistedOrder);
+  assert.deepEqual(
+    getSection(reorderedResume, 'experience').entries.map((entry) => entry.company),
+    ['TWO', 'ONE'],
+  );
+  assert.equal(getPersistableSampleEntryOrder(createEmptyResume(), 'experience', nextPreviewOrder), null);
+});
+
+test('sample-only entry reorders around real entries do not duplicate real editor rows', () => {
+  let resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  resume = addRoleBlockEntry(resume, 'experience');
+
+  const [firstEntry, secondEntry] = getSection(resume, 'experience').entries;
+  resume = updateRoleBlockEntry(resume, 'experience', firstEntry.id, 'company', 'TWO');
+  resume = updateRoleBlockEntry(resume, 'experience', secondEntry.id, 'company', 'ONE');
+
+  const mixedPreview = createMixedSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
+  const experiencePreview = mixedPreview.sectionBlocks.find((section) => section.id === 'experience');
+  const sampleOnlyEntryId = experiencePreview.entryOrder.find((entryId) => entryId !== firstEntry.id && entryId !== secondEntry.id);
+  const reorderedPreview = createMixedSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume), {
+    'experience.entries': [firstEntry.id, sampleOnlyEntryId, secondEntry.id, ...experiencePreview.entryOrder.filter((entryId) => (
+      entryId !== firstEntry.id && entryId !== secondEntry.id && entryId !== sampleOnlyEntryId
+    ))],
+  });
+  const reorderedExperience = reorderedPreview.sectionBlocks.find((section) => section.id === 'experience');
+
+  assert.equal(getPersistableSampleEntryOrder(resume, 'experience', reorderedExperience.entryOrder), null);
+  assert.deepEqual(reorderedExperience.entries.map((entry) => entry.id), reorderedExperience.entryOrder);
+  assert.deepEqual(reorderedExperience.entries.map((entry) => entry.company), [
+    'TWO',
+    'Hacker Hostel',
+    'ONE',
+    'Bachmanity Capital',
+  ]);
+  assert.deepEqual(getSection(resume, 'experience').entries.map((entry) => entry.company), ['TWO', 'ONE']);
+});
+
+test('sample-only entry reorders materialize blank editor rows that preserve order', () => {
+  let resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  resume = addRoleBlockEntry(resume, 'experience');
+
+  const [firstEntry, secondEntry] = getSection(resume, 'experience').entries;
+  resume = updateRoleBlockEntry(resume, 'experience', firstEntry.id, 'company', 'TWO');
+  resume = updateRoleBlockEntry(resume, 'experience', secondEntry.id, 'company', 'ONE');
+
+  const mixedPreview = createMixedSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
+  const experiencePreview = mixedPreview.sectionBlocks.find((section) => section.id === 'experience');
+  const sampleOnlyEntryId = experiencePreview.entryOrder.find((entryId) => entryId !== firstEntry.id && entryId !== secondEntry.id);
+  const nextPreviewOrder = [
+    sampleOnlyEntryId,
+    firstEntry.id,
+    secondEntry.id,
+    ...experiencePreview.entryOrder.filter((entryId) => (
+      entryId !== firstEntry.id && entryId !== secondEntry.id && entryId !== sampleOnlyEntryId
+    )),
+  ];
+
+  const materializedResume = materializeAndReorderSectionBlockEntries(resume, 'experience', nextPreviewOrder);
+  const materializedEntries = getSection(materializedResume, 'experience').entries;
+
+  assert.deepEqual(materializedEntries.map((entry) => entry.id), nextPreviewOrder);
+  assert.equal(materializedEntries[0].id, sampleOnlyEntryId);
+  assert.equal(materializedEntries[0].company, '');
+  assert.equal(materializedEntries[0].role, '');
+  assert.deepEqual(materializedEntries[0].activities, ['']);
+  assert.deepEqual(materializedEntries.slice(1, 3).map((entry) => entry.company), ['TWO', 'ONE']);
+
+  const updatedResume = updateRoleBlockEntry(materializedResume, 'experience', sampleOnlyEntryId, 'company', 'THREE');
+  const reloadedPreview = createMixedSamplePreviewModel(updatedResume, 'resume-5', getPreviewModel(updatedResume));
+  const reloadedExperience = reloadedPreview.sectionBlocks.find((section) => section.id === 'experience');
+
+  assert.deepEqual(getSection(updatedResume, 'experience').entries.slice(0, 3).map((entry) => entry.company), [
+    'THREE',
+    'TWO',
+    'ONE',
+  ]);
+  assert.deepEqual(reloadedExperience.entries.slice(0, 3).map((entry) => entry.company), [
+    'THREE',
+    'TWO',
+    'ONE',
+  ]);
+});
+
+test('sample preview bullet reorders persist only when source indexes map to real bullets', () => {
+  let resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  const experienceEntryId = getSection(resume, 'experience').entries[0].id;
+
+  resume = addRoleBlockActivity(resume, 'experience', experienceEntryId);
+  resume = updateRoleBlockActivity(resume, 'experience', experienceEntryId, 0, 'First real highlight.');
+  resume = addRoleBlockActivity(resume, 'experience', experienceEntryId);
+  resume = updateRoleBlockActivity(resume, 'experience', experienceEntryId, 1, 'Second real highlight.');
+
+  const persistedMove = getPersistableSampleTextListMove(resume, 'experience', experienceEntryId, 'activities', 1, 0);
+  const ignoredSampleOnlyMove = getPersistableSampleTextListMove(resume, 'experience', experienceEntryId, 'activities', 2, 0);
+
+  assert.deepEqual(persistedMove, { fromIndex: 1, toIndex: 0 });
+  assert.equal(ignoredSampleOnlyMove, null);
+
+  const reorderedResume = reorderSectionBlockTextListItem(
+    resume,
+    'experience',
+    experienceEntryId,
+    'activities',
+    persistedMove.fromIndex,
+    persistedMove.toIndex,
+  );
+
+  assert.deepEqual(
+    getSection(reorderedResume, 'experience').entries[0].activities,
+    ['Second real highlight.', 'First real highlight.', ''],
+  );
 });
 
 test('mixed sample preview keeps active empty added sections in resume order', () => {

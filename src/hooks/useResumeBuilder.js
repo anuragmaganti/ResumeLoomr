@@ -25,6 +25,7 @@ import {
   moveSectionBlockEducationProgram,
   moveSectionBlockEntry,
   moveSectionBlockTextListItem,
+  materializeAndReorderSectionBlockEntries,
   normalizeDraftPayload,
   normalizeWorkspaceIndex,
   removeResumeSectionBlock,
@@ -1081,6 +1082,11 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     },
     reorderSectionEntries(sectionId, nextEntryIds) {
       updateResume((currentResume) => reorderSectionBlockEntriesToMatch(currentResume, sectionId, nextEntryIds));
+    },
+    materializeAndReorderSectionEntries(sectionId, nextEntryIds) {
+      updateResume((currentResume) => (
+        materializeAndReorderSectionBlockEntries(currentResume, sectionId, nextEntryIds)
+      ));
     },
     removeSectionBlockEntry(sectionId, entryId) {
       updateResume((currentResume) => removeSectionBlockEntry(currentResume, sectionId, entryId));

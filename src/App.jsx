@@ -16,7 +16,11 @@ import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
 import { importResumeFile } from './lib/importResume.js';
 import { clearResumeSyncSession } from './lib/backgroundSync.js';
-import { createMixedSamplePreviewModel, createSamplePlaceholderResolver } from './lib/sampleResumes.js';
+import {
+  createMixedSamplePreviewModel,
+  createSamplePlaceholderResolver,
+  getPersistableSampleTextListMove,
+} from './lib/sampleResumes.js';
 import {
   clearBrowserResumeConnectionData,
   clearLocalResumeWorkspaceData,
@@ -66,6 +70,33 @@ function moveSourceIndexWithinOrder(order, fromIndex, toIndex) {
   const [item] = nextOrder.splice(fromPosition, 1);
   nextOrder.splice(toPosition, 0, item);
   return nextOrder;
+}
+
+function removeSampleOrderOverride(currentOverrides, resumeId, orderKey) {
+  const resumeOverrides = currentOverrides[resumeId];
+
+  if (!resumeOverrides || !Object.hasOwn(resumeOverrides, orderKey)) {
+    return currentOverrides;
+  }
+
+  const {
+    [orderKey]: _removedOverride,
+    ...nextResumeOverrides
+  } = resumeOverrides;
+
+  if (Object.keys(nextResumeOverrides).length === 0) {
+    const {
+      [resumeId]: _removedResumeOverrides,
+      ...nextOverrides
+    } = currentOverrides;
+
+    return nextOverrides;
+  }
+
+  return {
+    ...currentOverrides,
+    [resumeId]: nextResumeOverrides,
+  };
 }
 
 function App() {
@@ -340,14 +371,27 @@ function App() {
       return;
     }
 
+    const orderKey = sampleTextListOrderKey(sectionId, entryId, field);
+    const persistableMove = getPersistableSampleTextListMove(resume, sectionId, entryId, field, fromIndex, toIndex);
+
+    if (persistableMove) {
+      actions.reorderSectionTextList(sectionId, entryId, field, persistableMove.fromIndex, persistableMove.toIndex);
+
+      if (activeResumeId) {
+        setSampleOrderOverridesByResumeId((currentOverrides) => (
+          removeSampleOrderOverride(currentOverrides, activeResumeId, orderKey)
+        ));
+      }
+
+      return;
+    }
+
     const currentOrder = getPreviewTextListOrder(displayPreviewModel, sectionId, entryId, field);
     const nextOrder = moveSourceIndexWithinOrder(currentOrder, fromIndex, toIndex);
 
     if (nextOrder === currentOrder || !activeResumeId) {
       return;
     }
-
-    const orderKey = sampleTextListOrderKey(sectionId, entryId, field);
 
     setSampleOrderOverridesByResumeId((currentOverrides) => ({
       ...currentOverrides,
@@ -356,7 +400,7 @@ function App() {
         [orderKey]: nextOrder,
       },
     }));
-  }, [actions, activeResumeId, displayPreviewModel, isSamplePreview]);
+  }, [actions, activeResumeId, displayPreviewModel, isSamplePreview, resume]);
 
   const handlePreviewReorderSectionEntries = useCallback((sectionId, nextEntryIds) => {
     if (!isSamplePreview) {
@@ -380,15 +424,10 @@ function App() {
       return;
     }
 
-    const orderKey = sampleEntryOrderKey(sectionId);
-
-    setSampleOrderOverridesByResumeId((currentOverrides) => ({
-      ...currentOverrides,
-      [activeResumeId]: {
-        ...(currentOverrides[activeResumeId] || {}),
-        [orderKey]: nextOrder,
-      },
-    }));
+    actions.materializeAndReorderSectionEntries(sectionId, nextOrder);
+    setSampleOrderOverridesByResumeId((currentOverrides) => (
+      removeSampleOrderOverride(currentOverrides, activeResumeId, sampleEntryOrderKey(sectionId))
+    ));
   }, [actions, activeResumeId, displayPreviewModel, isSamplePreview]);
 
   const handlePreviewLayoutChange = useCallback((nextLayout) => {

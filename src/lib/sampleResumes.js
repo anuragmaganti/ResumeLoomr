@@ -1084,8 +1084,8 @@ function mergeSampleSection(sampleSection, realSection) {
   const realEntries = Array.isArray(realSection?.entries) ? realSection.entries : [];
   const realEntryById = new Map(realEntries.map((entry) => [entry.id, entry]));
   const usedRealIds = new Set();
-  const entries = (Array.isArray(sampleSection.entries) ? sampleSection.entries : []).map((sampleEntry, index) => {
-    const realEntry = realEntryById.get(sampleEntry.id) || realEntries[index];
+  const entries = (Array.isArray(sampleSection.entries) ? sampleSection.entries : []).map((sampleEntry) => {
+    const realEntry = realEntryById.get(sampleEntry.id);
 
     if (realEntry?.id) {
       usedRealIds.add(realEntry.id);
@@ -1156,6 +1156,66 @@ export function createMixedSamplePreviewModel(resume, resumeId, realPreviewModel
     sectionOrder: sectionBlocks.map((section) => section.id),
     sectionBlocks,
     showPersonal: true,
+  };
+}
+
+function getRealSampleSection(resume, sectionId) {
+  const normalizedResume = normalizeResume(resume);
+
+  return normalizedResume.sections.find((section) => section.id === sectionId) || null;
+}
+
+export function getPersistableSampleEntryOrder(resume, sectionId, orderedEntryIds) {
+  const section = getRealSampleSection(resume, sectionId);
+  const realEntryIds = Array.isArray(section?.entries)
+    ? section.entries.map((entry) => trimText(entry.id)).filter(Boolean)
+    : [];
+  const orderedIds = Array.isArray(orderedEntryIds)
+    ? orderedEntryIds.map(trimText).filter(Boolean)
+    : [];
+
+  if (realEntryIds.length < 2 || orderedIds.length === 0) {
+    return null;
+  }
+
+  const realEntryIdSet = new Set(realEntryIds);
+  const nextRealOrder = orderedIds.filter((entryId) => realEntryIdSet.has(entryId));
+
+  if (
+    nextRealOrder.length !== realEntryIds.length ||
+    nextRealOrder.every((entryId, index) => entryId === realEntryIds[index])
+  ) {
+    return null;
+  }
+
+  return nextRealOrder;
+}
+
+export function getPersistableSampleTextListMove(resume, sectionId, entryId, field, fromIndex, toIndex) {
+  const section = getRealSampleSection(resume, sectionId);
+  const entry = section?.entries?.find((sectionEntry) => sectionEntry.id === entryId);
+  const list = Array.isArray(entry?.[field]) ? entry[field] : [];
+  const fromItemIndex = Number(fromIndex);
+  const toItemIndex = Number(toIndex);
+
+  if (
+    list.filter((item) => trimText(item)).length < 2 ||
+    !Number.isInteger(fromItemIndex) ||
+    !Number.isInteger(toItemIndex) ||
+    fromItemIndex < 0 ||
+    toItemIndex < 0 ||
+    fromItemIndex >= list.length ||
+    toItemIndex >= list.length ||
+    !trimText(list[fromItemIndex]) ||
+    !trimText(list[toItemIndex]) ||
+    fromItemIndex === toItemIndex
+  ) {
+    return null;
+  }
+
+  return {
+    fromIndex: fromItemIndex,
+    toIndex: toItemIndex,
   };
 }
 
