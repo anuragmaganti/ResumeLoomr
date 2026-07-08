@@ -850,19 +850,34 @@ html[data-theme="dark"] .resumePage {
 }
 
 .entryHeaderLayoutGridLine {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 18px;
 }
 
 .entryHeaderLayoutGridSide {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  display: flex;
+  align-items: stretch;
+  flex: 1 1 0;
   gap: 6px;
+  min-width: 0;
+  max-width: calc(50% - 9px);
+}
+
+.entryHeaderLayoutGridSide--left {
+  justify-content: flex-start;
+}
+
+.entryHeaderLayoutGridSide--right {
+  justify-content: flex-end;
 }
 
 .entryHeaderLayoutSlot {
+  display: inline-flex;
+  align-items: stretch;
   min-width: 0;
+  max-width: 100%;
   min-height: 22px;
   border-radius: 7px;
   transition:
@@ -874,23 +889,27 @@ html[data-theme="dark"] .resumePage {
 }
 
 .entryHeaderLayoutSlot--empty {
+  flex: 0 0 72px;
+  width: 72px;
   border: 1px dashed color-mix(in srgb, var(--color-accent-strong) 42%, transparent 58%);
   background: color-mix(in srgb, var(--color-accent-soft) 13%, transparent 87%);
 }
 
 .entryHeaderLayoutSlot--filled {
+  flex: 0 1 auto;
+  width: fit-content;
   border: 1px solid color-mix(in srgb, var(--color-accent-strong) 26%, transparent 74%);
   background: color-mix(in srgb, var(--resume-page-bg, #fff) 76%, var(--color-accent-soft) 24%);
 }
 
 .entryHeaderLayoutSlot.isHeaderLayoutSource {
-  border-color: color-mix(in srgb, var(--resume-page-subtle) 28%, transparent 72%);
-  background: color-mix(in srgb, var(--resume-page-bg, #fff) 82%, transparent 18%);
-  box-shadow: none;
+  border: 1px dashed var(--color-accent-strong);
+  background: color-mix(in srgb, var(--color-accent-soft) 28%, transparent 72%);
+  box-shadow: inset 0 0 0 1px var(--color-accent-strong);
 }
 
 .entryHeaderLayoutSlot.isHeaderLayoutSource > * {
-  opacity: 0.28;
+  opacity: 0;
 }
 
 .entryHeaderLayoutSlot.isHeaderLayoutDropTarget,
@@ -904,8 +923,9 @@ html[data-theme="dark"] .resumePage {
 
 .entryHeaderLayoutChip,
 .entryHeaderLayoutEmpty {
-  display: block;
+  display: inline-block;
   min-width: 0;
+  max-width: 100%;
   padding: 3px 7px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -946,12 +966,6 @@ html[data-theme="dark"] .resumePage {
 .experienceSection--layoutActiveSection,
 .previewEntry--layoutActiveSection {
   border-radius: 10px;
-}
-
-.experienceSection--layoutActiveEntry,
-.previewEntry--layoutActiveEntry {
-  background: color-mix(in srgb, var(--color-accent-soft) 12%, transparent 88%);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-strong) 54%, transparent 46%);
 }
 
 .companyRoleLine,
@@ -1406,12 +1420,6 @@ html[data-theme="dark"] .resumePage {
 
   .entryHeaderLayoutMode {
     display: none !important;
-  }
-
-  .experienceSection--layoutActiveEntry,
-  .previewEntry--layoutActiveEntry {
-    background: transparent !important;
-    box-shadow: none !important;
   }
 
   .previewTextCaret {
