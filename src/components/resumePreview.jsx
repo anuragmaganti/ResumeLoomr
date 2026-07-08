@@ -60,6 +60,8 @@ const DEFAULT_PREVIEW_PAGE_MIN_HEIGHT = PRINT_PAGE_HEIGHT_PX;
 const FIRST_SECTION_ENTRY_SNAP_DISTANCE_PX = 144;
 const SUMMARY_WIDTH_MIN_PERCENT = 75;
 const SUMMARY_WIDTH_MAX_PERCENT = 100;
+const HEADER_LAYOUT_DOUBLE_CLICK_MS = 420;
+const HEADER_LAYOUT_DOUBLE_CLICK_TOLERANCE_PX = 8;
 const HEADER_LAYOUT_LONG_PRESS_MS = 520;
 const HEADER_LAYOUT_LONG_PRESS_MOVE_TOLERANCE_PX = 8;
 
@@ -651,6 +653,7 @@ export default function ResumePreview({
     const suppressPreviewClickRef = useRef(false);
     const activeDragScrollRef = useRef({ x: 0, y: 0, captured: false });
     const summaryWidthDragRef = useRef(null);
+    const headerLayoutDoubleClickRef = useRef(null);
     const headerLayoutLongPressRef = useRef(null);
     const [activeDragMeta, setActiveDragMeta] = useState(null);
     const [activeDragRect, setActiveDragRect] = useState(null);
@@ -1052,17 +1055,44 @@ export default function ResumePreview({
         headerLayoutLongPressRef.current = null;
     }
 
+    function clearHeaderLayoutDoubleClick() {
+        headerLayoutDoubleClickRef.current = null;
+    }
+
     function openHeaderLayoutMode(event, sectionId, entryId) {
         event.preventDefault();
         event.stopPropagation();
         suppressNextPreviewClick();
         clearHeaderLayoutLongPress();
+        clearHeaderLayoutDoubleClick();
         setActiveHeaderLayout({ sectionId, entryId });
     }
 
     function handleHeaderLayoutPointerDown(event, sectionId, entryId) {
         if (event.pointerType === 'mouse') {
-            return;
+            const previousClick = headerLayoutDoubleClickRef.current;
+            const clickTarget = { sectionId, entryId };
+            const isSameEntry = previousClick?.sectionId === sectionId && previousClick?.entryId === entryId;
+            const isFastEnough = previousClick
+                ? event.timeStamp - previousClick.timeStamp <= HEADER_LAYOUT_DOUBLE_CLICK_MS
+                : false;
+            const isCloseEnough = previousClick
+                ? Math.hypot(event.clientX - previousClick.x, event.clientY - previousClick.y) <= HEADER_LAYOUT_DOUBLE_CLICK_TOLERANCE_PX
+                : false;
+
+            if (isSameEntry && isFastEnough && isCloseEnough) {
+                openHeaderLayoutMode(event, sectionId, entryId);
+                return true;
+            }
+
+            headerLayoutDoubleClickRef.current = {
+                ...clickTarget,
+                pointerId: event.pointerId,
+                x: event.clientX,
+                y: event.clientY,
+                timeStamp: event.timeStamp,
+            };
+            return false;
         }
 
         clearHeaderLayoutLongPress();
@@ -1076,9 +1106,20 @@ export default function ResumePreview({
                 headerLayoutLongPressRef.current = null;
             }, HEADER_LAYOUT_LONG_PRESS_MS),
         };
+        return false;
     }
 
     function handleHeaderLayoutPointerMove(event) {
+        const doubleClick = headerLayoutDoubleClickRef.current;
+
+        if (doubleClick?.pointerId === event.pointerId) {
+            const distance = Math.hypot(event.clientX - doubleClick.x, event.clientY - doubleClick.y);
+
+            if (distance > HEADER_LAYOUT_DOUBLE_CLICK_TOLERANCE_PX) {
+                clearHeaderLayoutDoubleClick();
+            }
+        }
+
         const longPress = headerLayoutLongPressRef.current;
 
         if (!longPress || longPress.pointerId !== event.pointerId) {
@@ -1794,7 +1835,12 @@ export default function ResumePreview({
             'data-header-layout-trigger': 'true',
             onDoubleClick: (event) => openHeaderLayoutMode(event, block.id, entry.id),
             onPointerDown: (event) => {
-                handleHeaderLayoutPointerDown(event, block.id, entry.id);
+                const openedLayoutMode = handleHeaderLayoutPointerDown(event, block.id, entry.id);
+
+                if (openedLayoutMode) {
+                    return;
+                }
+
                 dragProps.onPointerDown?.(event);
             },
             onPointerMove: (event) => {
@@ -1807,6 +1853,7 @@ export default function ResumePreview({
             },
             onPointerCancel: (event) => {
                 clearHeaderLayoutLongPress();
+                clearHeaderLayoutDoubleClick();
                 dragProps.onPointerCancel?.(event);
             },
             'data-entry-header-path': path,
