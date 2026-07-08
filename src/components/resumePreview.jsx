@@ -429,6 +429,22 @@ function SortablePreviewEntry({ sectionId, entryId, className, previewScale, chi
         'data-preview-drag-handle': 'true',
         'data-preview-drag-scope': 'entry',
     };
+    const containerEntryDragProps = {
+        ...attributes,
+        'data-preview-drag-handle': 'true',
+        'data-preview-drag-scope': 'entry-empty-space',
+        onPointerDown: (event) => {
+            const shouldLetChildHandleDrag = event.target.closest(
+                '[data-edit-section-id], [data-preview-drag-scope="header-layout"], [data-preview-drag-scope="bullet"], [data-header-hover-slot], button, input, textarea, select, a',
+            );
+
+            if (shouldLetChildHandleDrag) {
+                return;
+            }
+
+            listeners?.onPointerDown?.(event);
+        },
+    };
 
     return (
         <div
@@ -437,6 +453,7 @@ function SortablePreviewEntry({ sectionId, entryId, className, previewScale, chi
             data-page-break-kind="entry"
             className={`${className} previewSortableItem previewSortableEntry ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
             style={style}
+            {...containerEntryDragProps}
         >
             {children(handleProps)}
         </div>
