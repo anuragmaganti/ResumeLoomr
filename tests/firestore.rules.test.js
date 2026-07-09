@@ -85,6 +85,11 @@ function createResumeDoc(overrides = {}) {
       sampleDisplay: {
         hasStarted: false,
         showInformation: true,
+        entryBindings: {
+          experience: {
+            entry1: 0,
+          },
+        },
       },
       sections: [
         {
@@ -302,6 +307,16 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
         sampleDisplay: {
           hasStarted: 'yes',
           showInformation: true,
+        },
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        sampleDisplay: {
+          hasStarted: true,
+          showInformation: true,
+          entryBindings: ['experience'],
         },
       },
     })));

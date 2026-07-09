@@ -140,10 +140,15 @@ service cloud.firestore {
       return sampleDisplay is map &&
         sampleDisplay.keys().hasOnly([
           'hasStarted',
-          'showInformation'
+          'showInformation',
+          'entryBindings'
         ]) &&
         sampleDisplay.hasStarted is bool &&
-        sampleDisplay.showInformation is bool;
+        sampleDisplay.showInformation is bool &&
+        (
+          !sampleDisplay.keys().hasAny(['entryBindings']) ||
+          sampleDisplay.entryBindings is map
+        );
     }
 
     function isValidMeta(meta, resumeIds) {

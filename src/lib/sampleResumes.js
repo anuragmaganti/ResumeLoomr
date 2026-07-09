@@ -784,12 +784,21 @@ function sampleEntrySourceIndex(section, entryId) {
   return Number.isInteger(sourceIndex) && sourceIndex >= 0 ? sourceIndex : null;
 }
 
-function sampleEntryId(section, index) {
+function sampleEntryId(section, index, entryBindings = {}, usedEntryIds = new Set()) {
   const generatedId = generatedSampleEntryId(section, index);
   const entries = Array.isArray(section?.entries) ? section.entries : [];
+  const entryIds = entries.map((entry) => trimText(entry.id)).filter(Boolean);
+  const boundEntryId = entryIds.find((entryId) => (
+    !usedEntryIds.has(entryId) && entryBindings[entryId] === index
+  ));
+
+  if (boundEntryId) {
+    return boundEntryId;
+  }
+
   const existingGeneratedId = entries
     .map((entry) => trimText(entry.id))
-    .find((entryId) => entryId === generatedId);
+    .find((entryId) => entryId === generatedId && !usedEntryIds.has(entryId));
 
   if (existingGeneratedId) {
     return existingGeneratedId;
@@ -797,7 +806,12 @@ function sampleEntryId(section, index) {
 
   const positionalRealEntryId = entries
     .map((entry) => trimText(entry.id))
-    .filter((entryId) => entryId && sampleEntrySourceIndex(section, entryId) === null)[index];
+    .filter((entryId) => (
+      entryId &&
+      sampleEntrySourceIndex(section, entryId) === null &&
+      !Number.isInteger(entryBindings[entryId]) &&
+      !usedEntryIds.has(entryId)
+    ))[0];
 
   return positionalRealEntryId || generatedId;
 }
@@ -808,6 +822,7 @@ function createSampleEducationEntry(section, sample) {
   return {
     id: entryId,
     isSamplePlaceholderEntry: true,
+    sampleSourceIndex: 0,
     school: sample.education.school,
     degree: sample.education.degree,
     yearsEdu: sample.education.yearsEdu,
@@ -835,13 +850,16 @@ function sampleExperiences(sample) {
   return sample.experience ? [sample.experience] : [];
 }
 
-function createSampleRoleEntries(section, sample, orderOverrides) {
+function createSampleRoleEntries(section, sample, orderOverrides, entryBindings = {}) {
+  const usedEntryIds = new Set();
   const entries = sampleExperiences(sample).map((experience, index) => {
-    const entryId = sampleEntryId(section, index);
+    const entryId = sampleEntryId(section, index, entryBindings, usedEntryIds);
+    usedEntryIds.add(entryId);
 
     return {
       id: entryId,
       isSamplePlaceholderEntry: true,
+      sampleSourceIndex: index,
       company: experience.company,
       role: experience.role,
       location: experience.location,
@@ -867,6 +885,7 @@ function createSampleProjectEntry(section, sample, orderOverrides) {
   return {
     id: entryId,
     isSamplePlaceholderEntry: true,
+    sampleSourceIndex: 0,
     name: sample.projects.name,
     subtitle: '',
     years: sample.projects.years,
@@ -879,6 +898,7 @@ function createSampleSkillsEntry(section, sample) {
   return {
     id: firstEntryId(section),
     isSamplePlaceholderEntry: true,
+    sampleSourceIndex: 0,
     category: sample.skills.category,
     items: sample.skills.items,
   };
@@ -899,7 +919,7 @@ function shouldCreateSampleSectionShell(section, options = {}) {
   return trimText(options.activeSectionId) === section.id;
 }
 
-function createSampleBlock(section, sample, orderOverrides) {
+function createSampleBlock(section, sample, orderOverrides, entryBindingsBySection = {}) {
   if (section.kind === 'education') {
     return {
       id: section.id,
@@ -912,7 +932,12 @@ function createSampleBlock(section, sample, orderOverrides) {
   }
 
   if (section.kind === 'roles' && /experience|work|career/i.test(`${section.id} ${section.title}`)) {
-    const entries = createSampleRoleEntries(section, sample, orderOverrides);
+    const entries = createSampleRoleEntries(
+      section,
+      sample,
+      orderOverrides,
+      entryBindingsBySection[section.id] || {},
+    );
 
     return {
       id: section.id,
@@ -953,6 +978,7 @@ export function createSamplePreviewModel(resume, resumeId, realPreviewModel = ge
   }
 
   const normalizedResume = normalizeResume(resume);
+  const entryBindingsBySection = normalizedResume.sampleDisplay?.entryBindings || {};
   const sample = getSampleResumeForId(resumeId);
   const personal = {
     name: trimText(sample.personal.name),
@@ -973,7 +999,7 @@ export function createSamplePreviewModel(resume, resumeId, realPreviewModel = ge
     personal.customField ? { id: 'custom', text: personal.customField } : null,
   ].filter(Boolean);
   const sectionBlocks = normalizedResume.sections
-    .map((section) => createSampleBlock(section, sample, orderOverrides) || (
+    .map((section) => createSampleBlock(section, sample, orderOverrides, entryBindingsBySection) || (
       shouldCreateSampleSectionShell(section, options) ? createSampleSectionShell(section) : null
     ))
     .filter(Boolean);
@@ -1186,9 +1212,45 @@ function mergeEntryByKind(kind, sampleEntry, realEntry) {
   };
 }
 
-function mergeSampleSection(sampleSection, realSection) {
+function mergeSampleSection(sampleSection, realSection, preferRealEntryOrder = false) {
   const realEntries = Array.isArray(realSection?.entries) ? realSection.entries : [];
   const realEntryById = new Map(realEntries.map((entry) => [entry.id, entry]));
+
+  if (preferRealEntryOrder) {
+    const sampleEntryById = new Map(
+      (Array.isArray(sampleSection.entries) ? sampleSection.entries : [])
+        .map((entry) => [entry.id, entry])
+    );
+    const usedSampleIds = new Set();
+    const entries = [];
+
+    realEntries.forEach((realEntry) => {
+      const sampleEntry = sampleEntryById.get(realEntry.id);
+
+      if (sampleEntry) {
+        usedSampleIds.add(sampleEntry.id);
+        entries.push(mergeEntryByKind(sampleSection.kind, sampleEntry, realEntry));
+        return;
+      }
+
+      entries.push(realEntry);
+    });
+
+    (Array.isArray(sampleSection.entries) ? sampleSection.entries : []).forEach((sampleEntry) => {
+      if (!usedSampleIds.has(sampleEntry.id)) {
+        entries.push(mergeEntryByKind(sampleSection.kind, sampleEntry, realEntryById.get(sampleEntry.id)));
+      }
+    });
+
+    return {
+      ...sampleSection,
+      title: mergePreviewText(realSection?.title, sampleSection.title),
+      entryHeaderLayout: realSection?.entryHeaderLayout || sampleSection.entryHeaderLayout,
+      entryOrder: entries.map((entry) => entry.id),
+      entries,
+    };
+  }
+
   const usedRealIds = new Set();
   const entries = (Array.isArray(sampleSection.entries) ? sampleSection.entries : []).map((sampleEntry) => {
     const realEntry = realEntryById.get(sampleEntry.id);
@@ -1246,7 +1308,11 @@ export function createMixedSamplePreviewModel(resume, resumeId, realPreviewModel
       const realSection = realSectionById.get(section.id);
 
       if (sampleSection) {
-        return mergeSampleSection(sampleSection, realSection);
+        return mergeSampleSection(
+          sampleSection,
+          realSection,
+          Boolean(normalizedResume.sampleDisplay?.entryBindings?.[section.id]),
+        );
       }
 
       return realSection || null;

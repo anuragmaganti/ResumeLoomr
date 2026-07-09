@@ -1087,9 +1087,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     reorderSectionEntries(sectionId, nextEntryIds) {
       updateResume((currentResume) => reorderSectionBlockEntriesToMatch(currentResume, sectionId, nextEntryIds));
     },
-    materializeAndReorderSectionEntries(sectionId, nextEntryIds) {
+    materializeAndReorderSectionEntries(sectionId, nextEntryIds, sampleEntryBindings) {
       updateResume((currentResume) => (
-        materializeAndReorderSectionBlockEntries(currentResume, sectionId, nextEntryIds)
+        materializeAndReorderSectionBlockEntries(currentResume, sectionId, nextEntryIds, sampleEntryBindings)
       ));
     },
     removeSectionBlockEntry(sectionId, entryId) {

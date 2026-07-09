@@ -48,6 +48,20 @@ function getPreviewEntryOrder(previewModel, sectionId) {
   return entries.map((entry) => entry.id).filter(Boolean);
 }
 
+function getPreviewEntrySampleBindings(previewModel, sectionId) {
+  const block = previewModel?.sectionBlocks?.find((section) => section.id === sectionId);
+  const entries = Array.isArray(block?.entries) ? block.entries : [];
+
+  return Object.fromEntries(
+    entries
+      .map((entry) => [
+        entry.id,
+        Number.isInteger(entry.sampleSourceIndex) ? entry.sampleSourceIndex : null,
+      ])
+      .filter(([entryId, sourceIndex]) => entryId && Number.isInteger(sourceIndex)),
+  );
+}
+
 function getPreviewSectionOrder(previewModel) {
   if (Array.isArray(previewModel?.sectionOrder) && previewModel.sectionOrder.length > 0) {
     return previewModel.sectionOrder.filter(Boolean);
@@ -434,7 +448,11 @@ function App() {
       return;
     }
 
-    actions.materializeAndReorderSectionEntries(sectionId, nextOrder);
+    actions.materializeAndReorderSectionEntries(
+      sectionId,
+      nextOrder,
+      getPreviewEntrySampleBindings(displayPreviewModel, sectionId),
+    );
     setSampleOrderOverridesByResumeId((currentOverrides) => (
       removeSampleOrderOverride(currentOverrides, activeResumeId, sampleEntryOrderKey(sectionId))
     ));

@@ -25,6 +25,7 @@ import {
   getPreviewModel,
   materializeAndReorderSectionBlockEntries,
   moveSectionHeaderField,
+  moveSectionBlockEntry,
   getResumePresentationVars,
   getResumePrintPageRule,
   moveResumeSectionBlock,
@@ -101,6 +102,17 @@ function getSection(resume, sectionId) {
   return resume.sections.find((section) => section.id === sectionId);
 }
 
+function getSampleEntryBindingsFromPreview(section) {
+  return Object.fromEntries(
+    (Array.isArray(section?.entries) ? section.entries : [])
+      .map((entry) => [
+        entry.id,
+        Number.isInteger(entry.sampleSourceIndex) ? entry.sampleSourceIndex : null,
+      ])
+      .filter(([entryId, sourceIndex]) => entryId && Number.isInteger(sourceIndex)),
+  );
+}
+
 function createDraft(name, savedAt = '2026-01-01T00:00:00.000Z') {
   const resume = updatePersonalField(createEmptyResume(), 'name', name);
 
@@ -129,6 +141,7 @@ test('createEmptyResume returns the block-first resume shape', () => {
   assert.deepEqual(resume.sampleDisplay, {
     hasStarted: false,
     showInformation: true,
+    entryBindings: {},
   });
   assert.deepEqual(resume.settings, {
     textSize: 0,
@@ -209,21 +222,36 @@ test('sample display metadata normalizes and updates with resume drafts', () => 
   assert.deepEqual(resume.sampleDisplay, {
     hasStarted: true,
     showInformation: false,
+    entryBindings: {},
   });
   assert.deepEqual(normalizeDraftPayload({ resume }).resume.sampleDisplay, {
     hasStarted: true,
     showInformation: false,
+    entryBindings: {},
   });
   assert.deepEqual(normalizeDraftPayload({
     resume: {
       ...resume,
       sampleDisplay: {
         hasStarted: 'yes',
+        entryBindings: {
+          experience: {
+            entry1: 2,
+            bad: -1,
+            tooLarge: 100,
+          },
+          badSection: ['entry1'],
+        },
       },
     },
   }).resume.sampleDisplay, {
     hasStarted: true,
     showInformation: true,
+    entryBindings: {
+      experience: {
+        entry1: 2,
+      },
+    },
   });
 });
 
@@ -652,6 +680,89 @@ test('sample preview entry reorders persist real editor entry order when IDs mat
     ['TWO', 'ONE'],
   );
   assert.equal(getPersistableSampleEntryOrder(createEmptyResume(), 'experience', nextPreviewOrder), null);
+});
+
+test('partially edited sample role entries keep fallback fields after reorder and reload', () => {
+  let resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  resume = addRoleBlockEntry(resume, 'experience');
+
+  const [firstEntry, secondEntry] = getSection(resume, 'experience').entries;
+  resume = updateRoleBlockEntry(resume, 'experience', firstEntry.id, 'company', '1');
+  resume = updateRoleBlockEntry(resume, 'experience', secondEntry.id, 'company', '2');
+
+  const mixedPreview = createMixedSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
+  const experiencePreview = mixedPreview.sectionBlocks.find((section) => section.id === 'experience');
+  const nextPreviewOrder = [
+    secondEntry.id,
+    firstEntry.id,
+    ...experiencePreview.entryOrder.filter((entryId) => entryId !== firstEntry.id && entryId !== secondEntry.id),
+  ];
+  const materializedResume = materializeAndReorderSectionBlockEntries(
+    resume,
+    'experience',
+    nextPreviewOrder,
+    getSampleEntryBindingsFromPreview(experiencePreview),
+  );
+  const persistedResume = normalizeDraftPayload({ resume: materializedResume }).resume;
+  const reloadedPreview = createMixedSamplePreviewModel(persistedResume, 'resume-5', getPreviewModel(persistedResume));
+  const reloadedExperience = reloadedPreview.sectionBlocks.find((section) => section.id === 'experience');
+
+  assert.deepEqual(materializedResume.sampleDisplay.entryBindings.experience, {
+    [secondEntry.id]: 1,
+    [firstEntry.id]: 0,
+    'experience-sample-entry-3': 2,
+    'experience-sample-entry-4': 3,
+  });
+  assert.deepEqual(reloadedExperience.entries.slice(0, 2).map((entry) => ({
+    company: entry.company,
+    role: entry.role,
+    location: entry.location,
+    yearsExp: entry.yearsExp,
+  })), [
+    {
+      company: '2',
+      role: 'Board Member / 10% Stakeholder',
+      location: 'Palo Alto, CA',
+      yearsExp: '2020-2022',
+    },
+    {
+      company: '1',
+      role: 'Founder & CEO',
+      location: 'San Francisco, CA',
+      yearsExp: '2018-2020',
+    },
+  ]);
+});
+
+test('editor entry moves keep partially edited sample fallback fields attached', () => {
+  let resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  resume = addRoleBlockEntry(resume, 'experience');
+
+  const [firstEntry, secondEntry] = getSection(resume, 'experience').entries;
+  resume = updateRoleBlockEntry(resume, 'experience', firstEntry.id, 'company', '1');
+  resume = updateRoleBlockEntry(resume, 'experience', secondEntry.id, 'company', '2');
+
+  const movedResume = moveSectionBlockEntry(resume, 'experience', secondEntry.id, -1);
+  const reloadedPreview = createMixedSamplePreviewModel(movedResume, 'resume-5', getPreviewModel(movedResume));
+  const reloadedExperience = reloadedPreview.sectionBlocks.find((section) => section.id === 'experience');
+
+  assert.deepEqual(movedResume.sampleDisplay.entryBindings.experience, {
+    [secondEntry.id]: 1,
+    [firstEntry.id]: 0,
+  });
+  assert.deepEqual(reloadedExperience.entries.slice(0, 2).map((entry) => ({
+    company: entry.company,
+    role: entry.role,
+  })), [
+    {
+      company: '2',
+      role: 'Board Member / 10% Stakeholder',
+    },
+    {
+      company: '1',
+      role: 'Founder & CEO',
+    },
+  ]);
 });
 
 test('sample-only entry reorders around real entries do not duplicate real editor rows', () => {

@@ -271,6 +271,50 @@ function previewCollisionDetection(args) {
         areCompatiblePreviewDragItems(activeMeta, parsePreviewDragId(container.id))
     ));
 
+    if (activeMeta.type === 'section' || activeMeta.type === 'entry') {
+        const sortableDroppableContainers = droppableContainers.filter((container) => (
+            String(container.id) !== String(args.active.id)
+        ));
+        const pointerY = args.pointerCoordinates?.y;
+        const pointerX = args.pointerCoordinates?.x;
+
+        if (sortableDroppableContainers.length === 0) {
+            return [];
+        }
+
+        if (Number.isFinite(pointerY)) {
+            const collisions = sortableDroppableContainers
+                .map((droppableContainer) => {
+                    const rect = args.droppableRects.get(droppableContainer.id);
+
+                    if (!rect) {
+                        return null;
+                    }
+
+                    const verticalDistance = Math.abs(pointerY - (rect.top + (rect.height / 2)));
+                    const horizontalDistance = Number.isFinite(pointerX)
+                        ? Math.abs(pointerX - (rect.left + (rect.width / 2)))
+                        : 0;
+
+                    return {
+                        id: droppableContainer.id,
+                        data: {
+                            droppableContainer,
+                            value: verticalDistance + (horizontalDistance * 0.01),
+                        },
+                    };
+                })
+                .filter(Boolean)
+                .sort((firstCollision, secondCollision) => firstCollision.data.value - secondCollision.data.value);
+
+            if (collisions.length > 0) {
+                return collisions;
+            }
+        }
+
+        return closestCenter({ ...args, droppableContainers: sortableDroppableContainers });
+    }
+
     const pointerCollisions = pointerWithin({ ...args, droppableContainers });
 
     if (pointerCollisions.length > 0) {
@@ -729,6 +773,88 @@ function moveIdWithinOrder(ids, activeId, overId) {
     return arrayMove(ids, fromIndex, toIndex);
 }
 
+function getPreviewVerticalItemGap(rects, index, activeIndex) {
+    const currentRect = rects[index];
+    const previousRect = rects[index - 1];
+    const nextRect = rects[index + 1];
+
+    if (!currentRect) {
+        return 0;
+    }
+
+    if (activeIndex < index) {
+        return previousRect
+            ? currentRect.top - (previousRect.top + previousRect.height)
+            : nextRect
+                ? nextRect.top - (currentRect.top + currentRect.height)
+                : 0;
+    }
+
+    return nextRect
+        ? nextRect.top - (currentRect.top + currentRect.height)
+        : previousRect
+            ? currentRect.top - (previousRect.top + previousRect.height)
+            : 0;
+}
+
+function previewVerticalListSortingStrategy({
+    activeIndex,
+    activeNodeRect: fallbackActiveRect,
+    index,
+    rects,
+    overIndex,
+}) {
+    const activeNodeRect = rects[activeIndex] || fallbackActiveRect;
+
+    if (!activeNodeRect || overIndex < 0) {
+        return null;
+    }
+
+    if (index === activeIndex) {
+        const overIndexRect = rects[overIndex];
+
+        if (!overIndexRect) {
+            return null;
+        }
+
+        return {
+            x: 0,
+            y: activeIndex < overIndex
+                ? overIndexRect.top + overIndexRect.height - (activeNodeRect.top + activeNodeRect.height)
+                : overIndexRect.top - activeNodeRect.top,
+            scaleX: 1,
+            scaleY: 1,
+        };
+    }
+
+    const itemGap = getPreviewVerticalItemGap(rects, index, activeIndex);
+
+    if (index > activeIndex && index <= overIndex) {
+        return {
+            x: 0,
+            y: -activeNodeRect.height - itemGap,
+            scaleX: 1,
+            scaleY: 1,
+        };
+    }
+
+    if (index < activeIndex && index >= overIndex) {
+        return {
+            x: 0,
+            y: activeNodeRect.height + itemGap,
+            scaleX: 1,
+            scaleY: 1,
+        };
+    }
+
+    return {
+        x: 0,
+        y: 0,
+        scaleX: 1,
+        scaleY: 1,
+    };
+}
+
 function getPreviewBulletText(item) {
     if (item && typeof item === 'object') {
         return item.text || '';
@@ -826,6 +952,8 @@ export default function ResumePreview({
     const [activeHeaderLayout, setActiveHeaderLayout] = useState(null);
     const [hoverHeaderLayout, setHoverHeaderLayout] = useState(null);
     const [summaryWidthDrag, setSummaryWidthDrag] = useState(null);
+    const isPreviewDragActive = Boolean(activeDragMeta?.type);
+    const canShowHeaderLayoutHover = !activeDragMeta?.type || activeDragMeta.type === 'headerSlot';
     const [pageMetrics, setPageMetrics] = useState({
         pageWidth: 0,
         pageHeight: 0,
@@ -1524,6 +1652,7 @@ export default function ResumePreview({
         }
 
         setActiveDragMeta(parsePreviewDragId(event.active.id));
+        setHoverHeaderLayout(null);
         const activeElement = getPreviewSortableElement(event.active.id);
         const rect = activeElement?.getBoundingClientRect() || event.active.rect.current.initial;
         setActiveDragRect(rect ? { width: rect.width, height: rect.height } : null);
@@ -1783,7 +1912,7 @@ export default function ResumePreview({
                         </h2>
                         {sectionSeparatorElement}
                         {sortable ? (
-                            <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
+                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
                                 {entryList}
                             </SortableContext>
                         ) : entryList}
@@ -1985,7 +2114,7 @@ export default function ResumePreview({
                         </h2>
                         {sectionSeparatorElement}
                         {sortable ? (
-                            <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
+                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
                                 {entries}
                             </SortableContext>
                         ) : entries}
@@ -2079,12 +2208,16 @@ export default function ResumePreview({
                 className={meta.className}
                 editProps={entryHeaderFieldProps(block, entry, field, entryHandleProps, !headerDragEnabled)}
                 dragEnabled={headerDragEnabled}
-                onFieldHover={() => setHoverHeaderLayout({
-                    sectionId: block.id,
-                    entryId: entry.id,
-                    field,
-                    ...slot,
-                })}
+                onFieldHover={() => {
+                    if (canShowHeaderLayoutHover) {
+                        setHoverHeaderLayout({
+                            sectionId: block.id,
+                            entryId: entry.id,
+                            field,
+                            ...slot,
+                        });
+                    }
+                }}
                 onFieldLeave={(event) => {
                     if (event?.buttons === 0 && !isHeaderSlotDragActiveForEntry(block.id, entry.id)) {
                         clearHoverHeaderLayout(block.id, entry.id);
@@ -2142,6 +2275,7 @@ export default function ResumePreview({
         }
 
         if (
+            canShowHeaderLayoutHover &&
             hoverHeaderLayout?.sectionId === blockId &&
             hoverHeaderLayout?.entryId === entryId &&
             Number.isInteger(hoverHeaderLayout.lineIndex) &&
@@ -2269,6 +2403,7 @@ export default function ResumePreview({
         const layout = getEntryHeaderLayout(block);
         const activeHeaderSlotSource = getActiveHeaderSlotSource(block.id, entry.id);
         const showHoverSlots = (
+            canShowHeaderLayoutHover &&
             !activeHeaderLayout?.sectionId &&
             Boolean(activeHeaderSlotSource)
         );
@@ -2280,13 +2415,21 @@ export default function ResumePreview({
         return (
             <div
                 className={`entryHeaderLayoutInteractive${showHoverSlots ? ' entryHeaderLayoutInteractive--showSlots' : ''}`}
-                onPointerEnter={() => setHoverHeaderLayout({ sectionId: block.id, entryId: entry.id })}
+                onPointerEnter={() => {
+                    if (canShowHeaderLayoutHover) {
+                        setHoverHeaderLayout({ sectionId: block.id, entryId: entry.id });
+                    }
+                }}
                 onPointerLeave={(event) => {
                     if (event.buttons === 0 && !isHeaderSlotDragActiveForEntry(block.id, entry.id)) {
                         clearHoverHeaderLayout(block.id, entry.id);
                     }
                 }}
-                onFocus={() => setHoverHeaderLayout({ sectionId: block.id, entryId: entry.id })}
+                onFocus={() => {
+                    if (canShowHeaderLayoutHover) {
+                        setHoverHeaderLayout({ sectionId: block.id, entryId: entry.id });
+                    }
+                }}
                 onBlur={(event) => {
                     if (!event.currentTarget.contains(event.relatedTarget)) {
                         clearHoverHeaderLayout(block.id, entry.id);
@@ -2415,7 +2558,7 @@ export default function ResumePreview({
                         </h2>
                         {sectionSeparatorElement}
                         {sortable ? (
-                            <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
+                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
                                 {entries}
                             </SortableContext>
                         ) : entries}
@@ -2484,7 +2627,7 @@ export default function ResumePreview({
                         </h2>
                         {sectionSeparatorElement}
                         {sortable ? (
-                            <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
+                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
                                 {entries}
                             </SortableContext>
                         ) : entries}
@@ -2563,7 +2706,7 @@ export default function ResumePreview({
                         </h2>
                         {sectionSeparatorElement}
                         {sortable ? (
-                            <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
+                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
                                 {entries}
                             </SortableContext>
                         ) : entries}
@@ -2623,7 +2766,7 @@ export default function ResumePreview({
                         </h2>
                         {sectionSeparatorElement}
                         {sortable ? (
-                            <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
+                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
                                 {entries}
                             </SortableContext>
                         ) : entries}
@@ -2684,7 +2827,7 @@ export default function ResumePreview({
                         </h2>
                         {sectionSeparatorElement}
                         {sortable ? (
-                            <SortableContext items={entryItems} strategy={verticalListSortingStrategy}>
+                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
                                 {entries}
                             </SortableContext>
                         ) : entries}
@@ -2877,7 +3020,7 @@ export default function ResumePreview({
                 return renderSectionBlock(block, { sortable: false, showSeparator });
             })
         ) : (
-            <SortableContext key="preview-sections" items={sectionDragItems} strategy={verticalListSortingStrategy}>
+            <SortableContext key="preview-sections" items={sectionDragItems} strategy={previewVerticalListSortingStrategy}>
                 {visibleSectionBlocks.map((block, index) => {
                     const showSeparator = sectionSeparatorPosition === 'belowSectionName'
                         ? true
@@ -2986,7 +3129,7 @@ export default function ResumePreview({
                             <div className="previewPageScaleLayer">
                                 <div
                                     ref={resumeRef}
-                                    className={`resumePage ${templateClassName(template)}${isSamplePreview ? ' resumePage--sample' : ''}${isHeaderLayoutModeActive ? ' resumePage--headerLayoutMode' : ''}`}
+                                    className={`resumePage ${templateClassName(template)}${isSamplePreview ? ' resumePage--sample' : ''}${isHeaderLayoutModeActive ? ' resumePage--headerLayoutMode' : ''}${isPreviewDragActive ? ' resumePage--dragging' : ''}`}
                                     style={presentationVars}
                                     onClick={handlePreviewClick}
                                     onPointerDownCapture={handlePreviewDragHandleCapture}

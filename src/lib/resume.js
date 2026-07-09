@@ -115,6 +115,7 @@ export const RESUME_SETTINGS_DEFAULTS = {
 export const SAMPLE_DISPLAY_DEFAULTS = {
   hasStarted: false,
   showInformation: true,
+  entryBindings: {},
 };
 
 const RESUME_SETTINGS_MIN = -5;
@@ -826,9 +827,144 @@ export function normalizeResumeSettings(settings) {
 }
 
 export function normalizeSampleDisplay(sampleDisplay) {
+  const display = sampleDisplay && typeof sampleDisplay === 'object' ? sampleDisplay : {};
+
   return {
-    hasStarted: Boolean(sampleDisplay?.hasStarted),
-    showInformation: sampleDisplay?.showInformation === false ? false : true,
+    hasStarted: Boolean(display.hasStarted),
+    showInformation: display.showInformation === false ? false : true,
+    entryBindings: normalizeSampleEntryBindings(display.entryBindings),
+  };
+}
+
+function normalizeSampleEntryBindings(entryBindings) {
+  if (!entryBindings || typeof entryBindings !== 'object' || Array.isArray(entryBindings)) {
+    return {};
+  }
+
+  const nextBindings = {};
+
+  Object.entries(entryBindings).forEach(([rawSectionId, sectionBindings]) => {
+    const sectionId = trimText(rawSectionId);
+
+    if (
+      !sectionId ||
+      sectionId.length > 100 ||
+      !sectionBindings ||
+      typeof sectionBindings !== 'object' ||
+      Array.isArray(sectionBindings)
+    ) {
+      return;
+    }
+
+    const entryBindingsById = {};
+
+    Object.entries(sectionBindings).forEach(([rawEntryId, rawSourceIndex]) => {
+      const entryId = trimText(rawEntryId);
+      const sourceIndex = Number(rawSourceIndex);
+
+      if (
+        !entryId ||
+        entryId.length > 160 ||
+        !Number.isInteger(sourceIndex) ||
+        sourceIndex < 0 ||
+        sourceIndex > 99
+      ) {
+        return;
+      }
+
+      entryBindingsById[entryId] = sourceIndex;
+    });
+
+    if (Object.keys(entryBindingsById).length > 0) {
+      nextBindings[sectionId] = entryBindingsById;
+    }
+  });
+
+  return nextBindings;
+}
+
+function isValidSampleSourceIndex(sourceIndex) {
+  return Number.isInteger(sourceIndex) && sourceIndex >= 0 && sourceIndex <= 99;
+}
+
+function canInferSampleEntryBindings(normalizedResume, section) {
+  return (
+    normalizedResume.sampleDisplay.showInformation &&
+    section?.kind === 'roles' &&
+    /experience|work|career/i.test(`${section.id} ${section.title}`)
+  );
+}
+
+function inferSectionSampleEntryBindings(normalizedResume, section) {
+  const currentBindings = normalizedResume.sampleDisplay.entryBindings?.[section.id] || {};
+  const shouldInfer = canInferSampleEntryBindings(normalizedResume, section);
+  const nextBindings = {};
+
+  (Array.isArray(section?.entries) ? section.entries : []).forEach((entry, index) => {
+    const entryId = trimText(entry.id);
+
+    if (!entryId) {
+      return;
+    }
+
+    const currentSourceIndex = currentBindings[entryId];
+
+    if (isValidSampleSourceIndex(currentSourceIndex)) {
+      nextBindings[entryId] = currentSourceIndex;
+      return;
+    }
+
+    if (shouldInfer && index <= 99) {
+      nextBindings[entryId] = index;
+    }
+  });
+
+  return nextBindings;
+}
+
+function applySectionSampleEntryBindings(
+  normalizedResume,
+  sectionId,
+  orderedEntries,
+  incomingBindings = {},
+  inferredSectionBindings = null,
+) {
+  const section = normalizedResume.sections.find((candidateSection) => candidateSection.id === sectionId);
+
+  if (!section) {
+    return normalizedResume;
+  }
+
+  const fallbackSectionBindings = inferredSectionBindings || inferSectionSampleEntryBindings(normalizedResume, section);
+  const nextSectionBindings = {};
+
+  (Array.isArray(orderedEntries) ? orderedEntries : []).forEach((entry) => {
+    const entryId = trimText(entry.id);
+    const sourceIndex = isValidSampleSourceIndex(incomingBindings[entryId])
+      ? incomingBindings[entryId]
+      : fallbackSectionBindings[entryId];
+
+    if (entryId && isValidSampleSourceIndex(sourceIndex)) {
+      nextSectionBindings[entryId] = sourceIndex;
+    }
+  });
+
+  const nextEntryBindings = {
+    ...normalizedResume.sampleDisplay.entryBindings,
+  };
+
+  if (Object.keys(nextSectionBindings).length > 0) {
+    nextEntryBindings[sectionId] = nextSectionBindings;
+  } else {
+    delete nextEntryBindings[sectionId];
+  }
+
+  return {
+    ...normalizedResume,
+    sampleDisplay: normalizeSampleDisplay({
+      ...normalizedResume.sampleDisplay,
+      entryBindings: nextEntryBindings,
+    }),
   };
 }
 
@@ -1272,23 +1408,66 @@ export function reorderResumeSectionBlocksToMatch(resume, orderedSectionIds) {
 }
 
 export function reorderSectionBlockEntriesToMatch(resume, sectionId, orderedEntryIds) {
-  return updateSection(resume, sectionId, (section) => ({
-    ...section,
-    entries: reorderItemSubsetById(section.entries, orderedEntryIds),
-  }));
-}
-
-export function materializeAndReorderSectionBlockEntries(resume, sectionId, orderedEntryIds) {
-  return updateSection(resume, sectionId, (section) => {
-    const requestedIds = Array.isArray(orderedEntryIds)
-      ? orderedEntryIds.map(trimText).filter(Boolean)
-      : [];
-    const requestedIdSet = new Set(requestedIds);
-
-    if (requestedIds.length === 0 || requestedIdSet.size !== requestedIds.length) {
+  const normalizedResume = normalizeResume(resume);
+  let didUpdateSection = false;
+  let nextSectionEntries = [];
+  let nextSectionBindings = {};
+  const nextSections = normalizedResume.sections.map((section) => {
+    if (section.id !== sectionId) {
       return section;
     }
 
+    const inferredBindings = inferSectionSampleEntryBindings(normalizedResume, section);
+    const entries = reorderItemSubsetById(section.entries, orderedEntryIds);
+    nextSectionEntries = entries;
+    nextSectionBindings = inferredBindings;
+    didUpdateSection = true;
+
+    return {
+      ...section,
+      entries,
+    };
+  });
+
+  if (!didUpdateSection) {
+    return normalizedResume;
+  }
+
+  return applySectionSampleEntryBindings({
+    ...normalizedResume,
+    sections: nextSections,
+  }, sectionId, nextSectionEntries, {}, nextSectionBindings);
+}
+
+export function materializeAndReorderSectionBlockEntries(
+  resume,
+  sectionId,
+  orderedEntryIds,
+  sampleEntryBindings = {},
+) {
+  const normalizedResume = normalizeResume(resume);
+  const requestedIds = Array.isArray(orderedEntryIds)
+    ? orderedEntryIds.map(trimText).filter(Boolean)
+    : [];
+  const requestedIdSet = new Set(requestedIds);
+
+  if (requestedIds.length === 0 || requestedIdSet.size !== requestedIds.length) {
+    return normalizedResume;
+  }
+
+  const normalizedIncomingBindings = normalizeSampleEntryBindings({
+    [sectionId]: sampleEntryBindings,
+  })[sectionId] || {};
+  let didUpdateSection = false;
+  let nextSectionEntryIds = [];
+  let fallbackSectionBindings = {};
+
+  const nextSections = normalizedResume.sections.map((section) => {
+    if (section.id !== sectionId) {
+      return section;
+    }
+
+    fallbackSectionBindings = inferSectionSampleEntryBindings(normalizedResume, section);
     const entryById = new Map(section.entries.map((entry) => [entry.id, entry]));
     const nextEntries = [...section.entries];
 
@@ -1302,11 +1481,24 @@ export function materializeAndReorderSectionBlockEntries(resume, sectionId, orde
       nextEntries.push(entry);
     });
 
+    const reorderedEntries = reorderItemSubsetById(nextEntries, requestedIds);
+    nextSectionEntryIds = reorderedEntries.map((entry) => entry.id).filter(Boolean);
+    didUpdateSection = true;
+
     return {
       ...section,
-      entries: reorderItemSubsetById(nextEntries, requestedIds),
+      entries: reorderedEntries,
     };
   });
+
+  if (!didUpdateSection) {
+    return normalizedResume;
+  }
+
+  return applySectionSampleEntryBindings({
+    ...normalizedResume,
+    sections: nextSections,
+  }, sectionId, nextSectionEntryIds.map((entryId) => ({ id: entryId })), normalizedIncomingBindings, fallbackSectionBindings);
 }
 
 export function updateSectionBlockEntry(resume, sectionId, entryId, field, value) {
@@ -1327,10 +1519,24 @@ export function addSectionBlockEntry(resume, sectionId) {
 }
 
 export function moveSectionBlockEntry(resume, sectionId, entryId, direction) {
-  return updateSection(resume, sectionId, (section) => ({
-    ...section,
-    entries: moveItemById(section.entries, entryId, direction),
-  }));
+  const normalizedResume = normalizeResume(resume);
+  const section = normalizedResume.sections.find((candidateSection) => candidateSection.id === sectionId);
+
+  if (!section) {
+    return normalizedResume;
+  }
+
+  const entries = moveItemById(section.entries, entryId, direction);
+
+  if (entries === section.entries) {
+    return normalizedResume;
+  }
+
+  return reorderSectionBlockEntriesToMatch(
+    normalizedResume,
+    sectionId,
+    entries.map((entry) => entry.id),
+  );
 }
 
 export function removeSectionBlockEntry(resume, sectionId, entryId) {
