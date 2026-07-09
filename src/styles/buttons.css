@@ -73,6 +73,14 @@
   background: var(--color-surface-muted);
 }
 
+html[data-theme="dark"] .buttonSecondary {
+  background: linear-gradient(180deg, #1e1e1e, #171717);
+}
+
+html[data-theme="dark"] .buttonSecondary:not(:disabled):hover {
+  background: #202020;
+}
+
 .buttonGhost {
   border-color: transparent;
   background: transparent;
@@ -139,6 +147,10 @@
   background: var(--color-surface-elevated);
   color: var(--color-text);
   box-shadow: var(--shadow-xs);
+}
+
+html[data-theme="dark"] .tabButton.isActive {
+  background: #222222;
 }
 
 .tabButton.isSortingPlaceholder {

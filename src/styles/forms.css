@@ -27,6 +27,10 @@ form {
     border-color var(--transition-base);
 }
 
+html[data-theme="dark"] .formSection {
+  background: linear-gradient(180deg, #181818 0%, #131313 100%);
+}
+
 .editorStage form {
   gap: 10px;
 }

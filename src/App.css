@@ -183,6 +183,10 @@ html[data-theme="dark"] .brandLogo--dark {
     transform var(--transition-fast);
 }
 
+html[data-theme="dark"] .resumePill {
+  background: #181818;
+}
+
 .resumePill * {
   -webkit-user-drag: none;
 }
@@ -198,6 +202,10 @@ html[data-theme="dark"] .brandLogo--dark {
 .resumePill.isActive {
   border-color: var(--color-accent-border);
   background: color-mix(in srgb, var(--color-accent-soft) 62%, var(--color-surface) 38%);
+}
+
+html[data-theme="dark"] .resumePill.isActive {
+  background: color-mix(in srgb, var(--color-accent-soft) 42%, #202020 58%);
 }
 
 .resumePill.isSortingPlaceholder {
@@ -1347,6 +1355,10 @@ html[data-theme="dark"] .brandLogo--dark {
   background: color-mix(in srgb, var(--color-surface-muted) 72%, var(--color-surface-elevated));
 }
 
+html[data-theme="dark"] .settingsRailList {
+  background: #181818;
+}
+
 .settingsAdvancedGroup {
   display: grid;
   grid-template-rows: 0fr;
@@ -1456,6 +1468,10 @@ html[data-theme="dark"] .brandLogo--dark {
   background: color-mix(in srgb, var(--color-surface-muted) 84%, var(--color-surface-elevated));
 }
 
+html[data-theme="dark"] .settingsTemplateSegment {
+  background: #151515;
+}
+
 .settingsTemplateOption {
   min-width: 0;
   min-height: 19px;
@@ -1478,6 +1494,10 @@ html[data-theme="dark"] .brandLogo--dark {
   background: var(--color-surface-elevated);
   color: var(--color-text);
   box-shadow: var(--shadow-xs);
+}
+
+html[data-theme="dark"] .settingsTemplateOption.isActive {
+  background: #222222;
 }
 
 .settingsTemplateOption:not(.isActive):hover,
@@ -1908,6 +1928,10 @@ html[data-theme="dark"] .brandLogo--dark {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface-muted);
+}
+
+html[data-theme="dark"] .tabs {
+  background: #181818;
 }
 
 .sectionAddControl {
