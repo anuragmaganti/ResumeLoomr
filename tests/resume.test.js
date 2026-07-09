@@ -1323,6 +1323,16 @@ test('preview page break helper keeps raw marker when no clean candidate is vali
   }), [900]);
 });
 
+test('preview page markers measure rendered content instead of fixed page scroll height', () => {
+  const previewComponent = fs.readFileSync('src/components/resumePreview.jsx', 'utf8');
+  const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
+
+  assert.match(previewComponent, /function measurePreviewContentFlowHeight/);
+  assert.match(previewComponent, /data-preview-page-content="true"/);
+  assert.doesNotMatch(previewComponent, /Math\.max\(printableHeight,\s*resumeElement\.scrollHeight - paddingTop - paddingBottom\)/);
+  assert.match(previewCss, /\.resumePageContent\s*\{/);
+});
+
 test('draft content hashes ignore saved time but track content', () => {
   const firstDraft = createDraft('Resume A', '2026-01-01T00:00:00.000Z');
   const secondDraft = {

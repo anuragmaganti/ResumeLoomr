@@ -63,6 +63,7 @@ const personalLinkFieldMap = {
 const DRAG_ID_SEPARATOR = '::';
 const DEFAULT_PREVIEW_PAGE_MIN_HEIGHT = PRINT_PAGE_HEIGHT_PX;
 const FIRST_SECTION_ENTRY_SNAP_DISTANCE_PX = 144;
+const PAGE_FIT_TOLERANCE_PX = 3;
 const SUMMARY_WIDTH_MIN_PERCENT = 75;
 const SUMMARY_WIDTH_MAX_PERCENT = 100;
 const PREVIEW_MARGIN_SETTING_MIN = -5;
@@ -1166,6 +1167,21 @@ function collectPreviewBreakCandidates(resumeElement, paddingTop) {
     return candidates;
 }
 
+function measurePreviewContentFlowHeight(resumeElement, paddingTop, fallbackHeight) {
+    const contentElement = resumeElement.querySelector('[data-preview-page-content="true"]');
+
+    if (!contentElement) {
+        return fallbackHeight;
+    }
+
+    const resumeRect = resumeElement.getBoundingClientRect();
+    const contentRect = contentElement.getBoundingClientRect();
+    const previewScale = getPreviewScaleFromElement(resumeElement);
+    const contentBottom = ((contentRect.bottom - resumeRect.top) / previewScale) - paddingTop;
+
+    return Math.max(0, contentBottom);
+}
+
 export default function ResumePreview({
     previewModel,
     template,
@@ -1393,8 +1409,13 @@ export default function ResumePreview({
             const paddingTop = parseCssLengthToPixels(styles.paddingTop);
             const paddingBottom = parseCssLengthToPixels(styles.paddingBottom);
             const printableHeight = Math.max(1, pageHeight - paddingTop - paddingBottom);
+            const measuredContentFlowHeight = measurePreviewContentFlowHeight(
+                resumeElement,
+                paddingTop,
+                resumeElement.scrollHeight - paddingTop - paddingBottom,
+            );
             const contentFlowHeight = previewModel.hasContent
-                ? Math.max(printableHeight, resumeElement.scrollHeight - paddingTop - paddingBottom)
+                ? Math.max(printableHeight, measuredContentFlowHeight - PAGE_FIT_TOLERANCE_PX)
                 : printableHeight;
             const pageBreaks = previewModel.hasContent
                 ? calculatePreviewPageBreaks({
@@ -3624,7 +3645,9 @@ export default function ResumePreview({
                                             onDragEnd={handlePreviewDragEnd}
                                         >
                                             {renderSampleInformationToggle()}
-                                            {orderedSections}
+                                            <div className="resumePageContent" data-preview-page-content="true">
+                                                {orderedSections}
+                                            </div>
                                             {typeof document === 'undefined' ? previewDragOverlay : createPortal(previewDragOverlay, document.body)}
                                         </DndContext>
                                     ) : (

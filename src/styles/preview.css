@@ -62,6 +62,11 @@ html[data-theme="dark"] .resumePage {
   --preview-edit-pulse-ring: color-mix(in srgb, #93c5fd 28%, transparent);
 }
 
+.resumePageContent {
+  position: relative;
+  z-index: 1;
+}
+
 .sampleInformationToggle {
   position: absolute;
   top: 12px;
