@@ -18,7 +18,6 @@ import {
     SortableContext,
     sortableKeyboardCoordinates,
     useSortable,
-    verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
@@ -265,13 +264,25 @@ function areCompatiblePreviewDragItems(activeMeta, overMeta) {
     return false;
 }
 
-function previewCollisionDetection(args) {
+function previewCollisionDetection(args, activeInitialRect = null) {
     const activeMeta = parsePreviewDragId(args.active.id);
     const droppableContainers = args.droppableContainers.filter((container) => (
         areCompatiblePreviewDragItems(activeMeta, parsePreviewDragId(container.id))
     ));
 
     if (activeMeta.type === 'section' || activeMeta.type === 'entry') {
+        const edgeCollision = getActivePreviewCollisionIfPointerOutsideListBounds(args, droppableContainers, activeInitialRect);
+
+        if (edgeCollision) {
+            return [edgeCollision];
+        }
+
+        const activeCollision = getActivePreviewCollisionIfPointerWithin(args, droppableContainers, activeInitialRect);
+
+        if (activeCollision) {
+            return [activeCollision];
+        }
+
         const sortableDroppableContainers = droppableContainers.filter((container) => (
             String(container.id) !== String(args.active.id)
         ));
@@ -322,6 +333,104 @@ function previewCollisionDetection(args) {
     }
 
     return closestCenter({ ...args, droppableContainers });
+}
+
+function getActivePreviewCollision(args, droppableContainers) {
+    const activeContainer = droppableContainers.find((container) => (
+        String(container.id) === String(args.active.id)
+    ));
+
+    if (!activeContainer) {
+        return null;
+    }
+
+    return {
+        id: activeContainer.id,
+        data: {
+            droppableContainer: activeContainer,
+            value: 0,
+        },
+    };
+}
+
+function getPreviewDroppableRect(args, droppableContainer, activeInitialRect = null) {
+    if (String(droppableContainer.id) === String(args.active.id) && activeInitialRect) {
+        return activeInitialRect;
+    }
+
+    return args.droppableRects.get(droppableContainer.id);
+}
+
+function getActivePreviewCollisionIfPointerOutsideListBounds(args, droppableContainers, activeInitialRect = null) {
+    const pointerY = args.pointerCoordinates?.y;
+
+    if (!Number.isFinite(pointerY)) {
+        return null;
+    }
+
+    const orderedContainers = droppableContainers
+        .map((droppableContainer) => ({
+            droppableContainer,
+            rect: getPreviewDroppableRect(args, droppableContainer, activeInitialRect),
+        }))
+        .filter(({ rect }) => rect && Number.isFinite(rect.top) && Number.isFinite(rect.height))
+        .sort((first, second) => first.rect.top - second.rect.top);
+    const activeIndex = orderedContainers.findIndex(({ droppableContainer }) => (
+        String(droppableContainer.id) === String(args.active.id)
+    ));
+
+    if (activeIndex < 0) {
+        return null;
+    }
+
+    const activeRect = orderedContainers[activeIndex].rect;
+
+    if (
+        (activeIndex === 0 && pointerY < activeRect.top) ||
+        (activeIndex === orderedContainers.length - 1 && pointerY > activeRect.top + activeRect.height)
+    ) {
+        return getActivePreviewCollision(args, droppableContainers);
+    }
+
+    return null;
+}
+
+function isPointWithinRect(point, rect) {
+    const rectRight = Number.isFinite(rect?.right) ? rect.right : rect?.left + rect?.width;
+    const rectBottom = Number.isFinite(rect?.bottom) ? rect.bottom : rect?.top + rect?.height;
+
+    return (
+        point &&
+        rect &&
+        Number.isFinite(point.x) &&
+        Number.isFinite(point.y) &&
+        Number.isFinite(rect.left) &&
+        Number.isFinite(rect.top) &&
+        Number.isFinite(rectRight) &&
+        Number.isFinite(rectBottom) &&
+        point.x >= rect.left &&
+        point.x <= rectRight &&
+        point.y >= rect.top &&
+        point.y <= rectBottom
+    );
+}
+
+function getActivePreviewCollisionIfPointerWithin(args, droppableContainers, activeInitialRect = null) {
+    const activeCollision = getActivePreviewCollision(args, droppableContainers);
+    const activeContainer = activeCollision?.data?.droppableContainer;
+    const activeRect = activeContainer ? args.droppableRects.get(activeContainer.id) : null;
+
+    if (
+        !activeContainer ||
+        (
+            !isPointWithinRect(args.pointerCoordinates, activeInitialRect) &&
+            !isPointWithinRect(args.pointerCoordinates, activeRect)
+        )
+    ) {
+        return null;
+    }
+
+    return activeCollision;
 }
 
 function getPreviewSortableElement(sortableId) {
@@ -944,6 +1053,7 @@ export default function ResumePreview({
     const previewFrameRef = useRef(null);
     const suppressPreviewClickRef = useRef(false);
     const activeDragScrollRef = useRef({ x: 0, y: 0, captured: false });
+    const activeDragInitialRectRef = useRef(null);
     const summaryWidthDragRef = useRef(null);
     const headerLayoutDoubleClickRef = useRef(null);
     const headerLayoutLongPressRef = useRef(null);
@@ -1655,6 +1765,16 @@ export default function ResumePreview({
         setHoverHeaderLayout(null);
         const activeElement = getPreviewSortableElement(event.active.id);
         const rect = activeElement?.getBoundingClientRect() || event.active.rect.current.initial;
+        activeDragInitialRectRef.current = rect
+            ? {
+                top: rect.top,
+                right: rect.right,
+                bottom: rect.bottom,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height,
+            }
+            : null;
         setActiveDragRect(rect ? { width: rect.width, height: rect.height } : null);
     }
 
@@ -1662,6 +1782,7 @@ export default function ResumePreview({
         setActiveDragMeta(null);
         setActiveDragRect(null);
         setHoverHeaderLayout(null);
+        activeDragInitialRectRef.current = null;
         activeDragScrollRef.current = { x: 0, y: 0, captured: false };
     }
 
@@ -1677,6 +1798,7 @@ export default function ResumePreview({
         setActiveDragMeta(null);
         setActiveDragRect(null);
         setHoverHeaderLayout(null);
+        activeDragInitialRectRef.current = null;
         activeDragScrollRef.current = { x: 0, y: 0, captured: false };
 
         if (!overMeta || !areCompatiblePreviewDragItems(activeMeta, overMeta)) {
@@ -1828,7 +1950,7 @@ export default function ResumePreview({
         }
 
         return (
-            <SortableContext items={bulletIds} strategy={verticalListSortingStrategy}>
+            <SortableContext items={bulletIds} strategy={previewVerticalListSortingStrategy}>
                 {bulletList}
             </SortableContext>
         );
@@ -2534,7 +2656,7 @@ export default function ResumePreview({
                             entryId: job.id,
                             field: 'activities',
                             createTarget: (activityIndex) => listTarget(block.id, job.id, 'activities', activityIndex),
-                            sortable: sortable && !job.isSamplePlaceholderEntry,
+                            sortable,
                         })}
                     </>
                 )}
@@ -2803,7 +2925,7 @@ export default function ResumePreview({
                             entryId: entry.id,
                             field: 'highlights',
                             createTarget: (highlightIndex) => listTarget(block.id, entry.id, 'highlights', highlightIndex),
-                            sortable: sortable && !entry.isSamplePlaceholderEntry,
+                            sortable,
                         })}
                     </>
                 )}
@@ -3001,7 +3123,13 @@ export default function ResumePreview({
         visibleSectionBlocks.some((block) => block.id === activeHeaderLayout.sectionId),
     );
     const previewDragOverlay = (
-        <DragOverlay adjustScale={false} dropAnimation={null} zIndex={1000}>
+        <DragOverlay
+            adjustScale={false}
+            dropAnimation={activeDragMeta?.type === 'bullet'
+                ? { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }
+                : null}
+            zIndex={1000}
+        >
             <div className={`previewDragOverlayFrame ${templateClassName(template)}`} style={dragOverlayStyle}>
                 <div className="previewDragOverlayScaleLayer" style={dragOverlayContentStyle}>
                     {renderPreviewDragOverlay()}
@@ -3139,7 +3267,7 @@ export default function ResumePreview({
                                         <DndContext
                                             sensors={sensors}
                                             measuring={previewDragMeasuring}
-                                            collisionDetection={previewCollisionDetection}
+                                            collisionDetection={(args) => previewCollisionDetection(args, activeDragInitialRectRef.current)}
                                             onDragStart={handlePreviewDragStart}
                                             onDragCancel={handlePreviewDragCancel}
                                             onDragEnd={handlePreviewDragEnd}
