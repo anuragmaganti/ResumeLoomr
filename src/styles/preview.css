@@ -253,7 +253,7 @@ html[data-theme="dark"] .resumePage {
   font-weight: 700;
   line-height: 1.06;
   letter-spacing: -0.045em;
-  text-align: center;
+  text-align: var(--resume-personal-alignment, center);
 }
 
 .resumePage h2 {
@@ -324,6 +324,7 @@ html[data-theme="dark"] .resumePage {
 
 .previewSortableSection.isPreviewSortingPlaceholder,
 .previewSortableEntry.isPreviewSortingPlaceholder,
+.previewSortablePersonalHeader.isPreviewSortingPlaceholder,
 .previewSortableBullet.isPreviewSortingPlaceholder {
   border-radius: 8px;
   outline: 1px dashed var(--color-accent-strong);
@@ -332,7 +333,8 @@ html[data-theme="dark"] .resumePage {
 }
 
 .previewSortableSection.isPreviewSortingPlaceholder > *,
-.previewSortableEntry.isPreviewSortingPlaceholder > * {
+.previewSortableEntry.isPreviewSortingPlaceholder > *,
+.previewSortablePersonalHeader.isPreviewSortingPlaceholder > * {
   opacity: 0;
 }
 
@@ -350,6 +352,20 @@ html[data-theme="dark"] .resumePage {
   background: color-mix(in srgb, var(--color-accent-soft) 28%, transparent 72%);
   box-shadow: none;
   color: transparent;
+}
+
+.previewSortablePersonalHeader {
+  display: block;
+  cursor: grab;
+}
+
+.previewSortablePersonalHeader:active {
+  cursor: grabbing;
+}
+
+.previewSortablePersonalHeader .personalDetails,
+.previewSortablePersonalHeader .personalHeadline {
+  cursor: grab;
 }
 
 .previewDragOverlayFrame {
@@ -640,7 +656,7 @@ html[data-theme="dark"] .resumePage {
 
 .personalDetails {
   display: flex;
-  justify-content: center;
+  justify-content: var(--resume-personal-justify-content, center);
   gap: 14px;
   flex-wrap: nowrap;
   margin-top: var(--resume-detail-gap);
@@ -664,19 +680,91 @@ html[data-theme="dark"] .resumePage {
   font-size: var(--resume-headline-size);
   font-weight: 600;
   line-height: var(--resume-body-line-height);
-  text-align: center;
+  text-align: var(--resume-personal-alignment, center);
 }
 
 .aboutMe {
   position: relative;
   width: var(--resume-summary-active-width, var(--resume-summary-width-percent, 100%));
   max-width: 100%;
-  margin: var(--resume-detail-gap) auto 0;
+  margin: var(--resume-detail-gap) var(--resume-summary-margin-right, auto) 0 var(--resume-summary-margin-left, auto);
   color: var(--resume-page-heading);
   font-size: var(--resume-body-size);
   line-height: var(--resume-detail-line-height);
-  text-align: justify;
+  text-align: left;
   text-align-last: left;
+}
+
+.personalSection {
+  position: relative;
+}
+
+.personalAlignmentMenu {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 12;
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--resume-page-bg) 82%, var(--color-surface-elevated));
+  box-shadow: var(--shadow-sm);
+  cursor: default;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.98);
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.personalSection:hover > .personalAlignmentMenu,
+.personalSection:focus-within > .personalAlignmentMenu {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+.personalAlignmentButton {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  width: 28px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--resume-page-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.personalAlignmentButton:hover,
+.personalAlignmentButton:focus-visible {
+  background: color-mix(in srgb, var(--color-accent-soft) 42%, transparent);
+  color: var(--resume-page-heading);
+  outline: none;
+}
+
+.personalAlignmentButton[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  color: var(--color-accent-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+
+.personalAlignmentIcon {
+  display: block;
+  width: 18px;
+  height: 16px;
+  fill: currentColor;
 }
 
 .aboutMe::after {
@@ -1462,22 +1550,12 @@ html[data-theme="dark"] .resumePage {
   font-family: Georgia, "Times New Roman", serif;
 }
 
-.resumePage--executive h1,
-.resumePage--executive .personalDetails,
-.resumePage--executive .personalHeadline {
-  text-align: left;
-  justify-content: flex-start;
-  margin-left: 0;
-}
-
 .resumePage--executive .personalSection {
   border-bottom-width: 2px;
 }
 
 .resumePage--executive .aboutMe {
   width: 100%;
-  margin-right: 0;
-  margin-left: 0;
 }
 
 .resumePage--compact {
@@ -1596,12 +1674,17 @@ html[data-theme="dark"] .resumePage {
   .previewSortableItem,
   .previewSortableSection.isPreviewSortingPlaceholder,
   .previewSortableEntry.isPreviewSortingPlaceholder,
+  .previewSortablePersonalHeader.isPreviewSortingPlaceholder,
   .previewSortablePersonalContact.isPreviewSortingPlaceholder,
   .previewSortableBullet.isPreviewSortingPlaceholder {
     outline: none;
     background: transparent;
     box-shadow: none;
     transition: none;
+  }
+
+  .personalAlignmentMenu {
+    display: none !important;
   }
 
   .resumePage--executive,

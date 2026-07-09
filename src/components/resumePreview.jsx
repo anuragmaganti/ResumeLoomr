@@ -22,13 +22,16 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
     ENTRY_HEADER_LAYOUT_FIELDS,
+    PERSONAL_ALIGNMENT_OPTIONS,
     PERSONAL_CONTACT_FIELDS,
     getDefaultEntryHeaderLayout,
+    getEffectivePersonalAlignment,
     getResumePresentationVars,
     getResumePrintPageRule,
     moveSectionHeaderField,
     normalizeEntryHeaderLayout,
     normalizePersonalContactOrder,
+    normalizePersonalHeaderOrder,
 } from '../lib/resume.js';
 import {
     CSS_PIXELS_PER_INCH,
@@ -149,6 +152,10 @@ function personalContactDragId(field) {
     return ['personalContact', field].join(DRAG_ID_SEPARATOR);
 }
 
+function personalHeaderDragId(rowId) {
+    return ['personalHeader', rowId].join(DRAG_ID_SEPARATOR);
+}
+
 function entryDragId(sectionId, entryId) {
     return ['entry', sectionId, entryId].join(DRAG_ID_SEPARATOR);
 }
@@ -192,6 +199,10 @@ function parsePreviewDragId(id) {
 
     if (type === 'personalContact' && sectionId) {
         return { type, field: sectionId };
+    }
+
+    if (type === 'personalHeader' && sectionId) {
+        return { type, rowId: sectionId };
     }
 
     if (type === 'section' && sectionId) {
@@ -245,6 +256,10 @@ function areCompatiblePreviewDragItems(activeMeta, overMeta) {
         return true;
     }
 
+    if (activeMeta.type === 'personalHeader') {
+        return true;
+    }
+
     if (activeMeta.type === 'entry') {
         return activeMeta.sectionId === overMeta.sectionId;
     }
@@ -270,7 +285,7 @@ function previewCollisionDetection(args, activeInitialRect = null) {
         areCompatiblePreviewDragItems(activeMeta, parsePreviewDragId(container.id))
     ));
 
-    if (activeMeta.type === 'section' || activeMeta.type === 'entry') {
+    if (activeMeta.type === 'section' || activeMeta.type === 'entry' || activeMeta.type === 'personalHeader') {
         const edgeCollision = getActivePreviewCollisionIfPointerOutsideListBounds(args, droppableContainers, activeInitialRect);
 
         if (edgeCollision) {
@@ -712,6 +727,132 @@ function SortablePersonalContact({ field, editProps, previewScale, children }) {
     );
 }
 
+function PersonalAlignmentControls({ activeAlignment, onAlignmentChange }) {
+    const labels = {
+        left: 'Align personal section left',
+        center: 'Align personal section center',
+    };
+    const iconBars = {
+        left: [
+            { x: 3, width: 14 },
+            { x: 3, width: 10 },
+            { x: 3, width: 13 },
+            { x: 3, width: 8 },
+        ],
+        center: [
+            { x: 3, width: 14 },
+            { x: 5, width: 10 },
+            { x: 3.5, width: 13 },
+            { x: 6, width: 8 },
+        ],
+    };
+
+    function stopControlEvent(event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    function renderAlignmentIcon(alignment) {
+        return (
+            <svg
+                className="personalAlignmentIcon"
+                viewBox="0 0 20 18"
+                aria-hidden="true"
+                focusable="false"
+            >
+                {iconBars[alignment].map((bar, index) => (
+                    <rect
+                        key={`${alignment}-${index}`}
+                        x={bar.x}
+                        y={3 + (index * 3.4)}
+                        width={bar.width}
+                        height="1.8"
+                        rx="0.9"
+                    />
+                ))}
+            </svg>
+        );
+    }
+
+    return (
+        <div
+            className="personalAlignmentMenu"
+            data-personal-alignment-menu="true"
+            aria-label="Personal section alignment"
+            onPointerDown={stopControlEvent}
+            onMouseDown={stopControlEvent}
+            onClick={(event) => event.stopPropagation()}
+        >
+            {PERSONAL_ALIGNMENT_OPTIONS.map((alignment) => (
+                <button
+                    key={alignment}
+                    type="button"
+                    className="personalAlignmentButton"
+                    aria-label={labels[alignment]}
+                    aria-pressed={activeAlignment === alignment}
+                    data-personal-alignment-option={alignment}
+                    onClick={(event) => {
+                        stopControlEvent(event);
+                        onAlignmentChange?.(alignment);
+                    }}
+                >
+                    {renderAlignmentIcon(alignment)}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+function SortablePersonalHeaderRow({
+    rowId,
+    previewScale,
+    children,
+}) {
+    const sortableId = personalHeaderDragId(rowId);
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: sortableId });
+    const style = {
+        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
+        transition,
+    };
+    const handleProps = {
+        ...attributes,
+        'data-preview-drag-handle': 'true',
+        'data-preview-drag-scope': 'personal-header',
+        onPointerDown: (event) => {
+            if (
+                event.target.closest(
+                    '[data-personal-alignment-menu], [data-preview-drag-scope="personal-contact"], .summaryResizeHandle, .summaryResizeEdge, button, input, textarea, select, a',
+                )
+            ) {
+                return;
+            }
+
+            listeners?.onPointerDown?.(event);
+        },
+        onKeyDown: listeners?.onKeyDown,
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            data-preview-sortable-id={sortableId}
+            className={`personalHeaderRow personalHeaderRow--${rowId} previewSortableItem previewSortablePersonalHeader ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
+            style={style}
+            data-personal-header-row={rowId}
+            {...handleProps}
+        >
+            {children}
+        </div>
+    );
+}
+
 function StaticPreviewBullet({ editProps, children }) {
     return <li data-page-break-kind="item" {...editProps}>{children}</li>;
 }
@@ -1035,6 +1176,8 @@ export default function ResumePreview({
     onReorderSectionEntries,
     onReorderSectionTextList,
     onReorderPersonalContact,
+    onPersonalAlignmentChange,
+    onPersonalHeaderOrderChange,
     onSetSectionEntryHeaderLayout,
     onSummaryWidthChange,
     onSeparatorSettingsOpen,
@@ -1075,6 +1218,8 @@ export default function ResumePreview({
     });
     const presentationVars = useMemo(() => getResumePresentationVars(settings, template), [settings, template]);
     const printPageRule = useMemo(() => getResumePrintPageRule(settings, template), [settings, template]);
+    const personalAlignment = useMemo(() => getEffectivePersonalAlignment(settings, template), [settings, template]);
+    const personalHeaderOrder = useMemo(() => normalizePersonalHeaderOrder(settings?.personalHeaderOrder), [settings?.personalHeaderOrder]);
     const summaryWidthPercent = clampSummaryWidthPercent(settings?.summaryWidthPercent);
     const renderedSummaryWidthPercent = summaryWidthDrag?.percent || summaryWidthPercent;
     const canResizeSummary = template !== 'executive' && typeof onSummaryWidthChange === 'function';
@@ -1108,6 +1253,13 @@ export default function ResumePreview({
 
         return orderedFields.map((field) => detailByField.get(field)).filter(Boolean);
     }, [previewModel.personal, settings?.personalContactOrder]);
+    const visiblePersonalHeaderRows = useMemo(() => (
+        personalHeaderOrder.filter((rowId) => (
+            rowId === 'headline'
+                ? Boolean(previewModel.personal.headline)
+                : personalDetails.length > 0
+        ))
+    ), [personalDetails.length, personalHeaderOrder, previewModel.personal.headline]);
 
     useEffect(() => {
         if (!activeHeaderLayout?.sectionId || typeof document === 'undefined') {
@@ -1365,6 +1517,10 @@ export default function ResumePreview({
         const field = personalDetails[0]?.field || 'location';
 
         return personalTarget(field);
+    }
+
+    function handlePersonalAlignmentChange(alignment) {
+        onPersonalAlignmentChange?.(alignment);
     }
 
     function sectionTitleTarget(sectionId) {
@@ -1823,6 +1979,28 @@ export default function ResumePreview({
             return;
         }
 
+        if (activeMeta.type === 'personalHeader') {
+            const nextVisibleOrder = moveIdWithinOrder(visiblePersonalHeaderRows, activeMeta.rowId, overMeta.rowId);
+
+            if (nextVisibleOrder !== visiblePersonalHeaderRows) {
+                onPersonalHeaderOrderChange?.(normalizePersonalHeaderOrder([
+                    ...nextVisibleOrder,
+                    ...personalHeaderOrder.filter((rowId) => !nextVisibleOrder.includes(rowId)),
+                ]));
+            }
+
+            const field = activeMeta.rowId === 'headline'
+                ? 'headline'
+                : personalDetails[0]?.field || 'location';
+
+            openPreviewEditTarget({
+                sectionId: 'personal',
+                field,
+                path: personalEditorPath(field),
+            }, scrollTarget);
+            return;
+        }
+
         if (activeMeta.type === 'headerSlot') {
             const block = findBlock(activeMeta.sectionId);
             const layout = block ? getEntryHeaderLayout(block) : null;
@@ -2049,39 +2227,72 @@ export default function ResumePreview({
             return null;
         }
 
+        function renderPersonalHeadlineRow() {
+            return (
+                <div className="personalHeadline" {...personalTarget('headline')}>
+                    {renderTextWithCaret(previewModel.personal.headline, personalEditorPath('headline'))}
+                </div>
+            );
+        }
+
+        function renderPersonalContactRow() {
+            return (
+                <div
+                    className={`personalDetails ${personalDetails.length >= 4 ? 'personalDetails--wrap' : ''}`}
+                    {...personalContactRowTarget()}
+                >
+                    <SortableContext
+                        items={personalDetails.map((detail) => personalContactDragId(detail.field))}
+                        strategy={horizontalListSortingStrategy}
+                    >
+                        {personalDetails.map((detail, index) => (
+                            <SortablePersonalContact
+                                key={`${detail.field}-${detail.text}-${index}`}
+                                field={detail.field}
+                                editProps={personalTarget(detail.field)}
+                                previewScale={pageMetrics.scale}
+                            >
+                                {renderTextWithCaret(detail.text, personalEditorPath(detail.field))}
+                            </SortablePersonalContact>
+                        ))}
+                    </SortableContext>
+                </div>
+            );
+        }
+
+        function renderPersonalHeaderRow(rowId) {
+            const rowContent = rowId === 'headline'
+                ? renderPersonalHeadlineRow()
+                : renderPersonalContactRow();
+
+            return (
+                <SortablePersonalHeaderRow
+                    key={rowId}
+                    rowId={rowId}
+                    previewScale={pageMetrics.scale}
+                >
+                    {rowContent}
+                </SortablePersonalHeaderRow>
+            );
+        }
+
         return (
             <div className={previewSectionClassName('resumeSection personalSection', showSeparator)} key="personal">
+                <PersonalAlignmentControls
+                    activeAlignment={personalAlignment}
+                    onAlignmentChange={handlePersonalAlignmentChange}
+                />
                 <h1 {...personalTarget('name')}>
                     {renderTextWithCaret(previewModel.personal.name, personalEditorPath('name'), { fallback: "Your Name" })}
                 </h1>
 
-                {previewModel.personal.headline && (
-                    <div className="personalHeadline" {...personalTarget('headline')}>
-                        {renderTextWithCaret(previewModel.personal.headline, personalEditorPath('headline'))}
-                    </div>
-                )}
-
-                {personalDetails.length > 0 && (
-                    <div
-                        className={`personalDetails ${personalDetails.length >= 4 ? 'personalDetails--wrap' : ''}`}
-                        {...personalContactRowTarget()}
+                {visiblePersonalHeaderRows.length > 0 && (
+                    <SortableContext
+                        items={visiblePersonalHeaderRows.map((rowId) => personalHeaderDragId(rowId))}
+                        strategy={previewVerticalListSortingStrategy}
                     >
-                        <SortableContext
-                            items={personalDetails.map((detail) => personalContactDragId(detail.field))}
-                            strategy={horizontalListSortingStrategy}
-                        >
-                            {personalDetails.map((detail, index) => (
-                                <SortablePersonalContact
-                                    key={`${detail.field}-${detail.text}-${index}`}
-                                    field={detail.field}
-                                    editProps={personalTarget(detail.field)}
-                                    previewScale={pageMetrics.scale}
-                                >
-                                    {renderTextWithCaret(detail.text, personalEditorPath(detail.field))}
-                                </SortablePersonalContact>
-                            ))}
-                        </SortableContext>
-                    </div>
+                        {visiblePersonalHeaderRows.map(renderPersonalHeaderRow)}
+                    </SortableContext>
                 )}
 
                 {previewModel.personal.aboutMe && (
@@ -3065,6 +3276,30 @@ export default function ResumePreview({
             ) : null;
         }
 
+        if (activeDragMeta.type === 'personalHeader') {
+            if (activeDragMeta.rowId === 'headline' && previewModel.personal.headline) {
+                return (
+                    <div className="previewDragOverlay previewDragOverlay--personalHeader">
+                        <div className="personalHeadline">
+                            {previewModel.personal.headline}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (activeDragMeta.rowId === 'contact' && personalDetails.length > 0) {
+                return (
+                    <div className="previewDragOverlay previewDragOverlay--personalHeader">
+                        <div className={`personalDetails ${personalDetails.length >= 4 ? 'personalDetails--wrap' : ''}`}>
+                            {personalDetails.map((detail, index) => (
+                                <span key={`${detail.field}-${index}`}>{detail.text}</span>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+        }
+
         if (activeDragMeta.type === 'headerSlot') {
             const block = findBlock(activeDragMeta.sectionId);
             const entry = findEntry(block, activeDragMeta.entryId);
@@ -3125,7 +3360,7 @@ export default function ResumePreview({
     const previewDragOverlay = (
         <DragOverlay
             adjustScale={false}
-            dropAnimation={activeDragMeta?.type === 'bullet'
+            dropAnimation={activeDragMeta?.type === 'bullet' || activeDragMeta?.type === 'personalHeader'
                 ? { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }
                 : null}
             zIndex={1000}

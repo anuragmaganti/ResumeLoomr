@@ -81,6 +81,8 @@ function createResumeDoc(overrides = {}) {
           'portfolioUrl',
           'customField',
         ],
+        personalAlignment: 'template',
+        personalHeaderOrder: ['headline', 'contact'],
       },
       sampleDisplay: {
         hasStarted: false,
@@ -173,6 +175,8 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
           personalSeparatorGap: -5,
           sectionSeparatorGap: 5,
           sectionSeparatorPosition: 'belowSectionName',
+          personalAlignment: 'left',
+          personalHeaderOrder: ['contact', 'headline'],
           personalContactOrder: [
             'email',
             'phone',
@@ -227,6 +231,24 @@ test('firestore rules protect user resume data', { skip: !FIRESTORE_EMULATOR_HOS
         settings: {
           ...createResumeDoc().resume.settings,
           sectionSeparatorPosition: 'middle',
+        },
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        settings: {
+          ...createResumeDoc().resume.settings,
+          personalAlignment: 'justify',
+        },
+      },
+    })));
+    await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set(createResumeDoc({
+      resume: {
+        ...createResumeDoc().resume,
+        settings: {
+          ...createResumeDoc().resume.settings,
+          personalHeaderOrder: ['headline', 'headline'],
         },
       },
     })));

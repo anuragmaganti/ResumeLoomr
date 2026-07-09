@@ -8,6 +8,7 @@ import {
   MAX_WORKSPACE_RESUME_NAME_LENGTH,
   MAX_WORKSPACE_RESUMES,
   PERSONAL_CONTACT_FIELDS,
+  PERSONAL_HEADER_ROWS,
   SECTION_TEMPLATE_GROUPS,
   UNTITLED_SECTION_TITLE,
   addResumeSectionBlock,
@@ -22,6 +23,7 @@ import {
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
   getDefaultEntryHeaderLayout,
+  getEffectivePersonalAlignment,
   getPreviewModel,
   materializeAndReorderSectionBlockEntries,
   moveSectionHeaderField,
@@ -31,6 +33,7 @@ import {
   moveResumeSectionBlock,
   normalizeDraftPayload,
   normalizePersonalContactOrder,
+  normalizePersonalHeaderOrder,
   normalizeResumeSettings,
   normalizeWorkspaceIndex,
   removeResumeSectionBlock,
@@ -39,6 +42,7 @@ import {
   reorderResumeSectionBlocksToMatch,
   reorderWorkspaceResumesToMatch,
   setPersonalContactOrder,
+  setPersonalHeaderOrder,
   setResumeSettingValue,
   setResumeSummaryWidthPercent,
   setSectionEntryHeaderLayout,
@@ -161,6 +165,8 @@ test('createEmptyResume returns the block-first resume shape', () => {
     sectionSeparatorGap: 0,
     sectionSeparatorPosition: 'aboveSectionName',
     personalContactOrder: PERSONAL_CONTACT_FIELDS,
+    personalAlignment: 'template',
+    personalHeaderOrder: PERSONAL_HEADER_ROWS,
   });
   assert.deepEqual(
     resume.sections.map((section) => [section.id, section.kind, section.title]),
@@ -1083,6 +1089,10 @@ test('resume settings produce bounded preview and print variables', () => {
   assert.equal(settings.personalSeparatorTone, 50);
   assert.equal(settings.sectionSeparatorWeight, 2);
   assert.equal(settings.sectionSeparatorPosition, 'aboveSectionName');
+  assert.equal(settings.personalAlignment, 'template');
+  assert.deepEqual(settings.personalHeaderOrder, ['headline', 'contact']);
+  assert.equal(getEffectivePersonalAlignment(settings, 'compact'), 'center');
+  assert.equal(getEffectivePersonalAlignment(settings, 'executive'), 'left');
   assert.match(vars['--resume-page-margin-inline'], /in$/);
   assert.match(vars['--resume-print-content-width'], /in$/);
   assert.match(vars['--resume-name-size'], /px$/);
@@ -1093,6 +1103,8 @@ test('resume settings produce bounded preview and print variables', () => {
   assert.match(vars['--resume-headline-size'], /px$/);
   assert.doesNotMatch(vars['--resume-body-size'], /rem$/);
   assert.equal(vars['--resume-summary-width-percent'], '100%');
+  assert.equal(vars['--resume-personal-alignment'], 'center');
+  assert.equal(vars['--resume-personal-justify-content'], 'center');
   assert.equal(vars['--resume-section-separator-color'], 'rgba(0, 0, 0, 0.5)');
   assert.equal(vars['--resume-section-separator-weight'], '1px');
   assert.match(getResumePrintPageRule(settings, 'compact'), /^@page \{ size: letter;/);
@@ -1120,6 +1132,13 @@ test('resume settings produce bounded preview and print variables', () => {
 
   const invalidSeparatorPosition = setResumeSettingValue(createEmptyResume(), 'sectionSeparatorPosition', 'sideways');
   assert.equal(invalidSeparatorPosition.settings.sectionSeparatorPosition, 'aboveSectionName');
+
+  const leftAlignedPersonal = setResumeSettingValue(createEmptyResume(), 'personalAlignment', 'left');
+  assert.equal(leftAlignedPersonal.settings.personalAlignment, 'left');
+  assert.equal(getResumePresentationVars(leftAlignedPersonal.settings, 'compact')['--resume-personal-alignment'], 'left');
+
+  const invalidPersonalAlignment = setResumeSettingValue(createEmptyResume(), 'personalAlignment', 'middle');
+  assert.equal(invalidPersonalAlignment.settings.personalAlignment, 'template');
 });
 
 test('personal contact order is display-only metadata for sample and real fields', () => {
@@ -1146,6 +1165,26 @@ test('personal contact order is display-only metadata for sample and real fields
 
   const rejected = setPersonalContactOrder(resume, ['email', 'email']);
   assert.deepEqual(rejected.settings.personalContactOrder, resume.settings.personalContactOrder);
+});
+
+test('personal headline and contact order is display-only metadata', () => {
+  assert.deepEqual(normalizePersonalHeaderOrder(['contact', 'headline']), ['contact', 'headline']);
+  assert.deepEqual(normalizePersonalHeaderOrder(['headline', 'headline', 'bad-row']), ['headline', 'contact']);
+
+  let resume = createEmptyResume();
+  resume = updatePersonalField(resume, 'headline', 'Software Engineer');
+  resume = updatePersonalField(resume, 'email', 'person@example.com');
+  resume = setPersonalHeaderOrder(resume, ['contact', 'headline']);
+
+  assert.deepEqual(resume.settings.personalHeaderOrder, ['contact', 'headline']);
+  assert.equal(resume.personal.headline, 'Software Engineer');
+  assert.equal(resume.personal.email, 'person@example.com');
+
+  const rejected = setPersonalHeaderOrder(resume, ['contact', 'contact']);
+  assert.deepEqual(rejected.settings.personalHeaderOrder, resume.settings.personalHeaderOrder);
+
+  const resetThroughSettingValue = setResumeSettingValue(resume, 'personalHeaderOrder', ['headline', 'contact']);
+  assert.deepEqual(resetThroughSettingValue.settings.personalHeaderOrder, ['headline', 'contact']);
 });
 
 test('preview mobile chrome rules do not reflow printable resume content', () => {

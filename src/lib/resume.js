@@ -35,6 +35,8 @@ export const PERSONAL_CONTACT_FIELDS = [
   'portfolioUrl',
   'customField',
 ];
+export const PERSONAL_ALIGNMENT_OPTIONS = ['left', 'center'];
+export const PERSONAL_HEADER_ROWS = ['headline', 'contact'];
 export const ENTRY_HEADER_LAYOUT_FIELDS = {
   education: ['school', 'degree', 'location', 'yearsEdu', 'gpa', 'honors'],
   roles: ['company', 'role', 'location', 'yearsExp'],
@@ -111,6 +113,8 @@ export const RESUME_SETTINGS_DEFAULTS = {
   sectionSeparatorGap: 0,
   sectionSeparatorPosition: 'aboveSectionName',
   personalContactOrder: PERSONAL_CONTACT_FIELDS,
+  personalAlignment: 'template',
+  personalHeaderOrder: PERSONAL_HEADER_ROWS,
 };
 export const SAMPLE_DISPLAY_DEFAULTS = {
   hasStarted: false,
@@ -130,6 +134,8 @@ const SEPARATOR_GAP_MIN = -5;
 const SEPARATOR_GAP_MAX = 5;
 const SECTION_SEPARATOR_POSITION_DEFAULT = 'aboveSectionName';
 const SECTION_SEPARATOR_POSITIONS = new Set(['aboveSectionName', 'belowSectionName']);
+const PERSONAL_ALIGNMENT_DEFAULT = 'template';
+const PERSONAL_ALIGNMENTS = new Set([PERSONAL_ALIGNMENT_DEFAULT, ...PERSONAL_ALIGNMENT_OPTIONS]);
 const DEFAULT_RESUME_LABEL = 'Resume';
 const TEXT_SIZE_STEP = 0.03;
 const HEADING_SIZE_STEP = 0.05;
@@ -171,6 +177,39 @@ export function normalizePersonalContactOrder(order) {
   });
 
   return nextFields;
+}
+
+export function normalizePersonalAlignment(alignment) {
+  return PERSONAL_ALIGNMENTS.has(alignment) ? alignment : PERSONAL_ALIGNMENT_DEFAULT;
+}
+
+export function getEffectivePersonalAlignment(settings, template = DEFAULT_TEMPLATE) {
+  const alignment = normalizePersonalAlignment(settings?.personalAlignment);
+
+  if (alignment !== PERSONAL_ALIGNMENT_DEFAULT) {
+    return alignment;
+  }
+
+  return template === 'executive' ? 'left' : 'center';
+}
+
+export function normalizePersonalHeaderOrder(order) {
+  const requestedRows = Array.isArray(order) ? order.map(trimText).filter(Boolean) : [];
+  const nextRows = [];
+
+  requestedRows.forEach((row) => {
+    if (PERSONAL_HEADER_ROWS.includes(row) && !nextRows.includes(row)) {
+      nextRows.push(row);
+    }
+  });
+
+  PERSONAL_HEADER_ROWS.forEach((row) => {
+    if (!nextRows.includes(row)) {
+      nextRows.push(row);
+    }
+  });
+
+  return nextRows;
 }
 
 const DEFAULT_SECTION_BLOCKS = [
@@ -809,6 +848,20 @@ export function normalizeResumeSettings(settings) {
         ];
       }
 
+      if (key === 'personalHeaderOrder') {
+        return [
+          key,
+          normalizePersonalHeaderOrder(settings?.[key] ?? RESUME_SETTINGS_DEFAULTS[key]),
+        ];
+      }
+
+      if (key === 'personalAlignment') {
+        return [
+          key,
+          normalizePersonalAlignment(settings?.[key] ?? RESUME_SETTINGS_DEFAULTS[key]),
+        ];
+      }
+
       if (key === 'sectionSeparatorPosition') {
         return [
           key,
@@ -1236,7 +1289,9 @@ export function updateResumeSetting(resume, settingId, delta) {
     !Object.hasOwn(RESUME_SETTINGS_DEFAULTS, settingId) ||
     SETTING_RANGES[settingId] ||
     settingId === 'sectionSeparatorPosition' ||
-    settingId === 'personalContactOrder'
+    settingId === 'personalContactOrder' ||
+    settingId === 'personalAlignment' ||
+    settingId === 'personalHeaderOrder'
   ) {
     return normalizedResume;
   }
@@ -1271,6 +1326,20 @@ export function setResumeSettingValue(resume, settingId, value) {
 
   if (settingId === 'personalContactOrder') {
     return setPersonalContactOrder(normalizedResume, value);
+  }
+
+  if (settingId === 'personalHeaderOrder') {
+    return setPersonalHeaderOrder(normalizedResume, value);
+  }
+
+  if (settingId === 'personalAlignment') {
+    return {
+      ...normalizedResume,
+      settings: {
+        ...normalizedResume.settings,
+        personalAlignment: normalizePersonalAlignment(value),
+      },
+    };
   }
 
   if (settingId === 'sectionSeparatorPosition') {
@@ -1319,6 +1388,30 @@ export function setPersonalContactOrder(resume, orderedFields) {
     settings: {
       ...normalizedResume.settings,
       personalContactOrder: nextOrder,
+    },
+  };
+}
+
+export function setPersonalHeaderOrder(resume, orderedRows) {
+  const normalizedResume = normalizeResume(resume);
+  const requestedRows = Array.isArray(orderedRows)
+    ? orderedRows.map(trimText).filter(Boolean)
+    : [];
+  const requestedRowSet = new Set(requestedRows);
+
+  if (
+    requestedRows.length === 0 ||
+    requestedRowSet.size !== requestedRows.length ||
+    requestedRows.some((row) => !PERSONAL_HEADER_ROWS.includes(row))
+  ) {
+    return normalizedResume;
+  }
+
+  return {
+    ...normalizedResume,
+    settings: {
+      ...normalizedResume.settings,
+      personalHeaderOrder: normalizePersonalHeaderOrder(requestedRows),
     },
   };
 }
@@ -2184,9 +2277,27 @@ function formatSeparatorWeight(weight) {
   return formatPx(weightMap[normalizedWeight] || 1);
 }
 
+function personalAlignmentToJustifyContent(alignment) {
+  if (alignment === 'left') {
+    return 'flex-start';
+  }
+
+  return 'center';
+}
+
+function personalAlignmentToSummaryMargins(alignment) {
+  if (alignment === 'left') {
+    return { left: '0', right: 'auto' };
+  }
+
+  return { left: 'auto', right: 'auto' };
+}
+
 export function getResumePresentationVars(settings, template) {
   const normalizedSettings = normalizeResumeSettings(settings);
   const base = resolvePresentationBase(template);
+  const personalAlignment = getEffectivePersonalAlignment(normalizedSettings, template);
+  const summaryMargins = personalAlignmentToSummaryMargins(personalAlignment);
   const textScale = 1 + (normalizedSettings.textSize * TEXT_SIZE_STEP);
   const headingScale = 1 + (normalizedSettings.headingSize * HEADING_SIZE_STEP);
   const nameScale = 1 + (normalizedSettings.nameSize * NAME_SIZE_STEP);
@@ -2237,6 +2348,10 @@ export function getResumePresentationVars(settings, template) {
     '--resume-detail-gap': formatPx(detailGap),
     '--resume-list-gap': formatPx(listGap),
     '--resume-summary-width-percent': `${normalizedSettings.summaryWidthPercent}%`,
+    '--resume-personal-alignment': personalAlignment,
+    '--resume-personal-justify-content': personalAlignmentToJustifyContent(personalAlignment),
+    '--resume-summary-margin-left': summaryMargins.left,
+    '--resume-summary-margin-right': summaryMargins.right,
     '--resume-print-min-height': formatInches(printMinHeight),
   };
 }

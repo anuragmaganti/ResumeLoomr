@@ -46,6 +46,17 @@ service cloud.firestore {
       return value is string && value in ['aboveSectionName', 'belowSectionName'];
     }
 
+    function isValidPersonalAlignment(value) {
+      return value is string && value in ['template', 'left', 'center'];
+    }
+
+    function isValidPersonalHeaderOrder(value) {
+      return value is list &&
+        value.size() == 2 &&
+        value.hasAll(['headline', 'contact']) &&
+        value.hasOnly(['headline', 'contact']);
+    }
+
     function isValidPersonalContactOrder(value) {
       return value is list &&
         value.size() == 7 &&
@@ -88,7 +99,9 @@ service cloud.firestore {
           'personalSeparatorGap',
           'sectionSeparatorGap',
           'sectionSeparatorPosition',
-          'personalContactOrder'
+          'personalContactOrder',
+          'personalAlignment',
+          'personalHeaderOrder'
         ]) &&
         isValidSetting(settings.textSize) &&
         isValidSetting(settings.horizontalMargins) &&
@@ -133,6 +146,14 @@ service cloud.firestore {
         (
           !settings.keys().hasAny(['personalContactOrder']) ||
           isValidPersonalContactOrder(settings.personalContactOrder)
+        ) &&
+        (
+          !settings.keys().hasAny(['personalAlignment']) ||
+          isValidPersonalAlignment(settings.personalAlignment)
+        ) &&
+        (
+          !settings.keys().hasAny(['personalHeaderOrder']) ||
+          isValidPersonalHeaderOrder(settings.personalHeaderOrder)
         );
     }
 

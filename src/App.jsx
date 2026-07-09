@@ -893,6 +893,8 @@ function App() {
               onReorderSectionEntries={handlePreviewReorderSectionEntries}
               onReorderSectionTextList={handlePreviewReorderSectionTextList}
               onReorderPersonalContact={actions.setPersonalContactOrder}
+              onPersonalAlignmentChange={(alignment) => actions.setResumeSettingValue('personalAlignment', alignment)}
+              onPersonalHeaderOrderChange={(order) => actions.setResumeSettingValue('personalHeaderOrder', order)}
               onSetSectionEntryHeaderLayout={actions.setSectionEntryHeaderLayout}
               onSummaryWidthChange={actions.setSummaryWidthPercent}
               onSeparatorSettingsOpen={handleSeparatorSettingsOpen}
