@@ -1653,28 +1653,54 @@ html[data-theme="dark"] .brandLogo--dark {
 }
 
 .separatorSliderControl input[type="range"] {
+  --separator-range-track-inset: 8px;
   width: 100%;
   accent-color: var(--color-accent);
   cursor: pointer;
 }
 
 .separatorSliderMarks {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
+  position: relative;
+  display: block;
+  width: calc(100% - (var(--separator-range-track-inset, 8px) * 2));
+  height: 18px;
+  margin-inline: var(--separator-range-track-inset, 8px);
   color: var(--color-text-subtle);
   font-size: 0.5625rem;
   font-weight: 720;
   line-height: 1.1;
-  text-align: center;
+  user-select: none;
 }
 
-.separatorSliderMarks span:first-child {
-  text-align: left;
+.separatorSliderMarks span {
+  position: absolute;
+  top: 0;
+  left: var(--separator-mark-position, 0%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  border-radius: 999px;
+  color: inherit;
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+  transform: translateX(-50%);
 }
 
-.separatorSliderMarks span:last-child {
-  text-align: right;
+.separatorSliderMarks span.isActive {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--color-accent) 18%, transparent) 0%,
+    color-mix(in srgb, var(--color-accent) 12%, transparent) 54%,
+    transparent 78%
+  );
+  box-shadow: none;
+  color: var(--color-accent-strong);
+  transform: translateX(-50%) translateY(-1px);
 }
 
 .separatorPositionSegment {

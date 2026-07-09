@@ -526,6 +526,14 @@ html[data-theme="dark"] .resumePage {
   --resume-active-separator-weight: var(--resume-personal-separator-weight, 1px);
 }
 
+html[data-theme="dark"] .resumeSection {
+  --resume-active-separator-color: var(--resume-section-separator-dark-color, var(--resume-section-separator-color, var(--resume-page-divider)));
+}
+
+html[data-theme="dark"] .personalSection {
+  --resume-active-separator-color: var(--resume-personal-separator-dark-color, var(--resume-personal-separator-color, var(--resume-page-divider)));
+}
+
 .resumeSection:last-child {
   margin-bottom: 0;
   padding-bottom: 0;
@@ -1587,6 +1595,14 @@ html[data-theme="dark"] .resumePage {
 @media print {
   body {
     background: #ffffff;
+  }
+
+  html[data-theme="dark"] .resumeSection {
+    --resume-active-separator-color: var(--resume-section-separator-color, var(--resume-page-divider));
+  }
+
+  html[data-theme="dark"] .personalSection {
+    --resume-active-separator-color: var(--resume-personal-separator-color, var(--resume-page-divider));
   }
 
   .previewToolbar,

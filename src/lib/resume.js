@@ -2264,6 +2264,16 @@ function formatSeparatorColor(tone) {
   return `rgba(0, 0, 0, ${Number((normalizedTone / 100).toFixed(2))})`;
 }
 
+function formatDarkSeparatorColor(tone) {
+  const normalizedTone = clampInteger(tone, SEPARATOR_TONE_MIN, SEPARATOR_TONE_MAX);
+
+  if (normalizedTone <= 0) {
+    return 'transparent';
+  }
+
+  return `rgba(255, 255, 255, ${Number((normalizedTone / 100).toFixed(2))})`;
+}
+
 function formatSeparatorWeight(weight) {
   const normalizedWeight = clampInteger(weight, SEPARATOR_WEIGHT_MIN, SEPARATOR_WEIGHT_MAX);
   const weightMap = {
@@ -2340,6 +2350,8 @@ export function getResumePresentationVars(settings, template) {
     '--resume-section-separator-gap': formatPx(sectionSeparatorGap),
     '--resume-personal-separator-color': formatSeparatorColor(normalizedSettings.personalSeparatorTone),
     '--resume-section-separator-color': formatSeparatorColor(normalizedSettings.sectionSeparatorTone),
+    '--resume-personal-separator-dark-color': formatDarkSeparatorColor(normalizedSettings.personalSeparatorTone),
+    '--resume-section-separator-dark-color': formatDarkSeparatorColor(normalizedSettings.sectionSeparatorTone),
     '--resume-personal-separator-weight': formatSeparatorWeight(normalizedSettings.personalSeparatorWeight),
     '--resume-section-separator-weight': formatSeparatorWeight(normalizedSettings.sectionSeparatorWeight),
     '--resume-section-heading-gap': formatPx(sectionHeadingGap),

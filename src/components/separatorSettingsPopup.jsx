@@ -4,25 +4,49 @@ import { createPortal } from 'react-dom';
 const POPUP_MARGIN = 12;
 const POPUP_OFFSET = 10;
 
+function createNumberMarks(min, max) {
+  return Array.from({ length: max - min + 1 }, (_, index) => {
+    const value = min + index;
+
+    return { value, label: String(value) };
+  });
+}
+
+function getMarkPosition(markValue, min, max) {
+  if (max <= min) {
+    return '0%';
+  }
+
+  return `${((markValue - min) / (max - min)) * 100}%`;
+}
+
+function clampNumber(value, min, max) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.max(min, Math.min(max, value));
+}
+
 const separatorControls = [
   {
     key: 'Tone',
     label: 'Color',
     min: 0,
-    max: 100,
+    max: 10,
     step: 1,
-    marks: [
-      { value: 0, label: 'None' },
-      { value: 25, label: 'Light' },
-      { value: 50, label: 'Gray' },
-      { value: 75, label: 'Dark' },
-      { value: 100, label: 'Black' },
-    ],
+    marks: createNumberMarks(0, 10),
+    fromSetting(value) {
+      return Math.round(clampNumber(value, 0, 100) / 10);
+    },
+    toSetting(value) {
+      return clampNumber(value, 0, 10) * 10;
+    },
     valueLabel(value) {
       if (value <= 0) return 'None';
-      if (value < 38) return 'Light';
-      if (value < 63) return 'Gray';
-      if (value < 88) return 'Dark';
+      if (value <= 3) return 'Light';
+      if (value <= 6) return 'Gray';
+      if (value <= 8) return 'Dark';
       return 'Black';
     },
   },
@@ -32,13 +56,7 @@ const separatorControls = [
     min: 1,
     max: 5,
     step: 1,
-    marks: [
-      { value: 1, label: 'Hairline' },
-      { value: 2, label: 'Thin' },
-      { value: 3, label: 'Standard' },
-      { value: 4, label: 'Strong' },
-      { value: 5, label: 'Thick' },
-    ],
+    marks: createNumberMarks(1, 5),
     valueLabel(value) {
       return ['Hairline', 'Thin', 'Standard', 'Strong', 'Thick'][Math.max(1, Math.min(5, value)) - 1] || 'Thin';
     },
@@ -46,22 +64,22 @@ const separatorControls = [
   {
     key: 'Gap',
     label: 'Section gap',
-    min: -5,
-    max: 5,
+    min: 0,
+    max: 10,
     step: 1,
-    marks: [
-      { value: -5, label: 'Tight' },
-      { value: -2, label: 'Snug' },
-      { value: -1, label: 'Default' },
-      { value: 0, label: 'Standard' },
-      { value: 5, label: 'Spacious' },
-    ],
+    marks: createNumberMarks(0, 10),
+    fromSetting(value) {
+      return Math.round(clampNumber(value, -5, 5) + 5);
+    },
+    toSetting(value) {
+      return clampNumber(value, 0, 10) - 5;
+    },
     valueLabel(value) {
-      if (value <= -4) return 'Tight';
-      if (value <= -2) return 'Snug';
-      if (value === -1) return 'Default';
-      if (value <= 1) return 'Standard';
-      if (value < 4) return 'Open';
+      if (value <= 1) return 'Tight';
+      if (value <= 3) return 'Snug';
+      if (value === 4) return 'Default';
+      if (value <= 5) return 'Standard';
+      if (value <= 8) return 'Open';
       return 'Spacious';
     },
   },
@@ -170,13 +188,16 @@ export default function SeparatorSettingsPopup({
       <div className="separatorSettingsTitle">{title}</div>
       <div className="separatorSettingsControls">
         {controls.map((control) => {
-          const value = settings?.[control.settingId] ?? defaultValues[control.key];
+          const storedValue = settings?.[control.settingId] ?? defaultValues[control.key];
+          const value = control.fromSetting ? control.fromSetting(storedValue) : storedValue;
+          const valueLabel = control.valueLabel(value);
+          const unitLabel = `${value}/${control.max}`;
 
           return (
             <label className="separatorSliderControl" key={control.settingId}>
               <span className="separatorSliderHeader">
                 <span>{control.label}</span>
-                <span>{control.valueLabel(value)}</span>
+                <span>{unitLabel} · {valueLabel}</span>
               </span>
               <input
                 type="range"
@@ -184,11 +205,24 @@ export default function SeparatorSettingsPopup({
                 max={control.max}
                 step={control.step}
                 value={value}
-                onChange={(event) => onChange(control.settingId, Number(event.target.value))}
+                aria-valuetext={`${unitLabel}, ${valueLabel}`}
+                onChange={(event) => {
+                  const nextValue = Number(event.target.value);
+                  onChange(control.settingId, control.toSetting ? control.toSetting(nextValue) : nextValue);
+                }}
               />
-              <span className="separatorSliderMarks" aria-hidden="true">
+              <span
+                className="separatorSliderMarks"
+                aria-hidden="true"
+              >
                 {control.marks.map((mark) => (
-                  <span key={`${control.settingId}-${mark.value}`}>{mark.label}</span>
+                  <span
+                    className={mark.value === value ? 'isActive' : undefined}
+                    key={`${control.settingId}-${mark.value}`}
+                    style={{ '--separator-mark-position': getMarkPosition(mark.value, control.min, control.max) }}
+                  >
+                    {mark.label}
+                  </span>
                 ))}
               </span>
             </label>

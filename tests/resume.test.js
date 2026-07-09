@@ -1106,6 +1106,7 @@ test('resume settings produce bounded preview and print variables', () => {
   assert.equal(vars['--resume-personal-alignment'], 'center');
   assert.equal(vars['--resume-personal-justify-content'], 'center');
   assert.equal(vars['--resume-section-separator-color'], 'rgba(0, 0, 0, 0.5)');
+  assert.equal(vars['--resume-section-separator-dark-color'], 'rgba(255, 255, 255, 0.5)');
   assert.equal(vars['--resume-section-separator-weight'], '1px');
   assert.equal(vars['--resume-section-separator-gap'], '8px');
   assert.match(getResumePrintPageRule(settings, 'compact'), /^@page \{ size: letter;/);
