@@ -110,7 +110,7 @@ export const RESUME_SETTINGS_DEFAULTS = {
   personalSeparatorWeight: 2,
   sectionSeparatorWeight: 2,
   personalSeparatorGap: 0,
-  sectionSeparatorGap: 0,
+  sectionSeparatorGap: -1,
   sectionSeparatorPosition: 'aboveSectionName',
   personalContactOrder: PERSONAL_CONTACT_FIELDS,
   personalAlignment: 'template',

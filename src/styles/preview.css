@@ -602,7 +602,7 @@ html[data-theme="dark"] .resumePage {
   display: block;
   width: 100%;
   height: calc((var(--resume-active-separator-gap) * 2) + var(--resume-active-separator-weight));
-  margin: 0 0 var(--resume-section-heading-gap);
+  margin: 0;
 }
 
 .sectionSeparatorPrintLine {
@@ -618,6 +618,10 @@ html[data-theme="dark"] .resumePage {
     height var(--transition-fast),
     background-color var(--transition-fast),
     box-shadow var(--transition-fast);
+}
+
+.resumeSection--separatorBelowHeading .sectionSeparatorBelowHeading + :is(.educationSection, .experienceSection, .previewEntry, .skillGroup) {
+  margin-top: 0;
 }
 
 .sectionSeparatorControl--belowHeading::before {

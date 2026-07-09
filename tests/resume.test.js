@@ -162,7 +162,7 @@ test('createEmptyResume returns the block-first resume shape', () => {
     personalSeparatorWeight: 2,
     sectionSeparatorWeight: 2,
     personalSeparatorGap: 0,
-    sectionSeparatorGap: 0,
+    sectionSeparatorGap: -1,
     sectionSeparatorPosition: 'aboveSectionName',
     personalContactOrder: PERSONAL_CONTACT_FIELDS,
     personalAlignment: 'template',
@@ -1107,6 +1107,7 @@ test('resume settings produce bounded preview and print variables', () => {
   assert.equal(vars['--resume-personal-justify-content'], 'center');
   assert.equal(vars['--resume-section-separator-color'], 'rgba(0, 0, 0, 0.5)');
   assert.equal(vars['--resume-section-separator-weight'], '1px');
+  assert.equal(vars['--resume-section-separator-gap'], '8px');
   assert.match(getResumePrintPageRule(settings, 'compact'), /^@page \{ size: letter;/);
 
   const updatedResume = updateResumeSetting(createEmptyResume(), 'textSize', 1);

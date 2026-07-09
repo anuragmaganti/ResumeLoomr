@@ -52,14 +52,15 @@ const separatorControls = [
     marks: [
       { value: -5, label: 'Tight' },
       { value: -2, label: 'Snug' },
-      { value: 0, label: 'Default' },
-      { value: 2, label: 'Open' },
+      { value: -1, label: 'Default' },
+      { value: 0, label: 'Standard' },
       { value: 5, label: 'Spacious' },
     ],
     valueLabel(value) {
       if (value <= -4) return 'Tight';
-      if (value < 0) return 'Snug';
-      if (value === 0) return 'Default';
+      if (value <= -2) return 'Snug';
+      if (value === -1) return 'Default';
+      if (value <= 1) return 'Standard';
       if (value < 4) return 'Open';
       return 'Spacious';
     },
@@ -69,7 +70,7 @@ const separatorControls = [
 const defaultValues = {
   Tone: 50,
   Weight: 2,
-  Gap: 0,
+  Gap: -1,
 };
 
 const sectionSeparatorPositionOptions = [
