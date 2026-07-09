@@ -896,6 +896,7 @@ function App() {
               onPersonalAlignmentChange={(alignment) => actions.setResumeSettingValue('personalAlignment', alignment)}
               onPersonalHeaderOrderChange={(order) => actions.setResumeSettingValue('personalHeaderOrder', order)}
               onSetSectionEntryHeaderLayout={actions.setSectionEntryHeaderLayout}
+              onAdjustSetting={actions.updateResumeSetting}
               onSummaryWidthChange={actions.setSummaryWidthPercent}
               onSeparatorSettingsOpen={handleSeparatorSettingsOpen}
               activeEditorCaret={editorCaretTarget}

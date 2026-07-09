@@ -65,6 +65,8 @@ const DEFAULT_PREVIEW_PAGE_MIN_HEIGHT = PRINT_PAGE_HEIGHT_PX;
 const FIRST_SECTION_ENTRY_SNAP_DISTANCE_PX = 144;
 const SUMMARY_WIDTH_MIN_PERCENT = 75;
 const SUMMARY_WIDTH_MAX_PERCENT = 100;
+const PREVIEW_MARGIN_SETTING_MIN = -5;
+const PREVIEW_MARGIN_SETTING_MAX = 5;
 const HEADER_LAYOUT_DOUBLE_CLICK_MS = 420;
 const HEADER_LAYOUT_DOUBLE_CLICK_TOLERANCE_PX = 8;
 const HEADER_LAYOUT_LONG_PRESS_MS = 520;
@@ -1179,6 +1181,7 @@ export default function ResumePreview({
     onPersonalAlignmentChange,
     onPersonalHeaderOrderChange,
     onSetSectionEntryHeaderLayout,
+    onAdjustSetting,
     onSummaryWidthChange,
     onSeparatorSettingsOpen,
     activeEditorCaret,
@@ -1866,6 +1869,118 @@ export default function ResumePreview({
                 onPointerUp={finishSummaryResize}
                 onPointerCancel={finishSummaryResize}
             />
+        );
+    }
+
+    function formatPreviewMarginValue(value) {
+        const numericValue = Number(value) || 0;
+
+        if (numericValue === 0) {
+            return '0';
+        }
+
+        return String(numericValue);
+    }
+
+    function stopMarginControlEvent(event) {
+        event.stopPropagation();
+    }
+
+    function adjustPreviewMarginSetting(event, settingId, delta) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressNextPreviewClick();
+        onAdjustSetting?.(settingId, delta);
+    }
+
+    function clearPointerMarginFocus(event) {
+        const activeElement = document.activeElement;
+
+        if (!activeElement || !event.currentTarget.contains(activeElement)) {
+            return;
+        }
+
+        if (typeof activeElement.matches === 'function' && activeElement.matches(':focus-visible')) {
+            return;
+        }
+
+        activeElement.blur?.();
+    }
+
+    function renderPreviewMarginControl(position, settingId) {
+        if (typeof onAdjustSetting !== 'function') {
+            return null;
+        }
+
+        const value = Number(settings?.[settingId]) || 0;
+        const isVerticalControl = position === 'left' || position === 'right';
+        const label = settingId === 'horizontalMargins' ? 'Side margin' : 'Top and bottom margin';
+        const decreaseControl = {
+            delta: -1,
+            sign: '-',
+            label: `Decrease ${label}`,
+            disabled: value <= PREVIEW_MARGIN_SETTING_MIN,
+        };
+        const increaseControl = {
+            delta: 1,
+            sign: '+',
+            label: `Increase ${label}`,
+            disabled: value >= PREVIEW_MARGIN_SETTING_MAX,
+        };
+        const orderedControls = isVerticalControl
+            ? [increaseControl, 'value', decreaseControl]
+            : [decreaseControl, 'value', increaseControl];
+
+        return (
+            <div
+                className={`previewMarginZone previewMarginZone--${position}`}
+                role="group"
+                tabIndex={0}
+                aria-label={`${label} preview controls`}
+                onPointerDown={stopMarginControlEvent}
+                onPointerLeave={clearPointerMarginFocus}
+                onClick={stopMarginControlEvent}
+            >
+                <div
+                    className={`previewMarginStepper${isVerticalControl ? ' previewMarginStepper--vertical' : ''}`}
+                    role="group"
+                    aria-label={`${label} controls`}
+                >
+                    {orderedControls.map((control) => (
+                        control === 'value' ? (
+                            <span className="previewMarginValue" key="value">{formatPreviewMarginValue(value)}</span>
+                        ) : (
+                            <button
+                                type="button"
+                                className="previewMarginButton"
+                                key={control.sign}
+                                onClick={(event) => adjustPreviewMarginSetting(event, settingId, control.delta)}
+                                disabled={control.disabled}
+                                aria-label={control.label}
+                            >
+                                {control.sign}
+                            </button>
+                        )
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    function renderPreviewMarginControls() {
+        if (typeof onAdjustSetting !== 'function' || showEmptyResumeChoice) {
+            return null;
+        }
+
+        return (
+            <div className="previewMarginControls" aria-hidden={false}>
+                <span className="previewMarginHighlight previewMarginHighlight--horizontal" aria-hidden="true" />
+                <span className="previewMarginHighlight previewMarginHighlight--vertical" aria-hidden="true" />
+                {renderPreviewMarginControl('top', 'verticalMargins')}
+                {renderPreviewMarginControl('right', 'horizontalMargins')}
+                {renderPreviewMarginControl('bottom', 'verticalMargins')}
+                {renderPreviewMarginControl('left', 'horizontalMargins')}
+            </div>
         );
     }
 
@@ -3498,6 +3613,7 @@ export default function ResumePreview({
                                     onPointerDownCapture={handlePreviewDragHandleCapture}
                                     onKeyDownCapture={handlePreviewDragHandleCapture}
                                 >
+                                    {renderPreviewMarginControls()}
                                     {previewModel.hasContent ? (
                                         <DndContext
                                             sensors={sensors}
