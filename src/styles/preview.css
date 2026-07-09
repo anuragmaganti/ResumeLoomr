@@ -86,7 +86,7 @@ html[data-theme="dark"] .resumePage {
   box-shadow: 0 11px 26px color-mix(in srgb, #0f172a 10%, transparent);
   cursor: pointer;
   user-select: none;
-  z-index: 5;
+  z-index: 14;
   transition:
     opacity var(--transition-base),
     transform var(--transition-base);
@@ -148,45 +148,6 @@ html[data-theme="dark"] .resumePage {
     pointer-events: auto;
     transform: none;
   }
-}
-
-.previewToolbar {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  color: var(--color-text-subtle);
-  font-size: 0.6875rem;
-  font-weight: 750;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-2px);
-  transition:
-    opacity var(--transition-base),
-    transform var(--transition-base);
-}
-
-.previewFrame:hover .previewToolbar,
-.previewToolbar:focus-within {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.previewToolbar > * {
-  pointer-events: none;
-}
-
-.previewFrame:hover .previewToolbar > *,
-.previewToolbar:focus-within > * {
-  pointer-events: auto;
-}
-
-.previewPageCount {
-  white-space: nowrap;
 }
 
 .previewMarginControls {
@@ -388,6 +349,13 @@ html[data-theme="dark"] .resumePage {
   min-width: 20px;
   color: var(--resume-page-heading);
   font-size: 0.75rem;
+}
+
+.resumePage:has(.sampleInformationToggle:hover, .sampleInformationToggle:focus-within, .personalAlignmentMenu:hover, .personalAlignmentMenu:focus-within) .previewMarginHighlight,
+.resumePage:has(.sampleInformationToggle:hover, .sampleInformationToggle:focus-within, .personalAlignmentMenu:hover, .personalAlignmentMenu:focus-within) .previewMarginStepper {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 @container (max-width: 28px) {
@@ -937,9 +905,9 @@ html[data-theme="dark"] .personalSection {
 
 .personalAlignmentMenu {
   position: absolute;
-  top: -3px;
-  right: 0;
-  z-index: 12;
+  top: 12px;
+  right: 12px;
+  z-index: 14;
   display: inline-flex;
   gap: 3px;
   padding: 3px;
@@ -957,8 +925,11 @@ html[data-theme="dark"] .personalSection {
     border-color var(--transition-fast);
 }
 
-.personalSection:hover > .personalAlignmentMenu,
-.personalSection:focus-within > .personalAlignmentMenu {
+.resumePage:has(.personalSection:hover) > .personalAlignmentMenu,
+.resumePage:has(.personalSection:focus-within) > .personalAlignmentMenu,
+.resumePage.resumePage--personalChromeActive > .personalAlignmentMenu,
+.personalAlignmentMenu:hover,
+.personalAlignmentMenu:focus-within {
   opacity: 1;
   pointer-events: auto;
   transform: scale(1);
@@ -1836,7 +1807,6 @@ html[data-theme="dark"] .personalSection {
     --resume-active-separator-color: var(--resume-personal-separator-color, var(--resume-page-divider));
   }
 
-  .previewToolbar,
   .resumePageMarkers,
   .previewMarginControls,
   .sampleInformationToggle,

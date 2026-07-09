@@ -1219,10 +1219,12 @@ export default function ResumePreview({
     const summaryWidthDragRef = useRef(null);
     const headerLayoutDoubleClickRef = useRef(null);
     const headerLayoutLongPressRef = useRef(null);
+    const personalChromeActiveRef = useRef(false);
     const [activeDragMeta, setActiveDragMeta] = useState(null);
     const [activeDragRect, setActiveDragRect] = useState(null);
     const [activeHeaderLayout, setActiveHeaderLayout] = useState(null);
     const [hoverHeaderLayout, setHoverHeaderLayout] = useState(null);
+    const [isPersonalChromeActive, setIsPersonalChromeActive] = useState(false);
     const [summaryWidthDrag, setSummaryWidthDrag] = useState(null);
     const isPreviewDragActive = Boolean(activeDragMeta?.type);
     const canShowHeaderLayoutHover = !activeDragMeta?.type || activeDragMeta.type === 'headerSlot';
@@ -2414,10 +2416,6 @@ export default function ResumePreview({
 
         return (
             <div className={previewSectionClassName('resumeSection personalSection', showSeparator)} key="personal">
-                <PersonalAlignmentControls
-                    activeAlignment={personalAlignment}
-                    onAlignmentChange={handlePersonalAlignmentChange}
-                />
                 <h1 {...personalTarget('name')}>
                     {renderTextWithCaret(previewModel.personal.name, personalEditorPath('name'), { fallback: "Your Name" })}
                 </h1>
@@ -3530,8 +3528,6 @@ export default function ResumePreview({
             </SortableContext>
         ),
     ].filter(Boolean);
-    const pageLabel = pageMetrics.pageCount === 1 ? '1 page' : `${pageMetrics.pageCount} pages`;
-
     function renderPageMarkers() {
         if (!previewModel.hasContent || pageMetrics.pageBreaks.length === 0) {
             return null;
@@ -3613,27 +3609,60 @@ export default function ResumePreview({
         );
     }
 
+    function setPersonalChromeActive(nextActive) {
+        if (personalChromeActiveRef.current === nextActive) {
+            return;
+        }
+
+        personalChromeActiveRef.current = nextActive;
+        setIsPersonalChromeActive(nextActive);
+    }
+
+    function handleResumePagePointerMove(event) {
+        if (!previewModel.hasContent || !previewModel.showPersonal) {
+            setPersonalChromeActive(false);
+            return;
+        }
+
+        const pageElement = resumeRef.current;
+        const personalElement = pageElement?.querySelector('.personalSection');
+
+        if (!pageElement || !personalElement) {
+            setPersonalChromeActive(false);
+            return;
+        }
+
+        const pageRect = pageElement.getBoundingClientRect();
+        const personalRect = personalElement.getBoundingClientRect();
+        const isInsidePageX = event.clientX >= pageRect.left && event.clientX <= pageRect.right;
+        const isInsidePersonalBandY = event.clientY >= pageRect.top && event.clientY <= personalRect.bottom;
+
+        setPersonalChromeActive(isInsidePageX && isInsidePersonalBandY);
+    }
+
     return (
         <>
             <section ref={panelRef} className="previewPanel">
                 <div ref={previewFrameRef} className="previewFrame">
-                    {previewModel.hasContent && (
-                        <div className="previewToolbar">
-                            <span className="previewPageCount">{pageLabel}</span>
-                        </div>
-                    )}
-
                     <div className="previewPageViewport" style={presentationVars}>
                         <div className="previewPageScaleShell" style={pageShellStyle}>
                             <div className="previewPageScaleLayer">
                                 <div
                                     ref={resumeRef}
-                                    className={`resumePage ${templateClassName(template)}${isSamplePreview ? ' resumePage--sample' : ''}${isHeaderLayoutModeActive ? ' resumePage--headerLayoutMode' : ''}${isPreviewDragActive ? ' resumePage--dragging' : ''}`}
+                                    className={`resumePage ${templateClassName(template)}${isSamplePreview ? ' resumePage--sample' : ''}${isHeaderLayoutModeActive ? ' resumePage--headerLayoutMode' : ''}${isPreviewDragActive ? ' resumePage--dragging' : ''}${isPersonalChromeActive ? ' resumePage--personalChromeActive' : ''}`}
                                     style={presentationVars}
                                     onClick={handlePreviewClick}
+                                    onPointerMove={handleResumePagePointerMove}
+                                    onPointerLeave={() => setPersonalChromeActive(false)}
                                     onPointerDownCapture={handlePreviewDragHandleCapture}
                                     onKeyDownCapture={handlePreviewDragHandleCapture}
                                 >
+                                    {previewModel.showPersonal && previewModel.hasContent ? (
+                                        <PersonalAlignmentControls
+                                            activeAlignment={personalAlignment}
+                                            onAlignmentChange={handlePersonalAlignmentChange}
+                                        />
+                                    ) : null}
                                     {renderPreviewMarginControls()}
                                     {previewModel.hasContent ? (
                                         <DndContext
