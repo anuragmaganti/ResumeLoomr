@@ -1316,9 +1316,9 @@ export default function ResumePreview({
                         return;
                     }
 
-                    const nextItem = items[index + 1];
-                    const shouldHideSeparator = nextItem
-                        ? nextItem.getBoundingClientRect().top > item.getBoundingClientRect().top + 1
+                    const previousItem = items[index - 1];
+                    const shouldHideSeparator = previousItem
+                        ? item.getBoundingClientRect().top > previousItem.getBoundingClientRect().top + 1
                         : false;
 
                     separator.classList.toggle('entryHeaderFieldSeparator--wrapped', shouldHideSeparator);
@@ -2571,8 +2571,8 @@ export default function ResumePreview({
 
         return visibleNodes.map((node, index) => (
             <span className="entryHeaderFieldGroupItem" data-entry-header-item="true" key={node.key || index}>
+                {index > 0 && <span className="entryHeaderFieldSeparator">,</span>}
                 {node}
-                {index < visibleNodes.length - 1 && <span className="entryHeaderFieldSeparator">,</span>}
             </span>
         ));
     }
