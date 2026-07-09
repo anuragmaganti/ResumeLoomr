@@ -19,7 +19,7 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 - Click any editable text in the live preview to open the matching editor field.
 - Drag sections, entries, and bullet points directly inside the live preview to reorder them.
 - Drag sections in the editor rail and drag resume tabs in the resume rail with dnd-kit sortable interactions.
-- New resumes start with Personal, Education, Internships, Experience, Projects, and Skills.
+- Fresh empty resumes offer import or start-from-scratch; scratch resumes use Personal plus Education, Experience, Internships, Projects, and Skills, with render-only sample placeholders until real content is added.
 - Add repeatable sections such as Research, Teaching, Leadership, Volunteering, Certifications, Languages, Awards, Publications, Presentations, Patents, Professional Affiliations, and custom sections.
 - Rename section titles inline, including temporarily blank names that fall back to an untitled section label on blur.
 - Collapse and expand repeated entry cards for dense editing.
@@ -28,10 +28,11 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 
 - Preview uses the same data and presentation settings as print output.
 - Print/Save uses browser print output with resume-specific document title naming.
-- The live preview supports subtle hover affordances, click-to-edit, and drag-to-reorder without affecting printed output.
-- Preview controls support `Full page` and `Large view` when those modes produce different sizes; on wide screens where they match, the controls stay hidden.
+- The live preview supports hover affordances, click-to-edit, drag-to-reorder, entry header layout editing, and separator controls without printing helper UI.
+- `Full page` preview scales a Letter-size page to the visible workspace while print output remains physical page size.
 - Personal details stay first; every other section is ordered by the resume’s section block list.
-- Resume text, margins, line spacing, section spacing, heading size, and name size can be adjusted from the settings rail.
+- Personal contact order, headline/contact order, compact summary width, entry header layout, and separator styling can be adjusted directly from the preview while field data stays structured.
+- Resume text, margins, line gap, entry gap, heading size, and name size can be adjusted from the settings rail.
 - Two print templates are available today: `Compact` as the default and `Executive` as an alternate layout.
 
 ### Block-First Data Model
@@ -41,6 +42,7 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 - Role sections share one implementation, so Experience, Internships, Leadership, Research, Teaching, Clinical Experience, Military Service, Volunteering, Campus Involvement, and Community Service all use the same editor and preview path.
 - Imported resumes and manually created resumes are edited through the same section block forms.
 - Custom imported headings can stay editable without forcing them into a rigid schema.
+- Layout preferences live as resume or section metadata, so visual rearranging stays separate from ATS-friendly field data.
 
 ### Multi-Resume Workspace
 
@@ -103,8 +105,9 @@ The core draft shape is:
   resume: {
     personal,
     settings,
+    sampleDisplay,
     sections: [
-      { id, kind, title, entries }
+      { id, kind, title, entries, entryHeaderLayout }
     ]
   },
   template,
@@ -237,7 +240,7 @@ The test suite covers:
 
 - Block-first resume normalization and editing helpers
 - Section creation, renaming, ordering, deletion, and validation
-- Preview model rendering and print presentation variables
+- Preview model rendering, sample resumes, separator settings, and print presentation variables
 - Saved-local timestamp behavior
 - Local/cloud login merge behavior
 - Account-scoped sync operations
