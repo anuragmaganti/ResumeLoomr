@@ -1,12 +1,5 @@
-import { useState } from "react";
-
 const settingOptions = [
   { id: "textSize", label: "Text size", shortLabel: "Text" },
-  { id: "horizontalMargins", label: "Horizontal margins", shortLabel: "Side margin" },
-  { id: "verticalMargins", label: "Vertical margins", shortLabel: "Top margin" }
-];
-
-const advancedSettingOptions = [
   { id: "lineSpacing", label: "Line spacing", shortLabel: "Line gap" },
   { id: "entrySpacing", label: "Entry spacing", shortLabel: "Entry gap" },
   { id: "headingSize", label: "Heading size", shortLabel: "Headings" },
@@ -28,8 +21,6 @@ export default function EditorSettingsRail({
   templateOptions,
   onTemplateChange
 }) {
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-
   function renderSettingControl(setting) {
     const value = settings[setting.id];
 
@@ -89,26 +80,6 @@ export default function EditorSettingsRail({
         </div>
 
         {settingOptions.map(renderSettingControl)}
-
-        <button
-          type="button"
-          className="settingsAdvancedToggle"
-          onClick={() => setIsAdvancedOpen((current) => !current)}
-          aria-expanded={isAdvancedOpen}
-          aria-controls="advanced-settings-group"
-        >
-          <span>Advanced</span>
-          <span aria-hidden="true">{isAdvancedOpen ? "▴" : "▾"}</span>
-        </button>
-
-        <div
-          id="advanced-settings-group"
-          className={`settingsAdvancedGroup${isAdvancedOpen ? " isExpanded" : ""}`}
-        >
-          <div className="settingsAdvancedContent">
-            {advancedSettingOptions.map(renderSettingControl)}
-          </div>
-        </div>
       </div>
     </div>
   );
