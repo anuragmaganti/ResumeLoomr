@@ -1604,28 +1604,160 @@ html[data-theme="dark"] .personalSection {
   text-align: center;
 }
 
-.resumeEmptyState--choice {
-  align-content: start;
-  gap: 18px;
-  padding-top: clamp(96px, 25%, 260px);
-}
-
 .resumeEmptyState--blank {
   visibility: hidden;
 }
 
-.resumeEmptyActions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 13px;
+.resumeEmptyChoiceOverlay {
+  position: absolute;
+  top: clamp(56px, 14%, 130px);
+  left: 0;
+  z-index: 16;
+  display: grid;
+  justify-items: center;
+  width: 100%;
+  padding-inline: clamp(12px, 5%, 40px);
+  pointer-events: none;
 }
 
-.resumeEmptyActions .button {
-  min-height: 44px;
-  padding-inline: 18px;
-  border-radius: 14px;
+.resumeEmptyActions {
+  display: grid;
+  gap: 14px;
+  width: min(470px, 100%);
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--resume-page-divider) 82%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--resume-page-bg) 94%, var(--color-surface-muted) 6%);
+  box-shadow:
+    0 18px 44px color-mix(in srgb, var(--resume-page-text) 7%, transparent),
+    0 2px 7px color-mix(in srgb, var(--resume-page-text) 5%, transparent);
+  color: var(--resume-page-text);
+  font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  text-align: left;
+  pointer-events: auto;
+}
+
+.resumeStartHeading {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 760;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.resumeStartOptions {
+  display: grid;
+  gap: 6px;
+}
+
+.emptyStartOption {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 62px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--resume-page-divider) 84%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--resume-page-bg) 88%, var(--color-surface-muted) 12%);
+  color: var(--resume-page-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    box-shadow var(--transition-base),
+    color var(--transition-base);
+}
+
+.emptyStartOption--import {
+  border-color: color-mix(in srgb, var(--color-accent) 34%, var(--resume-page-divider));
+  background: color-mix(in srgb, var(--color-accent-soft) 64%, var(--resume-page-bg) 36%);
+}
+
+.emptyStartOption:hover {
+  border-color: var(--color-accent-border);
+  background: color-mix(in srgb, var(--color-accent-soft) 72%, var(--resume-page-bg) 28%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.emptyStartOption:focus-visible {
+  border-color: var(--color-accent);
+  outline: 3px solid color-mix(in srgb, var(--color-accent) 18%, transparent);
+  outline-offset: 2px;
+}
+
+.emptyStartOption:disabled {
+  opacity: 0.58;
+  cursor: wait;
+}
+
+.emptyStartIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--resume-page-bg) 72%, var(--color-surface-elevated) 28%);
+  color: var(--resume-page-muted);
+}
+
+.emptyStartOption--import .emptyStartIcon {
+  background: color-mix(in srgb, var(--color-accent-soft) 72%, var(--resume-page-bg) 28%);
+  color: var(--color-accent-strong);
+}
+
+.emptyStartIcon > svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.emptyStartIcon .buttonSpinner {
+  width: 14px;
+  height: 14px;
+}
+
+.emptyStartCopy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.emptyStartCopy strong {
+  color: var(--resume-page-text);
+  font-size: 0.78rem;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.emptyStartCopy small {
+  color: var(--resume-page-muted);
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+.emptyStartArrow {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--resume-page-subtle);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+  transition: transform var(--transition-fast), stroke var(--transition-base);
+}
+
+.emptyStartOption:hover .emptyStartArrow,
+.emptyStartOption:focus-visible .emptyStartArrow {
+  stroke: var(--color-accent-strong);
+  transform: translateX(2px);
 }
 
 .resumeEmptyActions[data-empty-choice-nudge="odd"] {
@@ -1688,27 +1820,6 @@ html[data-theme="dark"] .personalSection {
   }
 }
 
-.resumeEmptyOr {
-  color: var(--resume-page-muted);
-  font-size: 0.8125rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.resumeEmptyState h3 {
-  margin: 0;
-  font-size: 1.65rem;
-  letter-spacing: -0.04em;
-}
-
-.resumeEmptyState p {
-  max-width: 28rem;
-  margin: 0;
-  color: var(--resume-page-muted);
-  line-height: 1.65;
-}
-
 .resumePage--executive {
   border-color: var(--resume-page-executive-border);
   box-shadow: var(--resume-page-executive-shadow);
@@ -1747,6 +1858,23 @@ html[data-theme="dark"] .personalSection {
     min-height: 420px;
     padding: var(--space-6);
   }
+
+  .resumeEmptyChoiceOverlay {
+    top: 44px;
+    padding-inline: 10px;
+  }
+
+  .resumeEmptyActions {
+    width: 100%;
+    gap: 11px;
+    padding: 12px;
+    border-radius: 15px;
+  }
+
+  .emptyStartOption {
+    min-height: 56px;
+    padding: 8px 9px;
+  }
 }
 
 @media print {
@@ -1766,6 +1894,7 @@ html[data-theme="dark"] .personalSection {
   .previewMarginControls,
   .sampleInformationToggle,
   .sectionSeparatorControl,
+  .resumeEmptyChoiceOverlay,
   .resumeEmptyState {
     display: none !important;
   }

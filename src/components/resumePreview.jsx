@@ -73,6 +73,32 @@ const HEADER_LAYOUT_DOUBLE_CLICK_TOLERANCE_PX = 8;
 const HEADER_LAYOUT_LONG_PRESS_MS = 520;
 const HEADER_LAYOUT_LONG_PRESS_MOVE_TOLERANCE_PX = 8;
 
+function ImportStartIcon() {
+    return (
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path d="M7 3.5h7l4 4V20.5H7z" />
+            <path d="M14 3.5v4h4M12.5 16V10.5m-2.5 2 2.5-2 2.5 2" />
+        </svg>
+    );
+}
+
+function ScratchStartIcon() {
+    return (
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path d="m5 16.5-.8 3.3 3.3-.8L18 8.5 14.5 5z" />
+            <path d="m12.8 6.7 3.5 3.5M8.5 19.5h10.8" />
+        </svg>
+    );
+}
+
+function StartChoiceArrow() {
+    return (
+        <svg className="emptyStartArrow" aria-hidden="true" viewBox="0 0 18 18" focusable="false">
+            <path d="m7 4 5 5-5 5" />
+        </svg>
+    );
+}
+
 const ENTRY_HEADER_FIELD_META = {
     education: {
         school: { label: 'Institution', className: 'school' },
@@ -3572,7 +3598,7 @@ export default function ResumePreview({
 
     function renderEmptyChoice() {
         if (!showEmptyResumeChoice) {
-            return <div className="resumeEmptyState resumeEmptyState--blank" aria-hidden="true" />;
+            return null;
         }
 
         const nudgeAttributes = emptyChoiceNudgeCount > 0
@@ -3580,30 +3606,44 @@ export default function ResumePreview({
             : {};
 
         return (
-            <div className="resumeEmptyState resumeEmptyState--choice">
+            <div className="resumeEmptyChoiceOverlay">
                 <div
                     className="resumeEmptyActions"
                     aria-label="Choose how to start this resume"
                     {...nudgeAttributes}
                 >
-                    <button
-                        type="button"
-                        className="button buttonPrimary emptyImportButton"
-                        onClick={onImportResume}
-                        disabled={isImportingResume}
-                    >
-                        {isImportingResume ? <span className="buttonSpinner" aria-hidden="true" /> : null}
-                        {isImportingResume ? 'Processing...' : 'Import your resume'}
-                    </button>
-                    <span className="resumeEmptyOr">or</span>
-                    <button
-                        type="button"
-                        className="button buttonSecondary emptyScratchButton"
-                        onClick={onStartFromScratch}
-                        disabled={isImportingResume}
-                    >
-                        Start from scratch
-                    </button>
+                    <h2 className="resumeStartHeading">How would you like to start?</h2>
+                    <div className="resumeStartOptions">
+                        <button
+                            type="button"
+                            className="emptyStartOption emptyStartOption--import"
+                            onClick={onImportResume}
+                            disabled={isImportingResume}
+                        >
+                            <span className="emptyStartIcon" aria-hidden="true">
+                                {isImportingResume ? <span className="buttonSpinner" /> : <ImportStartIcon />}
+                            </span>
+                            <span className="emptyStartCopy">
+                                <strong>{isImportingResume ? 'Processing resume…' : 'Import resume'}</strong>
+                                <small>Use AI to organize a PDF, DOCX, PNG, or JPG into editable sections.</small>
+                            </span>
+                            <StartChoiceArrow />
+                        </button>
+
+                        <button
+                            type="button"
+                            className="emptyStartOption emptyStartOption--scratch"
+                            onClick={onStartFromScratch}
+                            disabled={isImportingResume}
+                        >
+                            <span className="emptyStartIcon" aria-hidden="true"><ScratchStartIcon /></span>
+                            <span className="emptyStartCopy">
+                                <strong>Start from scratch</strong>
+                                <small>Open the editor and build your resume section by section.</small>
+                            </span>
+                            <StartChoiceArrow />
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -3682,12 +3722,13 @@ export default function ResumePreview({
                                     ) : (
                                         <>
                                             {!showEmptyResumeChoice ? renderSampleInformationToggle() : null}
-                                            {renderEmptyChoice()}
+                                            <div className="resumeEmptyState resumeEmptyState--blank" aria-hidden="true" />
                                         </>
                                     )}
                                 </div>
                                 {renderPageMarkers()}
                             </div>
+                            {renderEmptyChoice()}
                         </div>
                     </div>
                 </div>
