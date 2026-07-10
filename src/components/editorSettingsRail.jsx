@@ -7,11 +7,7 @@ const settingOptions = [
 ];
 
 function formatSettingValue(value) {
-  if (value === 0) {
-    return "0";
-  }
-
-  return value > 0 ? `+${value}` : String(value);
+  return String(value);
 }
 
 export default function EditorSettingsRail({
@@ -36,7 +32,7 @@ export default function EditorSettingsRail({
             disabled={value <= -5}
             aria-label={`Decrease ${setting.label}`}
           >
-            -
+            −
           </button>
 
           <span className="settingsControlValue">{formatSettingValue(value)}</span>

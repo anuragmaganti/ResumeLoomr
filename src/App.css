@@ -1566,9 +1566,9 @@ html[data-theme="dark"] .resumePill.isActive {
   container-name: settings-rail;
   --settings-inset: 5px;
   --settings-stepper-button-size: 20px;
-  --settings-stepper-value-width: 22px;
+  --settings-stepper-value-width: 20px;
   --settings-stepper-control-size: 20px;
-  --settings-stepper-gap: 0;
+  --settings-stepper-gap: 1px;
   --settings-stepper-font-size: 0.75rem;
   --settings-label-size: 0.625rem;
 }
@@ -1585,7 +1585,7 @@ html[data-theme="dark"] .resumePill.isActive {
 
 .settingsRailInner {
   display: grid;
-  gap: 8px;
+  gap: 0;
 }
 
 .editorPanelHeader h3 {
@@ -1597,7 +1597,7 @@ html[data-theme="dark"] .resumePill.isActive {
 
 .settingsRailList {
   display: grid;
-  gap: 5px;
+  gap: 2px;
   overflow: visible;
   border: 0;
   border-radius: 0;
@@ -1611,12 +1611,12 @@ html[data-theme="dark"] .resumePill.isActive {
   grid-template-columns: 1fr;
   align-items: center;
   justify-items: stretch;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
-  min-height: 36px;
-  padding: 5px 3px;
+  min-height: 29px;
+  padding: 3px 2px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   text-align: center;
   transition: background-color var(--transition-base);
@@ -1633,7 +1633,7 @@ html[data-theme="dark"] .resumePill.isActive {
   max-width: 100%;
   color: var(--color-text-subtle);
   font-size: var(--settings-label-size);
-  font-weight: 700;
+  font-weight: 680;
   line-height: 1.1;
   text-align: center;
   white-space: nowrap;
@@ -1642,7 +1642,18 @@ html[data-theme="dark"] .resumePill.isActive {
 }
 
 .settingsTemplateControl {
+  gap: 5px;
+  min-height: 0;
+  margin-bottom: 3px;
+  padding: 1px 2px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  border-radius: 0;
   cursor: default;
+}
+
+.settingsTemplateControl:hover,
+.settingsTemplateControl:focus-within {
+  background: transparent;
 }
 
 .settingsTemplateSegment {
@@ -1658,7 +1669,7 @@ html[data-theme="dark"] .resumePill.isActive {
 
 .settingsTemplateOption {
   min-width: 0;
-  min-height: 19px;
+  min-height: 21px;
   padding: 0 5px;
   border: 0;
   border-radius: 6px;
@@ -1698,9 +1709,11 @@ html[data-theme="dark"] .resumePill.isActive {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-input-bg);
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-surface-muted) 64%, var(--color-surface) 36%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-surface-elevated) 44%, transparent);
 }
 
 @container settings-control (max-width: 80px) {
@@ -1708,7 +1721,7 @@ html[data-theme="dark"] .resumePill.isActive {
     --settings-stepper-button-size: 18px;
     --settings-stepper-value-width: 20px;
     --settings-stepper-control-size: 18px;
-    --settings-stepper-gap: 2px;
+    --settings-stepper-gap: 1px;
     --settings-stepper-font-size: 0.6875rem;
   }
 }
@@ -1722,8 +1735,32 @@ html[data-theme="dark"] .resumePill.isActive {
     --settings-stepper-button-size: 16px;
     --settings-stepper-value-width: 18px;
     --settings-stepper-control-size: 17px;
-    --settings-stepper-gap: 1px;
+    --settings-stepper-gap: 0;
     --settings-stepper-font-size: 0.625rem;
+  }
+}
+
+@container settings-rail (min-width: 90px) and (max-width: 219px) {
+  .settingsControl:not(.settingsTemplateControl) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px;
+    min-height: 28px;
+    padding: 2px 0;
+    text-align: left;
+  }
+
+  .settingsControl:not(.settingsTemplateControl) .settingsControlLabel {
+    font-size: 0.5625rem;
+    text-align: left;
+  }
+
+  .settingsControl:not(.settingsTemplateControl) .settingsStepper {
+    --settings-stepper-button-size: 17px;
+    --settings-stepper-value-width: 18px;
+    --settings-stepper-control-size: 18px;
+    --settings-stepper-gap: 1px;
+    --settings-stepper-font-size: 0.6875rem;
+    justify-self: end;
   }
 }
 
@@ -1731,7 +1768,8 @@ html[data-theme="dark"] .resumePill.isActive {
   .settingsControl {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
-    padding: 6px 7px;
+    min-height: 31px;
+    padding: 4px 6px;
     text-align: left;
   }
 
@@ -1740,7 +1778,7 @@ html[data-theme="dark"] .resumePill.isActive {
   }
 
   .settingsTemplateSegment {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     width: min(100%, 180px);
     gap: 2px;
     padding: 2px;
@@ -1761,6 +1799,11 @@ html[data-theme="dark"] .resumePill.isActive {
   .settingsStepper {
     justify-self: end;
   }
+
+  .settingsTemplateControl {
+    margin-bottom: 4px;
+    padding-bottom: 8px;
+  }
 }
 
 .settingsControlValue,
@@ -1773,7 +1816,7 @@ html[data-theme="dark"] .resumePill.isActive {
   min-height: var(--settings-stepper-control-size);
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: 7px;
   background: transparent;
   color: var(--color-text);
   font-size: var(--settings-stepper-font-size);
@@ -1786,8 +1829,9 @@ html[data-theme="dark"] .resumePill.isActive {
 
 .settingsControlValue {
   width: var(--settings-stepper-value-width);
-  border-inline: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
-  background: color-mix(in srgb, var(--color-surface-muted) 54%, transparent);
+  background: transparent;
+  color: var(--color-text-subtle);
+  font-variant-numeric: tabular-nums;
 }
 
 .separatorSettingsPopup {
