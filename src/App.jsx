@@ -34,21 +34,12 @@ import {
 const THEME_STORAGE_KEY = 'resumeloomr:theme';
 const EMPTY_SAMPLE_ORDER_OVERRIDES = {};
 
-function NoticeToastIcon({ tone, isSyncError }) {
+function NoticeToastIcon({ isSyncError }) {
   if (isSyncError) {
     return (
       <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
         <path d="M7.2 17.5H5.8a3.3 3.3 0 0 1-.45-6.57A6.5 6.5 0 0 1 18 9.65a4 4 0 0 1 .2 7.85h-1.4" />
         <path d="m9 15 6 6M15 15l-6 6" />
-      </svg>
-    );
-  }
-
-  if (tone === 'success') {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-        <circle cx="12" cy="12" r="8.5" />
-        <path d="m8.2 12.2 2.4 2.4 5.2-5.2" />
       </svg>
     );
   }
@@ -78,10 +69,6 @@ function getNoticeToastPresentation(notice, syncState) {
     title: isCloudUnavailable ? 'Cloud sync unavailable' : '',
     message: isCloudUnavailable ? 'Your work is saved locally and remains editable.' : notice?.message,
   };
-}
-
-function sampleTextListOrderKey(sectionId, entryId, field) {
-  return `${sectionId}.${entryId}.${field}`;
 }
 
 function getPreviewEntryOrder(previewModel, sectionId) {
@@ -416,7 +403,7 @@ function App() {
       return;
     }
 
-    const orderKey = sampleTextListOrderKey(sectionId, entryId, field);
+    const orderKey = `${sectionId}.${entryId}.${field}`;
     const persistableMove = getPersistableSampleTextListMove(resume, sectionId, entryId, field, fromIndex, toIndex);
 
     if (persistableMove) {
@@ -810,7 +797,7 @@ function App() {
             aria-atomic="true"
           >
             <span className="noticeToastIcon">
-              <NoticeToastIcon tone={notice.tone} isSyncError={noticePresentation.isSyncError} />
+              <NoticeToastIcon isSyncError={noticePresentation.isSyncError} />
             </span>
             <span className="noticeToastCopy">
               {noticePresentation.title ? <strong>{noticePresentation.title}</strong> : null}

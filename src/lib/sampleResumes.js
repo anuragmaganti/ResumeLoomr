@@ -1337,32 +1337,6 @@ function getRealSampleSection(resume, sectionId) {
   return normalizedResume.sections.find((section) => section.id === sectionId) || null;
 }
 
-export function getPersistableSampleEntryOrder(resume, sectionId, orderedEntryIds) {
-  const section = getRealSampleSection(resume, sectionId);
-  const realEntryIds = Array.isArray(section?.entries)
-    ? section.entries.map((entry) => trimText(entry.id)).filter(Boolean)
-    : [];
-  const orderedIds = Array.isArray(orderedEntryIds)
-    ? orderedEntryIds.map(trimText).filter(Boolean)
-    : [];
-
-  if (realEntryIds.length < 2 || orderedIds.length === 0) {
-    return null;
-  }
-
-  const realEntryIdSet = new Set(realEntryIds);
-  const nextRealOrder = orderedIds.filter((entryId) => realEntryIdSet.has(entryId));
-
-  if (
-    nextRealOrder.length !== realEntryIds.length ||
-    nextRealOrder.every((entryId, index) => entryId === realEntryIds[index])
-  ) {
-    return null;
-  }
-
-  return nextRealOrder;
-}
-
 export function getPersistableSampleTextListMove(resume, sectionId, entryId, field, fromIndex, toIndex) {
   const section = getRealSampleSection(resume, sectionId);
   const entry = section?.entries?.find((sectionEntry) => sectionEntry.id === entryId);

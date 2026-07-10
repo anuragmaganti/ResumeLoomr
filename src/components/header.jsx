@@ -19,10 +19,6 @@ import { MAX_WORKSPACE_RESUME_NAME_LENGTH, sanitizeWorkspaceResumeName } from ".
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from "../lib/sortableSensors.js";
 import EntryActionMenu from "./forms/entryActionMenu";
 
-function getResumeIds(resumeList) {
-  return resumeList.map((resume) => resume.id);
-}
-
 const RESUME_SELECTION_LONG_PRESS_MS = 520;
 const RESUME_SELECTION_LONG_PRESS_MOVE_TOLERANCE_PX = 5;
 
@@ -399,7 +395,7 @@ export default function Header({
     accountKey: selectionAccountKey,
     ids: new Set(),
   }));
-  const resumeIds = useMemo(() => getResumeIds(resumeList), [resumeList]);
+  const resumeIds = useMemo(() => resumeList.map((resume) => resume.id), [resumeList]);
   const resumeById = useMemo(
     () => new Map(resumeList.map((resume) => [resume.id, resume])),
     [resumeList],

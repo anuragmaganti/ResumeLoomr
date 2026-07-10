@@ -713,6 +713,7 @@ html[data-theme="dark"] .resumePage {
 }
 
 .personalSection {
+  position: relative;
   --resume-active-separator-gap: var(--resume-personal-separator-gap, var(--resume-section-gap));
   --resume-active-separator-color: var(--resume-personal-separator-color, var(--resume-page-divider));
   --resume-active-separator-weight: var(--resume-personal-separator-weight, 1px);
@@ -897,10 +898,6 @@ html[data-theme="dark"] .personalSection {
   line-height: var(--resume-detail-line-height);
   text-align: left;
   text-align-last: left;
-}
-
-.personalSection {
-  position: relative;
 }
 
 .personalAlignmentMenu {
@@ -1170,7 +1167,17 @@ html[data-theme="dark"] .personalSection {
   flex: 0 0 auto;
   width: 48px;
   min-height: 1.2em;
+  border: 1px dotted var(--preview-edit-highlight-ring);
   border-radius: 5px;
+  background: var(--preview-edit-highlight-bg);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--preview-edit-highlight-ring) 18%, transparent 82%);
+  opacity: 0.86;
+  pointer-events: auto;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    opacity var(--transition-fast);
 }
 
 .entryHeaderHoverSlotPlaceholderWrap {
@@ -1190,19 +1197,6 @@ html[data-theme="dark"] .personalSection {
 
 .entryHeaderHoverSlotLayer--education .entryHeaderHoverSlot {
   width: 38px;
-}
-
-.entryHeaderHoverSlot {
-  border: 1px dotted var(--preview-edit-highlight-ring);
-  background: var(--preview-edit-highlight-bg);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--preview-edit-highlight-ring) 18%, transparent 82%);
-  opacity: 0.86;
-  pointer-events: auto;
-  transition:
-    background-color var(--transition-fast),
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast),
-    opacity var(--transition-fast);
 }
 
 .entryHeaderHoverSlot.isHeaderLayoutDropTarget,

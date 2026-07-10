@@ -40,7 +40,6 @@
 .button:focus-visible,
 .tabButton:focus-visible,
 .mobileWorkspaceButton:focus-visible,
-.noticeDismiss:focus-visible,
 .floatingThemeToggle:focus-visible,
 .settingsLauncher:focus-visible,
 .accountSettingsBackdrop:focus-visible {
@@ -305,6 +304,7 @@ html[data-theme="dark"] .buttonSecondary:not(:disabled):hover {
 }
 
 .button.resumePillMenuButton {
+  flex: 0 0 auto;
   min-width: 26px;
   width: 26px;
   min-height: 26px;
@@ -447,8 +447,6 @@ html[data-theme="dark"] .buttonSecondary:not(:disabled):hover {
   line-height: 1;
 }
 
-.statusBadge--neutral,
-.statusBadge--idle,
 .statusBadge--ready {
   border-color: var(--color-border);
   background: var(--color-surface-muted);
@@ -456,8 +454,7 @@ html[data-theme="dark"] .buttonSecondary:not(:disabled):hover {
 }
 
 .statusBadge--saving-local,
-.statusBadge--syncing,
-.statusBadge--info {
+.statusBadge--syncing {
   border-color: var(--color-info-border);
   background: var(--color-info-soft);
   color: var(--color-info);
@@ -479,8 +476,7 @@ html[data-theme="dark"] .buttonSecondary:not(:disabled):hover {
 }
 
 .statusBadge--local-error,
-.statusBadge--sync-error,
-.statusBadge--error {
+.statusBadge--sync-error {
   border-color: var(--color-error-border);
   background: var(--color-error-soft);
   color: var(--color-error);

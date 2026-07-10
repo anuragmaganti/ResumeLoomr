@@ -338,30 +338,6 @@ html[data-theme="dark"] .resumePill.isActive {
   outline: none;
 }
 
-.resumePillMenuButton,
-.resumeNewButton {
-  min-height: 30px;
-  border-radius: 9px;
-  box-shadow: none;
-}
-
-.resumePillMenuButton {
-  flex: 0 0 auto;
-  min-width: 26px;
-  width: 26px;
-  padding: 0;
-  border-color: transparent;
-  background: color-mix(in srgb, var(--color-surface-elevated) 64%, transparent);
-  color: var(--color-text-muted);
-}
-
-.resumePillMenuButton:not(:disabled):hover,
-.resumePillMenuButton:not(:disabled):focus-visible {
-  border-color: color-mix(in srgb, var(--color-accent) 24%, transparent);
-  background: color-mix(in srgb, var(--color-accent-soft) 62%, var(--color-surface-elevated));
-  color: var(--color-accent-strong);
-}
-
 .resumePillMenuHost {
   display: inline-flex;
   flex: 0 0 0;
@@ -592,21 +568,8 @@ html[data-theme="dark"] .resumePill.isActive {
 }
 
 .resumeNewButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
   width: 100%;
   min-width: 0;
-  padding: 0 12px;
-  font-size: 0.75rem;
-  border-color: color-mix(in srgb, var(--color-border-strong) 72%, transparent);
-  border-style: dashed;
-  background: color-mix(in srgb, var(--color-surface-muted) 44%, transparent);
-  color: var(--color-text-subtle);
-  font-weight: 680;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
 }
 
 .resumeNewButtonIcon {
@@ -634,14 +597,6 @@ html[data-theme="dark"] .resumePill.isActive {
 
 .resumeNewButtonIcon::after {
   transform: translate(-50%, -50%) rotate(90deg);
-}
-
-.resumeNewButton:not(:disabled):hover,
-.resumeNewButton:not(:disabled):focus-visible {
-  border-color: var(--color-accent-border);
-  border-style: solid;
-  background: color-mix(in srgb, var(--color-accent-soft) 48%, var(--color-surface) 52%);
-  color: var(--color-accent-strong);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -762,11 +717,6 @@ html[data-theme="dark"] .resumePill.isActive {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.55;
-}
-
-.noticeToast--success .noticeToastIcon {
-  background: var(--color-success-soft);
-  color: var(--color-success);
 }
 
 .noticeToast--error .noticeToastIcon {
@@ -1958,7 +1908,6 @@ html[data-theme="dark"] .accountSettingsPanel {
 .settingsRail {
   container-type: inline-size;
   container-name: settings-rail;
-  --settings-inset: 5px;
   --settings-stepper-button-size: 20px;
   --settings-stepper-value-width: 20px;
   --settings-stepper-control-size: 20px;
@@ -1980,13 +1929,6 @@ html[data-theme="dark"] .accountSettingsPanel {
 .settingsRailInner {
   display: grid;
   gap: 0;
-}
-
-.editorPanelHeader h3 {
-  margin: 0;
-  font-size: 1rem;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
 }
 
 .settingsRailList {
@@ -2442,15 +2384,6 @@ html[data-theme="dark"] .accountSettingsPanel {
     padding: 13px;
   }
 
-  .editorPanelHeader h3 {
-    font-size: 0.875rem;
-    letter-spacing: -0.02em;
-  }
-
-  .editorPanelHeader h3 {
-    font-size: 0.9375rem;
-  }
-
   .tabs {
     --tabs-inset: 5px;
     gap: 4px;
@@ -2478,18 +2411,11 @@ html[data-theme="dark"] .accountSettingsPanel {
 }
 
 .editorPanelHeading h3 {
+  margin: 0;
   white-space: nowrap;
   font-size: 1.0625rem;
   line-height: 1.1;
   letter-spacing: -0.025em;
-}
-
-.editorPanelHeader h2,
-.editorPanelHeader h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  line-height: 1.1;
-  letter-spacing: -0.04em;
 }
 
 .editorPanelMeta {

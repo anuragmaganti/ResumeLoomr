@@ -154,7 +154,6 @@ import {
   createMixedSamplePreviewModel,
   createSamplePlaceholderResolver,
   createSamplePreviewModel,
-  getPersistableSampleEntryOrder,
   getPersistableSampleTextListMove,
   getSampleResumeIndex,
 } from '../src/lib/sampleResumes.js';
@@ -738,34 +737,6 @@ test('mixed sample preview uses real user fields over sample fields', () => {
   assert.equal(roleEntry.activities[1].text.includes('Leveraged a seven-figure liquidity event'), true);
 });
 
-test('sample preview entry reorders persist real editor entry order when IDs match', () => {
-  let resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
-  resume = addRoleBlockEntry(resume, 'experience');
-
-  const [firstEntry, secondEntry] = getSection(resume, 'experience').entries;
-  resume = updateRoleBlockEntry(resume, 'experience', firstEntry.id, 'company', 'ONE');
-  resume = updateRoleBlockEntry(resume, 'experience', secondEntry.id, 'company', 'TWO');
-
-  const mixedPreview = createMixedSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
-  const experiencePreview = mixedPreview.sectionBlocks.find((section) => section.id === 'experience');
-  const nextPreviewOrder = [
-    secondEntry.id,
-    firstEntry.id,
-    ...experiencePreview.entryOrder.filter((entryId) => entryId !== firstEntry.id && entryId !== secondEntry.id),
-  ];
-  const persistedOrder = getPersistableSampleEntryOrder(resume, 'experience', nextPreviewOrder);
-
-  assert.deepEqual(experiencePreview.entries.slice(0, 2).map((entry) => entry.company), ['ONE', 'TWO']);
-  assert.deepEqual(persistedOrder, [secondEntry.id, firstEntry.id]);
-
-  const reorderedResume = reorderSectionBlockEntriesToMatch(resume, 'experience', persistedOrder);
-  assert.deepEqual(
-    getSection(reorderedResume, 'experience').entries.map((entry) => entry.company),
-    ['TWO', 'ONE'],
-  );
-  assert.equal(getPersistableSampleEntryOrder(createEmptyResume(), 'experience', nextPreviewOrder), null);
-});
-
 test('partially edited sample role entries keep fallback fields after reorder and reload', () => {
   let resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
   resume = addRoleBlockEntry(resume, 'experience');
@@ -867,7 +838,6 @@ test('sample-only entry reorders around real entries do not duplicate real edito
   });
   const reorderedExperience = reorderedPreview.sectionBlocks.find((section) => section.id === 'experience');
 
-  assert.equal(getPersistableSampleEntryOrder(resume, 'experience', reorderedExperience.entryOrder), null);
   assert.deepEqual(reorderedExperience.entries.map((entry) => entry.id), reorderedExperience.entryOrder);
   assert.deepEqual(reorderedExperience.entries.map((entry) => entry.company), [
     'TWO',
