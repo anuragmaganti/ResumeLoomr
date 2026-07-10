@@ -32,7 +32,7 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 - `Full page` preview scales a Letter-size page to the visible workspace while print output remains physical page size.
 - Personal details stay first; every other section is ordered by the resume’s section block list.
 - Personal contact order, headline/contact order, compact summary width, entry header layout, and separator styling can be adjusted directly from the preview while field data stays structured.
-- Resume text, margins, line gap, entry gap, heading size, and name size can be adjusted from the settings rail.
+- Page margins can be adjusted directly from the preview; text size, line gap, entry gap, heading size, and name size remain in the compact settings rail.
 - Two print templates are available today: `Compact` as the default and `Executive` as an alternate layout.
 
 ### Block-First Data Model
@@ -47,6 +47,7 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 ### Multi-Resume Workspace
 
 - Create, rename, duplicate, delete, reorder, and switch between resumes.
+- Select multiple resume tabs and delete them together through one guarded local-first operation; the workspace always retains at least one resume.
 - Resume tabs live in a wrapping rail under the main header.
 - Resume rail order is user-controlled and persists locally and through cloud sync.
 - A single browser workspace supports up to `100` resumes.
@@ -59,7 +60,7 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 - Local saves update the visible `Saved locally` timestamp from the actual local save time.
 - Local drafts include `localRevision` metadata to prevent stale tab saves from overwriting newer local changes.
 - `localStorage` is kept only for small compatibility markers, theme/settings, and fallback/migration helpers.
-- Signed-out users can keep editing locally, and settings explain how to remove account connection data and local resume copies from a shared browser.
+- On sign-out, users can clearly choose whether to keep local resumes editable on that browser or sync first and remove its local copies; neither choice deletes cloud resumes.
 
 ### Account Sync
 
@@ -240,6 +241,7 @@ The test suite covers:
 
 - Block-first resume normalization and editing helpers
 - Section creation, renaming, ordering, deletion, and validation
+- Multi-resume selection and guarded batch deletion
 - Preview model rendering, sample resumes, separator settings, and print presentation variables
 - Saved-local timestamp behavior
 - Local/cloud login merge behavior
