@@ -14,6 +14,31 @@ const DEFAULT_SIGNED_OUT_EDITING_PREFERENCE = {
   allow: true,
   skipPrompt: false,
 };
+
+export function getSignOutStorageMode(preference) {
+  if (!preference?.skipPrompt) {
+    return 'ask';
+  }
+
+  return preference.allow ? 'keep' : 'clear';
+}
+
+export function createSignOutStoragePreference(mode, currentPreference = DEFAULT_SIGNED_OUT_EDITING_PREFERENCE) {
+  if (mode === 'keep') {
+    return { allow: true, skipPrompt: true };
+  }
+
+  if (mode === 'clear') {
+    return { allow: false, skipPrompt: true };
+  }
+
+  return {
+    allow: typeof currentPreference?.allow === 'boolean'
+      ? currentPreference.allow
+      : DEFAULT_SIGNED_OUT_EDITING_PREFERENCE.allow,
+    skipPrompt: false,
+  };
+}
 const STALE_LOCAL_STORAGE_KEYS = [
   'resumeloomr:guest-backup-before-cloud-mirror:v1',
   'resumeloomr:cloud-mirror-manifest:v1',

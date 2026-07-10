@@ -917,8 +917,7 @@ html[data-theme="dark"] .resumePill.isActive {
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(15, 23, 42, 0.16);
-  backdrop-filter: blur(3px);
+  background: color-mix(in srgb, var(--color-bg) 42%, transparent);
   pointer-events: auto;
   cursor: default;
 }
@@ -929,172 +928,372 @@ html[data-theme="dark"] .resumePill.isActive {
   bottom: 72px;
   z-index: 1;
   display: grid;
-  gap: var(--space-4);
-  width: min(420px, calc(100vw - 36px));
-  padding: var(--space-5);
-  background: var(--color-surface);
+  gap: 0;
+  width: min(400px, calc(100vw - 36px));
+  max-height: calc(100dvh - 96px);
+  padding: 11px 12px 12px;
+  overflow: auto;
+  border-color: color-mix(in srgb, var(--color-border-strong) 56%, var(--color-border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-surface) 96%, var(--color-surface-muted));
+  box-shadow:
+    0 24px 64px color-mix(in srgb, #0f172a 22%, transparent),
+    0 4px 14px color-mix(in srgb, #0f172a 10%, transparent);
   pointer-events: auto;
-  animation: settingsPanelIn 180ms ease both;
+  outline: none;
+  animation: settingsPanelIn 170ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+html[data-theme="dark"] .accountSettingsPanel {
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.72),
+    0 4px 16px rgba(0, 0, 0, 0.46);
 }
 
 .accountSettingsHeader {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  padding: 1px 1px 10px 3px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent);
 }
 
 .accountSettingsHeader h2 {
   margin: 0;
-  font-size: 1.25rem;
-  letter-spacing: -0.03em;
+  font-size: 1rem;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.accountSettingsClose {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
+}
+
+.accountSettingsClose:hover,
+.accountSettingsClose:focus-visible {
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  outline: none;
+}
+
+.accountSettingsClose svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.7;
 }
 
 .connectionSummary {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-3);
-  align-items: center;
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background:
-    radial-gradient(circle at 0 0, var(--color-accent-soft), transparent 42%),
-    var(--color-surface-muted);
+  gap: 11px;
+  align-items: start;
+  padding: 12px 3px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent);
 }
 
-.connectionOrb {
+.connectionSummaryIcon {
+  display: inline-grid;
+  place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+}
+
+.connectionSummaryIcon.is-cloud {
+  border-color: var(--color-success-border);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.connectionSummaryIcon.is-remembered {
+  border-color: var(--color-info-border);
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+.connectionSummaryIconGraphic {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.connectionSummaryCopy {
+  min-width: 0;
+}
+
+.connectionStatusRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  color: var(--color-text-muted);
+  font-size: 0.66rem;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.connectionStatusDot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
   border-radius: 999px;
   background: var(--color-text-muted);
-  box-shadow: inset 0 0 0 6px var(--color-surface);
 }
 
-.connectionOrb.isCloud {
-  border-color: var(--color-success-border);
+.connectionStatusDot.is-cloud {
   background: var(--color-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 13%, transparent);
 }
 
-.connectionOrb.isRemembered {
-  border-color: var(--color-info-border);
+.connectionStatusDot.is-remembered {
   background: var(--color-info);
 }
 
-.connectionMode {
-  margin: 0 0 4px;
-  color: var(--color-text-subtle);
-  font-size: 0.78rem;
-  font-weight: 800;
-  line-height: 1.25;
-}
-
 .connectionAccount {
-  margin: 0;
+  margin: 0 0 4px;
   color: var(--color-text);
-  font-size: 1rem;
-  font-weight: 800;
-  line-height: 1.15;
+  font-size: 0.875rem;
+  font-weight: 760;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.signedOutEditingSettings {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-soft);
-}
-
-.signedOutEditingSettings h3 {
-  margin: 0 0 5px;
-  color: var(--color-text);
-  font-size: 0.95rem;
-  letter-spacing: -0.02em;
-}
-
-.signedOutEditingSettings p {
+.connectionDescription {
   margin: 0;
   color: var(--color-text-subtle);
-  font-size: 0.82rem;
+  font-size: 0.72rem;
   line-height: 1.4;
 }
 
-.settingsCheckboxRow {
+.signOutBehaviorSection {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
-  align-items: flex-start;
+  gap: 7px;
+  padding: 12px 2px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent);
+}
+
+.signOutBehaviorSection legend {
+  padding: 0;
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 760;
+  letter-spacing: -0.01em;
+}
+
+.accountSettingsSectionIntro {
+  margin: 0;
   color: var(--color-text-subtle);
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.signOutBehaviorOptions {
+  display: grid;
+  gap: 5px;
+}
+
+.signOutBehaviorOption {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  min-height: 48px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--color-surface-muted) 58%, var(--color-surface) 42%);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.signOutBehaviorOption:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-muted);
+}
+
+.signOutBehaviorOption:focus-within {
+  outline: 2px solid var(--color-accent-soft);
+  outline-offset: 1px;
+}
+
+.signOutBehaviorOption.isSelected {
+  border-color: var(--color-accent-border);
+  background: color-mix(in srgb, var(--color-accent-soft) 62%, var(--color-surface) 38%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.signOutBehaviorOption > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.storageChoiceIconWrap {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-elevated) 72%, transparent);
+  color: var(--color-text-muted);
+}
+
+.signOutBehaviorOption.isSelected .storageChoiceIconWrap {
+  background: color-mix(in srgb, var(--color-accent-soft) 76%, var(--color-surface-elevated));
+  color: var(--color-accent-strong);
+}
+
+.storageChoiceIcon {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.45;
+}
+
+.signOutBehaviorCopy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.signOutBehaviorCopy strong {
+  color: var(--color-text);
+  font-size: 0.74rem;
+  font-weight: 740;
+  line-height: 1.2;
+}
+
+.signOutBehaviorCopy small {
+  color: var(--color-text-subtle);
+  font-size: 0.66rem;
   line-height: 1.35;
 }
 
-.settingsCheckboxRow input {
-  width: 16px;
-  height: 16px;
-  margin-top: 1px;
-  accent-color: var(--color-accent);
+.signOutBehaviorCheck {
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow: inset 0 0 0 3px var(--color-surface);
 }
 
-.signedOutEditingSettings .signedOutEditingWarning {
-  padding: 10px;
-  border: 1px solid var(--color-danger-border);
-  border-radius: 12px;
-  background: var(--color-danger-bg);
-  color: var(--color-error);
-  font-weight: 700;
+.signOutBehaviorOption.isSelected .signOutBehaviorCheck {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
 }
 
 .accountSettingsPrimary {
   width: 100%;
-  min-height: 38px;
+  min-height: 36px;
+  margin-top: 12px;
+  border-radius: 10px;
+  box-shadow: none;
+  font-size: 0.78rem;
 }
 
-.disconnectBox {
+.browserDataSection {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: 9px;
+  padding: 12px 3px 1px;
+}
+
+.browserDataSection.isConfirming {
+  margin-top: 10px;
+  padding: 10px;
   border: 1px solid var(--color-danger-border);
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   background: var(--color-danger-bg);
 }
 
-.disconnectBox h3 {
-  margin: 0 0 5px;
+.browserDataCopy h3 {
+  margin: 0 0 3px;
   color: var(--color-text);
-  font-size: 0.95rem;
+  font-size: 0.78rem;
   letter-spacing: -0.02em;
 }
 
-.disconnectBox p {
+.browserDataCopy p {
   margin: 0;
   color: var(--color-text-subtle);
-  font-size: 0.82rem;
+  font-size: 0.69rem;
   line-height: 1.4;
 }
 
-.accountSettingsDanger {
-  width: 100%;
-  min-height: 38px;
+.browserDataRemoveButton {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-error);
+  font-size: 0.7rem;
+  font-weight: 740;
+  line-height: 1.2;
+  cursor: pointer;
 }
 
-.disconnectActions {
+.browserDataRemoveButton:hover,
+.browserDataRemoveButton:focus-visible {
+  color: var(--color-danger-hover-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  outline: none;
+}
+
+.browserDataRemoveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.browserDataActions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
 }
 
-.disconnectActions .button {
-  min-height: 36px;
+.browserDataActions .button {
+  min-height: 32px;
   padding-inline: 12px;
-  font-size: 0.78rem;
+  border-radius: 9px;
+  font-size: 0.72rem;
 }
 
 .signedOutPrompt {
@@ -2743,7 +2942,7 @@ html[data-theme="dark"] .sectionAddDialog {
     width: auto;
     max-height: calc(100dvh - 76px);
     overflow: auto;
-    padding: var(--space-4);
+    padding: 11px 12px 12px;
   }
 
 }

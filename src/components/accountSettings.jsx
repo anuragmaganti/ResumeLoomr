@@ -1,5 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { getSaveStatusPresentation } from '../lib/saveStatus.js';
+import {
+  createSignOutStoragePreference,
+  getSignOutStorageMode,
+} from '../lib/browserConnection.js';
 
 function SaveStatusIcon({ status }) {
   if (status === 'syncing') {
@@ -69,6 +73,60 @@ function formatAccountName(account, fallback = 'Unknown account') {
   return account?.email || account?.displayName || fallback;
 }
 
+function ConnectionIcon({ mode }) {
+  return (
+    <svg className="connectionSummaryIconGraphic" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      {mode === 'cloud' ? (
+        <>
+          <path d="M17.5 18H7a4 4 0 0 1-.5-8A6 6 0 0 1 18 9.5a4.25 4.25 0 0 1-.5 8.5Z" />
+          <path d="m9.2 13 2 2 4-4.5" />
+        </>
+      ) : mode === 'remembered' ? (
+        <>
+          <rect x="4" y="5" width="16" height="12" rx="2.5" />
+          <path d="M8 20h8M12 17v3" />
+        </>
+      ) : (
+        <>
+          <rect x="4" y="5" width="16" height="12" rx="2.5" />
+          <path d="M9 9.5h6M9 12.5h4" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function StorageChoiceIcon({ mode }) {
+  return (
+    <svg className="storageChoiceIcon" aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      {mode === 'ask' ? (
+        <>
+          <circle cx="10" cy="10" r="7" />
+          <path d="M8.2 7.8A2.1 2.1 0 0 1 10.3 6c1.3 0 2.3.8 2.3 2 0 1.8-2.1 1.9-2.1 3.4M10.5 14h.01" />
+        </>
+      ) : mode === 'keep' ? (
+        <>
+          <rect x="3" y="4" width="14" height="12" rx="2.5" />
+          <path d="M3 11h14M6 13.5h.01" />
+        </>
+      ) : (
+        <>
+          <path d="M4 6h12M8 3.5h4M6 6l.7 10h6.6L14 6" />
+          <path d="M8.5 9v4M11.5 9v4" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 18 18" focusable="false">
+      <path d="m5 5 8 8M13 5l-8 8" />
+    </svg>
+  );
+}
+
 export default function AccountSettings({
   isOpen,
   saveState,
@@ -88,6 +146,13 @@ export default function AccountSettings({
 }) {
   const [isConfirmingDisconnect, setIsConfirmingDisconnect] = useState(false);
   const [isThemeAnimating, setIsThemeAnimating] = useState(false);
+  const launcherRef = useRef(null);
+  const panelRef = useRef(null);
+  const closeSettingsFromEffect = useEffectEvent(() => {
+    setIsConfirmingDisconnect(false);
+    onClose();
+    window.requestAnimationFrame(() => launcherRef.current?.focus({ preventScroll: true }));
+  });
   const activeAccount = authUser
     ? {
         uid: authUser.uid,
@@ -103,19 +168,40 @@ export default function AccountSettings({
     cloudMode: isSignedIn,
   });
   const hasRememberedAccount = Boolean(connectedAccount?.uid);
-  const connectionMode = isSignedIn
-    ? 'Signed in and syncing to your account'
+  const hasAccountContext = isSignedIn || hasRememberedAccount;
+  const connectionStatus = isSignedIn
+    ? {
+        mode: 'cloud',
+        label: 'Cloud sync on',
+        account: accountName,
+        description: 'Changes save to this browser first, then sync to your account.',
+      }
     : hasRememberedAccount
-      ? 'Signed out, but this browser has local resume data from an account'
-      : 'Local-only browser';
-  const disconnectTitle = isSignedIn ? 'Disconnect this browser?' : 'Clear local resume data?';
+      ? {
+          mode: 'remembered',
+          label: 'Signed out',
+          account: accountName,
+          description: 'This browser remembers the last connected account and may contain local resumes.',
+        }
+      : {
+          mode: 'local',
+          label: 'This browser only',
+          account: 'Not signed in',
+          description: 'Resumes are stored locally until you sign in for cloud backup.',
+        };
+  const signOutMode = getSignOutStorageMode(signedOutEditingPreference);
+  const disconnectTitle = 'Remove data from this browser?';
   const disconnectBody = isSignedIn
-    ? 'This signs you out, removes local resume data and account connection markers from this browser, and returns the app to a fresh local-only workspace. Your cloud resumes stay in your account.'
-    : 'This removes the local resumes and saved account connection from this browser, then starts a fresh local-only workspace. This cannot be undone from this browser.';
+    ? 'Pending changes are synced first. Then you are signed out and local resumes and account details are removed from this browser. Cloud resumes are not deleted.'
+    : 'Local resumes and the remembered account are removed from this browser. Changes that exist only here cannot be recovered. Cloud resumes are not deleted.';
 
-  function closeSettings() {
+  function closeSettings({ restoreFocus = true } = {}) {
     setIsConfirmingDisconnect(false);
     onClose();
+
+    if (restoreFocus) {
+      window.requestAnimationFrame(() => launcherRef.current?.focus({ preventScroll: true }));
+    }
   }
 
   async function confirmDisconnect() {
@@ -126,6 +212,59 @@ export default function AccountSettings({
     setIsThemeAnimating(true);
     onToggleTheme();
   }
+
+  function updateSignOutMode(mode) {
+    onSignedOutEditingPreferenceChange(
+      createSignOutStoragePreference(mode, signedOutEditingPreference),
+    );
+  }
+
+  function handlePanelKeyDown(event) {
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const focusableElements = Array.from(
+      panelRef.current?.querySelectorAll('button:not(:disabled), input:not(:disabled)') || [],
+    );
+
+    if (focusableElements.length === 0) {
+      return;
+    }
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+    } else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    const frameId = window.requestAnimationFrame(() => panelRef.current?.focus({ preventScroll: true }));
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeSettingsFromEffect();
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
 
   return (
     <>
@@ -168,6 +307,7 @@ export default function AccountSettings({
       </button>
 
       <button
+        ref={launcherRef}
         type="button"
         className="settingsLauncher"
         onClick={onOpen}
@@ -185,68 +325,90 @@ export default function AccountSettings({
           <button type="button" className="accountSettingsBackdrop" onClick={closeSettings} aria-label="Close settings" />
           <section
             className="accountSettingsPanel panel"
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="account-settings-title"
+            tabIndex={-1}
+            onKeyDown={handlePanelKeyDown}
           >
             <div className="accountSettingsHeader">
-              <div>
-                <h2 id="account-settings-title">Settings</h2>
-              </div>
-              <button type="button" className="authCloseButton" onClick={closeSettings} aria-label="Close settings">
-                x
+              <h2 id="account-settings-title">Settings</h2>
+              <button type="button" className="accountSettingsClose" onClick={closeSettings} aria-label="Close settings">
+                <CloseIcon />
               </button>
             </div>
 
             <div className="connectionSummary">
-              <div className={`connectionOrb ${isSignedIn ? 'isCloud' : hasRememberedAccount ? 'isRemembered' : ''}`} aria-hidden="true" />
-              <div>
-                <p className="connectionMode">{connectionMode}</p>
-                <p className="connectionAccount">
-                  {isSignedIn || hasRememberedAccount ? accountName : 'No account connected'}
-                </p>
+              <span className={`connectionSummaryIcon is-${connectionStatus.mode}`} aria-hidden="true">
+                <ConnectionIcon mode={connectionStatus.mode} />
+              </span>
+              <div className="connectionSummaryCopy">
+                <div className="connectionStatusRow">
+                  <span className={`connectionStatusDot is-${connectionStatus.mode}`} aria-hidden="true" />
+                  <span>{connectionStatus.label}</span>
+                </div>
+                <p className="connectionAccount">{connectionStatus.account}</p>
+                <p className="connectionDescription">{connectionStatus.description}</p>
               </div>
             </div>
 
-            <div className="signedOutEditingSettings">
-              <div>
-                <h3>Keep resumes available after sign out</h3>
-                <p>
-                  Stores resumes on this browser so you can edit without signing in. Turn off on shared computers.
-                </p>
-              </div>
-              <label className="settingsCheckboxRow">
-                <input
-                  type="checkbox"
-                  checked={signedOutEditingPreference.allow}
-                  onChange={(event) => onSignedOutEditingPreferenceChange({
-                    ...signedOutEditingPreference,
-                    allow: event.target.checked,
-                  })}
-                />
-                <span>
-                  Keep resumes available after sign out
-                </span>
-              </label>
-              <label className="settingsCheckboxRow">
-                <input
-                  type="checkbox"
-                  checked={!signedOutEditingPreference.skipPrompt}
-                  onChange={(event) => onSignedOutEditingPreferenceChange({
-                    ...signedOutEditingPreference,
-                    skipPrompt: !event.target.checked,
-                  })}
-                />
-                <span>
-                  Ask me when I sign out. If you turn this off, this setting will be used automatically.
-                </span>
-              </label>
-              {!signedOutEditingPreference.allow ? (
-                <p className="signedOutEditingWarning">
-                  When you sign out, local resume copies will be cleared from this browser after cloud sync finishes.
-                </p>
-              ) : null}
-            </div>
+            {hasAccountContext ? (
+              <fieldset className="signOutBehaviorSection">
+                <legend>When I sign out</legend>
+                <p className="accountSettingsSectionIntro">Choose what this browser should do with local resume copies.</p>
+
+                <div className="signOutBehaviorOptions">
+                  <label className={`signOutBehaviorOption${signOutMode === 'ask' ? ' isSelected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="sign-out-behavior"
+                      value="ask"
+                      checked={signOutMode === 'ask'}
+                      onChange={() => updateSignOutMode('ask')}
+                    />
+                    <span className="storageChoiceIconWrap" aria-hidden="true"><StorageChoiceIcon mode="ask" /></span>
+                    <span className="signOutBehaviorCopy">
+                      <strong>Ask every time</strong>
+                      <small>Choose whether to keep or clear local copies when signing out.</small>
+                    </span>
+                    <span className="signOutBehaviorCheck" aria-hidden="true" />
+                  </label>
+
+                  <label className={`signOutBehaviorOption${signOutMode === 'keep' ? ' isSelected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="sign-out-behavior"
+                      value="keep"
+                      checked={signOutMode === 'keep'}
+                      onChange={() => updateSignOutMode('keep')}
+                    />
+                    <span className="storageChoiceIconWrap" aria-hidden="true"><StorageChoiceIcon mode="keep" /></span>
+                    <span className="signOutBehaviorCopy">
+                      <strong>Keep resumes here</strong>
+                      <small>Sign out and continue editing on this browser.</small>
+                    </span>
+                    <span className="signOutBehaviorCheck" aria-hidden="true" />
+                  </label>
+
+                  <label className={`signOutBehaviorOption${signOutMode === 'clear' ? ' isSelected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="sign-out-behavior"
+                      value="clear"
+                      checked={signOutMode === 'clear'}
+                      onChange={() => updateSignOutMode('clear')}
+                    />
+                    <span className="storageChoiceIconWrap" aria-hidden="true"><StorageChoiceIcon mode="clear" /></span>
+                    <span className="signOutBehaviorCopy">
+                      <strong>Clear this browser</strong>
+                      <small>Sync first, then remove local copies. Cloud resumes stay safe.</small>
+                    </span>
+                    <span className="signOutBehaviorCheck" aria-hidden="true" />
+                  </label>
+                </div>
+              </fieldset>
+            ) : null}
 
             {!isSignedIn && !hasRememberedAccount ? (
               <button
@@ -255,19 +417,19 @@ export default function AccountSettings({
                 onClick={onOpenAuth}
                 disabled={!firebaseEnabled || busy}
               >
-                Sign in to sync
+                Sign in for cloud backup
               </button>
             ) : null}
 
             {isSignedIn || hasRememberedAccount ? (
-              <div className="disconnectBox">
+              <div className={`browserDataSection${isConfirmingDisconnect ? ' isConfirming' : ''}`}>
                 {isConfirmingDisconnect ? (
                   <>
-                    <div>
+                    <div className="browserDataCopy">
                       <h3>{disconnectTitle}</h3>
                       <p>{disconnectBody}</p>
                     </div>
-                    <div className="disconnectActions">
+                    <div className="browserDataActions">
                       <button
                         type="button"
                         className="button buttonGhost"
@@ -282,23 +444,23 @@ export default function AccountSettings({
                         onClick={confirmDisconnect}
                         disabled={busy}
                       >
-                        {busy ? 'Clearing…' : 'Clear this browser'}
+                        {busy ? 'Removing…' : 'Remove data'}
                       </button>
                     </div>
                   </>
                 ) : (
                   <>
-                    <div>
-                      <h3>Remove account from this browser</h3>
-                      <p>Clears local resume copies and account connection on this browser only. Your cloud resumes are not deleted.</p>
+                    <div className="browserDataCopy">
+                      <h3>Browser data</h3>
+                      <p>Remove local resumes and forget this account on this browser. Cloud resumes are not deleted.</p>
                     </div>
                     <button
                       type="button"
-                      className="button buttonDanger accountSettingsDanger"
+                      className="browserDataRemoveButton"
                       onClick={() => setIsConfirmingDisconnect(true)}
                       disabled={busy}
                     >
-                      Disconnect browser
+                      Remove from this browser
                     </button>
                   </>
                 )}

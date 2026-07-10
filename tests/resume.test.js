@@ -61,6 +61,10 @@ import {
 import { calculatePreviewPageBreaks } from '../src/lib/previewPagination.js';
 import { getSaveStatusPresentation } from '../src/lib/saveStatus.js';
 import {
+  createSignOutStoragePreference,
+  getSignOutStorageMode,
+} from '../src/lib/browserConnection.js';
+import {
   createOutboxAckDescriptor,
   createDraftContentHash,
   createSavedDraftState,
@@ -122,6 +126,25 @@ test('save status presentation distinguishes local and cloud completion states',
     getSaveStatusPresentation({ saveState: 'saved', syncState: 'offline', cloudMode: true }),
     { id: 'queued', label: 'Queued' },
   );
+});
+
+test('account settings maps sign-out choices to the existing browser storage preference', () => {
+  assert.equal(getSignOutStorageMode({ allow: true, skipPrompt: false }), 'ask');
+  assert.equal(getSignOutStorageMode({ allow: true, skipPrompt: true }), 'keep');
+  assert.equal(getSignOutStorageMode({ allow: false, skipPrompt: true }), 'clear');
+
+  assert.deepEqual(createSignOutStoragePreference('ask', { allow: false, skipPrompt: true }), {
+    allow: false,
+    skipPrompt: false,
+  });
+  assert.deepEqual(createSignOutStoragePreference('keep'), {
+    allow: true,
+    skipPrompt: true,
+  });
+  assert.deepEqual(createSignOutStoragePreference('clear'), {
+    allow: false,
+    skipPrompt: true,
+  });
 });
 import {
   validateImportResumeFile,
