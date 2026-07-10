@@ -104,6 +104,128 @@ html[data-theme="dark"] .buttonSecondary:not(:disabled):hover {
   color: var(--color-danger-hover-text);
 }
 
+.resumeSelectionActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.button.resumeSelectionDelete,
+.button.resumeSelectionClear {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: 0.6875rem;
+  font-weight: 750;
+}
+
+.resumeSelectionDeleteIcon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.45;
+}
+
+.resumeDeleteDialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, #07101f 34%, transparent);
+  animation: resumeDeleteBackdropIn 160ms ease-out both;
+}
+
+.resumeDeleteDialog {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  width: min(100%, 390px);
+  padding: 17px;
+  border: 1px solid color-mix(in srgb, var(--color-danger-border) 68%, var(--color-border));
+  border-radius: 16px;
+  background: var(--color-popover-bg);
+  box-shadow: var(--shadow-md);
+  animation: resumeDeleteDialogIn 190ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.resumeDeleteDialogIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--color-danger-bg);
+  color: var(--color-error);
+}
+
+.resumeDeleteDialogIcon .resumeSelectionDeleteIcon {
+  width: 17px;
+  height: 17px;
+}
+
+.resumeDeleteDialogCopy {
+  min-width: 0;
+  padding-top: 1px;
+}
+
+.resumeDeleteDialogCopy h2,
+.resumeDeleteDialogCopy p {
+  margin: 0;
+}
+
+.resumeDeleteDialogCopy h2 {
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+}
+
+.resumeDeleteDialogCopy p {
+  margin-top: 5px;
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.resumeDeleteDialogActions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.resumeDeleteDialogActions .button {
+  min-height: 34px;
+  padding-inline: 13px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+}
+
+@keyframes resumeDeleteBackdropIn {
+  from { opacity: 0; }
+}
+
+@keyframes resumeDeleteDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(7px) scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resumeDeleteDialogBackdrop,
+  .resumeDeleteDialog {
+    animation: none;
+  }
+}
+
 .tabButton {
   position: relative;
   justify-content: flex-start;

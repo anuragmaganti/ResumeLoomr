@@ -33,6 +33,7 @@ import {
   reorderSectionBlockTextListItem,
   reorderResumeSectionBlocksToMatch,
   reorderWorkspaceResumesToMatch,
+  removeWorkspaceResumes,
   sanitizeWorkspaceResumeName,
   setPersonalContactOrder,
   setSampleTextListOrder,
@@ -54,7 +55,7 @@ import {
   initializeLocalWorkspace,
   mergeLocalAndCloudWorkspaces,
   persistLocalDraftSnapshot,
-  persistLocalResumeDelete,
+  persistLocalResumeBatchDelete,
   persistLocalWorkspaceSnapshot,
   persistLoginMergedWorkspace,
   readLocalWorkspaceBundle,
@@ -103,19 +104,6 @@ function withWorkspaceResumeMeta(workspace, resumeId, updates) {
         ...updates,
       },
     },
-  });
-}
-
-function withoutWorkspaceResume(workspace, resumeId) {
-  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
-  const nextResumeIds = normalizedWorkspace.resumeIds.filter((id) => id !== resumeId);
-  const nextMeta = { ...normalizedWorkspace.meta };
-  delete nextMeta[resumeId];
-
-  return normalizeWorkspaceIndex({
-    activeResumeId: nextResumeIds[0] || '',
-    resumeIds: nextResumeIds,
-    meta: nextMeta,
   });
 }
 
@@ -1043,35 +1031,77 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     commitWorkspace(nextWorkspace, { reason: 'resume-reorder' });
   }
 
-  async function deleteActiveResume() {
+  async function deleteResumes(requestedResumeIds = null) {
     const currentWorkspace = workspaceRef.current;
-    const deletedResumeId = currentWorkspace.activeResumeId;
+    const resumeIdsToDelete = Array.isArray(requestedResumeIds)
+      ? requestedResumeIds
+      : [currentWorkspace.activeResumeId];
+    let deletion = removeWorkspaceResumes(
+      currentWorkspace,
+      resumeIdsToDelete,
+    );
 
-    if (!deletedResumeId || currentWorkspace.resumeIds.length <= 1 || conflictRef.current) {
+    if (deletion.rejectedReason || conflictRef.current) {
       if (conflictRef.current) {
         setNotice({ tone: 'warning', message: 'Resolve the current save conflict before deleting a resume.' });
+      } else if (deletion.rejectedReason === 'all') {
+        setNotice({ tone: 'warning', message: 'Keep at least one resume in this browser.' });
       }
-      return;
+      return false;
     }
 
-    const currentIndex = currentWorkspace.resumeIds.indexOf(deletedResumeId);
-    const nextVisibleWorkspace = withoutWorkspaceResume(currentWorkspace, deletedResumeId);
-    const nextResumeId = nextVisibleWorkspace.resumeIds[Math.max(0, currentIndex - 1)] || nextVisibleWorkspace.resumeIds[0];
-    const nextWorkspace = normalizeWorkspaceIndex({
-      ...nextVisibleWorkspace,
-      activeResumeId: nextResumeId,
-    });
+    const deletedIds = new Set(deletion.deletedResumeIds);
+    const deletesActiveResume = deletedIds.has(currentWorkspace.activeResumeId);
+    const deletedActiveResumeId = deletesActiveResume ? editorDraftResumeIdRef.current : '';
 
-    commitWorkspace(nextWorkspace, { persist: false });
-    await persistLocalResumeDelete({
-      resumeId: deletedResumeId,
-      workspace: nextWorkspace,
-      accountUid: userRef.current?.uid || '',
-      reason: 'delete-resume',
-    });
-    scheduleCloudSync('delete-resume', 500);
-    const nextDraft = await readLocalDraft(nextResumeId);
-    loadDraftIntoEditor(nextDraft, { resumeId: nextResumeId });
+    if (!deletesActiveResume) {
+      const saveResult = await persistCurrentEditorDraft({
+        reason: 'batch-delete',
+        persistWorkspace: false,
+      });
+
+      if (saveResult?.conflict || saveResult?.error) {
+        return false;
+      }
+
+      deletion = removeWorkspaceResumes(saveResult?.workspace || workspaceRef.current, resumeIdsToDelete);
+
+      if (deletion.rejectedReason) {
+        return false;
+      }
+    }
+
+    if (deletesActiveResume) {
+      // Prevent exit/visibility handlers from recreating the draft while its delete is queued.
+      editorDraftResumeIdRef.current = '';
+    }
+
+    try {
+      await persistLocalResumeBatchDelete({
+        resumeIds: deletion.deletedResumeIds,
+        workspace: deletion.workspace,
+        accountUid: userRef.current?.uid || '',
+        reason: deletion.deletedResumeIds.length === 1 ? 'delete-resume' : 'batch-delete-resumes',
+      });
+    } catch {
+      if (deletesActiveResume) {
+        editorDraftResumeIdRef.current = deletedActiveResumeId;
+      }
+      setSaveState('error');
+      setNotice({ tone: 'error', message: 'These resumes could not be removed from this browser.' });
+      return false;
+    }
+
+    commitWorkspace(deletion.workspace, { persist: false });
+    scheduleCloudSync('delete-resumes', 500);
+
+    if (deletesActiveResume) {
+      const nextResumeId = deletion.workspace.activeResumeId;
+      const nextDraft = await readLocalDraft(nextResumeId);
+      loadDraftIntoEditor(nextDraft, { resumeId: nextResumeId });
+    }
+
+    return true;
   }
 
   async function retryCloudSync() {
@@ -1331,6 +1361,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     duplicateActiveResume,
     renameActiveResume: renameResume,
     reorderResumes,
-    deleteActiveResume,
+    deleteResumes,
   };
 }

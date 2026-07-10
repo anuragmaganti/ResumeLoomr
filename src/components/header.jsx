@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   closestCenter,
@@ -68,6 +68,113 @@ function ResumeMenuIcon() {
       <circle cx="9" cy="9" r="1.25" />
       <circle cx="14" cy="9" r="1.25" />
     </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg className="resumeSelectionDeleteIcon" aria-hidden="true" viewBox="0 0 18 18" focusable="false">
+      <path d="M3.75 5.25h10.5M7 5.25V3.5h4v1.75M5.25 5.25l.6 9.25h6.3l.6-9.25M7.4 7.5v4.75M10.6 7.5v4.75" />
+    </svg>
+  );
+}
+
+function ResumeBatchDeleteDialog({ count, isDeleting, isSignedIn, onCancel, onConfirm }) {
+  const dialogRef = useRef(null);
+  const cancelButtonRef = useRef(null);
+  const label = `${count} ${count === 1 ? 'resume' : 'resumes'}`;
+
+  const handleDialogKeyDown = useEffectEvent((event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+
+      if (!isDeleting) {
+        onCancel();
+      }
+
+      return;
+    }
+
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const focusable = [...dialogRef.current?.querySelectorAll('button:not(:disabled)') || []];
+
+    if (focusable.length === 0) {
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable.at(-1);
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+
+  useEffect(() => {
+    cancelButtonRef.current?.focus();
+
+    function handleKeyDown(event) {
+      handleDialogKeyDown(event);
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  return createPortal(
+    <div
+      className="resumeDeleteDialogBackdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isDeleting) {
+          onCancel();
+        }
+      }}
+    >
+      <section
+        ref={dialogRef}
+        className="resumeDeleteDialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="resume-delete-dialog-title"
+        aria-describedby="resume-delete-dialog-description"
+      >
+        <span className="resumeDeleteDialogIcon" aria-hidden="true"><DeleteIcon /></span>
+        <div className="resumeDeleteDialogCopy">
+          <h2 id="resume-delete-dialog-title">Delete {label}?</h2>
+          <p id="resume-delete-dialog-description">
+            {count === 1 ? 'This resume' : 'These resumes'} will be removed from this browser
+            {isSignedIn ? ' and your synced account.' : '.'}
+          </p>
+        </div>
+        <div className="resumeDeleteDialogActions">
+          <button
+            ref={cancelButtonRef}
+            type="button"
+            className="button buttonSecondary"
+            onClick={() => onCancel()}
+            disabled={isDeleting}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="button buttonDanger resumeDeleteDialogConfirm"
+            onClick={onConfirm}
+            disabled={isDeleting}
+          >
+            {isDeleting ? 'Deleting…' : `Delete ${count}`}
+          </button>
+        </div>
+      </section>
+    </div>,
+    document.body,
   );
 }
 
@@ -390,6 +497,9 @@ export default function Header({
   const [renameValue, setRenameValue] = useState('');
   const [activeDragId, setActiveDragId] = useState(null);
   const [activeDragRect, setActiveDragRect] = useState(null);
+  const [deleteDialogRequest, setDeleteDialogRequest] = useState(null);
+  const [isDeletingSelected, setIsDeletingSelected] = useState(false);
+  const deleteDialogTriggerRef = useRef(null);
   const selectionAccountKey = authUser?.uid || 'signed-out';
   const [selectionState, setSelectionState] = useState(() => ({
     accountKey: selectionAccountKey,
@@ -410,6 +520,7 @@ export default function Header({
   const activeDragResume = activeDragId ? resumeById.get(activeDragId) : null;
   const selectedResumeCount = selectedResumeIds.size;
   const hasSelectedResumes = selectedResumeCount > 0;
+  const wouldDeleteEveryResume = hasSelectedResumes && selectedResumeCount >= resumeList.length;
   const sensors = useSensors(
     useSensor(ResumeLoomrPointerSensor, {
       activationConstraint: {
@@ -444,6 +555,72 @@ export default function Header({
   function clearResumeSelection() {
     setSelectionState({ accountKey: selectionAccountKey, ids: new Set() });
   }
+
+  function openDeleteDialog(resumeIdsToDelete, source) {
+    const validResumeIds = [...new Set(resumeIdsToDelete)].filter((resumeId) => resumeById.has(resumeId));
+
+    if (validResumeIds.length === 0 || validResumeIds.length >= resumeList.length) {
+      return;
+    }
+
+    deleteDialogTriggerRef.current = document.activeElement;
+    setDeleteDialogRequest({ ids: validResumeIds, source, accountKey: selectionAccountKey });
+  }
+
+  function closeDeleteDialog({ restoreFocus = true, preferActiveResume = false } = {}) {
+    setDeleteDialogRequest(null);
+    setIsDeletingSelected(false);
+
+    if (restoreFocus) {
+      window.requestAnimationFrame(() => {
+        const previousTrigger = deleteDialogTriggerRef.current;
+        const fallbackTrigger = document.querySelector('.resumePill.isActive .resumePillMenuButton');
+        const activeResumeTrigger = document.querySelector('.resumePill.isActive .resumePillButton:not(:disabled)');
+        const previousTriggerIsUsable = previousTrigger?.isConnected && !previousTrigger.disabled;
+        const focusTarget = preferActiveResume
+          ? (activeResumeTrigger || fallbackTrigger)
+          : (previousTriggerIsUsable ? previousTrigger : fallbackTrigger || activeResumeTrigger);
+
+        focusTarget?.focus();
+      });
+    }
+  }
+
+  async function confirmSelectedResumeDeletion() {
+    if (isDeletingSelected || !deleteDialogRequest?.ids?.length) {
+      return;
+    }
+
+    if (deleteDialogRequest.accountKey !== selectionAccountKey) {
+      closeDeleteDialog({ restoreFocus: false });
+      return;
+    }
+
+    const accountKeyAtStart = selectionAccountKey;
+    const { ids: resumeIdsToDelete, source } = deleteDialogRequest;
+    let deleted = false;
+    setIsDeletingSelected(true);
+
+    try {
+      deleted = await onDeleteResume(resumeIdsToDelete);
+
+      if (deleted && source === 'selection' && accountKeyAtStart === selectionAccountKey) {
+        clearResumeSelection();
+      }
+    } finally {
+      closeDeleteDialog({ preferActiveResume: deleted });
+    }
+  }
+
+  useEffect(() => {
+    if (deleteDialogRequest && (
+      deleteDialogRequest.accountKey !== selectionAccountKey ||
+      (!hasSelectedResumes && deleteDialogRequest.source === 'selection')
+    )) {
+      setDeleteDialogRequest(null);
+      setIsDeletingSelected(false);
+    }
+  }, [deleteDialogRequest, hasSelectedResumes, selectionAccountKey]);
 
   function startRenamingActiveResume() {
     setRenamingId(activeResumeId);
@@ -481,9 +658,7 @@ export default function Header({
       return;
     }
 
-    if (window.confirm(`Delete "${activeResumeName}"?`)) {
-      onDeleteResume();
-    }
+    openDeleteDialog([activeResumeId], 'active');
   }
 
   function handleResumeDragStart(event) {
@@ -616,23 +791,49 @@ export default function Header({
               <span className="resumeSelectionCountDot" aria-hidden="true" />
               {selectedResumeCount} selected
             </span>
-            <button
-              type="button"
-              className="button buttonSecondary resumeSelectionClear"
-              onClick={clearResumeSelection}
-              disabled={!hasSelectedResumes}
-              tabIndex={hasSelectedResumes ? 0 : -1}
-            >
-              Clear
-            </button>
+            <div className="resumeSelectionActions">
+              <button
+                type="button"
+                className="button buttonDanger resumeSelectionDelete"
+                onClick={() => openDeleteDialog([...selectedResumeIds], 'selection')}
+                disabled={!hasSelectedResumes || wouldDeleteEveryResume}
+                tabIndex={hasSelectedResumes ? 0 : -1}
+                title={wouldDeleteEveryResume ? 'Keep at least one resume. Deselect one to continue.' : 'Delete selected resumes'}
+                aria-describedby={wouldDeleteEveryResume ? 'resume-selection-delete-limit' : undefined}
+              >
+                <DeleteIcon />
+                Delete
+              </button>
+              <button
+                type="button"
+                className="button buttonSecondary resumeSelectionClear"
+                onClick={clearResumeSelection}
+                disabled={!hasSelectedResumes}
+                tabIndex={hasSelectedResumes ? 0 : -1}
+              >
+                Clear
+              </button>
+            </div>
           </div>
         </div>
       </div>
+      <span id="resume-selection-delete-limit" className="visuallyHidden">
+        Batch deletion is unavailable because a workspace must keep at least one resume.
+      </span>
       <span className="visuallyHidden" aria-live="polite" aria-atomic="true">
         {hasSelectedResumes
           ? `${selectedResumeCount} ${selectedResumeCount === 1 ? 'resume' : 'resumes'} selected`
           : 'Resume selection cleared'}
       </span>
+      {deleteDialogRequest && typeof document !== 'undefined' ? (
+        <ResumeBatchDeleteDialog
+          count={deleteDialogRequest.ids.length}
+          isDeleting={isDeletingSelected}
+          isSignedIn={Boolean(authUser)}
+          onCancel={closeDeleteDialog}
+          onConfirm={confirmSelectedResumeDeletion}
+        />
+      ) : null}
     </section>
   );
 

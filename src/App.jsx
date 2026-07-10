@@ -210,7 +210,7 @@ function App() {
     duplicateActiveResume,
     renameActiveResume,
     reorderResumes,
-    deleteActiveResume,
+    deleteResumes,
   } = useResumeBuilder({
     user: builderUser,
     authReady: auth.authReady,
@@ -721,7 +721,7 @@ function App() {
           onDuplicateResume={duplicateActiveResume}
           onRenameResume={renameActiveResume}
           onReorderResumes={reorderResumes}
-          onDeleteResume={deleteActiveResume}
+          onDeleteResume={deleteResumes}
           authUser={auth.user}
           authReady={auth.authReady}
           firebaseEnabled={auth.firebaseEnabled}

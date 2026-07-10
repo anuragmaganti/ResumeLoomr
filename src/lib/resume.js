@@ -1241,6 +1241,57 @@ export function reorderWorkspaceResumesToMatch(workspace, orderedResumeIds) {
   });
 }
 
+export function removeWorkspaceResumes(workspace, requestedResumeIds) {
+  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+  const requestedIds = new Set(
+    (Array.isArray(requestedResumeIds) ? requestedResumeIds : [])
+      .map(trimText)
+      .filter(Boolean),
+  );
+  const deletedResumeIds = normalizedWorkspace.resumeIds.filter((resumeId) => requestedIds.has(resumeId));
+
+  if (deletedResumeIds.length === 0) {
+    return {
+      workspace: normalizedWorkspace,
+      deletedResumeIds: [],
+      rejectedReason: 'empty',
+    };
+  }
+
+  if (deletedResumeIds.length >= normalizedWorkspace.resumeIds.length) {
+    return {
+      workspace: normalizedWorkspace,
+      deletedResumeIds: [],
+      rejectedReason: 'all',
+    };
+  }
+
+  const deletedIds = new Set(deletedResumeIds);
+  const activeIndex = normalizedWorkspace.resumeIds.indexOf(normalizedWorkspace.activeResumeId);
+  const remainingResumeIds = normalizedWorkspace.resumeIds.filter((resumeId) => !deletedIds.has(resumeId));
+  const nextActiveResumeId = deletedIds.has(normalizedWorkspace.activeResumeId)
+    ? (
+      remainingResumeIds.find((resumeId) => normalizedWorkspace.resumeIds.indexOf(resumeId) > activeIndex)
+      || remainingResumeIds.at(-1)
+    )
+    : normalizedWorkspace.activeResumeId;
+  const nextMeta = { ...normalizedWorkspace.meta };
+
+  deletedResumeIds.forEach((resumeId) => {
+    delete nextMeta[resumeId];
+  });
+
+  return {
+    workspace: normalizeWorkspaceIndex({
+      activeResumeId: nextActiveResumeId,
+      resumeIds: remainingResumeIds,
+      meta: nextMeta,
+    }),
+    deletedResumeIds,
+    rejectedReason: '',
+  };
+}
+
 function updateSection(resume, sectionId, updater) {
   const normalizedResume = normalizeResume(resume);
 

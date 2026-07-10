@@ -41,6 +41,7 @@ import {
   reorderSectionBlockTextListItem,
   reorderResumeSectionBlocksToMatch,
   reorderWorkspaceResumesToMatch,
+  removeWorkspaceResumes,
   setPersonalContactOrder,
   setPersonalHeaderOrder,
   setResumeSettingValue,
@@ -72,6 +73,7 @@ import {
   mergeLocalAndCloudWorkspaces,
   outboxOperationBelongsToAccount,
   outboxOperationMatchesAck,
+  persistLocalResumeBatchDelete,
 } from '../src/lib/localWorkspaceDb.js';
 import {
   getOperationAcksFromResponse,
@@ -1111,6 +1113,50 @@ test('workspace reorder helper preserves active resume and exact rail order', ()
 
   assert.deepEqual(reordered.resumeIds, ['r3', 'r1', 'r2']);
   assert.equal(reordered.activeResumeId, 'r2');
+});
+
+test('workspace batch deletion preserves order and an active resume that survives', () => {
+  const workspace = createWorkspace(['r1', 'r2', 'r3', 'r4'], { activeResumeId: 'r2' });
+  const result = removeWorkspaceResumes(workspace, ['r4', 'r1']);
+
+  assert.deepEqual(result.deletedResumeIds, ['r1', 'r4']);
+  assert.deepEqual(result.workspace.resumeIds, ['r2', 'r3']);
+  assert.equal(result.workspace.activeResumeId, 'r2');
+  assert.equal(result.workspace.meta.r1, undefined);
+  assert.equal(result.rejectedReason, '');
+});
+
+test('workspace batch deletion chooses the next ordered resume when active is deleted', () => {
+  const workspace = createWorkspace(['r1', 'r2', 'r3', 'r4'], { activeResumeId: 'r2' });
+  const result = removeWorkspaceResumes(workspace, ['r2', 'r4']);
+
+  assert.deepEqual(result.workspace.resumeIds, ['r1', 'r3']);
+  assert.equal(result.workspace.activeResumeId, 'r3');
+});
+
+test('workspace batch deletion ignores stale ids and refuses to remove every resume', () => {
+  const workspace = createWorkspace(['r1', 'r2'], { activeResumeId: 'r1' });
+  const staleResult = removeWorkspaceResumes(workspace, ['missing', 'r2', 'missing']);
+  const rejectedResult = removeWorkspaceResumes(workspace, ['r2', 'r1', 'missing']);
+  const emptyResult = removeWorkspaceResumes(workspace, ['missing']);
+
+  assert.deepEqual(staleResult.deletedResumeIds, ['r2']);
+  assert.deepEqual(staleResult.workspace.resumeIds, ['r1']);
+  assert.equal(rejectedResult.rejectedReason, 'all');
+  assert.deepEqual(rejectedResult.workspace.resumeIds, ['r1', 'r2']);
+  assert.equal(emptyResult.rejectedReason, 'empty');
+});
+
+test('local batch deletion accepts one normalized workspace snapshot without browser storage', async () => {
+  const workspace = createWorkspace(['r1', 'r3'], { activeResumeId: 'r3' });
+  const persistedWorkspace = await persistLocalResumeBatchDelete({
+    resumeIds: ['r2', 'r2'],
+    workspace,
+    enqueueSync: false,
+  });
+
+  assert.deepEqual(persistedWorkspace.resumeIds, ['r1', 'r3']);
+  assert.equal(persistedWorkspace.activeResumeId, 'r3');
 });
 
 test('resume settings produce bounded preview and print variables', () => {

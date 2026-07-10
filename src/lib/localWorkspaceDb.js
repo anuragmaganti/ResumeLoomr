@@ -1110,32 +1110,43 @@ export async function persistLocalWorkspaceSnapshot({
   });
 }
 
-export async function persistLocalResumeDelete({
-  resumeId,
+export async function persistLocalResumeBatchDelete({
+  resumeIds,
   workspace,
   accountUid = '',
   enqueueSync = true,
-  reason = 'delete',
+  reason = 'batch-delete',
 }) {
   return runLocalMutation(async () => {
     const db = await getLocalWorkspaceDb();
     const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+    const deletedResumeIds = [...new Set(
+      (Array.isArray(resumeIds) ? resumeIds : [])
+        .map((resumeId) => trimText(resumeId))
+        .filter(Boolean),
+    )];
 
     writeLocalStorageWorkspace(normalizedWorkspace);
-    removeLocalStorageDraft(resumeId);
+    deletedResumeIds.forEach(removeLocalStorageDraft);
 
-    if (!db || !resumeId) {
+    if (!db || deletedResumeIds.length === 0) {
       return normalizedWorkspace;
     }
 
     const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
 
     await writeWorkspaceRecord(tx, normalizedWorkspace);
-    await tx.objectStore(DRAFTS_STORE).delete(resumeId);
+
+    for (const resumeId of deletedResumeIds) {
+      await tx.objectStore(DRAFTS_STORE).delete(resumeId);
+    }
 
     if (enqueueSync) {
       await queueWorkspaceSyncInTx(tx, normalizedWorkspace, { accountUid, reason });
-      await queueDeleteSyncInTx(tx, resumeId, normalizedWorkspace, { accountUid, reason });
+
+      for (const resumeId of deletedResumeIds) {
+        await queueDeleteSyncInTx(tx, resumeId, normalizedWorkspace, { accountUid, reason });
+      }
     }
 
     await tx.done;

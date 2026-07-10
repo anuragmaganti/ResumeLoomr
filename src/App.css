@@ -1441,8 +1441,343 @@ html[data-theme="dark"] .accountSettingsPanel {
   font-size: 0.72rem;
 }
 
+.signedOutPromptOverlay {
+  padding: clamp(10px, 3vw, 20px);
+}
+
+.signedOutPromptBackdrop {
+  border: 0;
+  cursor: default;
+}
+
 .signedOutPrompt {
-  width: min(480px, 100%);
+  position: relative;
+  z-index: 1;
+  width: min(470px, 100%);
+  padding: clamp(19px, 4vw, 22px);
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 58%, var(--color-border));
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--color-surface) 97%, var(--color-surface-muted));
+  box-shadow:
+    0 28px 72px color-mix(in srgb, #0f172a 24%, transparent),
+    0 5px 18px color-mix(in srgb, #0f172a 11%, transparent);
+  outline: none;
+  animation: signedOutPromptIn 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+html[data-theme="dark"] .signedOutPrompt {
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.74),
+    0 6px 20px rgba(0, 0, 0, 0.46);
+}
+
+.signedOutPromptHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.signedOutPromptHeader h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: clamp(1.08rem, 3.8vw, 1.18rem);
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+
+.signedOutPromptEyebrow {
+  margin: 0 0 5px;
+  color: var(--color-text-muted);
+  font-size: 0.64rem;
+  font-weight: 780;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.signedOutPromptClose {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
+}
+
+.signedOutPromptClose:hover,
+.signedOutPromptClose:focus-visible {
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  outline: none;
+}
+
+.signedOutPromptClose:focus-visible {
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.signedOutPromptClose:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.signedOutPromptClose svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.7;
+}
+
+.signedOutPromptIntro {
+  margin: 9px 0 17px;
+  max-width: 38ch;
+  color: var(--color-text-subtle);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.signedOutPromptChoices {
+  display: grid;
+  gap: 8px;
+}
+
+.signedOutChoice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  min-height: 67px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.signedOutChoice:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.signedOutChoice:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.signedOutChoice:disabled {
+  opacity: 0.56;
+  cursor: wait;
+}
+
+.signedOutChoice--keep {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent-soft) 52%, var(--color-surface) 48%);
+}
+
+.signedOutChoice--keep:not(:disabled):hover,
+.signedOutChoice--keep:focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-soft) 74%, var(--color-surface) 26%);
+}
+
+.signedOutChoice--remove {
+  background: color-mix(in srgb, var(--color-surface-muted) 70%, var(--color-surface) 30%);
+}
+
+.signedOutChoice--remove:not(:disabled):hover,
+.signedOutChoice--remove:focus-visible {
+  border-color: var(--color-danger-border);
+  background: color-mix(in srgb, var(--color-danger-bg) 58%, var(--color-surface) 42%);
+}
+
+.signedOutChoiceIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-muted);
+}
+
+.signedOutChoice--keep .signedOutChoiceIcon {
+  background: color-mix(in srgb, var(--color-accent-soft) 76%, var(--color-surface-elevated));
+  color: var(--color-accent-strong);
+}
+
+.signedOutChoice--remove .signedOutChoiceIcon {
+  background: color-mix(in srgb, var(--color-danger-bg) 72%, var(--color-surface-elevated));
+  color: var(--color-error);
+}
+
+.signedOutChoiceIcon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.signedOutChoiceCopy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.signedOutChoiceCopy strong {
+  color: inherit;
+  font-size: 0.78rem;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.signedOutChoiceCopy small {
+  color: var(--color-text-subtle);
+  font-size: 0.69rem;
+  line-height: 1.35;
+}
+
+.signedOutChoiceArrow {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  transition: transform var(--transition-fast);
+}
+
+.signedOutChoice:not(:disabled):hover .signedOutChoiceArrow {
+  transform: translateX(2px);
+}
+
+.signedOutCloudNote {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 3px 0;
+  color: var(--color-text-subtle);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.signedOutCloudNote svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  fill: none;
+  stroke: var(--color-success);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.signedOutPromptRemember {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  color: var(--color-text-subtle);
+  font-size: 0.7rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.signedOutPromptRemember > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.signedOutRememberCheck {
+  display: inline-grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 5px;
+  background: var(--color-input-bg);
+  color: #fff;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.signedOutRememberCheck svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  opacity: 0;
+  transform: scale(0.7);
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.signedOutPromptRemember > input:checked + .signedOutRememberCheck {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.signedOutPromptRemember > input:checked + .signedOutRememberCheck svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.signedOutPromptRemember > input:focus-visible + .signedOutRememberCheck {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.signedOutPromptRemember:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes signedOutPromptIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signedOutPrompt,
+  .signedOutChoice,
+  .signedOutChoiceArrow,
+  .signedOutRememberCheck svg {
+    animation: none;
+    transition: none;
+  }
 }
 
 .signedOutPromptNote {
@@ -1454,24 +1789,6 @@ html[data-theme="dark"] .accountSettingsPanel {
   font-size: 0.84rem;
   font-weight: 800;
   line-height: 1.4;
-}
-
-.signedOutPromptRemember {
-  margin-top: 0;
-}
-
-.signedOutPromptActions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: var(--space-4);
-}
-
-.signedOutPromptActions .button {
-  min-height: 38px;
-  padding-inline: 14px;
-  font-size: 0.78rem;
 }
 
 .accountSwitchPrompt {
