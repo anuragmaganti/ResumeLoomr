@@ -14,31 +14,20 @@ import {
   trimText,
 } from './resume.js';
 
-export const LOCAL_WORKSPACE_DB_NAME = 'resumeloomr-local-workspace';
-export const LOCAL_WORKSPACE_DB_VERSION = 1;
-export const LOCAL_WORKSPACE_ID = 'main';
-export const LOCAL_SYNC_META_ID = 'main';
-export const LOCAL_ACCOUNT_BINDING_ID = 'current';
+const LOCAL_WORKSPACE_DB_NAME = 'resumeloomr-local-workspace';
+const LOCAL_WORKSPACE_DB_VERSION = 1;
+const LOCAL_WORKSPACE_ID = 'main';
+const LOCAL_ACCOUNT_BINDING_ID = 'current';
 export const LOCAL_WORKSPACE_PRESENT_KEY = 'resumeloomr:local-workspace-present:v1';
 
 const WORKSPACE_STORE = 'workspace';
 const DRAFTS_STORE = 'drafts';
 const OUTBOX_STORE = 'outbox';
 const TOMBSTONES_STORE = 'tombstones';
-const SYNC_META_STORE = 'syncMeta';
 const ACCOUNT_BINDING_STORE = 'accountBinding';
 const LOCAL_WORKSPACE_LOCK_NAME = 'resumeloomr-local-workspace-mutation';
 const LOCAL_SYNC_CLIENT_ID_KEY = 'resumeloomr:sync-client-id:v1';
 const LOCAL_SYNC_SEQUENCE_KEY = 'resumeloomr:sync-sequence:v1';
-
-const STORE_NAMES = [
-  WORKSPACE_STORE,
-  DRAFTS_STORE,
-  OUTBOX_STORE,
-  TOMBSTONES_STORE,
-  SYNC_META_STORE,
-  ACCOUNT_BINDING_STORE,
-];
 
 let dbPromise = null;
 let localMutationQueue = Promise.resolve();
@@ -493,10 +482,7 @@ function readLegacyDraftFromLocalStorage(resumeId) {
 
 function readLegacyWorkspaceFromLocalStorage() {
   const storage = getStorage();
-  const fresh = {
-    ...createFreshWorkspaceDraft(),
-    source: 'fresh',
-  };
+  const fresh = createFreshWorkspaceDraft();
 
   if (!storage) {
     return fresh;
@@ -515,7 +501,6 @@ function readLegacyWorkspaceFromLocalStorage() {
         workspace,
         activeResumeId,
         draft,
-        source: 'workspace-localstorage',
       };
     }
   }
@@ -530,11 +515,10 @@ export function readLegacyWorkspaceSnapshot() {
     workspace: normalizeWorkspaceIndex(legacy.workspace),
     activeResumeId: legacy.activeResumeId || legacy.workspace.activeResumeId,
     draft: normalizeDraftState(legacy.draft),
-    source: legacy.source,
   };
 }
 
-export async function getLocalWorkspaceDb() {
+async function getLocalWorkspaceDb() {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -559,10 +543,6 @@ export async function getLocalWorkspaceDb() {
 
         if (!db.objectStoreNames.contains(TOMBSTONES_STORE)) {
           db.createObjectStore(TOMBSTONES_STORE, { keyPath: 'resumeId' });
-        }
-
-        if (!db.objectStoreNames.contains(SYNC_META_STORE)) {
-          db.createObjectStore(SYNC_META_STORE, { keyPath: 'id' });
         }
 
         if (!db.objectStoreNames.contains(ACCOUNT_BINDING_STORE)) {
@@ -705,12 +685,11 @@ export async function initializeLocalWorkspace() {
         workspace,
         activeResumeId,
         draft,
-        source: 'indexeddb',
       };
     }
 
     const legacySnapshot = readLegacyWorkspaceSnapshot();
-    const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, SYNC_META_STORE], 'readwrite');
+    const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE], 'readwrite');
 
     await writeWorkspaceRecord(tx, legacySnapshot.workspace);
 
@@ -724,11 +703,6 @@ export async function initializeLocalWorkspace() {
       }
     }
 
-    await tx.objectStore(SYNC_META_STORE).put({
-      id: LOCAL_SYNC_META_ID,
-      migratedAt: new Date().toISOString(),
-      source: legacySnapshot.source,
-    });
     await tx.done;
 
     writeLocalStorageWorkspace(legacySnapshot.workspace);
@@ -738,7 +712,7 @@ export async function initializeLocalWorkspace() {
   });
 }
 
-export async function readLocalWorkspaceSnapshot() {
+async function readLocalWorkspaceSnapshot() {
   const db = await getLocalWorkspaceDb();
 
   if (!db) {
@@ -759,7 +733,6 @@ export async function readLocalWorkspaceSnapshot() {
     workspace,
     activeResumeId,
     draft: await readLocalDraft(activeResumeId),
-    source: 'indexeddb',
   };
 }
 
@@ -783,7 +756,7 @@ export async function readLocalDraft(resumeId) {
     : normalizeDraftWithRevision(createBlankDraftState(), createLocalRevision());
 }
 
-export async function readAllLocalDrafts(workspace) {
+async function readAllLocalDrafts(workspace) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const drafts = new Map();
 
@@ -794,7 +767,7 @@ export async function readAllLocalDrafts(workspace) {
   return drafts;
 }
 
-export async function readLocalTombstones() {
+async function readLocalTombstones() {
   const db = await getLocalWorkspaceDb();
 
   if (!db) {

@@ -15,7 +15,7 @@ export const TEMPLATE_OPTIONS = [
   { id: 'compact', label: 'Compact' },
   { id: 'executive', label: 'Executive' },
 ];
-export const SECTION_BLOCK_KINDS = [
+const SECTION_BLOCK_KINDS = [
   'education',
   'roles',
   'skills',
@@ -95,7 +95,7 @@ export const SECTION_TEMPLATE_GROUPS = [
     ],
   },
 ];
-export const RESUME_SETTINGS_DEFAULTS = {
+const RESUME_SETTINGS_DEFAULTS = {
   textSize: 0,
   horizontalMargins: 0,
   verticalMargins: 0,
@@ -115,12 +115,6 @@ export const RESUME_SETTINGS_DEFAULTS = {
   personalContactOrder: PERSONAL_CONTACT_FIELDS,
   personalAlignment: 'template',
   personalHeaderOrder: PERSONAL_HEADER_ROWS,
-};
-export const SAMPLE_DISPLAY_DEFAULTS = {
-  hasStarted: false,
-  showInformation: true,
-  entryBindings: {},
-  textListOrders: {},
 };
 
 const RESUME_SETTINGS_MIN = -5;
@@ -180,7 +174,7 @@ export function normalizePersonalContactOrder(order) {
   return nextFields;
 }
 
-export function normalizePersonalAlignment(alignment) {
+function normalizePersonalAlignment(alignment) {
   return PERSONAL_ALIGNMENTS.has(alignment) ? alignment : PERSONAL_ALIGNMENT_DEFAULT;
 }
 
@@ -399,22 +393,6 @@ function reorderItemSubsetById(items, orderedItemIds) {
     reorderedIndex += 1;
     return nextItem;
   });
-}
-
-function reorderItemById(items, itemId, targetItemId, placement = 'before') {
-  const fromIndex = items.findIndex((item) => item.id === itemId);
-  const targetIndex = items.findIndex((item) => item.id === targetItemId);
-
-  if (fromIndex < 0 || targetIndex < 0 || itemId === targetItemId) {
-    return items;
-  }
-
-  const nextItems = [...items];
-  const [item] = nextItems.splice(fromIndex, 1);
-  const adjustedTargetIndex = nextItems.findIndex((candidate) => candidate.id === targetItemId);
-  const insertIndex = placement === 'after' ? adjustedTargetIndex + 1 : adjustedTargetIndex;
-  nextItems.splice(insertIndex, 0, item);
-  return nextItems;
 }
 
 function createEducationProgram(candidate = {}) {
@@ -707,7 +685,7 @@ export function normalizeEntryHeaderLayout(sectionKind, layout) {
   return normalizedLayout;
 }
 
-export function findEntryHeaderFieldSlot(layout, field) {
+function findEntryHeaderFieldSlot(layout, field) {
   for (let lineIndex = 0; lineIndex < 2; lineIndex += 1) {
     for (const side of ['left', 'right']) {
       const slots = layout?.lines?.[lineIndex]?.[side] || [];
@@ -880,7 +858,7 @@ export function normalizeResumeSettings(settings) {
   );
 }
 
-export function normalizeSampleDisplay(sampleDisplay) {
+function normalizeSampleDisplay(sampleDisplay) {
   const display = sampleDisplay && typeof sampleDisplay === 'object' ? sampleDisplay : {};
 
   return {
@@ -1043,7 +1021,7 @@ function applySectionSampleEntryBindings(
   };
 }
 
-export function createPersonal(candidate = {}) {
+function createPersonal(candidate = {}) {
   return {
     name: asText(candidate.name),
     headline: asText(candidate.headline),
@@ -1058,14 +1036,14 @@ export function createPersonal(candidate = {}) {
   };
 }
 
-export function createDefaultSections() {
+function createDefaultSections() {
   return DEFAULT_SECTION_BLOCKS.map((section) => ({
     ...section,
     entries: [createEntryForKind(section.kind)],
   }));
 }
 
-export function createResumeSectionBlock(resume, templateId) {
+function createResumeSectionBlock(resume, templateId) {
   const normalizedResume = normalizeResume(resume);
 
   if (normalizedResume.sections.length >= MAX_RESUME_SECTIONS) {
@@ -1246,21 +1224,6 @@ export function createDuplicateResumeName(sourceName = DEFAULT_RESUME_LABEL, exi
   }
 
   return sanitizeWorkspaceResumeName(`${DEFAULT_RESUME_LABEL} copy ${Date.now()}`, DEFAULT_RESUME_LABEL);
-}
-
-export function reorderWorkspaceResumes(workspace, sourceResumeId, targetResumeId, placement = 'before') {
-  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
-  const resumeIds = reorderItemById(
-    normalizedWorkspace.resumeIds.map((id) => ({ id })),
-    sourceResumeId,
-    targetResumeId,
-    placement,
-  ).map((item) => item.id);
-
-  return normalizeWorkspaceIndex({
-    ...normalizedWorkspace,
-    resumeIds,
-  });
 }
 
 export function reorderWorkspaceResumesToMatch(workspace, orderedResumeIds) {
@@ -1526,15 +1489,6 @@ export function moveResumeSectionBlock(resume, sectionId, direction) {
   };
 }
 
-export function reorderResumeSectionBlock(resume, sectionId, targetSectionId, placement = 'before') {
-  const normalizedResume = normalizeResume(resume);
-
-  return {
-    ...normalizedResume,
-    sections: reorderItemById(normalizedResume.sections, sectionId, targetSectionId, placement),
-  };
-}
-
 export function reorderResumeSectionBlocksToMatch(resume, orderedSectionIds) {
   const normalizedResume = normalizeResume(resume);
   const nextSections = reorderItemSubsetById(
@@ -1691,11 +1645,6 @@ export function removeSectionBlockEntry(resume, sectionId, entryId) {
   });
 }
 
-export const updateRoleBlockEntry = updateSectionBlockEntry;
-export const addRoleBlockEntry = addSectionBlockEntry;
-export const moveRoleBlockEntry = moveSectionBlockEntry;
-export const removeRoleBlockEntry = removeSectionBlockEntry;
-
 export function updateSectionBlockTextList(resume, sectionId, entryId, field, itemIndex, value) {
   return updateSection(resume, sectionId, (section) => ({
     ...section,
@@ -1759,19 +1708,6 @@ export function removeSectionBlockTextListItem(resume, sectionId, entryId, field
     }),
   }));
 }
-
-export const updateRoleBlockActivity = (resume, sectionId, entryId, activityIndex, value) => (
-  updateSectionBlockTextList(resume, sectionId, entryId, 'activities', activityIndex, value)
-);
-export const addRoleBlockActivity = (resume, sectionId, entryId) => (
-  addSectionBlockTextListItem(resume, sectionId, entryId, 'activities')
-);
-export const moveRoleBlockActivity = (resume, sectionId, entryId, activityIndex, direction) => (
-  moveSectionBlockTextListItem(resume, sectionId, entryId, 'activities', activityIndex, direction)
-);
-export const removeRoleBlockActivity = (resume, sectionId, entryId, activityIndex) => (
-  removeSectionBlockTextListItem(resume, sectionId, entryId, 'activities', activityIndex)
-);
 
 export function updateSectionBlockEducationCustomSection(resume, sectionId, entryId, sectionIndex, field, value) {
   return updateSection(resume, sectionId, (section) => ({
@@ -1871,7 +1807,7 @@ export function removeSectionBlockEducationProgram(resume, sectionId, entryId, p
   }));
 }
 
-export function personalHasContent(personal) {
+function personalHasContent(personal) {
   return [
     personal.name,
     personal.headline,
@@ -1935,7 +1871,7 @@ function customEntryHasContent(entry) {
   return entryHasTextContent(entry, ['title', 'subtitle', 'location', 'years', 'details']) || listHasContent(entry.highlights);
 }
 
-export function normalizeBulletText(value) {
+function normalizeBulletText(value) {
   return trimText(value).replace(/^([*-]+|\d+[.)])\s+/, '').trim();
 }
 

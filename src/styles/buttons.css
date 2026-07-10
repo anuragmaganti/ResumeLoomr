@@ -39,7 +39,6 @@
 
 .button:focus-visible,
 .tabButton:focus-visible,
-.toolbarSelect:focus-visible,
 .mobileWorkspaceButton:focus-visible,
 .noticeDismiss:focus-visible,
 .floatingThemeToggle:focus-visible,
@@ -184,22 +183,8 @@ html[data-theme="dark"] .tabButton.isActive {
   cursor: default;
 }
 
-.tabIndex {
-  flex: 0 0 auto;
-  color: var(--color-text-muted);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.tabCopy {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  overflow: hidden;
-}
-
 .tabLabel {
+  min-width: 0;
   color: var(--color-text);
   font-size: 0.95rem;
   font-weight: 700;
@@ -207,13 +192,6 @@ html[data-theme="dark"] .tabButton.isActive {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.tabHint {
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  line-height: 1.35;
 }
 
 @media (min-width: 721px) {
@@ -229,18 +207,11 @@ html[data-theme="dark"] .tabButton.isActive {
     gap: 0;
   }
 
-  .tabIndex {
-    display: none;
-  }
-
   .tabLabel {
     font-size: 0.6875rem;
     line-height: 1;
   }
 
-  .tabHint {
-    display: none;
-  }
 }
 
 .addEntryButton,

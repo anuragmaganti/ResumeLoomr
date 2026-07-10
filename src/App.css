@@ -348,33 +348,6 @@ html[data-theme="dark"] .resumePill.isActive {
   white-space: nowrap;
 }
 
-.toolbarSelect {
-  min-width: 96px;
-  min-height: 36px;
-  padding: 0 28px 0 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: linear-gradient(
-    180deg,
-    var(--color-surface-elevated),
-    var(--color-surface-muted)
-  );
-  color: var(--color-text);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  box-shadow: var(--shadow-xs);
-  transition:
-    border-color var(--transition-base),
-    box-shadow var(--transition-base),
-    background-color var(--transition-base);
-}
-
-.toolbarSelect:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 4px var(--color-accent-soft);
-}
-
 .noticeBanner {
   display: flex;
   align-items: center;
@@ -2380,15 +2353,6 @@ html[data-theme="dark"] .sectionAddDialog {
   .tabs .tabButton {
     min-height: 30px;
     padding: 5px 6px;
-    gap: 0;
-  }
-
-  .tabs .tabIndex,
-  .tabs .tabHint {
-    display: none;
-  }
-
-  .tabs .tabCopy {
     gap: 0;
   }
 

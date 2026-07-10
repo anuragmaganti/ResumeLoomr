@@ -12,8 +12,8 @@ import {
   SECTION_TEMPLATE_GROUPS,
   UNTITLED_SECTION_TITLE,
   addResumeSectionBlock,
-  addRoleBlockActivity,
-  addRoleBlockEntry,
+  addSectionBlockEntry,
+  addSectionBlockTextListItem,
   commitSectionTitle,
   createDuplicateResumeName,
   createEmptyResume,
@@ -49,8 +49,6 @@ import {
   setSectionEntryHeaderLayout,
   normalizeEntryHeaderLayout,
   updatePersonalField,
-  updateRoleBlockActivity,
-  updateRoleBlockEntry,
   updateResumeSetting,
   updateSampleDisplay,
   updateSectionBlockEducationCustomSection,
@@ -97,6 +95,7 @@ import {
 import {
   validateImportResumeFile,
 } from '../src/lib/importResume.js';
+
 import {
   createMixedSamplePreviewModel,
   createSamplePlaceholderResolver,
@@ -105,6 +104,15 @@ import {
   getPersistableSampleTextListMove,
   getSampleResumeIndex,
 } from '../src/lib/sampleResumes.js';
+
+const addRoleBlockEntry = addSectionBlockEntry;
+const updateRoleBlockEntry = updateSectionBlockEntry;
+const addRoleBlockActivity = (resume, sectionId, entryId) => (
+  addSectionBlockTextListItem(resume, sectionId, entryId, 'activities')
+);
+const updateRoleBlockActivity = (resume, sectionId, entryId, activityIndex, value) => (
+  updateSectionBlockTextList(resume, sectionId, entryId, 'activities', activityIndex, value)
+);
 
 function getSection(resume, sectionId) {
   return resume.sections.find((section) => section.id === sectionId);

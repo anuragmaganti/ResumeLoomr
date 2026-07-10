@@ -1090,14 +1090,6 @@ html[data-theme="dark"] .personalSection {
   margin-top: var(--resume-dense-entry-gap);
 }
 
-.degreeYearsEduFlex,
-.companyYearsExpFlex {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: baseline;
-}
-
 .entryHeaderLayoutLine {
   display: flex;
   justify-content: space-between;
@@ -1433,11 +1425,6 @@ html[data-theme="dark"] .personalSection {
   border-radius: 10px;
 }
 
-.companyRoleLine,
-.previewEntryTitleLine {
-  min-width: 0;
-}
-
 .skillGroup {
   color: var(--resume-page-muted);
   font-size: var(--resume-detail-size);
@@ -1478,8 +1465,7 @@ html[data-theme="dark"] .personalSection {
   font-weight: 600;
 }
 
-.role,
-.customSubtitleYearsRow .previewEntrySubtitle {
+.role {
   font-style: italic;
 }
 
@@ -1490,17 +1476,6 @@ html[data-theme="dark"] .personalSection {
   font-size: var(--resume-meta-size);
   line-height: var(--resume-detail-line-height);
   white-space: nowrap;
-}
-
-.previewEntryMetaStack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  color: var(--resume-page-subtle);
-  font-size: var(--resume-meta-size);
-  line-height: var(--resume-detail-line-height);
-  min-width: max-content;
-  text-align: right;
 }
 
 .previewEntryLocation {
@@ -1518,24 +1493,13 @@ html[data-theme="dark"] .personalSection {
   margin-top: var(--resume-detail-gap);
 }
 
-.educationGpa,
 .educationGpaInline {
   line-height: var(--resume-detail-line-height);
 }
 
 .role,
-.previewEntrySubtitle:not(.previewEntrySubtitle--inline) {
+.previewEntrySubtitle {
   margin-top: max(0px, calc(var(--resume-detail-gap) - 2px));
-}
-
-.roleYearsExpFlex,
-.customSubtitleYearsRow {
-  margin-top: max(0px, calc(var(--resume-detail-gap) - 2px));
-}
-
-.roleYearsExpFlex .role,
-.customSubtitleYearsRow .previewEntrySubtitle {
-  margin-top: 0;
 }
 
 .schoolLocation {
@@ -1729,15 +1693,6 @@ html[data-theme="dark"] .personalSection {
   font-size: 0.8125rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.resumeEmptyEyebrow {
-  margin: 0;
-  color: var(--resume-page-subtle);
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 

@@ -145,7 +145,6 @@ function App() {
     activeTab,
     setActiveTab,
     moveSection,
-    reorderSection,
     reorderSections,
     mobileView,
     setMobileView,
@@ -823,7 +822,6 @@ function App() {
               activeTab={activeTab}
               setActiveTab={setActiveTab}
               onMoveSection={moveSection}
-              onReorderSection={reorderSection}
               onReorderSections={reorderSections}
               template={template}
               templateOptions={templateOptions}

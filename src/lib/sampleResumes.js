@@ -721,7 +721,7 @@ export function getSampleResumeIndex(resumeId) {
   return stableHash(resumeId) % SAMPLE_RESUMES.length;
 }
 
-export function getSampleResumeForId(resumeId) {
+function getSampleResumeForId(resumeId) {
   return SAMPLE_RESUMES[getSampleResumeIndex(resumeId)];
 }
 

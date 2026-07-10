@@ -34,7 +34,7 @@ function parseServiceAccount() {
   return serviceAccount;
 }
 
-export function getAdminApp() {
+function getAdminApp() {
   if (getApps().length > 0) {
     return getApps()[0];
   }
@@ -97,7 +97,7 @@ function parseCookieHeader(cookieHeader) {
   );
 }
 
-export async function verifyFirebaseSessionCookie(cookieHeader) {
+async function verifyFirebaseSessionCookie(cookieHeader) {
   const cookies = parseCookieHeader(cookieHeader);
   const sessionCookie = cookies.__session || cookies.resumeSyncSession || '';
 

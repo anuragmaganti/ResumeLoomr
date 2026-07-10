@@ -5,8 +5,6 @@ import {
   MAX_WORKSPACE_RESUMES,
   TEMPLATE_OPTIONS,
   addResumeSectionBlock,
-  addRoleBlockActivity,
-  addRoleBlockEntry,
   addSectionBlockEducationCustomSection,
   addSectionBlockEducationProgram,
   addSectionBlockEntry,
@@ -19,8 +17,6 @@ import {
   createWorkspaceResumeMeta,
   getPreviewModel,
   moveResumeSectionBlock,
-  moveRoleBlockActivity,
-  moveRoleBlockEntry,
   moveSectionBlockEducationCustomSection,
   moveSectionBlockEducationProgram,
   moveSectionBlockEntry,
@@ -29,17 +25,13 @@ import {
   normalizeDraftPayload,
   normalizeWorkspaceIndex,
   removeResumeSectionBlock,
-  removeRoleBlockActivity,
-  removeRoleBlockEntry,
   removeSectionBlockEducationCustomSection,
   removeSectionBlockEducationProgram,
   removeSectionBlockEntry,
   removeSectionBlockTextListItem,
   reorderSectionBlockEntriesToMatch,
   reorderSectionBlockTextListItem,
-  reorderResumeSectionBlock,
   reorderResumeSectionBlocksToMatch,
-  reorderWorkspaceResumes,
   reorderWorkspaceResumesToMatch,
   sanitizeWorkspaceResumeName,
   setPersonalContactOrder,
@@ -50,8 +42,6 @@ import {
   updatePersonalField,
   updateResumeSetting as updateResumeSettingValue,
   updateSampleDisplay,
-  updateRoleBlockActivity,
-  updateRoleBlockEntry,
   updateSectionBlockEducationCustomSection,
   updateSectionBlockEducationProgram,
   updateSectionBlockEntry,
@@ -795,11 +785,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     updateResume((currentResume) => moveResumeSectionBlock(currentResume, sectionId, direction));
   }
 
-  function reorderSection(sectionId, targetSectionId, placement) {
-    setSaveState('saving');
-    updateResume((currentResume) => reorderResumeSectionBlock(currentResume, sectionId, targetSectionId, placement));
-  }
-
   function reorderSections(nextSectionIds) {
     setSaveState('saving');
     updateResume((currentResume) => reorderResumeSectionBlocksToMatch(currentResume, nextSectionIds));
@@ -1077,23 +1062,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     scheduleCloudSync('rename-resume', 500);
   }
 
-  async function reorderResume(sourceResumeId, targetResumeId, placement = 'before') {
-    const currentWorkspace = workspaceRef.current;
-
-    if (!currentWorkspace.resumeIds.includes(sourceResumeId) || sourceResumeId === targetResumeId) {
-      return;
-    }
-
-    const nextWorkspace = reorderWorkspaceResumes(currentWorkspace, sourceResumeId, targetResumeId, placement);
-
-    if (nextWorkspace.resumeIds.join('\u0000') === currentWorkspace.resumeIds.join('\u0000')) {
-      return;
-    }
-
-    persistCurrentEditorDraft({ reason: 'resume-reorder', persistWorkspace: false });
-    commitWorkspace(nextWorkspace, { reason: 'resume-reorder' });
-  }
-
   async function reorderResumes(nextResumeIds) {
     const currentWorkspace = workspaceRef.current;
     const nextWorkspace = reorderWorkspaceResumesToMatch(currentWorkspace, nextResumeIds);
@@ -1290,30 +1258,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     removeResumeSection(sectionId) {
       updateResume((currentResume) => removeResumeSectionBlock(currentResume, sectionId));
     },
-    updateRoleBlockEntry(sectionId, entryId, field, value) {
-      updateResume((currentResume) => updateRoleBlockEntry(currentResume, sectionId, entryId, field, value));
-    },
-    addRoleBlockEntry(sectionId) {
-      updateResume((currentResume) => addRoleBlockEntry(currentResume, sectionId));
-    },
-    moveRoleBlockEntry(sectionId, entryId, direction) {
-      updateResume((currentResume) => moveRoleBlockEntry(currentResume, sectionId, entryId, direction));
-    },
-    removeRoleBlockEntry(sectionId, entryId) {
-      updateResume((currentResume) => removeRoleBlockEntry(currentResume, sectionId, entryId));
-    },
-    updateRoleBlockActivity(sectionId, entryId, activityIndex, value) {
-      updateResume((currentResume) => updateRoleBlockActivity(currentResume, sectionId, entryId, activityIndex, value));
-    },
-    addRoleBlockActivity(sectionId, entryId) {
-      updateResume((currentResume) => addRoleBlockActivity(currentResume, sectionId, entryId));
-    },
-    moveRoleBlockActivity(sectionId, entryId, activityIndex, direction) {
-      updateResume((currentResume) => moveRoleBlockActivity(currentResume, sectionId, entryId, activityIndex, direction));
-    },
-    removeRoleBlockActivity(sectionId, entryId, activityIndex) {
-      updateResume((currentResume) => removeRoleBlockActivity(currentResume, sectionId, entryId, activityIndex));
-    },
     updateSectionBlockEntry(sectionId, entryId, field, value) {
       updateResume((currentResume) => updateSectionBlockEntry(currentResume, sectionId, entryId, field, value));
     },
@@ -1382,16 +1326,12 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     activeTab,
     setActiveTab,
     moveSection,
-    reorderSection,
     reorderSections,
     mobileView,
     setMobileView,
     previewModel,
-    errors,
     getFieldError,
     markTouched,
-    revealAllErrors,
-    showAllErrors,
     actions,
     printResume,
     notice,
@@ -1416,7 +1356,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
           ? 'Save conflict'
         : formatSavedAt(savedAt, { cloudMode: isCloudMode, syncState }),
     syncState,
-    isCloudMode,
     templateOptions: TEMPLATE_OPTIONS,
     resumeList,
     activeResumeId,
@@ -1429,7 +1368,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     replaceResumeDraft,
     duplicateActiveResume,
     renameActiveResume: renameResume,
-    reorderResume,
     reorderResumes,
     deleteActiveResume,
   };

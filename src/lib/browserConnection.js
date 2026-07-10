@@ -8,9 +8,9 @@ import {
   deleteLocalWorkspaceDatabase,
 } from './localWorkspaceDb.js';
 
-export const CONNECTED_ACCOUNT_STORAGE_KEY = 'resumeloomr:connected-account:v1';
-export const SIGNED_OUT_EDITING_PREFERENCE_KEY = 'resumeloomr:signed-out-editing-preference:v1';
-export const DEFAULT_SIGNED_OUT_EDITING_PREFERENCE = {
+const CONNECTED_ACCOUNT_STORAGE_KEY = 'resumeloomr:connected-account:v1';
+const SIGNED_OUT_EDITING_PREFERENCE_KEY = 'resumeloomr:signed-out-editing-preference:v1';
+const DEFAULT_SIGNED_OUT_EDITING_PREFERENCE = {
   allow: true,
   skipPrompt: false,
 };

@@ -17,31 +17,16 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from "../lib/sortableSensors.js";
 
-const defaultSections = [
-    { id: "personal", navLabel: "Personal", navHint: "Name, contact, summary" },
-    { id: "education", navLabel: "Education", navHint: "Schools, degree, dates" },
-    { id: "experience", navLabel: "Experience", navHint: "Roles and highlights" }
-];
-
 function getSectionIds(sections) {
     return sections.map((section) => section.id);
 }
 
-function SectionTabContent({ section, index }) {
-    return (
-        <>
-            <span className="tabIndex" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
-            <span className="tabCopy">
-                <span className="tabLabel">{section.navLabel}</span>
-                <span className="tabHint">{section.navHint}</span>
-            </span>
-        </>
-    );
+function SectionTabContent({ section }) {
+    return <span className="tabLabel">{section.navLabel}</span>;
 }
 
 function SortableSectionTab({
     section,
-    index,
     isActive,
     isLocked,
     setActiveTab
@@ -79,19 +64,19 @@ function SortableSectionTab({
             {...attributes}
             {...listeners}
         >
-            <SectionTabContent section={section} index={index} />
+            <SectionTabContent section={section} />
         </button>
     );
 }
 
-function SectionTabOverlay({ section, index, isActive, style }) {
+function SectionTabOverlay({ section, isActive, style }) {
     if (!section) {
         return null;
     }
 
     return (
         <div className={`tabButton tabButtonOverlay${isActive ? " isActive" : ""}`} style={style}>
-            <SectionTabContent section={section} index={index} />
+            <SectionTabContent section={section} />
         </div>
     );
 }
@@ -260,9 +245,8 @@ function SectionAddDialog({
 export default function SectionTabs({
     activeTab,
     setActiveTab,
-    sections = defaultSections,
+    sections,
     onReorderSections,
-    onReorderSection,
     sectionTemplateGroups = [],
     onAddSection,
     canAddMoreSections = true
@@ -281,8 +265,7 @@ export default function SectionTabs({
         [sectionIds, sectionById]
     );
     const activeDragSection = activeDragId ? sectionById.get(activeDragId) : null;
-    const activeDragIndex = activeDragId ? sectionIds.indexOf(activeDragId) : -1;
-    const canReorder = Boolean(onReorderSections || onReorderSection);
+    const canReorder = Boolean(onReorderSections);
     const canAddSections = Boolean(onAddSection && sectionTemplateGroups.length > 0);
     const sensors = useSensors(
         useSensor(ResumeLoomrPointerSensor, {
@@ -329,11 +312,7 @@ export default function SectionTabs({
         if (oldIndex >= 1 && newIndex >= 1 && oldIndex !== newIndex) {
             const nextSectionIds = arrayMove(sectionIds, oldIndex, newIndex);
 
-            if (onReorderSections) {
-                onReorderSections(nextSectionIds);
-            } else if (event.over?.id && onReorderSection) {
-                onReorderSection(activeId, String(event.over.id), "before");
-            }
+            onReorderSections(nextSectionIds);
 
             setActiveTab(activeId);
             return;
@@ -359,7 +338,6 @@ export default function SectionTabs({
         <DragOverlay adjustScale={false} zIndex={1000}>
             <SectionTabOverlay
                 section={activeDragSection}
-                index={activeDragIndex}
                 isActive={activeDragId === activeTab}
                 style={activeDragRect ? {
                     width: `${activeDragRect.width}px`,
@@ -380,11 +358,10 @@ export default function SectionTabs({
             >
                 <SortableContext items={sectionIds} strategy={rectSortingStrategy}>
                     <div className="tabs" role="tablist" aria-label="Resume sections">
-                        {orderedSections.map((section, index) => (
+                        {orderedSections.map((section) => (
                             <SortableSectionTab
                                 key={section.id}
                                 section={section}
-                                index={index}
                                 isActive={activeTab === section.id}
                                 isLocked={section.id === "personal" || !canReorder}
                                 setActiveTab={setActiveTab}

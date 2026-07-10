@@ -1,4 +1,4 @@
-export const IMPORT_RESUME_MAX_BYTES = 3 * 1024 * 1024;
+const IMPORT_RESUME_MAX_BYTES = 3 * 1024 * 1024;
 
 const PDF_MIME_TYPE = 'application/pdf';
 const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -54,7 +54,7 @@ export function validateImportResumeFile(file) {
   return '';
 }
 
-export function readFileAsBase64(file) {
+function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 

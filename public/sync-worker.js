@@ -29,10 +29,6 @@ function openWorkspaceDb() {
         db.createObjectStore(TOMBSTONES_STORE, { keyPath: 'resumeId' });
       }
 
-      if (!db.objectStoreNames.contains('syncMeta')) {
-        db.createObjectStore('syncMeta', { keyPath: 'id' });
-      }
-
       if (!db.objectStoreNames.contains(ACCOUNT_BINDING_STORE)) {
         db.createObjectStore(ACCOUNT_BINDING_STORE, { keyPath: 'id' });
       }

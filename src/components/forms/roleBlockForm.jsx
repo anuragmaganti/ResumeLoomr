@@ -26,9 +26,9 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
             moveUpLabel={`Move ${section.title} entry ${index + 1} up`}
             moveDownLabel={`Move ${section.title} entry ${index + 1} down`}
             removeLabel={`Remove ${section.title} entry ${index + 1}`}
-            onMoveUp={() => actions.moveRoleBlockEntry(section.id, entry.id, -1)}
-            onMoveDown={() => actions.moveRoleBlockEntry(section.id, entry.id, 1)}
-            onRemove={() => actions.removeRoleBlockEntry(section.id, entry.id)}
+            onMoveUp={() => actions.moveSectionBlockEntry(section.id, entry.id, -1)}
+            onMoveDown={() => actions.moveSectionBlockEntry(section.id, entry.id, 1)}
+            onRemove={() => actions.removeSectionBlockEntry(section.id, entry.id)}
             disableUp={index === 0}
             disableDown={index === entries.length - 1}
             disableRemove={entries.length === 1}
@@ -43,7 +43,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                     id={`role-company-${section.id}-${entry.id}`}
                     {...createEditorTargetAttributes(`${pathPrefix}.company`, { entryId: entry.id })}
                     value={entry.company}
-                    onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'company', event.target.value)}
+                    onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'company', event.target.value)}
                     onBlur={() => markTouched(`${pathPrefix}.company`)}
                     placeholder={placeholder(`${pathPrefix}.company`, 'Organization or company')}
                   />
@@ -57,7 +57,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                     id={`role-title-${section.id}-${entry.id}`}
                     {...createEditorTargetAttributes(`${pathPrefix}.role`, { entryId: entry.id })}
                     value={entry.role}
-                    onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'role', event.target.value)}
+                    onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'role', event.target.value)}
                     onBlur={() => markTouched(`${pathPrefix}.role`)}
                     placeholder={placeholder(`${pathPrefix}.role`, 'Role title')}
                   />
@@ -73,7 +73,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                     id={`role-location-${section.id}-${entry.id}`}
                     {...createEditorTargetAttributes(`${pathPrefix}.location`, { entryId: entry.id })}
                     value={entry.location}
-                    onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'location', event.target.value)}
+                    onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'location', event.target.value)}
                     onBlur={() => markTouched(`${pathPrefix}.location`)}
                     placeholder={placeholder(`${pathPrefix}.location`, 'City, State')}
                   />
@@ -86,7 +86,7 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                     id={`role-years-${section.id}-${entry.id}`}
                     {...createEditorTargetAttributes(`${pathPrefix}.yearsExp`, { entryId: entry.id })}
                     value={entry.yearsExp}
-                    onChange={(event) => actions.updateRoleBlockEntry(section.id, entry.id, 'yearsExp', event.target.value)}
+                    onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'yearsExp', event.target.value)}
                     onBlur={() => markTouched(`${pathPrefix}.yearsExp`)}
                     placeholder={placeholder(`${pathPrefix}.yearsExp`, '2022 - Present')}
                   />
@@ -104,17 +104,17 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                 addLabel="Add highlight"
                 getFieldError={getFieldError}
                 markTouched={markTouched}
-                onChangeItem={(activityIndex, value) => actions.updateRoleBlockActivity(section.id, entry.id, activityIndex, value)}
-                onMoveItem={(activityIndex, direction) => actions.moveRoleBlockActivity(section.id, entry.id, activityIndex, direction)}
-                onRemoveItem={(activityIndex) => actions.removeRoleBlockActivity(section.id, entry.id, activityIndex)}
-                onAddItem={() => actions.addRoleBlockActivity(section.id, entry.id)}
+                onChangeItem={(activityIndex, value) => actions.updateSectionBlockTextList(section.id, entry.id, 'activities', activityIndex, value)}
+                onMoveItem={(activityIndex, direction) => actions.moveSectionBlockTextListItem(section.id, entry.id, 'activities', activityIndex, direction)}
+                onRemoveItem={(activityIndex) => actions.removeSectionBlockTextListItem(section.id, entry.id, 'activities', activityIndex)}
+                onAddItem={() => actions.addSectionBlockTextListItem(section.id, entry.id, 'activities')}
               />
             </form>
           </CollapsibleEntryCard>
         );
       })}
 
-      <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addRoleBlockEntry(section.id)}>
+      <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addSectionBlockEntry(section.id)}>
         Add role
       </button>
     </div>

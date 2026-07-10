@@ -9,7 +9,6 @@ const firebaseConfig = {
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: env.VITE_FIREBASE_PROJECT_ID,
   appId: env.VITE_FIREBASE_APP_ID,
-  measurementId: env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 let appInstance = null;
@@ -25,7 +24,7 @@ export function hasFirebaseConfig() {
   );
 }
 
-export function getFirebaseApp() {
+function getFirebaseApp() {
   if (!hasFirebaseConfig()) {
     return null;
   }

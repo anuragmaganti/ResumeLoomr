@@ -11,74 +11,7 @@ import {
 } from "../lib/editorTargets";
 import { MAX_RESUME_SECTIONS, SECTION_TEMPLATE_GROUPS, UNTITLED_SECTION_TITLE } from "../lib/resume";
 
-const sectionMeta = {
-    personal: {
-        navLabel: "Personal",
-        navHint: "Name, contact, summary",
-        label: "Personal details",
-        description: "Add your name, contact details, and summary with clear validation and polished defaults."
-    },
-    education: {
-        navLabel: "Education",
-        navHint: "Schools, degree, dates",
-        label: "Education",
-        description: "Organize institutions, degrees, and dates in a structure that stays easy to scan."
-    },
-    experience: {
-        navLabel: "Experience",
-        navHint: "Roles and highlights",
-        label: "Experience",
-        description: "Shape concise, high-signal role entries with reorderable highlights for stronger storytelling."
-    },
-    skills: {
-        navLabel: "Skills",
-        navHint: "Core strengths",
-        label: "Skills",
-        description: "Group skills into concise, scannable sets that support the rest of the resume."
-    },
-    projects: {
-        navLabel: "Projects",
-        navHint: "Builds and outcomes",
-        label: "Projects",
-        description: "Highlight portfolio-worthy work with concise summaries and measurable outcomes."
-    },
-    certifications: {
-        navLabel: "Certifications",
-        navHint: "Credentials",
-        label: "Certifications",
-        description: "Show certifications, issuers, and optional supporting detail without clutter."
-    },
-    volunteering: {
-        navLabel: "Volunteer",
-        navHint: "Service roles",
-        label: "Volunteering",
-        description: "Capture volunteer work with the same clarity as your professional experience."
-    },
-    leadership: {
-        navLabel: "Leadership",
-        navHint: "Teams and initiatives",
-        label: "Leadership",
-        description: "Surface leadership roles, scope, and outcomes in a direct, professional format."
-    },
-    languages: {
-        navLabel: "Languages",
-        navHint: "Language skills",
-        label: "Languages",
-        description: "List languages and proficiency clearly for fast recruiter scanning."
-    },
-    awards: {
-        navLabel: "Awards",
-        navHint: "Recognition",
-        label: "Awards",
-        description: "Separate major honors from education details so they can stand on their own."
-    },
-    publications: {
-        navLabel: "Publications",
-        navHint: "Articles and papers",
-        label: "Publications",
-        description: "Add writing, research, or speaking-related publication credits with context."
-    }
-};
+const PERSONAL_SECTION_LABEL = "Personal details";
 
 function formatSectionRailLabel(value) {
     const label = typeof value === "string" ? value.trim() : "";
@@ -123,7 +56,6 @@ export default function EditorPanel({
     activeTab,
     setActiveTab,
     onMoveSection,
-    onReorderSection,
     onReorderSections,
     template,
     templateOptions,
@@ -147,23 +79,19 @@ export default function EditorPanel({
     const resumeBlocks = Array.isArray(resume.sections) ? resume.sections : [];
     const activeBlock = resumeBlocks.find((section) => section.id === activeTab);
     const currentSectionTitleValue = activeTab === "personal"
-        ? sectionMeta.personal.label
+        ? PERSONAL_SECTION_LABEL
         : activeBlock?.title ?? "";
     const currentSectionLabel = activeTab === "personal"
-        ? sectionMeta.personal.label
+        ? PERSONAL_SECTION_LABEL
         : activeBlock?.title?.trim() || UNTITLED_SECTION_TITLE;
     const sections = [
         {
             id: "personal",
-            navLabel: sectionMeta.personal.navLabel,
-            navHint: sectionMeta.personal.navHint
+            navLabel: "Personal"
         },
         ...resumeBlocks.map((section) => ({
             id: section.id,
-            navLabel: formatSectionRailLabel(section.title) || UNTITLED_SECTION_TITLE,
-            navHint: sectionMeta[section.id]?.navHint || sectionMeta[section.kind]?.navHint || (
-                section.kind === "roles" ? "Roles and highlights" : "Section details"
-            )
+            navLabel: formatSectionRailLabel(section.title) || UNTITLED_SECTION_TITLE
         }))
     ];
     const activeSectionIndex = sections.findIndex((section) => section.id === activeTab);
@@ -443,7 +371,6 @@ export default function EditorPanel({
                             activeTab={activeTab}
                             setActiveTab={setManualActiveTab}
                             sections={sections}
-                            onReorderSection={onReorderSection}
                             onReorderSections={onReorderSections}
                             sectionTemplateGroups={SECTION_TEMPLATE_GROUPS}
                             onAddSection={handleAddSection}
