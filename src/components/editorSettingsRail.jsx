@@ -57,10 +57,6 @@ export default function EditorSettingsRail({
 
   return (
     <div className="settingsRailInner">
-      <div className="settingsRailHeader">
-        <h2>Settings</h2>
-      </div>
-
       <div className="settingsRailList">
         <div className="settingsTemplateControl settingsControl">
           <span className="settingsControlLabel">Template</span>

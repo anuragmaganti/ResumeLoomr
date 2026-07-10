@@ -106,24 +106,24 @@ function SectionAddDialog({
             }
 
             const viewportPadding = 16;
-            const preferredLeft = anchorRect.right + 12;
-            const maxDialogWidth = Math.min(820, window.innerWidth - viewportPadding * 2);
-            const rightSideWidth = window.innerWidth - preferredLeft - viewportPadding;
-            const dialogWidth = rightSideWidth >= 360
-                ? Math.min(maxDialogWidth, rightSideWidth)
-                : maxDialogWidth;
-            const left = rightSideWidth >= 360
-                ? preferredLeft
-                : Math.min(
-                    Math.max(viewportPadding, preferredLeft),
-                    window.innerWidth - dialogWidth - viewportPadding
-                );
+            const editorStage = anchorRef.current
+                ?.closest(".editorWorkspace")
+                ?.querySelector(".editorStage");
+            const editorStageRect = editorStage?.getBoundingClientRect() || anchorRect;
+            const dialogWidth = Math.min(
+                760,
+                window.innerWidth - Math.max(viewportPadding, editorStageRect.left) - viewportPadding
+            );
+            const left = Math.min(
+                Math.max(viewportPadding, editorStageRect.left),
+                window.innerWidth - dialogWidth - viewportPadding
+            );
             const dialogHeight = Math.min(
                 dialogRef.current?.scrollHeight || 520,
                 window.innerHeight - viewportPadding * 2
             );
             const top = Math.min(
-                Math.max(viewportPadding, anchorRect.top - 8),
+                Math.max(viewportPadding, editorStageRect.top),
                 window.innerHeight - dialogHeight - viewportPadding
             );
 
