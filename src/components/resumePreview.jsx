@@ -3584,9 +3584,13 @@ export default function ResumePreview({
             return null;
         }
 
+        const positionClassName = personalAlignment === 'left'
+            ? ' sampleInformationToggle--personalLeft'
+            : '';
+
         return (
             <div
-                className={`sampleInformationToggle${showSampleInformation ? "" : " sampleInformationToggle--hiddenUntilHover"}`}
+                className={`sampleInformationToggle${positionClassName}${showSampleInformation ? "" : " sampleInformationToggle--hiddenUntilHover"}`}
                 data-dnd-no-drag="true"
                 onPointerDown={(event) => event.stopPropagation()}
             >

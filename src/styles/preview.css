@@ -82,11 +82,17 @@ html[data-theme="dark"] .resumePage {
   line-height: 1;
   box-shadow: 0 11px 26px color-mix(in srgb, #0f172a 10%, transparent);
   overflow: hidden;
+  opacity: 0.24;
   user-select: none;
   z-index: 14;
   transition:
     opacity var(--transition-base),
     transform var(--transition-base);
+}
+
+.resumePage:hover .sampleInformationToggle,
+.sampleInformationToggle:focus-within {
+  opacity: 1;
 }
 
 .sampleInformationToggleRow {
@@ -95,6 +101,11 @@ html[data-theme="dark"] .resumePage {
   gap: 8px;
   padding: 7px 10px 7px 8px;
   cursor: pointer;
+}
+
+.sampleInformationToggle--personalLeft {
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .sampleInformationToggle input {
@@ -169,6 +180,10 @@ html[data-theme="dark"] .resumePage {
   transform: translateY(-3px);
 }
 
+.sampleInformationToggle--personalLeft.sampleInformationToggle--hiddenUntilHover {
+  transform: translate(-50%, -3px);
+}
+
 .resumePage:hover .sampleInformationToggle--hiddenUntilHover,
 .resumePage:focus-within .sampleInformationToggle--hiddenUntilHover {
   opacity: 1;
@@ -176,11 +191,24 @@ html[data-theme="dark"] .resumePage {
   transform: translateY(0);
 }
 
+.resumePage:hover .sampleInformationToggle--personalLeft.sampleInformationToggle--hiddenUntilHover,
+.resumePage:focus-within .sampleInformationToggle--personalLeft.sampleInformationToggle--hiddenUntilHover {
+  transform: translateX(-50%);
+}
+
 @media (hover: none) {
+  .sampleInformationToggle {
+    opacity: 1;
+  }
+
   .sampleInformationToggle--hiddenUntilHover {
     opacity: 1;
     pointer-events: auto;
     transform: none;
+  }
+
+  .sampleInformationToggle--personalLeft.sampleInformationToggle--hiddenUntilHover {
+    transform: translateX(-50%);
   }
 }
 

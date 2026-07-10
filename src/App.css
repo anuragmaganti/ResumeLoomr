@@ -2490,52 +2490,152 @@ html[data-theme="dark"] .signedOutPrompt {
 .separatorSettingsPopup {
   position: fixed;
   z-index: 1000;
-  width: min(280px, calc(100vw - 24px));
-  padding: 8px;
-  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-surface) 96%, var(--color-bg));
+  width: min(304px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 62%, var(--color-border));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--color-surface-elevated) 96%, var(--color-surface));
   color: var(--color-text);
   box-shadow:
-    0 18px 44px color-mix(in srgb, #020617 18%, transparent),
-    0 2px 8px color-mix(in srgb, #020617 10%, transparent);
+    0 24px 60px color-mix(in srgb, #020617 21%, transparent),
+    0 4px 14px color-mix(in srgb, #020617 10%, transparent);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  outline: none;
+  animation: separatorSettingsPopupIn 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-theme="dark"] .separatorSettingsPopup {
+  box-shadow:
+    0 28px 68px rgba(0, 0, 0, 0.72),
+    0 5px 18px rgba(0, 0, 0, 0.4);
+}
+
+.separatorSettingsHeader {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 50px;
+  padding: 9px 10px 9px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  background: color-mix(in srgb, var(--color-surface-muted) 42%, transparent);
+}
+
+.separatorSettingsHeading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.separatorSettingsHeading > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.separatorSettingsHeading h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 760;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+
+.separatorSettingsHeading > div > span {
+  color: var(--color-text-muted);
+  font-size: 0.61rem;
+  font-weight: 680;
+  line-height: 1.15;
+}
+
+.separatorSettingsHeaderIcon,
+.separatorControlIcon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--color-accent-strong);
+}
+
+.separatorSettingsHeaderIcon {
+  width: 29px;
+  height: 29px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--color-accent-soft) 62%, transparent);
+}
+
+.separatorSettingsHeaderIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.separatorSettingsClose {
+  display: inline-grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  flex: 0 0 29px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.separatorSettingsClose:hover,
+.separatorSettingsClose:focus-visible {
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
   outline: none;
 }
 
-.separatorSettingsTitle {
-  padding: 6px 8px 7px;
-  color: var(--color-text-muted);
-  font-size: 0.6875rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+.separatorSettingsClose:focus-visible {
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.separatorSettingsClose svg,
+.separatorControlIcon svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.separatorSettingsClose svg {
+  width: 15px;
+  height: 15px;
 }
 
 .separatorSettingsControls {
   display: grid;
-  gap: 3px;
+  padding: 2px 11px 8px;
 }
 
 .separatorSliderControl {
   display: grid;
-  gap: 6px;
-  padding: 9px 8px 8px;
-  border-radius: 10px;
+  gap: 7px;
+  padding: 11px 3px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 62%, transparent);
   cursor: default;
 }
 
 .separatorPositionControl {
   display: grid;
-  gap: 7px;
-  padding: 9px 8px 8px;
-  border-radius: 10px;
-}
-
-.separatorSliderControl:hover,
-.separatorSliderControl:focus-within,
-.separatorPositionControl:hover,
-.separatorPositionControl:focus-within {
-  background: color-mix(in srgb, var(--color-accent-soft) 38%, transparent);
+  gap: 8px;
+  padding: 11px 3px 3px;
 }
 
 .separatorSliderHeader {
@@ -2543,98 +2643,205 @@ html[data-theme="dark"] .signedOutPrompt {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  font-size: 0.75rem;
-  font-weight: 760;
+  min-height: 20px;
 }
 
-.separatorSliderHeader span:last-child {
+.separatorSliderLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text);
+  font-size: 0.72rem;
+  font-weight: 740;
+  line-height: 1.2;
+}
+
+.separatorControlIcon {
+  width: 17px;
+  height: 17px;
   color: var(--color-text-muted);
-  font-size: 0.6875rem;
-  font-weight: 700;
+}
+
+.separatorControlIcon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.separatorSliderValue {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-muted) 76%, transparent);
+  color: var(--color-text-muted);
+  font-size: 0.61rem;
+  font-weight: 720;
+  line-height: 1;
 }
 
 .separatorSliderControl input[type="range"] {
   --separator-range-track-inset: 8px;
+  appearance: none;
   width: 100%;
-  accent-color: var(--color-accent);
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
   cursor: pointer;
 }
 
+.separatorSliderControl input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--color-accent) 0 var(--separator-slider-progress, 50%),
+    color-mix(in srgb, var(--color-border-strong) 58%, transparent) var(--separator-slider-progress, 50%) 100%
+  );
+}
+
+.separatorSliderControl input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  margin-top: -5.5px;
+  border: 2px solid var(--color-surface-elevated);
+  border-radius: 999px;
+  background: var(--color-accent);
+  box-shadow: 0 1px 4px color-mix(in srgb, #020617 24%, transparent);
+}
+
+.separatorSliderControl input[type="range"]::-moz-range-track {
+  height: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border-strong) 58%, transparent);
+}
+
+.separatorSliderControl input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-accent);
+}
+
+.separatorSliderControl input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-surface-elevated);
+  border-radius: 999px;
+  background: var(--color-accent);
+  box-shadow: 0 1px 4px color-mix(in srgb, #020617 24%, transparent);
+}
+
+.separatorSliderControl input[type="range"]:focus-visible {
+  outline: none;
+}
+
+.separatorSliderControl input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 1px 4px color-mix(in srgb, #020617 24%, transparent),
+    0 0 0 4px var(--color-accent-soft);
+}
+
+.separatorSliderControl input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 1px 4px color-mix(in srgb, #020617 24%, transparent),
+    0 0 0 4px var(--color-accent-soft);
+}
+
 .separatorSliderMarks {
-  position: relative;
-  display: block;
+  display: grid;
+  grid-template-columns: repeat(var(--separator-mark-count, 11), minmax(0, 1fr));
   width: calc(100% - (var(--separator-range-track-inset, 8px) * 2));
-  height: 18px;
+  min-height: 19px;
   margin-inline: var(--separator-range-track-inset, 8px);
   color: var(--color-text-subtle);
-  font-size: 0.5625rem;
-  font-weight: 720;
+  font-size: 0.55rem;
+  font-weight: 680;
   line-height: 1.1;
   user-select: none;
 }
 
 .separatorSliderMarks span {
-  position: absolute;
-  top: 0;
-  left: var(--separator-mark-position, 0%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 16px;
+  width: 19px;
+  height: 19px;
+  justify-self: center;
   border-radius: 999px;
   color: inherit;
   transition:
-    background 160ms ease,
-    box-shadow 160ms ease,
+    background-color 150ms ease,
     color 160ms ease,
     transform 160ms ease;
-  transform: translateX(-50%);
 }
 
 .separatorSliderMarks span.isActive {
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--color-accent) 18%, transparent) 0%,
-    color-mix(in srgb, var(--color-accent) 12%, transparent) 54%,
-    transparent 78%
-  );
-  box-shadow: none;
+  background: color-mix(in srgb, var(--color-accent-soft) 78%, transparent);
   color: var(--color-accent-strong);
-  transform: translateX(-50%) translateY(-1px);
+  font-weight: 800;
+  transform: translateY(-1px);
 }
 
 .separatorPositionSegment {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-surface-muted) 76%, transparent);
 }
 
 .separatorPositionOption {
-  min-height: 28px;
+  min-height: 30px;
   padding: 0 7px;
-  border: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--color-surface-muted) 74%, transparent);
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
   color: var(--color-text-muted);
-  font-size: 0.6875rem;
-  font-weight: 760;
+  font-size: 0.64rem;
+  font-weight: 720;
   line-height: 1;
   text-align: center;
   cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .separatorPositionOption:hover,
 .separatorPositionOption:focus-visible {
-  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-surface-elevated) 72%, transparent);
   color: var(--color-text);
   outline: none;
 }
 
 .separatorPositionOption.isActive {
-  border-color: color-mix(in srgb, var(--color-accent) 58%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent-soft) 72%, var(--color-surface));
-  color: var(--color-text);
+  background: var(--color-surface-elevated);
+  color: var(--color-accent-strong);
+  box-shadow: 0 1px 4px color-mix(in srgb, #020617 12%, transparent);
+}
+
+@keyframes separatorSettingsPopupIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .separatorSettingsPopup,
+  .separatorSliderMarks span,
+  .separatorPositionOption {
+    animation: none;
+    transition: none;
+  }
 }
 
 .button.settingsAdjustButton:not(:disabled):hover {

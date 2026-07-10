@@ -4,6 +4,49 @@ import { createPortal } from 'react-dom';
 const POPUP_MARGIN = 12;
 const POPUP_OFFSET = 10;
 
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+      <path d="m5 5 8 8m0-8-8 8" />
+    </svg>
+  );
+}
+
+function ControlIcon({ type }) {
+  if (type === 'tone') {
+    return (
+      <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+        <path d="M3 9h12" />
+        <circle cx="12.5" cy="9" r="2.25" />
+      </svg>
+    );
+  }
+
+  if (type === 'weight') {
+    return (
+      <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+        <path d="M3 6.25h12M3 11.75h12" />
+      </svg>
+    );
+  }
+
+  if (type === 'gap') {
+    return (
+      <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+        <path d="M3 5h12M3 13h12M9 7.25v3.5m-1.6-2L9 7.15l1.6 1.6M7.4 9.25 9 10.85l1.6-1.6" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+      <path d="M3 5.5h12M3 12.5h12" />
+      <circle cx="6" cy="5.5" r="1.5" />
+      <circle cx="12" cy="12.5" r="1.5" />
+    </svg>
+  );
+}
+
 function createNumberMarks(min, max) {
   return Array.from({ length: max - min + 1 }, (_, index) => {
     const value = min + index;
@@ -32,6 +75,7 @@ const separatorControls = [
   {
     key: 'Tone',
     label: 'Color',
+    icon: 'tone',
     min: 0,
     max: 10,
     step: 1,
@@ -53,6 +97,7 @@ const separatorControls = [
   {
     key: 'Weight',
     label: 'Width',
+    icon: 'weight',
     min: 1,
     max: 5,
     step: 1,
@@ -64,6 +109,7 @@ const separatorControls = [
   {
     key: 'Gap',
     label: 'Section gap',
+    icon: 'gap',
     min: 0,
     max: 10,
     step: 1,
@@ -179,25 +225,45 @@ export default function SeparatorSettingsPopup({
   const popup = (
     <div
       ref={popupRef}
-      className="separatorSettingsPopup"
+      className={`separatorSettingsPopup separatorSettingsPopup--${anchor.scope}`}
       style={{ left: `${position.left}px`, top: `${position.top}px` }}
       role="dialog"
       aria-label={title}
       tabIndex={-1}
     >
-      <div className="separatorSettingsTitle">{title}</div>
+      <header className="separatorSettingsHeader">
+        <div className="separatorSettingsHeading">
+          <span className="separatorSettingsHeaderIcon"><ControlIcon type="position" /></span>
+          <div>
+            <h2>{title}</h2>
+            <span>{anchor.scope === 'personal' ? 'Personal only' : 'All sections'}</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="separatorSettingsClose"
+          onClick={() => onClose()}
+          aria-label={`Close ${title.toLowerCase()}`}
+        >
+          <CloseIcon />
+        </button>
+      </header>
       <div className="separatorSettingsControls">
         {controls.map((control) => {
           const storedValue = settings?.[control.settingId] ?? defaultValues[control.key];
           const value = control.fromSetting ? control.fromSetting(storedValue) : storedValue;
           const valueLabel = control.valueLabel(value);
           const unitLabel = `${value}/${control.max}`;
+          const sliderProgress = getMarkPosition(value, control.min, control.max);
 
           return (
             <label className="separatorSliderControl" key={control.settingId}>
               <span className="separatorSliderHeader">
-                <span>{control.label}</span>
-                <span>{unitLabel} · {valueLabel}</span>
+                <span className="separatorSliderLabel">
+                  <span className="separatorControlIcon"><ControlIcon type={control.icon} /></span>
+                  <span>{control.label}</span>
+                </span>
+                <span className="separatorSliderValue">{valueLabel}</span>
               </span>
               <input
                 type="range"
@@ -206,6 +272,7 @@ export default function SeparatorSettingsPopup({
                 step={control.step}
                 value={value}
                 aria-valuetext={`${unitLabel}, ${valueLabel}`}
+                style={{ '--separator-slider-progress': sliderProgress }}
                 onChange={(event) => {
                   const nextValue = Number(event.target.value);
                   onChange(control.settingId, control.toSetting ? control.toSetting(nextValue) : nextValue);
@@ -214,12 +281,12 @@ export default function SeparatorSettingsPopup({
               <span
                 className="separatorSliderMarks"
                 aria-hidden="true"
+                style={{ '--separator-mark-count': control.marks.length }}
               >
                 {control.marks.map((mark) => (
                   <span
                     className={mark.value === value ? 'isActive' : undefined}
                     key={`${control.settingId}-${mark.value}`}
-                    style={{ '--separator-mark-position': getMarkPosition(mark.value, control.min, control.max) }}
                   >
                     {mark.label}
                   </span>
@@ -231,11 +298,9 @@ export default function SeparatorSettingsPopup({
         {anchor.scope === 'section' && (
           <div className="separatorPositionControl">
             <span className="separatorSliderHeader">
-              <span>Position</span>
-              <span>
-                {settings?.sectionSeparatorPosition === 'belowSectionName'
-                  ? 'Below'
-                  : 'Above'}
+              <span className="separatorSliderLabel">
+                <span className="separatorControlIcon"><ControlIcon type="position" /></span>
+                <span>Position</span>
               </span>
             </span>
             <div className="separatorPositionSegment" role="group" aria-label="Section separator position">
