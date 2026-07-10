@@ -1607,6 +1607,8 @@ html[data-theme="dark"] .personalSection {
 .educationDescription,
 .previewEntryDetail {
   margin-top: var(--resume-detail-gap);
+  text-align: justify;
+  text-align-last: left;
 }
 
 .educationDetailLabel {
@@ -1625,6 +1627,8 @@ html[data-theme="dark"] .personalSection {
   color: var(--resume-page-body);
   font-size: var(--resume-body-size);
   line-height: var(--resume-list-line-height);
+  text-align: justify;
+  text-align-last: left;
 }
 
 .experienceSection li + li,
