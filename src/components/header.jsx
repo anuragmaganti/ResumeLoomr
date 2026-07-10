@@ -600,7 +600,8 @@ export default function Header({
                   onCreateResume();
                 }}
               >
-                + New
+                <span className="resumeNewButtonIcon" aria-hidden="true" />
+                <span>New</span>
               </button>
             </div>
           </SortableContext>

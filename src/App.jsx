@@ -34,6 +34,52 @@ import {
 const THEME_STORAGE_KEY = 'resumeloomr:theme';
 const EMPTY_SAMPLE_ORDER_OVERRIDES = {};
 
+function NoticeToastIcon({ tone, isSyncError }) {
+  if (isSyncError) {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+        <path d="M7.2 17.5H5.8a3.3 3.3 0 0 1-.45-6.57A6.5 6.5 0 0 1 18 9.65a4 4 0 0 1 .2 7.85h-1.4" />
+        <path d="m9 15 6 6M15 15l-6 6" />
+      </svg>
+    );
+  }
+
+  if (tone === 'success') {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="m8.2 12.2 2.4 2.4 5.2-5.2" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      <path d="M12 3.5 21 20H3z" />
+      <path d="M12 9v4.5M12 17h.01" />
+    </svg>
+  );
+}
+
+function NoticeDismissIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 18 18" focusable="false">
+      <path d="m5 5 8 8M13 5l-8 8" />
+    </svg>
+  );
+}
+
+function getNoticeToastPresentation(notice, syncState) {
+  const isSyncError = syncState === 'error';
+  const isCloudUnavailable = isSyncError && notice?.message === 'Cloud sync is unavailable. Your local draft is still editable.';
+
+  return {
+    isSyncError,
+    title: isCloudUnavailable ? 'Cloud sync unavailable' : '',
+    message: isCloudUnavailable ? 'Your work is saved locally and remains editable.' : notice?.message,
+  };
+}
+
 function sampleTextListOrderKey(sectionId, entryId, field) {
   return `${sectionId}.${entryId}.${field}`;
 }
@@ -201,6 +247,7 @@ function App() {
   const displayPreviewModel = isPrintRendering ? previewModel : (samplePreviewModel || previewModel);
   const isSamplePreview = Boolean(samplePreviewModel) && !isPrintRendering;
   const isImportingResume = importState.status === 'processing';
+  const noticePresentation = getNoticeToastPresentation(notice, syncState);
 
   const closeSeparatorSettings = useCallback(() => {
     const triggerElement = separatorSettingsAnchor?.triggerElement;
@@ -756,18 +803,34 @@ function App() {
         />
 
         {notice && (
-          <div className={`noticeBanner noticeBanner--${notice.tone}`} role="status">
-            <span>{notice.message}</span>
-            <div className="noticeActions">
-              {syncState === 'error' ? (
-                <button type="button" className="noticeDismiss" onClick={retryCloudSync}>
-                  Retry sync
+          <div
+            className={`noticeToast noticeToast--${notice.tone}`}
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <span className="noticeToastIcon">
+              <NoticeToastIcon tone={notice.tone} isSyncError={noticePresentation.isSyncError} />
+            </span>
+            <span className="noticeToastCopy">
+              {noticePresentation.title ? <strong>{noticePresentation.title}</strong> : null}
+              <span>{noticePresentation.message}</span>
+            </span>
+            <span className="noticeToastActions">
+              {noticePresentation.isSyncError ? (
+                <button type="button" className="noticeToastRetry" onClick={retryCloudSync}>
+                  Retry
                 </button>
               ) : null}
-              <button type="button" className="noticeDismiss" onClick={dismissNotice} aria-label="Dismiss message">
-                Dismiss
+              <button
+                type="button"
+                className="noticeToastDismiss"
+                onClick={dismissNotice}
+                aria-label="Dismiss message"
+              >
+                <NoticeDismissIcon />
               </button>
-            </div>
+            </span>
           </div>
         )}
 

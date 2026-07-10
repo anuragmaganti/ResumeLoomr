@@ -134,9 +134,9 @@ html[data-theme="dark"] .brandLogo--dark {
   container-name: resume-rail;
   width: 100%;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 9px 10px;
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-surface) 90%, var(--color-surface-muted));
+  background: color-mix(in srgb, var(--color-surface) 94%, var(--color-surface-muted));
 }
 
 .resumePillStrip {
@@ -144,11 +144,11 @@ html[data-theme="dark"] .brandLogo--dark {
   display: grid;
   grid-template-columns: repeat(var(--resume-rail-columns), minmax(0, 1fr));
   align-items: flex-start;
-  gap: 8px;
+  gap: 7px;
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  padding: 2px;
+  padding: 1px;
   overflow: visible;
   transition:
     gap var(--transition-fast),
@@ -183,15 +183,15 @@ html[data-theme="dark"] .brandLogo--dark {
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
+  gap: 3px;
   width: 100%;
   min-width: 0;
-  min-height: 36px;
-  padding: 2px 2px 2px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--color-surface-muted) 72%, transparent);
-  box-shadow: none;
+  min-height: 38px;
+  padding: 3px 3px 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+  border-radius: 11px;
+  background: var(--color-surface-soft);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 4%, transparent);
   user-select: none;
   -webkit-user-select: none;
   transition:
@@ -216,16 +216,29 @@ html[data-theme="dark"] .brandLogo--dark {
 
 .resumePill.isActive {
   border-color: var(--color-accent-border);
-  background: color-mix(in srgb, var(--color-accent-soft) 66%, var(--color-surface) 34%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background: color-mix(in srgb, var(--color-accent-soft) 62%, var(--color-surface) 38%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 8%, transparent),
+    0 1px 2px color-mix(in srgb, var(--color-text) 5%, transparent);
 }
 
 .resumePill.isSelected {
   border-color: var(--color-accent);
 }
 
+.resumePill:not(.isActive):not(.isSelected):hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-muted);
+  box-shadow: var(--shadow-xs);
+}
+
+.resumePill.isActive:hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-soft) 72%, var(--color-surface) 28%);
+}
+
 html[data-theme="dark"] .resumePill.isActive {
-  background: color-mix(in srgb, var(--color-accent-soft) 42%, #202020 58%);
+  background: color-mix(in srgb, var(--color-accent-soft) 48%, var(--color-surface) 52%);
 }
 
 .resumePill.isSortingPlaceholder {
@@ -241,12 +254,10 @@ html[data-theme="dark"] .resumePill.isActive {
 
 .resumePillOverlay {
   border-color: var(--color-accent-strong);
-  background: color-mix(in srgb, var(--color-surface-elevated) 74%, var(--color-accent-soft) 26%);
+  background: color-mix(in srgb, var(--color-surface-elevated) 80%, var(--color-accent-soft) 20%);
   box-shadow:
     0 12px 28px rgba(15, 23, 42, 0.18),
     var(--shadow-md);
-  outline: 2px solid var(--color-accent);
-  outline-offset: -5px;
   cursor: grabbing;
   pointer-events: none;
 }
@@ -271,6 +282,27 @@ html[data-theme="dark"] .resumePill.isActive {
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
+}
+
+.resumePillButton::before {
+  content: "";
+  width: 10px;
+  height: 14px;
+  flex: 0 0 10px;
+  margin-right: 7px;
+  background-image: radial-gradient(circle, currentColor 1px, transparent 1.2px);
+  background-position: center;
+  background-size: 5px 5px;
+  color: var(--color-text-muted);
+  opacity: 0.24;
+  transition: opacity var(--transition-base), color var(--transition-base);
+}
+
+.resumePill:hover .resumePillButton::before,
+.resumePill.isActive .resumePillButton::before,
+.resumePill.isSelected .resumePillButton::before {
+  color: var(--color-accent-strong);
+  opacity: 0.58;
 }
 
 .resumePillLabel {
@@ -309,7 +341,7 @@ html[data-theme="dark"] .resumePill.isActive {
 .resumePillMenuButton,
 .resumeNewButton {
   min-height: 30px;
-  border-radius: 10px;
+  border-radius: 9px;
   box-shadow: none;
 }
 
@@ -318,6 +350,16 @@ html[data-theme="dark"] .resumePill.isActive {
   min-width: 26px;
   width: 26px;
   padding: 0;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--color-surface-elevated) 64%, transparent);
+  color: var(--color-text-muted);
+}
+
+.resumePillMenuButton:not(:disabled):hover,
+.resumePillMenuButton:not(:disabled):focus-visible {
+  border-color: color-mix(in srgb, var(--color-accent) 24%, transparent);
+  background: color-mix(in srgb, var(--color-accent-soft) 62%, var(--color-surface-elevated));
+  color: var(--color-accent-strong);
 }
 
 .resumePillMenuHost {
@@ -514,9 +556,11 @@ html[data-theme="dark"] .resumePill.isActive {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin: 8px 2px 0;
-  padding: 9px 2px 0;
-  border-top: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  margin: 7px 1px 0;
+  padding: 6px 7px 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 18%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-accent-soft) 36%, var(--color-surface) 64%);
 }
 
 .resumeSelectionCount {
@@ -531,12 +575,12 @@ html[data-theme="dark"] .resumePill.isActive {
 }
 
 .resumeSelectionCountDot {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 7px;
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
   border-radius: 999px;
   background: var(--color-accent);
-  box-shadow: 0 0 0 4px var(--color-accent-soft);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
 
 .button.resumeSelectionClear {
@@ -548,13 +592,56 @@ html[data-theme="dark"] .resumePill.isActive {
 }
 
 .resumeNewButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   width: 100%;
   min-width: 0;
   padding: 0 12px;
   font-size: 0.75rem;
-  font-weight: 700;
+  border-color: color-mix(in srgb, var(--color-border-strong) 72%, transparent);
+  border-style: dashed;
+  background: color-mix(in srgb, var(--color-surface-muted) 44%, transparent);
+  color: var(--color-text-subtle);
+  font-weight: 680;
   letter-spacing: -0.01em;
   white-space: nowrap;
+}
+
+.resumeNewButtonIcon {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--color-surface-elevated) 72%, transparent);
+  color: currentColor;
+}
+
+.resumeNewButtonIcon::before,
+.resumeNewButtonIcon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 1.4px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.resumeNewButtonIcon::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.resumeNewButton:not(:disabled):hover,
+.resumeNewButton:not(:disabled):focus-visible {
+  border-color: var(--color-accent-border);
+  border-style: solid;
+  background: color-mix(in srgb, var(--color-accent-soft) 48%, var(--color-surface) 52%);
+  color: var(--color-accent-strong);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -633,48 +720,156 @@ html[data-theme="dark"] .resumePill.isActive {
   white-space: nowrap;
 }
 
-.noticeBanner {
-  display: flex;
+.noticeToast {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 90;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-  padding: 14px 16px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
+  gap: 10px;
+  width: min(440px, calc(100vw - 112px));
+  min-height: 54px;
+  padding: 7px 8px 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 74%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface-elevated) 94%, transparent);
+  color: var(--color-text);
+  box-shadow:
+    0 18px 44px color-mix(in srgb, #000000 18%, transparent),
+    0 2px 8px color-mix(in srgb, #000000 10%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 8%, transparent);
+  transform: translateX(-50%);
+  animation: noticeToastIn 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.noticeBanner--success {
-  border-color: var(--color-success-border);
+.noticeToastIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+}
+
+.noticeToastIcon svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.noticeToast--success .noticeToastIcon {
   background: var(--color-success-soft);
   color: var(--color-success);
 }
 
-.noticeBanner--error {
-  border-color: var(--color-error-border);
+.noticeToast--error .noticeToastIcon {
   background: var(--color-error-soft);
   color: var(--color-error);
 }
 
-.noticeBanner--warning {
-  border-color: var(--color-warning);
+.noticeToast--warning .noticeToastIcon {
   background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.noticeToastCopy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.noticeToastCopy strong {
   color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 780;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
-.noticeDismiss {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-weight: 600;
-  cursor: pointer;
+.noticeToastCopy > span {
+  color: var(--color-text-subtle);
+  font-size: 0.7rem;
+  font-weight: 560;
+  line-height: 1.35;
 }
 
-.noticeActions {
+.noticeToastActions {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 3px;
   flex: 0 0 auto;
+}
+
+.noticeToastRetry,
+.noticeToastDismiss {
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-base),
+    color var(--transition-base);
+}
+
+.noticeToastRetry {
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--color-accent-strong);
+  font-size: 0.68rem;
+  font-weight: 780;
+}
+
+.noticeToastDismiss {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 9px;
+}
+
+.noticeToastDismiss svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.6;
+}
+
+.noticeToastRetry:hover,
+.noticeToastRetry:focus-visible,
+.noticeToastDismiss:hover,
+.noticeToastDismiss:focus-visible {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  outline: none;
+}
+
+@keyframes noticeToastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noticeToast {
+    animation: none;
+  }
 }
 
 .conflictBanner {
@@ -2908,9 +3103,9 @@ html[data-theme="dark"] .sectionAddDialog {
     min-height: 34px;
   }
 
-  .noticeBanner {
-    align-items: flex-start;
-    flex-direction: column;
+  .noticeToast {
+    top: max(60px, calc(env(safe-area-inset-top) + 48px));
+    width: calc(100vw - 24px);
   }
 
   .settingsLauncher {
@@ -3014,7 +3209,7 @@ html[data-theme="dark"] .sectionAddDialog {
   .headerStack,
   .topbar,
   .resumeSubbar,
-  .noticeBanner,
+  .noticeToast,
   .conflictBanner,
   .authOverlay,
   .settingsLauncher,
