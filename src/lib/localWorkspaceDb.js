@@ -1,9 +1,10 @@
-import { openDB } from 'idb';
+import { deleteDB, openDB } from 'idb';
 import {
   MAX_WORKSPACE_RESUMES,
   WORKSPACE_INDEX_STORAGE_KEY,
   createDuplicateResumeName,
   createDraftPayload,
+  createEmptyResume,
   createFreshWorkspaceDraft,
   createResumeStorageKey,
   createWorkspaceResumeId,
@@ -27,6 +28,8 @@ const TOMBSTONES_STORE = 'tombstones';
 const SYNC_META_STORE = 'syncMeta';
 const ACCOUNT_BINDING_STORE = 'accountBinding';
 const LOCAL_WORKSPACE_LOCK_NAME = 'resumeloomr-local-workspace-mutation';
+const LOCAL_SYNC_CLIENT_ID_KEY = 'resumeloomr:sync-client-id:v1';
+const LOCAL_SYNC_SEQUENCE_KEY = 'resumeloomr:sync-sequence:v1';
 
 const STORE_NAMES = [
   WORKSPACE_STORE,
@@ -40,6 +43,49 @@ const STORE_NAMES = [
 let dbPromise = null;
 let localMutationQueue = Promise.resolve();
 let localMutationDepth = 0;
+let fallbackSyncSequence = 0;
+let fallbackSyncClientId = '';
+
+function createSyncClientId() {
+  return globalThis.crypto?.randomUUID?.() ?? `client-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function getSyncOperationIdentity() {
+  const storage = getStorage();
+
+  if (!storage) {
+    fallbackSyncClientId ||= createSyncClientId();
+    fallbackSyncSequence += 1;
+    return {
+      clientId: fallbackSyncClientId,
+      operationVersion: fallbackSyncSequence,
+    };
+  }
+
+  try {
+    let clientId = trimText(storage.getItem(LOCAL_SYNC_CLIENT_ID_KEY));
+
+    if (!clientId) {
+      clientId = createSyncClientId();
+      storage.setItem(LOCAL_SYNC_CLIENT_ID_KEY, clientId);
+    }
+
+    const previousSequence = Number(storage.getItem(LOCAL_SYNC_SEQUENCE_KEY) || 0);
+    const operationVersion = Number.isSafeInteger(previousSequence) && previousSequence >= 0
+      ? previousSequence + 1
+      : 1;
+
+    storage.setItem(LOCAL_SYNC_SEQUENCE_KEY, String(operationVersion));
+    return { clientId, operationVersion };
+  } catch {
+    fallbackSyncClientId ||= createSyncClientId();
+    fallbackSyncSequence += 1;
+    return {
+      clientId: fallbackSyncClientId,
+      operationVersion: fallbackSyncSequence,
+    };
+  }
+}
 
 function createLocalRevision() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -224,6 +270,22 @@ function stableJson(value) {
   return JSON.stringify(stableValue(value));
 }
 
+function withoutIdentityFields(value) {
+  if (Array.isArray(value)) {
+    return value.map(withoutIdentityFields);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key]) => key !== 'id')
+        .map(([key, entryValue]) => [key, withoutIdentityFields(entryValue)]),
+    );
+  }
+
+  return value;
+}
+
 export function createDraftContentHash(draft) {
   const normalizedDraft = normalizeDraftState(draft);
   const content = {
@@ -295,6 +357,28 @@ function draftHasVisibleText(draft) {
     ));
 }
 
+function draftHasMeaningfulChanges(draft) {
+  if (draftHasVisibleText(draft)) {
+    return true;
+  }
+
+  const normalizedDraft = normalizeDraftState(draft);
+  const pristineDraft = normalizeDraftState({
+    resume: createEmptyResume(),
+    template: 'compact',
+  });
+  const { sampleDisplay: _sampleDisplay, ...resumeWithoutSampleDisplay } = normalizedDraft.resume;
+  const { sampleDisplay: _pristineSampleDisplay, ...pristineResumeWithoutSampleDisplay } = pristineDraft.resume;
+
+  return stableJson(withoutIdentityFields({
+    resume: resumeWithoutSampleDisplay,
+    template: normalizedDraft.template,
+  })) !== stableJson(withoutIdentityFields({
+    resume: pristineResumeWithoutSampleDisplay,
+    template: pristineDraft.template,
+  }));
+}
+
 function normalizeDraftMap(candidate) {
   if (candidate instanceof Map) {
     return new Map(Array.from(candidate.entries()).map(([resumeId, draft]) => [
@@ -321,9 +405,20 @@ function getDraftTimestamp(draft, meta = {}) {
 function workspaceHasVisibleDrafts(workspace, draftsByResumeId, tombstonedResumeIds = new Set()) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
 
-  return normalizedWorkspace.resumeIds.some((resumeId) => (
-    !tombstonedResumeIds.has(resumeId) && draftHasVisibleText(draftsByResumeId.get(resumeId))
-  ));
+  if (normalizedWorkspace.resumeIds.length > 1) {
+    return true;
+  }
+
+  return normalizedWorkspace.resumeIds.some((resumeId, index) => {
+    if (tombstonedResumeIds.has(resumeId)) {
+      return false;
+    }
+
+    const name = trimText(normalizedWorkspace.meta[resumeId]?.name);
+    const hasCustomName = name !== '' && name !== `Resume ${index + 1}`;
+
+    return hasCustomName || draftHasMeaningfulChanges(draftsByResumeId.get(resumeId));
+  });
 }
 
 function createUniqueResumeId(existingIds) {
@@ -474,6 +569,9 @@ export async function getLocalWorkspaceDb() {
           db.createObjectStore(ACCOUNT_BINDING_STORE, { keyPath: 'id' });
         }
       },
+      blocking(_currentVersion, _blockedVersion, event) {
+        event?.target?.close?.();
+      },
     });
   }
 
@@ -507,6 +605,7 @@ async function writeDraftRecord(tx, resumeId, draft, { localRevision = '' } = {}
 
 function createOutboxRecord({ type, resumeId = '', workspace = null, draft = null, tombstone = null, accountUid = '', reason = '' }) {
   const now = new Date().toISOString();
+  const syncIdentity = getSyncOperationIdentity();
   const id = type === 'workspace'
     ? 'workspace'
     : `${type}:${resumeId}`;
@@ -518,7 +617,8 @@ function createOutboxRecord({ type, resumeId = '', workspace = null, draft = nul
     workspace: workspace ? normalizeWorkspaceIndex(workspace) : null,
     draft: draft ? normalizeDraftState(draft) : null,
     localRevision: draft ? (getDraftStateRevision(draft) || createLocalRevision()) : createLocalRevision(),
-    operationVersion: draft?.savedAt ? Date.parse(draft.savedAt) || Date.now() : Date.now(),
+    clientId: syncIdentity.clientId,
+    operationVersion: syncIdentity.operationVersion,
     tombstone,
     accountUid: accountUid || '',
     reason,
@@ -1146,6 +1246,25 @@ export async function persistLoginMergedWorkspace({
       draftsByResumeId,
     };
   });
+}
+
+export async function deleteLocalWorkspaceDatabase() {
+  await localMutationQueue.catch(() => null);
+  const pendingDb = dbPromise;
+  dbPromise = null;
+
+  if (pendingDb) {
+    try {
+      const db = await pendingDb;
+      db?.close?.();
+    } catch {
+      // Continue with deletion even if opening the old connection failed.
+    }
+  }
+
+  await deleteDB(LOCAL_WORKSPACE_DB_NAME);
+  localMutationQueue = Promise.resolve();
+  localMutationDepth = 0;
 }
 
 export async function readPendingOutbox({ limit = 150, accountUid = null } = {}) {

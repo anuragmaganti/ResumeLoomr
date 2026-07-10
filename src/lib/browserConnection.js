@@ -4,8 +4,8 @@ import {
   WORKSPACE_INDEX_STORAGE_KEY,
 } from './resume.js';
 import {
-  LOCAL_WORKSPACE_DB_NAME,
   LOCAL_WORKSPACE_PRESENT_KEY,
+  deleteLocalWorkspaceDatabase,
 } from './localWorkspaceDb.js';
 
 export const CONNECTED_ACCOUNT_STORAGE_KEY = 'resumeloomr:connected-account:v1';
@@ -19,6 +19,8 @@ const STALE_LOCAL_STORAGE_KEYS = [
   'resumeloomr:cloud-mirror-manifest:v1',
   'resumeloomr:firebase-device-id',
   'resumeloomr:firebase-trusted-device',
+  'resumeloomr:sync-client-id:v1',
+  'resumeloomr:sync-sequence:v1',
 ];
 const STALE_SESSION_STORAGE_KEYS = [
   'resumeloomr:firebase-session-id',
@@ -181,16 +183,12 @@ export function hasLocalResumeWorkspaceData(storage) {
   return false;
 }
 
-export function clearLocalResumeWorkspaceData(storage) {
+export async function clearLocalResumeWorkspaceData(storage) {
   const targetStorage = getStorage(storage);
-
-  if (!targetStorage) {
-    return;
-  }
 
   const keysToRemove = [];
 
-  for (let index = 0; index < targetStorage.length; index += 1) {
+  for (let index = 0; targetStorage && index < targetStorage.length; index += 1) {
     const key = targetStorage.key(index);
 
     if (
@@ -205,24 +203,20 @@ export function clearLocalResumeWorkspaceData(storage) {
     }
   }
 
-  keysToRemove.forEach((key) => targetStorage.removeItem(key));
+  keysToRemove.forEach((key) => targetStorage?.removeItem(key));
 
   if (typeof indexedDB !== 'undefined') {
-    indexedDB.deleteDatabase(LOCAL_WORKSPACE_DB_NAME);
+    await deleteLocalWorkspaceDatabase();
   }
 }
 
-export function clearBrowserResumeConnectionData({ storage, sessionStorage } = {}) {
+export async function clearBrowserResumeConnectionData({ storage, sessionStorage } = {}) {
   const targetStorage = getStorage(storage);
   const targetSessionStorage = getSessionStorage(sessionStorage);
 
-  if (!targetStorage) {
-    return;
-  }
-
-  clearLocalResumeWorkspaceData(targetStorage);
-  targetStorage.removeItem(CONNECTED_ACCOUNT_STORAGE_KEY);
-  targetStorage.removeItem(SIGNED_OUT_EDITING_PREFERENCE_KEY);
-  STALE_LOCAL_STORAGE_KEYS.forEach((key) => targetStorage.removeItem(key));
+  await clearLocalResumeWorkspaceData(targetStorage);
+  targetStorage?.removeItem(CONNECTED_ACCOUNT_STORAGE_KEY);
+  targetStorage?.removeItem(SIGNED_OUT_EDITING_PREFERENCE_KEY);
+  STALE_LOCAL_STORAGE_KEYS.forEach((key) => targetStorage?.removeItem(key));
   STALE_SESSION_STORAGE_KEYS.forEach((key) => targetSessionStorage?.removeItem(key));
 }

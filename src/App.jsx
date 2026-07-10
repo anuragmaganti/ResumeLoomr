@@ -1,4 +1,5 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import './App.css'
 import './styles/buttons.css'
 import './styles/forms.css'
@@ -35,10 +36,6 @@ const EMPTY_SAMPLE_ORDER_OVERRIDES = {};
 
 function sampleTextListOrderKey(sectionId, entryId, field) {
   return `${sectionId}.${entryId}.${field}`;
-}
-
-function sampleEntryOrderKey(sectionId) {
-  return `${sectionId}.entries`;
 }
 
 function getPreviewEntryOrder(previewModel, sectionId) {
@@ -96,33 +93,6 @@ function moveSourceIndexWithinOrder(order, fromIndex, toIndex) {
   return nextOrder;
 }
 
-function removeSampleOrderOverride(currentOverrides, resumeId, orderKey) {
-  const resumeOverrides = currentOverrides[resumeId];
-
-  if (!resumeOverrides || !Object.hasOwn(resumeOverrides, orderKey)) {
-    return currentOverrides;
-  }
-
-  const {
-    [orderKey]: _removedOverride,
-    ...nextResumeOverrides
-  } = resumeOverrides;
-
-  if (Object.keys(nextResumeOverrides).length === 0) {
-    const {
-      [resumeId]: _removedResumeOverrides,
-      ...nextOverrides
-    } = currentOverrides;
-
-    return nextOverrides;
-  }
-
-  return {
-    ...currentOverrides,
-    [resumeId]: nextResumeOverrides,
-  };
-}
-
 function App() {
   const previewPanelRef = useRef(null);
   const documentTitleRef = useRef('ResumeLoomr | Professional Resume Builder');
@@ -144,7 +114,7 @@ function App() {
   const [editorCaretTarget, setEditorCaretTarget] = useState(null);
   const [previewLayout, setPreviewLayout] = useState({ mode: 'fitPage', width: 0 });
   const [emptyChoiceNudgeCount, setEmptyChoiceNudgeCount] = useState(0);
-  const [sampleOrderOverridesByResumeId, setSampleOrderOverridesByResumeId] = useState({});
+  const [isPrintRendering, setIsPrintRendering] = useState(false);
   const [separatorSettingsAnchor, setSeparatorSettingsAnchor] = useState(null);
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') {
@@ -214,9 +184,7 @@ function App() {
     user: builderUser,
     authReady: auth.authReady,
   });
-  const sampleOrderOverrides = activeResumeId
-    ? sampleOrderOverridesByResumeId[activeResumeId] || EMPTY_SAMPLE_ORDER_OVERRIDES
-    : EMPTY_SAMPLE_ORDER_OVERRIDES;
+  const sampleOrderOverrides = resume.sampleDisplay?.textListOrders || EMPTY_SAMPLE_ORDER_OVERRIDES;
   const sampleDisplay = resume.sampleDisplay || {};
   const shouldShowEmptyResumeChoice = !previewModel.hasContent && !sampleDisplay.hasStarted;
   const shouldShowSampleInformation = Boolean(sampleDisplay.hasStarted && sampleDisplay.showInformation);
@@ -232,8 +200,8 @@ function App() {
     () => createSamplePlaceholderResolver(resume, samplePreviewModel),
     [resume, samplePreviewModel],
   );
-  const displayPreviewModel = samplePreviewModel || previewModel;
-  const isSamplePreview = Boolean(samplePreviewModel);
+  const displayPreviewModel = isPrintRendering ? previewModel : (samplePreviewModel || previewModel);
+  const isSamplePreview = Boolean(samplePreviewModel) && !isPrintRendering;
   const isImportingResume = importState.status === 'processing';
 
   const closeSeparatorSettings = useCallback(() => {
@@ -325,19 +293,27 @@ function App() {
   }, [template, displayPreviewModel]);
 
   useEffect(() => {
-    function restoreDocumentTitle() {
-      document.title = documentTitleRef.current;
+    function preparePrintPreview() {
+      flushSync(() => setIsPrintRendering(true));
     }
 
+    function restoreDocumentTitle() {
+      document.title = documentTitleRef.current;
+      setIsPrintRendering(false);
+    }
+
+    window.addEventListener('beforeprint', preparePrintPreview);
     window.addEventListener('afterprint', restoreDocumentTitle);
 
     return () => {
+      window.removeEventListener('beforeprint', preparePrintPreview);
       window.removeEventListener('afterprint', restoreDocumentTitle);
     };
   }, []);
 
   function handlePrint() {
     document.title = activeResumeName || 'Resume';
+    flushSync(() => setIsPrintRendering(true));
     printResume();
   }
 
@@ -401,11 +377,7 @@ function App() {
     if (persistableMove) {
       actions.reorderSectionTextList(sectionId, entryId, field, persistableMove.fromIndex, persistableMove.toIndex);
 
-      if (activeResumeId) {
-        setSampleOrderOverridesByResumeId((currentOverrides) => (
-          removeSampleOrderOverride(currentOverrides, activeResumeId, orderKey)
-        ));
-      }
+      actions.setSampleTextListOrder(orderKey, null);
 
       return;
     }
@@ -413,18 +385,12 @@ function App() {
     const currentOrder = getPreviewTextListOrder(displayPreviewModel, sectionId, entryId, field);
     const nextOrder = moveSourceIndexWithinOrder(currentOrder, fromIndex, toIndex);
 
-    if (nextOrder === currentOrder || !activeResumeId) {
+    if (nextOrder === currentOrder) {
       return;
     }
 
-    setSampleOrderOverridesByResumeId((currentOverrides) => ({
-      ...currentOverrides,
-      [activeResumeId]: {
-        ...(currentOverrides[activeResumeId] || {}),
-        [orderKey]: nextOrder,
-      },
-    }));
-  }, [actions, activeResumeId, displayPreviewModel, isSamplePreview, resume]);
+    actions.setSampleTextListOrder(orderKey, nextOrder);
+  }, [actions, displayPreviewModel, isSamplePreview, resume]);
 
   const handlePreviewReorderSectionEntries = useCallback((sectionId, nextEntryIds) => {
     if (!isSamplePreview) {
@@ -453,9 +419,6 @@ function App() {
       nextOrder,
       getPreviewEntrySampleBindings(displayPreviewModel, sectionId),
     );
-    setSampleOrderOverridesByResumeId((currentOverrides) => (
-      removeSampleOrderOverride(currentOverrides, activeResumeId, sampleEntryOrderKey(sectionId))
-    ));
   }, [actions, activeResumeId, displayPreviewModel, isSamplePreview]);
 
   const handlePreviewReorderSections = useCallback((nextSectionIds) => {
@@ -617,7 +580,7 @@ function App() {
 
       if (!allowSignedOutEditing) {
         await clearResumeSyncSession();
-        clearLocalResumeWorkspaceData();
+        await clearLocalResumeWorkspaceData();
         window.location.reload();
       }
     } finally {
@@ -670,7 +633,7 @@ function App() {
     }
 
     await auth.clearBrowserConnection();
-    clearBrowserResumeConnectionData();
+    await clearBrowserResumeConnectionData();
     window.location.reload();
   }
 
@@ -691,12 +654,12 @@ function App() {
     });
   }
 
-  function handleAccountSwitchClear() {
+  async function handleAccountSwitchClear() {
     if (!auth.user) {
       return;
     }
 
-    clearLocalResumeWorkspaceData();
+    await clearLocalResumeWorkspaceData();
     preSignInConnectedAccountRef.current = {
       uid: auth.user.uid,
       email: auth.user.email || '',
@@ -813,15 +776,15 @@ function App() {
         {conflict && (
           <div className="conflictBanner" role="alert">
             <div>
-              <strong>This resume changed on another device.</strong>
-              <span>Choose which version to keep before continuing sync.</span>
+              <strong>This resume changed in another tab or device.</strong>
+              <span>Choose which version to keep before continuing.</span>
             </div>
             <div className="conflictActions">
               <button type="button" className="button buttonSecondary" onClick={resolveConflictWithCloud}>
-                Use cloud version
+                Use saved version
               </button>
               <button type="button" className="button buttonSecondary" onClick={resolveConflictWithLocal}>
-                Keep this device
+                Keep my edits
               </button>
               <button type="button" className="button buttonPrimary" onClick={saveConflictAsCopy}>
                 Save as copy

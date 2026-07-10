@@ -120,6 +120,7 @@ export const SAMPLE_DISPLAY_DEFAULTS = {
   hasStarted: false,
   showInformation: true,
   entryBindings: {},
+  textListOrders: {},
 };
 
 const RESUME_SETTINGS_MIN = -5;
@@ -886,7 +887,28 @@ export function normalizeSampleDisplay(sampleDisplay) {
     hasStarted: Boolean(display.hasStarted),
     showInformation: display.showInformation === false ? false : true,
     entryBindings: normalizeSampleEntryBindings(display.entryBindings),
+    textListOrders: normalizeSampleTextListOrders(display.textListOrders),
   };
+}
+
+function normalizeSampleTextListOrders(textListOrders) {
+  if (!textListOrders || typeof textListOrders !== 'object' || Array.isArray(textListOrders)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(textListOrders).flatMap(([rawKey, rawOrder]) => {
+      const key = trimText(rawKey);
+      const order = Array.isArray(rawOrder)
+        ? rawOrder.map(Number).filter((value) => Number.isInteger(value) && value >= 0 && value <= 99)
+        : [];
+      const uniqueOrder = [...new Set(order)];
+
+      return key && key.length <= 360 && uniqueOrder.length === order.length && uniqueOrder.length > 0
+        ? [[key, uniqueOrder]]
+        : [];
+    }),
+  );
 }
 
 function normalizeSampleEntryBindings(entryBindings) {
@@ -1439,6 +1461,32 @@ export function updateSampleDisplay(resume, updates = {}) {
       ...updates,
     }),
   };
+}
+
+export function setSampleTextListOrder(resume, orderKey, orderedSourceIndexes) {
+  const normalizedResume = normalizeResume(resume);
+  const key = trimText(orderKey);
+
+  if (!key || key.length > 360) {
+    return normalizedResume;
+  }
+
+  const nextOrders = {
+    ...normalizedResume.sampleDisplay.textListOrders,
+  };
+  const normalizedOrder = normalizeSampleTextListOrders({
+    [key]: orderedSourceIndexes,
+  })[key];
+
+  if (normalizedOrder) {
+    nextOrders[key] = normalizedOrder;
+  } else {
+    delete nextOrders[key];
+  }
+
+  return updateSampleDisplay(normalizedResume, {
+    textListOrders: nextOrders,
+  });
 }
 
 export function updateSectionTitle(resume, sectionId, value) {

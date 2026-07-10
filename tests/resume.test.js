@@ -45,6 +45,7 @@ import {
   setPersonalHeaderOrder,
   setResumeSettingValue,
   setResumeSummaryWidthPercent,
+  setSampleTextListOrder,
   setSectionEntryHeaderLayout,
   normalizeEntryHeaderLayout,
   updatePersonalField,
@@ -73,8 +74,11 @@ import {
   getOperationAcksFromResponse,
 } from '../src/lib/backgroundSync.js';
 import {
+  getSyncCursorId,
   operationBelongsToSyncAccount,
   partitionSyncOperationsByAccount,
+  shouldAcceptDraftSyncOperation,
+  shouldAcceptSyncOperation,
 } from '../api/sync-workspace.js';
 import {
   DEFAULT_GEMINI_IMPORT_MODEL,
@@ -146,6 +150,7 @@ test('createEmptyResume returns the block-first resume shape', () => {
     hasStarted: false,
     showInformation: true,
     entryBindings: {},
+    textListOrders: {},
   });
   assert.deepEqual(resume.settings, {
     textSize: 0,
@@ -229,11 +234,13 @@ test('sample display metadata normalizes and updates with resume drafts', () => 
     hasStarted: true,
     showInformation: false,
     entryBindings: {},
+    textListOrders: {},
   });
   assert.deepEqual(normalizeDraftPayload({ resume }).resume.sampleDisplay, {
     hasStarted: true,
     showInformation: false,
     entryBindings: {},
+    textListOrders: {},
   });
   assert.deepEqual(normalizeDraftPayload({
     resume: {
@@ -258,7 +265,16 @@ test('sample display metadata normalizes and updates with resume drafts', () => 
         entry1: 2,
       },
     },
+    textListOrders: {},
   });
+
+  resume = setSampleTextListOrder(resume, 'experience.entry.activities', [2, 0, 1]);
+  assert.deepEqual(resume.sampleDisplay.textListOrders, {
+    'experience.entry.activities': [2, 0, 1],
+  });
+
+  resume = setSampleTextListOrder(resume, 'experience.entry.activities', null);
+  assert.deepEqual(resume.sampleDisplay.textListOrders, {});
 });
 
 test('block actions update roles, education details, and list items', () => {
@@ -1245,6 +1261,14 @@ test('preview print CSS uses physical page geometry instead of mobile viewport g
   assert.doesNotMatch(previewComponent, /<style media="print">/);
 });
 
+test('empty sample content is replaced with the real preview model before print', () => {
+  const appComponent = fs.readFileSync('src/App.jsx', 'utf8');
+
+  assert.match(appComponent, /const displayPreviewModel = isPrintRendering \? previewModel : \(samplePreviewModel \|\| previewModel\)/);
+  assert.match(appComponent, /window\.addEventListener\('beforeprint', preparePrintPreview\)/);
+  assert.match(appComponent, /flushSync\(\(\) => setIsPrintRendering\(true\)\)/);
+});
+
 test('below-heading section separators render on the final visible section', () => {
   const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
   const previewComponent = fs.readFileSync('src/components/resumePreview.jsx', 'utf8');
@@ -1403,6 +1427,25 @@ test('login merge treats sample-only local state as blank when restoring cloud r
   assert.deepEqual(result.syncPlan.upsertResumeIds, []);
 });
 
+test('login merge preserves blank resumes with intentional layout or settings changes', () => {
+  const localResume = setResumeSettingValue(createEmptyResume(), 'textSize', 2);
+  const localDraft = {
+    resume: localResume,
+    template: DEFAULT_TEMPLATE,
+    savedAt: '2026-02-01T00:00:00.000Z',
+  };
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace: createWorkspace(['local-layout']),
+    localDraftsByResumeId: new Map([['local-layout', localDraft]]),
+    cloudWorkspace: createWorkspace(['cloud-1']),
+    cloudDraftsByResumeId: new Map([['cloud-1', createDraft('Cloud Resume')]]),
+  });
+
+  assert.equal(result.localHasContent, true);
+  assert.deepEqual(result.workspace.resumeIds, ['local-layout', 'cloud-1']);
+  assert.deepEqual(result.syncPlan.upsertResumeIds, ['local-layout']);
+});
+
 test('login merge preserves local and cloud content without dropping either side', () => {
   const result = mergeLocalAndCloudWorkspaces({
     localWorkspace: createWorkspace(['local-1']),
@@ -1483,6 +1526,55 @@ test('outbox acknowledgement matching requires the exact operation version and r
     operationVersion: 200,
     localRevision: 'delete-token',
   }), true);
+});
+
+test('server sync cursors reject older same-browser operations without using wall-clock time', () => {
+  const operation = {
+    id: 'upsertDraft:r1',
+    type: 'upsertDraft',
+    resumeId: 'r1',
+    clientId: 'browser-a',
+    operationVersion: 7,
+  };
+
+  assert.equal(shouldAcceptSyncOperation(operation, null), true);
+  assert.equal(shouldAcceptSyncOperation(operation, { lastSequence: 6 }), true);
+  assert.equal(shouldAcceptSyncOperation(operation, { lastSequence: 7 }), false);
+  assert.equal(shouldAcceptSyncOperation(operation, { lastSequence: 8 }), false);
+});
+
+test('draft upserts and deletes share a cursor and permanent tombstones block resurrection', () => {
+  const upsert = {
+    id: 'upsertDraft:r1',
+    type: 'upsertDraft',
+    resumeId: 'r1',
+    clientId: 'browser-a',
+    operationVersion: 7,
+  };
+  const remove = {
+    ...upsert,
+    id: 'deleteDraft:r1',
+    type: 'deleteDraft',
+    operationVersion: 8,
+  };
+
+  assert.equal(getSyncCursorId(upsert), getSyncCursorId(remove));
+  assert.equal(shouldAcceptDraftSyncOperation(upsert, { lastSequence: 6 }, false), true);
+  assert.equal(shouldAcceptDraftSyncOperation(upsert, { lastSequence: 6 }, true), false);
+  assert.equal(shouldAcceptSyncOperation(upsert, { lastSequence: 8 }), false);
+});
+
+test('local persistence serializes editor saves and awaits them before switching or clearing', () => {
+  const builderHook = fs.readFileSync('src/hooks/useResumeBuilder.js', 'utf8');
+  const appComponent = fs.readFileSync('src/App.jsx', 'utf8');
+  const browserConnection = fs.readFileSync('src/lib/browserConnection.js', 'utf8');
+
+  assert.match(builderHook, /const editorSaveQueueRef = useRef\(Promise\.resolve\(\)\)/);
+  assert.match(builderHook, /const saveResult = await persistCurrentEditorDraft\(\{ reason: 'switch-resume'/);
+  assert.match(builderHook, /saveResult\?\.conflict \|\|\s*saveResult\?\.error \|\|\s*saveResult\?\.skipped/);
+  assert.match(appComponent, /const flushedDraft = await flushActiveCloudDraft\(\{ reason: 'signout' \}\)/);
+  assert.match(appComponent, /await clearLocalResumeWorkspaceData\(\)/);
+  assert.match(browserConnection, /await deleteLocalWorkspaceDatabase\(\)/);
 });
 
 test('outbox account filtering keeps cloud sync scoped to the signed-in user', () => {

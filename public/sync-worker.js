@@ -37,7 +37,10 @@ function openWorkspaceDb() {
         db.createObjectStore(ACCOUNT_BINDING_STORE, { keyPath: 'id' });
       }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      request.result.onversionchange = () => request.result.close();
+      resolve(request.result);
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -194,51 +197,55 @@ async function markStale(db, operations, errorMessage = 'Skipped stale cloud wri
 
 async function syncOutbox() {
   const db = await openWorkspaceDb();
-  const accountUid = await readCurrentAccountUid(db);
-
-  if (!accountUid) {
-    return;
-  }
-
-  const tx = db.transaction(OUTBOX_STORE, 'readonly');
-  const operations = (await getAll(tx.objectStore(OUTBOX_STORE)))
-    .filter((operation) => operation?.status === 'pending' && operationBelongsToAccount(operation, accountUid))
-    .sort((a, b) => String(a.updatedAt).localeCompare(String(b.updatedAt)))
-    .slice(0, 150);
-
-  if (operations.length === 0) {
-    return;
-  }
-
   try {
-    const response = await fetch('/api/sync-workspace', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({ accountUid, operations }),
-    });
+    const accountUid = await readCurrentAccountUid(db);
 
-    if (response.status === 409) {
+    if (!accountUid) {
       return;
     }
 
-    if (!response.ok) {
-      throw new Error(`Cloud sync failed with ${response.status}`);
+    const tx = db.transaction(OUTBOX_STORE, 'readonly');
+    const operations = (await getAll(tx.objectStore(OUTBOX_STORE)))
+      .filter((operation) => operation?.status === 'pending' && operationBelongsToAccount(operation, accountUid))
+      .sort((a, b) => String(a.updatedAt).localeCompare(String(b.updatedAt)))
+      .slice(0, 150);
+
+    if (operations.length === 0) {
+      return;
     }
 
-    const payload = await response.json();
-    const syncedOperations = getOperationAcksFromResponse(payload, operations, 'syncedOperations', 'syncedOperationIds');
-    const staleOperations = getOperationAcksFromResponse(payload, operations, 'staleOperations', 'staleOperationIds');
-    const rejectedOperations = getOperationAcksFromResponse(payload, operations, 'rejectedOperations', 'rejectedOperationIds');
+    try {
+      const response = await fetch('/api/sync-workspace', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ accountUid, operations }),
+      });
 
-    await markSynced(db, syncedOperations);
-    await markStale(db, staleOperations);
-    await markStale(db, rejectedOperations, 'Skipped cloud sync because these changes belong to another account.');
-  } catch (error) {
-    await markFailed(db, operations.map(normalizeAckDescriptor).filter(Boolean), error?.message || 'Cloud sync failed.');
-    throw error;
+      if (response.status === 409) {
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Cloud sync failed with ${response.status}`);
+      }
+
+      const payload = await response.json();
+      const syncedOperations = getOperationAcksFromResponse(payload, operations, 'syncedOperations', 'syncedOperationIds');
+      const staleOperations = getOperationAcksFromResponse(payload, operations, 'staleOperations', 'staleOperationIds');
+      const rejectedOperations = getOperationAcksFromResponse(payload, operations, 'rejectedOperations', 'rejectedOperationIds');
+
+      await markSynced(db, syncedOperations);
+      await markStale(db, staleOperations);
+      await markStale(db, rejectedOperations, 'Skipped cloud sync because these changes belong to another account.');
+    } catch (error) {
+      await markFailed(db, operations.map(normalizeAckDescriptor).filter(Boolean), error?.message || 'Cloud sync failed.');
+      throw error;
+    }
+  } finally {
+    db.close();
   }
 }
 

@@ -179,13 +179,14 @@ export async function syncLocalOutbox({ idToken = '', useCookie = false, account
     await markOutboxStale(rejectedOperations, 'Skipped cloud sync because these changes belong to another account.');
 
     const skippedCount = staleOperations.length + rejectedOperations.length;
+    const remainingOperations = await readPendingOutbox({ accountUid: normalizedAccountUid });
 
     return {
       status: skippedCount > 0 ? 'stale' : 'synced',
       syncedCount: syncedOperations.length,
       staleCount: staleOperations.length,
       rejectedCount: rejectedOperations.length,
-      pendingCount: Math.max(0, operations.length - syncedOperations.length - skippedCount),
+      pendingCount: remainingOperations.length,
     };
   } catch (error) {
     await markOutboxFailed(operations.map(createOutboxAckDescriptor).filter(Boolean), error?.message || 'Cloud sync failed.');

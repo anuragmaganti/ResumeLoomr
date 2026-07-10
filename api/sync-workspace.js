@@ -9,6 +9,7 @@ import {
   getAdminDb,
   verifyRequestUser,
 } from '../server/firebaseAdmin.js';
+import { createHash } from 'node:crypto';
 
 const CLOUD_WORKSPACE_SCHEMA_VERSION = 1;
 const CLOUD_WORKSPACE_RESUME_LIMIT = 100;
@@ -84,6 +85,33 @@ function getOperationVersion(operation) {
   return getTimestamp(operation?.updatedAt) || Date.now();
 }
 
+function getOperationClientId(operation) {
+  const clientId = typeof operation?.clientId === 'string' ? operation.clientId.trim() : '';
+
+  return clientId || `legacy:${getOperationAccountUid(operation) || 'unknown'}`;
+}
+
+function getOperationScope(operation) {
+  return operation?.type === 'workspace' ? 'workspace' : `resume:${operation?.resumeId || 'unknown'}`;
+}
+
+export function getSyncCursorId(operation) {
+  return createHash('sha256')
+    .update(`${getOperationClientId(operation)}:${getOperationScope(operation)}`)
+    .digest('hex');
+}
+
+export function shouldAcceptSyncOperation(operation, cursorData = null) {
+  const sequence = getOperationVersion(operation);
+  const lastSequence = Number(cursorData?.lastSequence || 0);
+
+  return Number.isFinite(sequence) && sequence > lastSequence;
+}
+
+export function shouldAcceptDraftSyncOperation(operation, cursorData = null, tombstoneExists = false) {
+  return !tombstoneExists && shouldAcceptSyncOperation(operation, cursorData);
+}
+
 function createOperationAck(operation) {
   return {
     id: operation.id,
@@ -146,7 +174,15 @@ function createWorkspaceDoc(workspace, { deviceId = 'browser', sessionId = 'back
   };
 }
 
-function createDraftDoc({ resumeId, workspace, draft, deviceId = 'browser', sessionId = 'background-sync' }) {
+function createDraftDoc({
+  resumeId,
+  workspace,
+  draft,
+  deviceId = 'browser',
+  sessionId = 'background-sync',
+  updatedAt = new Date().toISOString(),
+  version = 1,
+}) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const normalizedDraft = normalizeDraftPayload(draft);
   const savedAt = typeof draft?.savedAt === 'string' && draft.savedAt
@@ -166,8 +202,8 @@ function createDraftDoc({ resumeId, workspace, draft, deviceId = 'browser', sess
     template: payload.template,
     resume: payload.resume,
     savedAt,
-    updatedAt: savedAt,
-    version: getTimestamp(savedAt) || Date.now(),
+    updatedAt,
+    version,
     deviceId,
     sessionId,
     deletedAt: null,
@@ -214,11 +250,15 @@ function sortResumeDocsByUpdatedAt(docs) {
 async function readCloudSnapshot(uid) {
   const db = getAdminDb();
   const workspaceRef = db.doc(`users/${uid}/workspace/main`);
-  const resumesSnapshot = await db.collection(`users/${uid}/resumes`).get();
+  const [resumesSnapshot, tombstonesSnapshot] = await Promise.all([
+    db.collection(`users/${uid}/resumes`).get(),
+    db.collection(`users/${uid}/resumeTombstones`).get(),
+  ]);
+  const tombstonedResumeIds = new Set(tombstonesSnapshot.docs.map((doc) => doc.id));
   const resumeDocs = sortResumeDocsByUpdatedAt(
     resumesSnapshot.docs
       .map((doc) => ({ id: doc.id, data: doc.data() }))
-      .filter((record) => !record.data?.deletedAt),
+      .filter((record) => !record.data?.deletedAt && !tombstonedResumeIds.has(record.id)),
   ).slice(0, CLOUD_WORKSPACE_RESUME_LIMIT);
   const draftsByResumeId = new Map(
     resumeDocs.map((record) => [record.id, cloudDocToDraft(record.data)]),
@@ -308,41 +348,55 @@ async function applySyncOperations(uid, operations) {
       ? {
           operation: workspaceOperation,
           ref: workspaceRef,
-          doc: createWorkspaceDoc(workspace, {
-            updatedAt: workspaceOperation.updatedAt || new Date().toISOString(),
-            version: getOperationVersion(workspaceOperation),
-          }),
+          cursorRef: db.doc(`users/${uid}/syncCursors/${getSyncCursorId(workspaceOperation)}`),
         }
       : null;
     const draftWrites = draftOperations.map((operation) => ({
       operation,
       ref: db.doc(`users/${uid}/resumes/${operation.resumeId}`),
-      doc: createDraftDoc({
-        resumeId: operation.resumeId,
-        workspace: operation.workspace || workspace,
-        draft: operation.draft,
-      }),
+      cursorRef: db.doc(`users/${uid}/syncCursors/${getSyncCursorId(operation)}`),
+      tombstoneRef: db.doc(`users/${uid}/resumeTombstones/${operation.resumeId}`),
     }));
     const deleteWrites = deleteOperations.map((operation) => ({
       operation,
       ref: db.doc(`users/${uid}/resumes/${operation.resumeId}`),
-      tombstoneVersion: Number(operation.tombstone?.version || Date.now()),
+      cursorRef: db.doc(`users/${uid}/syncCursors/${getSyncCursorId(operation)}`),
+      tombstoneRef: db.doc(`users/${uid}/resumeTombstones/${operation.resumeId}`),
     }));
     const [
       workspaceSnapshot,
+      workspaceCursorSnapshot,
       draftSnapshots,
-      deleteSnapshots,
+      draftCursorSnapshots,
+      draftTombstoneSnapshots,
+      deleteCursorSnapshots,
     ] = await Promise.all([
       workspaceWrite ? transaction.get(workspaceWrite.ref) : Promise.resolve(null),
+      workspaceWrite ? transaction.get(workspaceWrite.cursorRef) : Promise.resolve(null),
       Promise.all(draftWrites.map((write) => transaction.get(write.ref))),
-      Promise.all(deleteWrites.map((write) => transaction.get(write.ref))),
+      Promise.all(draftWrites.map((write) => transaction.get(write.cursorRef))),
+      Promise.all(draftWrites.map((write) => transaction.get(write.tombstoneRef))),
+      Promise.all(deleteWrites.map((write) => transaction.get(write.cursorRef))),
     ]);
+
+    function writeCursor(write) {
+      transaction.set(write.cursorRef, {
+        clientId: getOperationClientId(write.operation),
+        scope: getOperationScope(write.operation),
+        lastSequence: getOperationVersion(write.operation),
+        updatedAt: new Date().toISOString(),
+      }, { merge: false });
+    }
 
     if (workspaceWrite) {
       const currentVersion = Number(workspaceSnapshot?.exists ? workspaceSnapshot.data()?.version || 0 : 0);
 
-      if (currentVersion <= workspaceWrite.doc.version) {
-        transaction.set(workspaceWrite.ref, workspaceWrite.doc, { merge: false });
+      if (shouldAcceptSyncOperation(workspaceWrite.operation, workspaceCursorSnapshot?.data?.())) {
+        transaction.set(workspaceWrite.ref, createWorkspaceDoc(workspace, {
+          updatedAt: new Date().toISOString(),
+          version: currentVersion + 1,
+        }), { merge: false });
+        writeCursor(workspaceWrite);
         syncedOperations.push(createOperationAck(workspaceWrite.operation));
       } else {
         staleOperations.push(createOperationAck(workspaceWrite.operation));
@@ -353,8 +407,21 @@ async function applySyncOperations(uid, operations) {
       const currentSnapshot = draftSnapshots[index];
       const currentVersion = Number(currentSnapshot.exists ? currentSnapshot.data()?.version || 0 : 0);
 
-      if (currentVersion <= write.doc.version) {
-        transaction.set(write.ref, write.doc, { merge: true });
+      if (
+        shouldAcceptDraftSyncOperation(
+          write.operation,
+          draftCursorSnapshots[index]?.data?.(),
+          draftTombstoneSnapshots[index].exists,
+        )
+      ) {
+        transaction.set(write.ref, createDraftDoc({
+          resumeId: write.operation.resumeId,
+          workspace: write.operation.workspace || workspace,
+          draft: write.operation.draft,
+          updatedAt: new Date().toISOString(),
+          version: currentVersion + 1,
+        }), { merge: false });
+        writeCursor(write);
         syncedOperations.push(createOperationAck(write.operation));
       } else {
         staleOperations.push(createOperationAck(write.operation));
@@ -362,11 +429,16 @@ async function applySyncOperations(uid, operations) {
     });
 
     deleteWrites.forEach((write, index) => {
-      const currentSnapshot = deleteSnapshots[index];
-      const currentVersion = Number(currentSnapshot.exists ? currentSnapshot.data()?.version || 0 : 0);
-
-      if (currentVersion <= write.tombstoneVersion) {
+      if (shouldAcceptSyncOperation(write.operation, deleteCursorSnapshots[index]?.data?.())) {
         transaction.delete(write.ref);
+        transaction.set(write.tombstoneRef, {
+          resumeId: write.operation.resumeId,
+          deletedAt: new Date().toISOString(),
+          clientId: getOperationClientId(write.operation),
+          operationVersion: getOperationVersion(write.operation),
+          localRevision: write.operation.localRevision || '',
+        }, { merge: false });
+        writeCursor(write);
         syncedOperations.push(createOperationAck(write.operation));
       } else {
         staleOperations.push(createOperationAck(write.operation));
