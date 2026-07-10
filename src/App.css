@@ -67,16 +67,8 @@
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   transition:
-    transform var(--transition-fast),
     box-shadow var(--transition-base),
     border-color var(--transition-base);
-}
-
-@media (hover: hover) {
-  .panel:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
-  }
 }
 
 .headerStack {
@@ -96,8 +88,9 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-3);
   align-items: center;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 94%, var(--color-surface-muted));
 }
 
 .brand {
@@ -141,8 +134,9 @@ html[data-theme="dark"] .brandLogo--dark {
   container-name: resume-rail;
   width: 100%;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 90%, var(--color-surface-muted));
 }
 
 .resumePillStrip {
@@ -196,8 +190,8 @@ html[data-theme="dark"] .brandLogo--dark {
   padding: 2px 2px 2px 10px;
   border: 1px solid var(--color-border);
   border-radius: 12px;
-  background: var(--color-surface-muted);
-  box-shadow: var(--shadow-xs);
+  background: color-mix(in srgb, var(--color-surface-muted) 72%, transparent);
+  box-shadow: none;
   user-select: none;
   -webkit-user-select: none;
   transition:
@@ -206,10 +200,6 @@ html[data-theme="dark"] .brandLogo--dark {
     box-shadow var(--transition-base),
     opacity var(--transition-fast),
     transform var(--transition-fast);
-}
-
-html[data-theme="dark"] .resumePill {
-  background: #181818;
 }
 
 .resumePill * {
@@ -226,7 +216,8 @@ html[data-theme="dark"] .resumePill {
 
 .resumePill.isActive {
   border-color: var(--color-accent-border);
-  background: color-mix(in srgb, var(--color-accent-soft) 62%, var(--color-surface) 38%);
+  background: color-mix(in srgb, var(--color-accent-soft) 66%, var(--color-surface) 34%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 8%, transparent);
 }
 
 .resumePill.isSelected {
@@ -599,6 +590,36 @@ html[data-theme="dark"] .resumePill.isActive {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+.topbarMeta .button {
+  border-color: color-mix(in srgb, var(--color-border) 84%, transparent);
+  background: transparent;
+  box-shadow: none;
+}
+
+.topbarMeta .printButton {
+  border-color: color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent-soft) 52%, transparent);
+  color: var(--color-accent-strong);
+}
+
+.topbarMeta .button:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--color-accent) 34%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent-soft) 62%, transparent);
+  color: var(--color-accent-strong);
+  box-shadow: none;
+}
+
+.topbarActionIcon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.55;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .button.accountButton {
@@ -1478,7 +1499,7 @@ html[data-theme="dark"] .resumePill.isActive {
 .editorSidebar::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
-  background: #d2dbe8 padding-box;
+  background: color-mix(in srgb, var(--color-text-muted) 44%, transparent) padding-box;
 }
 
 .settingsRail,
@@ -1489,7 +1510,7 @@ html[data-theme="dark"] .resumePill.isActive {
   width: 100%;
   min-width: 0;
   overflow: hidden;
-  padding: 12px;
+  padding: 11px;
 }
 
 .settingsRail.isStartPending,
@@ -1547,7 +1568,7 @@ html[data-theme="dark"] .resumePill.isActive {
   --settings-stepper-button-size: 20px;
   --settings-stepper-value-width: 22px;
   --settings-stepper-control-size: 20px;
-  --settings-stepper-gap: 3px;
+  --settings-stepper-gap: 0;
   --settings-stepper-font-size: 0.75rem;
   --settings-label-size: 0.625rem;
 }
@@ -1564,14 +1585,14 @@ html[data-theme="dark"] .resumePill.isActive {
 
 .settingsRailInner {
   display: grid;
-  gap: 7px;
+  gap: 8px;
 }
 
 .settingsRailHeader {
   display: grid;
   gap: 0;
   justify-items: start;
-  padding: 0 2px;
+  padding: 0 3px;
   text-align: left;
 }
 
@@ -1585,15 +1606,11 @@ html[data-theme="dark"] .resumePill.isActive {
 
 .settingsRailList {
   display: grid;
-  gap: 0;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: calc(var(--radius-lg) - var(--settings-inset));
-  background: color-mix(in srgb, var(--color-surface-muted) 72%, var(--color-surface-elevated));
-}
-
-html[data-theme="dark"] .settingsRailList {
-  background: #181818;
+  gap: 5px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .settingsControl {
@@ -1605,16 +1622,18 @@ html[data-theme="dark"] .settingsRailList {
   justify-items: stretch;
   gap: 4px;
   min-width: 0;
-  min-height: 34px;
-  padding: 7px;
+  min-height: 36px;
+  padding: 5px 3px;
   border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border-radius: 10px;
   background: transparent;
   text-align: center;
+  transition: background-color var(--transition-base);
 }
 
-.settingsRailList > .settingsControl:last-child {
-  border-bottom: 0;
+.settingsControl:hover,
+.settingsControl:focus-within {
+  background: color-mix(in srgb, var(--color-surface-muted) 76%, transparent);
 }
 
 .settingsControlLabel {
@@ -1623,7 +1642,7 @@ html[data-theme="dark"] .settingsRailList {
   max-width: 100%;
   color: var(--color-text-subtle);
   font-size: var(--settings-label-size);
-  font-weight: 750;
+  font-weight: 700;
   line-height: 1.1;
   text-align: center;
   white-space: nowrap;
@@ -1642,12 +1661,8 @@ html[data-theme="dark"] .settingsRailList {
   width: 100%;
   padding: 2px;
   border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
-  border-radius: 11px;
-  background: color-mix(in srgb, var(--color-surface-muted) 84%, var(--color-surface-elevated));
-}
-
-html[data-theme="dark"] .settingsTemplateSegment {
-  background: #151515;
+  border-radius: 9px;
+  background: var(--color-input-bg);
 }
 
 .settingsTemplateOption {
@@ -1655,7 +1670,7 @@ html[data-theme="dark"] .settingsTemplateSegment {
   min-height: 19px;
   padding: 0 5px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: var(--color-text-muted);
   font-size: 0.5625rem;
@@ -1669,13 +1684,9 @@ html[data-theme="dark"] .settingsTemplateSegment {
 }
 
 .settingsTemplateOption.isActive {
-  background: var(--color-surface-elevated);
-  color: var(--color-text);
-  box-shadow: var(--shadow-xs);
-}
-
-html[data-theme="dark"] .settingsTemplateOption.isActive {
-  background: #222222;
+  background: color-mix(in srgb, var(--color-accent-soft) 70%, var(--color-surface-elevated));
+  color: var(--color-accent-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 
 .settingsTemplateOption:not(.isActive):hover,
@@ -1695,6 +1706,10 @@ html[data-theme="dark"] .settingsTemplateOption.isActive {
   gap: var(--settings-stepper-gap);
   min-width: 0;
   max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-input-bg);
 }
 
 @container settings-control (max-width: 80px) {
@@ -1739,15 +1754,15 @@ html[data-theme="dark"] .settingsTemplateOption.isActive {
     gap: 2px;
     padding: 2px;
     border: 1px solid var(--color-border);
-    border-radius: 999px;
-    background: var(--color-surface-muted);
+    border-radius: 9px;
+    background: var(--color-input-bg);
   }
 
   .settingsTemplateOption {
     min-height: 20px;
     padding: 0 5px;
     border: 0;
-    border-radius: 999px;
+    border-radius: 6px;
     background: transparent;
     font-size: 0.5625rem;
   }
@@ -1766,9 +1781,9 @@ html[data-theme="dark"] .settingsTemplateOption.isActive {
   height: var(--settings-stepper-control-size);
   min-height: var(--settings-stepper-control-size);
   padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface-muted);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text);
   font-size: var(--settings-stepper-font-size);
   font-weight: 700;
@@ -1780,8 +1795,8 @@ html[data-theme="dark"] .settingsTemplateOption.isActive {
 
 .settingsControlValue {
   width: var(--settings-stepper-value-width);
-  border-color: transparent;
-  background: transparent;
+  border-inline: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+  background: color-mix(in srgb, var(--color-surface-muted) 54%, transparent);
 }
 
 .separatorSettingsPopup {
@@ -1935,8 +1950,8 @@ html[data-theme="dark"] .settingsTemplateOption.isActive {
 }
 
 .button.settingsAdjustButton:not(:disabled):hover {
-  border-color: var(--color-border-strong);
-  background: var(--color-surface-muted);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--color-accent-soft) 54%, transparent);
   color: var(--color-text);
   transform: none;
 }
@@ -1946,27 +1961,27 @@ html[data-theme="dark"] .settingsTemplateOption.isActive {
 }
 
 .button.settingsAdjustButton--increase:not(:disabled):hover {
-  border-color: var(--color-success-border);
-  background: var(--color-success-soft);
-  color: var(--color-success);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--color-accent-soft) 64%, transparent);
+  color: var(--color-accent-strong);
 }
 
 .button.settingsAdjustButton--increase:not(:disabled):active {
-  border-color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 18%, var(--color-surface));
-  color: var(--color-success);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--color-accent-soft) 82%, transparent);
+  color: var(--color-accent-strong);
 }
 
 .button.settingsAdjustButton--decrease:not(:disabled):hover {
-  border-color: var(--color-danger-border);
-  background: var(--color-danger-bg);
-  color: var(--color-error);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--color-accent-soft) 64%, transparent);
+  color: var(--color-accent-strong);
 }
 
 .button.settingsAdjustButton--decrease:not(:disabled):active {
-  border-color: var(--color-danger-hover-border);
-  background: var(--color-danger-hover-bg);
-  color: var(--color-danger-hover-text);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--color-accent-soft) 82%, transparent);
+  color: var(--color-accent-strong);
 }
 
 .editorStage {
@@ -1984,7 +1999,7 @@ html[data-theme="dark"] .settingsTemplateOption.isActive {
   );
   overflow: hidden;
 
-  padding: var(--space-6);
+  padding: 18px;
 }
 
 @media screen and (min-width: 721px) {
@@ -1995,7 +2010,7 @@ html[data-theme="dark"] .settingsTemplateOption.isActive {
 
   .settingsRail,
   .editorRail {
-    padding: 16px;
+    padding: 13px;
   }
 
   .settingsRailHeader {
@@ -2021,20 +2036,13 @@ html[data-theme="dark"] .settingsTemplateOption.isActive {
 }
 
 .editorPanelHeader {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-2);
-  padding-inline: var(--space-4);
-  text-align: center;
-}
-
-.editorPanelHeader {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
-  padding: 0 10px 0 6px;
+  margin-bottom: 12px;
+  padding: 0 2px 11px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent);
   text-align: left;
 }
 
@@ -2072,44 +2080,39 @@ html[data-theme="dark"] .settingsTemplateOption.isActive {
 .sectionPlacementControl {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  gap: 8px;
-  padding: 0 8px 0 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface-muted);
+  min-height: 28px;
+  gap: 5px;
+  padding: 0 0 0 7px;
+  border: 0;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--color-surface-muted) 64%, transparent);
 }
 
 .sectionPlacementLabel {
   color: var(--color-text-muted);
-  font-size: 0.8125rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   line-height: 1;
 }
 
 .sectionPlacementControl .entryMenuButton {
-  min-width: 22px;
-  min-height: 22px;
-  padding: 0 5px;
-  border-radius: 999px;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  border-radius: 8px;
   box-shadow: none;
-  font-size: 0.625rem;
 }
 
 .tabs {
   --tabs-inset: 4px;
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-2);
-  overflow: hidden;
-  padding: var(--tabs-inset);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-muted);
-}
-
-html[data-theme="dark"] .tabs {
-  background: #181818;
+  gap: 3px;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .sectionAddControl {
@@ -2140,11 +2143,11 @@ html[data-theme="dark"] .tabs {
   justify-content: center;
   position: relative;
   width: 100%;
-  height: 24px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--color-accent-soft) 34%, var(--color-surface-elevated));
-  color: color-mix(in srgb, var(--color-accent) 78%, var(--color-text-subtle));
+  height: 22px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-text-muted);
   font-size: 0;
   line-height: 0;
   text-align: center;
@@ -2175,8 +2178,8 @@ html[data-theme="dark"] .tabs {
 
 .sectionAddButton:not(:disabled):hover .sectionAddButtonIcon,
 .sectionAddButton:not(:disabled):focus-visible .sectionAddButtonIcon {
-  border-color: color-mix(in srgb, var(--color-accent) 48%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent-soft) 52%, var(--color-surface-elevated));
+  border-color: transparent;
+  background: color-mix(in srgb, var(--color-accent-soft) 66%, transparent);
   color: var(--color-accent);
   transform: scale(1.04);
 }
@@ -2406,7 +2409,7 @@ html[data-theme="dark"] .sectionAddDialog {
 .formContainer::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
-  background: #d2dbe8 padding-box;
+  background: color-mix(in srgb, var(--color-text-muted) 44%, transparent) padding-box;
 }
 
 .previewFrame {
@@ -2528,7 +2531,7 @@ html[data-theme="dark"] .sectionAddDialog {
 
 @media screen and (max-width: 980px) {
   .topbar {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .resumeWorkspaceBar {
@@ -2537,8 +2540,8 @@ html[data-theme="dark"] .sectionAddDialog {
 
   .topbarSide,
   .topbarMeta {
-    justify-items: stretch;
-    justify-content: flex-start;
+    justify-items: end;
+    justify-content: flex-end;
   }
 
   .workspace {
@@ -2595,17 +2598,17 @@ html[data-theme="dark"] .sectionAddDialog {
 
   .editorPanelHeader {
     align-items: center;
-    flex-direction: column;
-    padding-inline: var(--space-2);
-    text-align: center;
+    flex-direction: row;
+    padding-inline: 2px;
+    text-align: left;
   }
 
   .editorPanelMeta {
-    justify-content: center;
+    justify-content: flex-end;
   }
 
   .sectionPlacementControl {
-    justify-content: center;
+    justify-content: flex-end;
   }
 
   .tabs {
@@ -2653,11 +2656,11 @@ html[data-theme="dark"] .sectionAddDialog {
   }
 
   .topbarMeta {
-    justify-content: stretch;
+    justify-content: flex-end;
   }
 
   .topbarMeta > .button {
-    flex: 1 1 calc(50% - 8px);
+    flex: 0 1 auto;
   }
 
   .resumePillStrip {
@@ -2706,6 +2709,37 @@ html[data-theme="dark"] .sectionAddDialog {
     padding: var(--space-4);
   }
 
+}
+
+@media screen and (max-width: 560px) {
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .topbarSide,
+  .topbarMeta {
+    width: 100%;
+    justify-items: stretch;
+    justify-content: stretch;
+  }
+
+  .topbarMeta > .button {
+    flex: 1 1 calc(50% - 4px);
+  }
+}
+
+@media screen and (max-width: 440px) {
+  .editorPanelHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .editorPanelMeta,
+  .sectionPlacementControl {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 
 @media print {

@@ -19,16 +19,12 @@ form {
   padding: var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, var(--color-form-section-top) 0%, var(--color-form-section-bottom) 100%);
-  box-shadow: var(--shadow-xs);
+  background: color-mix(in srgb, var(--color-surface-soft) 82%, var(--color-surface));
+  box-shadow: none;
   transition:
     transform var(--transition-fast),
     box-shadow var(--transition-base),
     border-color var(--transition-base);
-}
-
-html[data-theme="dark"] .formSection {
-  background: linear-gradient(180deg, #181818 0%, #131313 100%);
 }
 
 .editorStage form {
@@ -63,9 +59,8 @@ html[data-theme="dark"] .formSection {
 
 @media (hover: hover) {
   .formSection:hover {
-    transform: translateY(-1px);
     border-color: var(--color-border-strong);
-    box-shadow: var(--shadow-sm);
+    box-shadow: none;
   }
 }
 
@@ -244,7 +239,7 @@ html[data-theme="dark"] .formSection {
 .field textarea {
   width: 100%;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: 9px;
   background: var(--color-input-bg);
   color: var(--color-text);
   padding: 13px 14px;
@@ -280,7 +275,7 @@ html[data-theme="dark"] .formSection {
 .field textarea:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 4px var(--color-accent-soft);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
 
 .field textarea {
@@ -326,7 +321,7 @@ html[data-theme="dark"] .formSection {
 .nestedEntryCard {
   padding: var(--space-3);
   border: 1px solid var(--color-nested-border);
-  border-radius: calc(var(--radius-md) + 2px);
+  border-radius: 10px;
   background: var(--color-nested-bg);
 }
 

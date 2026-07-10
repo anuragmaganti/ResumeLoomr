@@ -1,8 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 
+function MoreActionsIcon() {
+  return (
+    <svg className="entryMenuIcon" aria-hidden="true" viewBox="0 0 18 18" focusable="false">
+      <circle cx="4" cy="9" r="1.25" />
+      <circle cx="9" cy="9" r="1.25" />
+      <circle cx="14" cy="9" r="1.25" />
+    </svg>
+  );
+}
+
 export default function EntryActionMenu({
   menuLabel,
-  triggerContent = '•••',
+  triggerContent,
   buttonClassName = '',
   moveUpLabel,
   moveDownLabel,
@@ -59,7 +69,7 @@ export default function EntryActionMenu({
         aria-haspopup="menu"
         onClick={() => setIsOpen((open) => !open)}
       >
-        {triggerContent}
+        {triggerContent ?? <MoreActionsIcon />}
       </button>
 
       {isOpen ? (
