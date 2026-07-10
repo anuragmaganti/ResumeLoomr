@@ -958,7 +958,7 @@ html[data-theme="dark"] .personalSection {
   color: var(--resume-page-heading);
   font-size: var(--resume-body-size);
   line-height: var(--resume-detail-line-height);
-  text-align: left;
+  text-align: justify;
   text-align-last: left;
 }
 
