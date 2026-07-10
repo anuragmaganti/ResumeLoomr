@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   closestCenter,
@@ -23,10 +23,71 @@ function getResumeIds(resumeList) {
   return resumeList.map((resume) => resume.id);
 }
 
+const RESUME_SELECTION_LONG_PRESS_MS = 520;
+const RESUME_SELECTION_LONG_PRESS_MOVE_TOLERANCE_PX = 5;
+
+function ResumeSelectionControl({ resume, isSelected, onToggle, interactive = true }) {
+  return (
+    <span
+      className="resumePillSelectionSlot"
+      data-dnd-no-drag="true"
+      onPointerDown={interactive ? (event) => event.stopPropagation() : undefined}
+      onClick={interactive ? (event) => event.stopPropagation() : undefined}
+    >
+      {interactive ? (
+        <label
+          className="resumePillSelectionControl"
+          title={`${isSelected ? 'Deselect' : 'Select'} ${resume.name}`}
+        >
+          <input
+            className="resumePillSelectionInput"
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggle(resume.id)}
+            aria-label={`${isSelected ? 'Deselect' : 'Select'} ${resume.name}`}
+          />
+          <span className="resumePillSelectionMark" aria-hidden="true">
+            <svg viewBox="0 0 16 16" focusable="false">
+              <path d="m3.5 8.2 2.7 2.7 6.3-6.3" />
+            </svg>
+          </span>
+        </label>
+      ) : (
+        <span className="resumePillSelectionControl" aria-hidden="true">
+          <span className="resumePillSelectionMark isChecked">
+            <svg viewBox="0 0 16 16" focusable="false">
+              <path d="m3.5 8.2 2.7 2.7 6.3-6.3" />
+            </svg>
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+function ResumeMenuIcon() {
+  return (
+    <svg className="resumePillMenuIcon" aria-hidden="true" viewBox="0 0 18 18" focusable="false">
+      <circle cx="4" cy="9" r="1.25" />
+      <circle cx="9" cy="9" r="1.25" />
+      <circle cx="14" cy="9" r="1.25" />
+    </svg>
+  );
+}
+
+function ResumeMenuPlaceholder() {
+  return (
+    <span className="button resumePillMenuButton resumePillMenuPlaceholder" aria-hidden="true">
+      <ResumeMenuIcon />
+    </span>
+  );
+}
+
 function ResumePillContents({
   resume,
   isActive,
   isRenaming,
+  isSelected,
   renameValue,
   canAddResume,
   canDeleteActiveResume,
@@ -38,33 +99,46 @@ function ResumePillContents({
   onStartRenamingActiveResume,
   onDuplicateResume,
   onDeleteResume,
+  onToggleSelected,
 }) {
   if (isRenaming) {
     return (
-      <form
-        className="resumePillRenameForm"
-        data-dnd-no-drag="true"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onCommitRename();
-        }}
-      >
-        <input
-          className="resumePillRenameInput"
-          value={renameValue}
-          onChange={(event) => onRenameValueChange(event.target.value)}
-          onBlur={onCommitRename}
-          maxLength={MAX_WORKSPACE_RESUME_NAME_LENGTH}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              onCancelRename();
-            }
+      <>
+        <form
+          className="resumePillRenameForm"
+          data-dnd-no-drag="true"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onCommitRename();
           }}
-          aria-label="Rename active resume"
-          autoFocus
-        />
-      </form>
+        >
+          <input
+            className="resumePillRenameInput"
+            value={renameValue}
+            onChange={(event) => onRenameValueChange(event.target.value)}
+            onBlur={onCommitRename}
+            maxLength={MAX_WORKSPACE_RESUME_NAME_LENGTH}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                onCancelRename();
+              }
+            }}
+            aria-label="Rename active resume"
+            autoFocus
+          />
+        </form>
+        <span className="resumePillActions">
+          <ResumeSelectionControl
+            resume={resume}
+            isSelected={isSelected}
+            onToggle={onToggleSelected}
+          />
+          <span className="resumePillMenuHost" data-dnd-no-drag="true" aria-hidden="true">
+            <ResumeMenuPlaceholder />
+          </span>
+        </span>
+      </>
     );
   }
 
@@ -80,31 +154,46 @@ function ResumePillContents({
         <span className="resumePillLabel">{resume.name}</span>
       </button>
 
-      {isActive ? (
-        <span className="resumePillMenuHost" data-dnd-no-drag="true">
-          <EntryActionMenu
-            menuLabel={`${resume.name} actions`}
-            extraItems={[
-              {
-                label: 'Rename',
-                onSelect: onStartRenamingActiveResume,
-              },
-              {
-                label: 'Duplicate',
-                onSelect: onDuplicateResume,
-                disabled: !canAddResume,
-              },
-              {
-                label: 'Delete',
-                onSelect: onDeleteResume,
-                tone: 'danger',
-                disabled: !canDeleteActiveResume,
-              },
-            ]}
-            buttonClassName="resumePillMenuButton"
-          />
+      <span className="resumePillActions">
+        <ResumeSelectionControl
+          resume={resume}
+          isSelected={isSelected}
+          onToggle={onToggleSelected}
+        />
+
+        <span
+          className="resumePillMenuHost"
+          data-dnd-no-drag="true"
+          aria-hidden={!isActive}
+        >
+          {isActive ? (
+            <EntryActionMenu
+              menuLabel={`${resume.name} actions`}
+              triggerContent={<ResumeMenuIcon />}
+              extraItems={[
+                {
+                  label: 'Rename',
+                  onSelect: onStartRenamingActiveResume,
+                },
+                {
+                  label: 'Duplicate',
+                  onSelect: onDuplicateResume,
+                  disabled: !canAddResume,
+                },
+                {
+                  label: 'Delete',
+                  onSelect: onDeleteResume,
+                  tone: 'danger',
+                  disabled: !canDeleteActiveResume,
+                },
+              ]}
+              buttonClassName="resumePillMenuButton"
+            />
+          ) : (
+            <ResumeMenuPlaceholder />
+          )}
         </span>
-      ) : null}
+      </span>
     </>
   );
 }
@@ -113,8 +202,13 @@ function SortableResumePill({
   resume,
   isActive,
   isRenaming,
+  isSelected,
+  onToggleSelected,
   children,
 }) {
+  const longPressTimerRef = useRef(null);
+  const longPressOriginRef = useRef(null);
+  const suppressNextClickRef = useRef(false);
   const {
     attributes,
     listeners,
@@ -131,35 +225,120 @@ function SortableResumePill({
     transition,
   };
 
+  function clearLongPress() {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    longPressOriginRef.current = null;
+  }
+
+  function handlePointerDown(event) {
+    listeners?.onPointerDown?.(event);
+
+    if (
+      event.pointerType !== 'touch' ||
+      event.button !== 0 ||
+      event.target.closest('.resumePillActions, .resumePillRenameForm')
+    ) {
+      return;
+    }
+
+    clearLongPress();
+    longPressOriginRef.current = { x: event.clientX, y: event.clientY };
+    longPressTimerRef.current = window.setTimeout(() => {
+      suppressNextClickRef.current = true;
+      longPressTimerRef.current = null;
+      longPressOriginRef.current = null;
+      onToggleSelected(resume.id);
+    }, RESUME_SELECTION_LONG_PRESS_MS);
+  }
+
+  function handlePointerMove(event) {
+    const origin = longPressOriginRef.current;
+
+    if (!origin) {
+      return;
+    }
+
+    if (
+      Math.abs(event.clientX - origin.x) > RESUME_SELECTION_LONG_PRESS_MOVE_TOLERANCE_PX ||
+      Math.abs(event.clientY - origin.y) > RESUME_SELECTION_LONG_PRESS_MOVE_TOLERANCE_PX
+    ) {
+      clearLongPress();
+    }
+  }
+
+  useEffect(() => () => clearLongPress(), []);
+
+  useEffect(() => {
+    if (isDragging) {
+      clearLongPress();
+    }
+  }, [isDragging]);
+
   return (
     <div
       ref={setNodeRef}
       className={[
         'resumePill',
         isActive ? 'isActive' : '',
+        isSelected ? 'isSelected' : '',
         isRenaming ? 'isEditing' : '',
         isDragging ? 'isSortingPlaceholder' : '',
       ].filter(Boolean).join(' ')}
       style={style}
       {...attributes}
       {...listeners}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={clearLongPress}
+      onPointerCancel={clearLongPress}
+      onPointerLeave={clearLongPress}
+      onClickCapture={(event) => {
+        if (suppressNextClickRef.current) {
+          suppressNextClickRef.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
     >
       {children}
     </div>
   );
 }
 
-function ResumePillOverlay({ resume, isActive, style }) {
+function ResumePillOverlay({ resume, isActive, isSelected, style }) {
   if (!resume) {
     return null;
   }
 
   return (
-    <div className={`resumePill resumePillOverlay${isActive ? ' isActive' : ''}`} style={style}>
+    <div
+      className={[
+        'resumePill',
+        'resumePillOverlay',
+        isActive ? 'isActive' : '',
+        isSelected ? 'isSelected' : '',
+      ].filter(Boolean).join(' ')}
+      style={style}
+    >
       <span className="resumePillButton">
         <span className="resumePillLabel">{resume.name}</span>
       </span>
-      {isActive ? <span className="button resumePillMenuButton">•••</span> : null}
+      <span className="resumePillActions">
+        {isSelected ? (
+          <ResumeSelectionControl resume={resume} isSelected interactive={false} />
+        ) : (
+          <span className="resumePillSelectionSlot" />
+        )}
+        {isActive ? (
+          <span className="resumePillMenuHost">
+            <ResumeMenuPlaceholder />
+          </span>
+        ) : null}
+      </span>
     </div>
   );
 }
@@ -187,12 +366,26 @@ export default function Header({
   const [renameValue, setRenameValue] = useState('');
   const [activeDragId, setActiveDragId] = useState(null);
   const [activeDragRect, setActiveDragRect] = useState(null);
+  const selectionAccountKey = authUser?.uid || 'signed-out';
+  const [selectionState, setSelectionState] = useState(() => ({
+    accountKey: selectionAccountKey,
+    ids: new Set(),
+  }));
   const resumeIds = useMemo(() => getResumeIds(resumeList), [resumeList]);
   const resumeById = useMemo(
     () => new Map(resumeList.map((resume) => [resume.id, resume])),
     [resumeList],
   );
+  const selectedResumeIds = useMemo(() => {
+    if (selectionState.accountKey !== selectionAccountKey) {
+      return new Set();
+    }
+
+    return new Set([...selectionState.ids].filter((resumeId) => resumeById.has(resumeId)));
+  }, [resumeById, selectionAccountKey, selectionState]);
   const activeDragResume = activeDragId ? resumeById.get(activeDragId) : null;
+  const selectedResumeCount = selectedResumeIds.size;
+  const hasSelectedResumes = selectedResumeCount > 0;
   const sensors = useSensors(
     useSensor(ResumeLoomrPointerSensor, {
       activationConstraint: {
@@ -203,6 +396,30 @@ export default function Header({
       coordinateGetter: sortableKeyboardCoordinates,
     }),
   );
+
+  function toggleResumeSelection(resumeId) {
+    if (!resumeById.has(resumeId)) {
+      return;
+    }
+
+    setSelectionState((currentState) => {
+      const nextIds = currentState.accountKey === selectionAccountKey
+        ? new Set([...currentState.ids].filter((selectedId) => resumeById.has(selectedId)))
+        : new Set();
+
+      if (nextIds.has(resumeId)) {
+        nextIds.delete(resumeId);
+      } else {
+        nextIds.add(resumeId);
+      }
+
+      return { accountKey: selectionAccountKey, ids: nextIds };
+    });
+  }
+
+  function clearResumeSelection() {
+    setSelectionState({ accountKey: selectionAccountKey, ids: new Set() });
+  }
 
   function startRenamingActiveResume() {
     setRenamingId(activeResumeId);
@@ -286,6 +503,7 @@ export default function Header({
       <ResumePillOverlay
         resume={activeDragResume}
         isActive={activeDragId === activeResumeId}
+        isSelected={Boolean(activeDragId && selectedResumeIds.has(activeDragId))}
         style={activeDragRect ? {
           width: `${activeDragRect.width}px`,
           height: `${activeDragRect.height}px`,
@@ -309,6 +527,7 @@ export default function Header({
               {resumeList.map((resume) => {
                 const isActive = resume.id === activeResumeId;
                 const isRenaming = resume.id === renamingId;
+                const isSelected = selectedResumeIds.has(resume.id);
 
                 return (
                   <SortableResumePill
@@ -316,11 +535,14 @@ export default function Header({
                     resume={resume}
                     isActive={isActive}
                     isRenaming={isRenaming}
+                    isSelected={isSelected}
+                    onToggleSelected={toggleResumeSelection}
                   >
                     <ResumePillContents
                       resume={resume}
                       isActive={isActive}
                       isRenaming={isRenaming}
+                      isSelected={isSelected}
                       renameValue={renameValue}
                       canAddResume={canAddResume}
                       canDeleteActiveResume={canDeleteActiveResume}
@@ -335,6 +557,7 @@ export default function Header({
                       onStartRenamingActiveResume={startRenamingActiveResume}
                       onDuplicateResume={onDuplicateResume}
                       onDeleteResume={handleDeleteResume}
+                      onToggleSelected={toggleResumeSelection}
                     />
                   </SortableResumePill>
                 );
@@ -357,6 +580,34 @@ export default function Header({
           {typeof document === 'undefined' ? resumeDragOverlay : createPortal(resumeDragOverlay, document.body)}
         </DndContext>
       </div>
+
+      <div
+        className={`resumeSelectionFooter${hasSelectedResumes ? ' isVisible' : ''}`}
+        aria-hidden={!hasSelectedResumes}
+      >
+        <div className="resumeSelectionFooterClip">
+          <div className="resumeSelectionToolbar">
+            <span className="resumeSelectionCount">
+              <span className="resumeSelectionCountDot" aria-hidden="true" />
+              {selectedResumeCount} selected
+            </span>
+            <button
+              type="button"
+              className="button buttonSecondary resumeSelectionClear"
+              onClick={clearResumeSelection}
+              disabled={!hasSelectedResumes}
+              tabIndex={hasSelectedResumes ? 0 : -1}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      </div>
+      <span className="visuallyHidden" aria-live="polite" aria-atomic="true">
+        {hasSelectedResumes
+          ? `${selectedResumeCount} ${selectedResumeCount === 1 ? 'resume' : 'resumes'} selected`
+          : 'Resume selection cleared'}
+      </span>
     </section>
   );
 
