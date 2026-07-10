@@ -85,36 +85,6 @@ function getDraftEditorSectionIds(draft) {
   return ['personal', ...blockIds];
 }
 
-function formatSavedAt(savedAt, { cloudMode = false, syncState = 'idle' } = {}) {
-  if (cloudMode && syncState === 'syncing') {
-    return 'Saved locally • syncing';
-  }
-
-  if (cloudMode && syncState === 'offline') {
-    return 'Saved locally • queued';
-  }
-
-  if (cloudMode && syncState === 'error') {
-    return 'Saved locally • cloud unavailable';
-  }
-
-  if (cloudMode && syncState === 'stale') {
-    return 'Saved locally • review sync';
-  }
-
-  if (!savedAt) {
-    return 'Autosave ready';
-  }
-
-  const date = new Date(savedAt);
-
-  if (Number.isNaN(date.getTime())) {
-    return 'Saved locally';
-  }
-
-  return `Saved locally ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-}
-
 function isOnline() {
   return typeof navigator === 'undefined' || navigator.onLine;
 }
@@ -215,7 +185,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     [initialWorkspaceState.workspace.activeResumeId, initialWorkspaceState.draft.localRevision || ''],
   ]));
   const conflictRef = useRef(null);
-  const isCloudMode = Boolean(authReady && user);
   const activeResumeId = workspace.activeResumeId;
   const errors = useMemo(() => validateResume(resume), [resume]);
   const previewModel = useMemo(() => getPreviewModel(resume), [resume]);
@@ -1348,13 +1317,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     retryCloudSync,
     flushActiveCloudDraft,
     saveState,
-    saveLabel: saveState === 'saving'
-      ? 'Saving locally…'
-      : saveState === 'error'
-        ? 'Local autosave unavailable'
-        : saveState === 'conflict'
-          ? 'Save conflict'
-        : formatSavedAt(savedAt, { cloudMode: isCloudMode, syncState }),
     syncState,
     templateOptions: TEMPLATE_OPTIONS,
     resumeList,

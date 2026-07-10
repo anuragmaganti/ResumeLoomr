@@ -1,4 +1,69 @@
 import { useState } from 'react';
+import { getSaveStatusPresentation } from '../lib/saveStatus.js';
+
+function SaveStatusIcon({ status }) {
+  if (status === 'syncing') {
+    return (
+      <svg key={status} className={`saveStatusIcon saveStatusIcon--${status}`} aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M20 7v5h-5" />
+        <path d="M4 17v-5h5" />
+        <path d="M6.1 9A7 7 0 0 1 17.7 6.6L20 9" />
+        <path d="M17.9 15A7 7 0 0 1 6.3 17.4L4 15" />
+      </svg>
+    );
+  }
+
+  if (status === 'synced' || status === 'queued' || status === 'sync-error' || status === 'stale') {
+    return (
+      <svg key={status} className={`saveStatusIcon saveStatusIcon--${status}`} aria-hidden="true" viewBox="0 0 24 24">
+        <path className="saveStatusCloud" d="M17.5 18H7a4 4 0 0 1-.5-8A6 6 0 0 1 18 9.5a4.25 4.25 0 0 1-.5 8.5Z" />
+        {status === 'synced' ? <path className="saveStatusCheck" d="m9.2 13 2 2 4-4.5" /> : null}
+        {status === 'queued' ? (
+          <g className="saveStatusClock">
+            <circle cx="16.5" cy="16.5" r="3.5" />
+            <path className="saveStatusClockHand" d="M16.5 14.5v2.2l1.4.8" />
+          </g>
+        ) : null}
+        {status === 'sync-error' || status === 'stale' ? (
+          <g className="saveStatusAlert">
+            <path d="M12 10.5v3" />
+            <path d="M12 16.2h.01" />
+          </g>
+        ) : null}
+      </svg>
+    );
+  }
+
+  if (status === 'conflict') {
+    return (
+      <svg key={status} className={`saveStatusIcon saveStatusIcon--${status}`} aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M12 3.5 21 20H3L12 3.5Z" />
+        <path d="M12 9v5" />
+        <path d="M12 17h.01" />
+      </svg>
+    );
+  }
+
+  const isSaving = status === 'saving-local';
+  const isError = status === 'local-error';
+  const isSaved = status === 'saved-local';
+
+  return (
+    <svg key={status} className={`saveStatusIcon saveStatusIcon--${status}`} aria-hidden="true" viewBox="0 0 24 24">
+      <rect x="3.5" y="4" width="17" height="16" rx="3" />
+      <path d="M3.5 14.5h17" />
+      <path d="M7 17.3h.01" />
+      {isSaving ? <path className="saveStatusArrow" d="M12 7v5m-2-2 2 2 2-2" /> : null}
+      {isSaved ? <path className="saveStatusCheck" d="m9.2 10 2 2 4-4.5" /> : null}
+      {isError ? (
+        <g className="saveStatusAlert">
+          <path d="M12 7.2v3.2" />
+          <path d="M12 12.5h.01" />
+        </g>
+      ) : null}
+    </svg>
+  );
+}
 
 function formatAccountName(account, fallback = 'Unknown account') {
   return account?.email || account?.displayName || fallback;
@@ -7,7 +72,7 @@ function formatAccountName(account, fallback = 'Unknown account') {
 export default function AccountSettings({
   isOpen,
   saveState,
-  saveLabel,
+  syncState,
   theme,
   authUser,
   connectedAccount,
@@ -32,6 +97,11 @@ export default function AccountSettings({
     : connectedAccount;
   const accountName = formatAccountName(activeAccount);
   const isSignedIn = Boolean(authUser);
+  const saveStatus = getSaveStatusPresentation({
+    saveState,
+    syncState,
+    cloudMode: isSignedIn,
+  });
   const hasRememberedAccount = Boolean(connectedAccount?.uid);
   const connectionMode = isSignedIn
     ? 'Signed in and syncing to your account'
@@ -59,8 +129,14 @@ export default function AccountSettings({
 
   return (
     <>
-      <div className={`floatingSaveStatus statusBadge statusBadge--${saveState}`} role="status">
-        {saveLabel}
+      <div
+        className={`floatingSaveStatus statusBadge statusBadge--${saveStatus.id}`}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <SaveStatusIcon status={saveStatus.id} />
+        <span>{saveStatus.label}</span>
       </div>
 
       <button

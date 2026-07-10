@@ -364,6 +364,7 @@ html[data-theme="dark"] .tabButton.isActive {
 .statusBadge {
   display: inline-flex;
   align-items: center;
+  gap: 7px;
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid var(--color-border);
@@ -377,21 +378,171 @@ html[data-theme="dark"] .tabButton.isActive {
 
 .statusBadge--neutral,
 .statusBadge--idle,
-.statusBadge--saved {
+.statusBadge--ready {
   border-color: var(--color-border);
   background: var(--color-surface-muted);
   color: var(--color-text-subtle);
 }
 
-.statusBadge--saving,
+.statusBadge--saving-local,
+.statusBadge--syncing,
 .statusBadge--info {
   border-color: var(--color-info-border);
   background: var(--color-info-soft);
   color: var(--color-info);
 }
 
+.statusBadge--saved-local,
+.statusBadge--synced {
+  border-color: var(--color-success-border);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.statusBadge--queued,
+.statusBadge--stale,
+.statusBadge--conflict {
+  border-color: color-mix(in srgb, var(--color-warning) 44%, transparent);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.statusBadge--local-error,
+.statusBadge--sync-error,
 .statusBadge--error {
   border-color: var(--color-error-border);
   background: var(--color-error-soft);
   color: var(--color-error);
+}
+
+.saveStatusIcon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.saveStatusIcon--saving-local .saveStatusArrow {
+  animation: saveStatusArrowPulse 680ms ease-in-out infinite;
+}
+
+.saveStatusIcon--syncing {
+  animation: saveStatusSyncSpin 950ms linear infinite;
+}
+
+.saveStatusIcon--queued {
+  animation: saveStatusQueuePulse 1.8s ease-in-out infinite;
+}
+
+.saveStatusIcon--queued .saveStatusClockHand {
+  transform-origin: 16.5px 16.5px;
+  animation: saveStatusClockTick 1.8s steps(4, end) infinite;
+}
+
+.saveStatusIcon--saved-local,
+.saveStatusIcon--synced {
+  animation: saveStatusCompletePop 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.saveStatusIcon--saved-local .saveStatusCheck,
+.saveStatusIcon--synced .saveStatusCheck {
+  stroke-dasharray: 12;
+  stroke-dashoffset: 12;
+  animation: saveStatusCheckDraw 420ms 80ms ease-out forwards;
+}
+
+.saveStatusIcon--local-error,
+.saveStatusIcon--sync-error,
+.saveStatusIcon--stale,
+.saveStatusIcon--conflict {
+  animation: saveStatusErrorShake 320ms ease-out both;
+}
+
+@keyframes saveStatusArrowPulse {
+  0%,
+  100% {
+    transform: translateY(-0.5px);
+  }
+
+  50% {
+    transform: translateY(1px);
+  }
+}
+
+@keyframes saveStatusSyncSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes saveStatusQueuePulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.96);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes saveStatusClockTick {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes saveStatusCompletePop {
+  0% {
+    opacity: 0.45;
+    transform: scale(0.78);
+  }
+
+  70% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes saveStatusCheckDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes saveStatusErrorShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  35% {
+    transform: translateX(-1.5px);
+  }
+
+  70% {
+    transform: translateX(1.5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saveStatusIcon,
+  .saveStatusIcon * {
+    animation: none !important;
+  }
+
+  .saveStatusIcon .saveStatusCheck {
+    stroke-dashoffset: 0;
+  }
 }

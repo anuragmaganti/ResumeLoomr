@@ -157,7 +157,6 @@ function App() {
     showNotice,
     dismissNotice,
     saveState,
-    saveLabel,
     syncState,
     conflict,
     resolveConflictWithCloud,
@@ -741,7 +740,7 @@ function App() {
         <AccountSettings
           isOpen={isAccountSettingsOpen}
           saveState={saveState}
-          saveLabel={saveLabel}
+          syncState={syncState}
           theme={theme}
           authUser={auth.user}
           connectedAccount={auth.connectedAccount}

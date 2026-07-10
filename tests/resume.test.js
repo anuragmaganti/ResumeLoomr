@@ -59,6 +59,7 @@ import {
   validateResume,
 } from '../src/lib/resume.js';
 import { calculatePreviewPageBreaks } from '../src/lib/previewPagination.js';
+import { getSaveStatusPresentation } from '../src/lib/saveStatus.js';
 import {
   createOutboxAckDescriptor,
   createDraftContentHash,
@@ -92,6 +93,36 @@ import {
   shouldUseVisualPdfFallbackForSourceText,
   validateImportedDraftCoverage,
 } from '../server/importResume.js';
+
+test('save status presentation prioritizes local writes before cloud state', () => {
+  assert.deepEqual(
+    getSaveStatusPresentation({ saveState: 'saving', syncState: 'saved', cloudMode: true }),
+    { id: 'saving-local', label: 'Saving locally' },
+  );
+  assert.deepEqual(
+    getSaveStatusPresentation({ saveState: 'error', syncState: 'syncing', cloudMode: true }),
+    { id: 'local-error', label: 'Local save unavailable' },
+  );
+});
+
+test('save status presentation distinguishes local and cloud completion states', () => {
+  assert.deepEqual(
+    getSaveStatusPresentation({ saveState: 'saved', syncState: 'idle', cloudMode: false }),
+    { id: 'saved-local', label: 'Saved locally' },
+  );
+  assert.deepEqual(
+    getSaveStatusPresentation({ saveState: 'saved', syncState: 'syncing', cloudMode: true }),
+    { id: 'syncing', label: 'Syncing' },
+  );
+  assert.deepEqual(
+    getSaveStatusPresentation({ saveState: 'saved', syncState: 'saved', cloudMode: true }),
+    { id: 'synced', label: 'Synced' },
+  );
+  assert.deepEqual(
+    getSaveStatusPresentation({ saveState: 'saved', syncState: 'offline', cloudMode: true }),
+    { id: 'queued', label: 'Queued' },
+  );
+});
 import {
   validateImportResumeFile,
 } from '../src/lib/importResume.js';
