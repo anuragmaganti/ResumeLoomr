@@ -9,6 +9,7 @@ import {
   createResumeStorageKey,
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
+  dismissSampleInformation,
   normalizeDraftPayload,
   normalizeWorkspaceIndex,
   trimText,
@@ -308,6 +309,21 @@ function createDraftMergeContentHash(draft) {
   }
 
   return (hash >>> 0).toString(36);
+}
+
+function preservePermanentSampleDismissal(preferredDraft, ...otherDrafts) {
+  const normalizedPreferredDraft = normalizeDraftState(preferredDraft);
+  const isDismissed = [normalizedPreferredDraft, ...otherDrafts]
+    .some((draft) => normalizeDraftState(draft).resume.sampleDisplay.isDismissed);
+
+  if (!isDismissed || normalizedPreferredDraft.resume.sampleDisplay.isDismissed) {
+    return normalizedPreferredDraft;
+  }
+
+  return {
+    ...normalizedPreferredDraft,
+    resume: dismissSampleInformation(normalizedPreferredDraft.resume),
+  };
 }
 
 function draftHasVisibleText(draft) {
@@ -892,18 +908,20 @@ export function mergeLocalAndCloudWorkspaces({
 
       const localHash = createDraftMergeContentHash(localDraft);
       const cloudHash = createDraftMergeContentHash(cloudDraft);
-      const localFullHash = createDraftContentHash(localDraft);
       const cloudFullHash = createDraftContentHash(cloudDraft);
 
       if (localHash === cloudHash) {
         const localIsNewer = getDraftTimestamp(localDraft, normalizedLocalWorkspace.meta[resumeId]) >= getDraftTimestamp(cloudDraft, normalizedCloudWorkspace.meta[resumeId]);
+        const preferredDraft = localIsNewer ? localDraft : cloudDraft;
+        const mergedDraft = preservePermanentSampleDismissal(preferredDraft, localDraft, cloudDraft);
+        const mergedFullHash = createDraftContentHash(mergedDraft);
 
         addResume({
           resumeId,
-          draft: localIsNewer ? localDraft : cloudDraft,
+          draft: mergedDraft,
           meta: localHasContent ? normalizedLocalWorkspace.meta[resumeId] : normalizedCloudWorkspace.meta[resumeId],
-          origin: localIsNewer && localFullHash !== cloudFullHash ? 'local' : 'cloud',
-          forceUpsert: localIsNewer && localFullHash !== cloudFullHash,
+          origin: mergedFullHash !== cloudFullHash ? 'local' : 'cloud',
+          forceUpsert: mergedFullHash !== cloudFullHash,
         });
         return;
       }
@@ -913,7 +931,7 @@ export function mergeLocalAndCloudWorkspaces({
       if (localIsNewer) {
         addResume({
           resumeId,
-          draft: localDraft,
+          draft: preservePermanentSampleDismissal(localDraft, cloudDraft),
           meta: normalizedLocalWorkspace.meta[resumeId],
           origin: 'local',
           forceUpsert: true,
@@ -923,11 +941,14 @@ export function mergeLocalAndCloudWorkspaces({
           meta: normalizedCloudWorkspace.meta[resumeId],
         });
       } else {
+        const mergedCloudDraft = preservePermanentSampleDismissal(cloudDraft, localDraft);
+
         addResume({
           resumeId,
-          draft: cloudDraft,
+          draft: mergedCloudDraft,
           meta: normalizedCloudWorkspace.meta[resumeId],
           origin: 'cloud',
+          forceUpsert: createDraftContentHash(mergedCloudDraft) !== cloudFullHash,
         });
         addConflictCopy({
           draft: localDraft,

@@ -71,25 +71,30 @@ html[data-theme="dark"] .resumePage {
   position: absolute;
   top: 12px;
   left: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: grid;
   max-width: calc(100% - 24px);
-  padding: 7px 10px 7px 8px;
   border: 1px solid color-mix(in srgb, var(--resume-page-heading) 16%, transparent);
-  border-radius: 999px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--resume-page-bg) 88%, transparent);
   color: var(--resume-page-muted);
   font-size: calc(var(--resume-meta-size) * 1.034);
   font-weight: 700;
   line-height: 1;
   box-shadow: 0 11px 26px color-mix(in srgb, #0f172a 10%, transparent);
-  cursor: pointer;
+  overflow: hidden;
   user-select: none;
   z-index: 14;
   transition:
     opacity var(--transition-base),
     transform var(--transition-base);
+}
+
+.sampleInformationToggleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 8px;
+  cursor: pointer;
 }
 
 .sampleInformationToggle input {
@@ -127,6 +132,35 @@ html[data-theme="dark"] .resumePage {
 
 .sampleInformationToggle input:checked + .sampleInformationSwitch::after {
   transform: translateX(13px);
+}
+
+.sampleInformationDelete {
+  min-height: 24px;
+  padding: 6px 10px 7px;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--resume-page-heading) 10%, transparent);
+  background: color-mix(in srgb, var(--resume-page-bg) 72%, transparent);
+  color: color-mix(in srgb, var(--color-error) 82%, var(--resume-page-muted));
+  font: inherit;
+  font-size: calc(var(--resume-meta-size) * 0.94);
+  font-weight: 720;
+  line-height: 1.15;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.sampleInformationDelete:hover,
+.sampleInformationDelete:focus-visible {
+  background: color-mix(in srgb, var(--color-error) 9%, var(--resume-page-bg));
+  color: var(--color-error);
+  outline: none;
+}
+
+.sampleInformationDelete:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-error) 38%, transparent);
 }
 
 .sampleInformationToggle--hiddenUntilHover {

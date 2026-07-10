@@ -860,12 +860,14 @@ export function normalizeResumeSettings(settings) {
 
 function normalizeSampleDisplay(sampleDisplay) {
   const display = sampleDisplay && typeof sampleDisplay === 'object' ? sampleDisplay : {};
+  const isDismissed = Boolean(display.isDismissed);
 
   return {
-    hasStarted: Boolean(display.hasStarted),
-    showInformation: display.showInformation === false ? false : true,
-    entryBindings: normalizeSampleEntryBindings(display.entryBindings),
-    textListOrders: normalizeSampleTextListOrders(display.textListOrders),
+    hasStarted: isDismissed || Boolean(display.hasStarted),
+    showInformation: isDismissed ? false : display.showInformation !== false,
+    isDismissed,
+    entryBindings: isDismissed ? {} : normalizeSampleEntryBindings(display.entryBindings),
+    textListOrders: isDismissed ? {} : normalizeSampleTextListOrders(display.textListOrders),
   };
 }
 
@@ -1467,14 +1469,26 @@ export function setSectionEntryHeaderLayout(resume, sectionId, layout) {
 
 export function updateSampleDisplay(resume, updates = {}) {
   const normalizedResume = normalizeResume(resume);
+  const isDismissed = normalizedResume.sampleDisplay.isDismissed || updates.isDismissed === true;
 
   return {
     ...normalizedResume,
     sampleDisplay: normalizeSampleDisplay({
       ...normalizedResume.sampleDisplay,
       ...updates,
+      isDismissed,
     }),
   };
+}
+
+export function dismissSampleInformation(resume) {
+  return updateSampleDisplay(resume, {
+    hasStarted: true,
+    showInformation: false,
+    isDismissed: true,
+    entryBindings: {},
+    textListOrders: {},
+  });
 }
 
 export function setSampleTextListOrder(resume, orderKey, orderedSourceIndexes) {

@@ -1236,6 +1236,7 @@ export default function ResumePreview({
     onImportResume,
     onStartFromScratch,
     onToggleSampleInformation,
+    onDismissSampleInformation,
 }) {
     const resumeRef = useRef(null);
     const previewFrameRef = useRef(null);
@@ -3579,20 +3580,37 @@ export default function ResumePreview({
     }
 
     function renderSampleInformationToggle() {
-        if (!showSampleInformationToggle || !onToggleSampleInformation) {
+        if (!showSampleInformationToggle || !onToggleSampleInformation || !onDismissSampleInformation) {
             return null;
         }
 
         return (
-            <label className={`sampleInformationToggle${showSampleInformation ? "" : " sampleInformationToggle--hiddenUntilHover"}`}>
-                <input
-                    type="checkbox"
-                    checked={showSampleInformation}
-                    onChange={(event) => onToggleSampleInformation(event.target.checked)}
-                />
-                <span aria-hidden="true" className="sampleInformationSwitch" />
-                <span>Show sample information</span>
-            </label>
+            <div
+                className={`sampleInformationToggle${showSampleInformation ? "" : " sampleInformationToggle--hiddenUntilHover"}`}
+                data-dnd-no-drag="true"
+                onPointerDown={(event) => event.stopPropagation()}
+            >
+                <label className="sampleInformationToggleRow">
+                    <input
+                        type="checkbox"
+                        checked={showSampleInformation}
+                        onChange={(event) => onToggleSampleInformation(event.target.checked)}
+                    />
+                    <span aria-hidden="true" className="sampleInformationSwitch" />
+                    <span>Show sample information</span>
+                </label>
+                <button
+                    type="button"
+                    className="sampleInformationDelete"
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        onDismissSampleInformation();
+                    }}
+                    aria-label="Permanently delete sample information for this resume"
+                >
+                    Delete sample information
+                </button>
+            </div>
         );
     }
 

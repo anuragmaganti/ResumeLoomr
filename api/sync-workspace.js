@@ -1,6 +1,7 @@
 import {
   createDraftPayload,
   createWorkspaceResumeMeta,
+  dismissSampleInformation,
   normalizeDraftPayload,
   normalizeWorkspaceIndex,
 } from '../src/lib/resume.js';
@@ -219,6 +220,20 @@ function createDraftDoc({
   return doc;
 }
 
+export function preservePermanentSampleDismissal(draft, currentResumeDocument = null) {
+  const normalizedDraft = normalizeDraftPayload(draft);
+  const wasDismissed = currentResumeDocument?.resume?.sampleDisplay?.isDismissed === true;
+
+  if (!wasDismissed || normalizedDraft.resume.sampleDisplay.isDismissed) {
+    return normalizedDraft;
+  }
+
+  return {
+    ...normalizedDraft,
+    resume: dismissSampleInformation(normalizedDraft.resume),
+  };
+}
+
 function cloudDocToDraft(data) {
   const normalizedDraft = normalizeDraftPayload({
     template: data?.template,
@@ -417,7 +432,10 @@ async function applySyncOperations(uid, operations) {
         transaction.set(write.ref, createDraftDoc({
           resumeId: write.operation.resumeId,
           workspace: write.operation.workspace || workspace,
-          draft: write.operation.draft,
+          draft: preservePermanentSampleDismissal(
+            write.operation.draft,
+            currentSnapshot.exists ? currentSnapshot.data() : null,
+          ),
           updatedAt: new Date().toISOString(),
           version: currentVersion + 1,
         }), { merge: false });

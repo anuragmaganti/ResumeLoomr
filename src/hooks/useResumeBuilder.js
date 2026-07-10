@@ -15,6 +15,7 @@ import {
   createNextResumeName,
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
+  dismissSampleInformation,
   getPreviewModel,
   moveResumeSectionBlock,
   moveSectionBlockEducationCustomSection,
@@ -1229,6 +1230,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         hasStarted: true,
         showInformation,
       }));
+    },
+    dismissSampleInformation() {
+      updateResume((currentResume) => dismissSampleInformation(currentResume));
     },
     setSampleTextListOrder(orderKey, orderedSourceIndexes) {
       updateResume((currentResume) => setSampleTextListOrder(currentResume, orderKey, orderedSourceIndexes));

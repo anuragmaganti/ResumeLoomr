@@ -218,7 +218,8 @@ function App() {
   const sampleOrderOverrides = resume.sampleDisplay?.textListOrders || EMPTY_SAMPLE_ORDER_OVERRIDES;
   const sampleDisplay = resume.sampleDisplay || {};
   const shouldShowEmptyResumeChoice = !previewModel.hasContent && !sampleDisplay.hasStarted;
-  const shouldShowSampleInformation = Boolean(sampleDisplay.hasStarted && sampleDisplay.showInformation);
+  const canUseSampleInformation = Boolean(sampleDisplay.hasStarted && !sampleDisplay.isDismissed);
+  const shouldShowSampleInformation = Boolean(canUseSampleInformation && sampleDisplay.showInformation);
   const samplePreviewModel = useMemo(
     () => (shouldShowSampleInformation
       ? createMixedSamplePreviewModel(resume, activeResumeId, previewModel, sampleOrderOverrides, {
@@ -914,11 +915,12 @@ function App() {
               showEmptyResumeChoice={shouldShowEmptyResumeChoice}
               emptyChoiceNudgeCount={emptyChoiceNudgeCount}
               isImportingResume={isImportingResume}
-              showSampleInformationToggle={Boolean(sampleDisplay.hasStarted)}
+              showSampleInformationToggle={canUseSampleInformation}
               showSampleInformation={shouldShowSampleInformation}
               onImportResume={handleImportResumeClick}
               onStartFromScratch={actions.startFromScratch}
               onToggleSampleInformation={actions.setSampleInformationVisible}
+              onDismissSampleInformation={actions.dismissSampleInformation}
             />
           </div>
         </main>

@@ -978,6 +978,11 @@ export function createSamplePreviewModel(resume, resumeId, realPreviewModel = ge
   }
 
   const normalizedResume = normalizeResume(resume);
+
+  if (normalizedResume.sampleDisplay.isDismissed) {
+    return null;
+  }
+
   const entryBindingsBySection = normalizedResume.sampleDisplay?.entryBindings || {};
   const sample = getSampleResumeForId(resumeId);
   const personal = {

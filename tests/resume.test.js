@@ -22,6 +22,7 @@ import {
   createResumeStorageKey,
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
+  dismissSampleInformation,
   getDefaultEntryHeaderLayout,
   getEffectivePersonalAlignment,
   getPreviewModel,
@@ -82,6 +83,7 @@ import {
   getSyncCursorId,
   operationBelongsToSyncAccount,
   partitionSyncOperationsByAccount,
+  preservePermanentSampleDismissal,
   shouldAcceptDraftSyncOperation,
   shouldAcceptSyncOperation,
 } from '../api/sync-workspace.js';
@@ -212,6 +214,7 @@ test('createEmptyResume returns the block-first resume shape', () => {
   assert.deepEqual(resume.sampleDisplay, {
     hasStarted: false,
     showInformation: true,
+    isDismissed: false,
     entryBindings: {},
     textListOrders: {},
   });
@@ -296,12 +299,14 @@ test('sample display metadata normalizes and updates with resume drafts', () => 
   assert.deepEqual(resume.sampleDisplay, {
     hasStarted: true,
     showInformation: false,
+    isDismissed: false,
     entryBindings: {},
     textListOrders: {},
   });
   assert.deepEqual(normalizeDraftPayload({ resume }).resume.sampleDisplay, {
     hasStarted: true,
     showInformation: false,
+    isDismissed: false,
     entryBindings: {},
     textListOrders: {},
   });
@@ -323,6 +328,7 @@ test('sample display metadata normalizes and updates with resume drafts', () => 
   }).resume.sampleDisplay, {
     hasStarted: true,
     showInformation: true,
+    isDismissed: false,
     entryBindings: {
       experience: {
         entry1: 2,
@@ -338,6 +344,30 @@ test('sample display metadata normalizes and updates with resume drafts', () => 
 
   resume = setSampleTextListOrder(resume, 'experience.entry.activities', null);
   assert.deepEqual(resume.sampleDisplay.textListOrders, {});
+});
+
+test('sample information dismissal is permanent and clears sample-only ordering metadata', () => {
+  let resume = updateSampleDisplay(createEmptyResume(), {
+    hasStarted: true,
+    showInformation: true,
+    entryBindings: { experience: { entry1: 0 } },
+    textListOrders: { 'experience.entry.activities': [1, 0] },
+  });
+
+  resume = dismissSampleInformation(resume);
+
+  assert.deepEqual(resume.sampleDisplay, {
+    hasStarted: true,
+    showInformation: false,
+    isDismissed: true,
+    entryBindings: {},
+    textListOrders: {},
+  });
+
+  const attemptedRestore = updateSampleDisplay(resume, { showInformation: true });
+  assert.equal(attemptedRestore.sampleDisplay.isDismissed, true);
+  assert.equal(attemptedRestore.sampleDisplay.showInformation, false);
+  assert.equal(createMixedSamplePreviewModel(attemptedRestore, 'resume-5'), null);
 });
 
 test('block actions update roles, education details, and list items', () => {
@@ -1575,6 +1605,51 @@ test('login merge syncs sample display preference without duplicating identical 
   assert.equal(result.draftsByResumeId.get('resume-1').resume.sampleDisplay.showInformation, false);
   assert.equal(result.syncPlan.workspaceNeedsSync, true);
   assert.deepEqual(result.syncPlan.upsertResumeIds, ['resume-1']);
+});
+
+test('login merge never resurrects sample information after either copy dismissed it', () => {
+  const baseResume = createDraft('Same Resume').resume;
+  const localDraft = {
+    ...createDraft('Same Resume', '2026-01-01T00:00:00.000Z'),
+    resume: dismissSampleInformation(baseResume),
+  };
+  const cloudDraft = {
+    ...createDraft('Same Resume', '2026-02-01T00:00:00.000Z'),
+    resume: updateSampleDisplay(baseResume, {
+      hasStarted: true,
+      showInformation: true,
+    }),
+  };
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace: createWorkspace(['resume-1'], { activeResumeId: 'resume-1' }),
+    localDraftsByResumeId: new Map([['resume-1', localDraft]]),
+    cloudWorkspace: createWorkspace(['resume-1'], { activeResumeId: 'resume-1' }),
+    cloudDraftsByResumeId: new Map([['resume-1', cloudDraft]]),
+  });
+
+  assert.equal(result.draftsByResumeId.get('resume-1').resume.sampleDisplay.isDismissed, true);
+  assert.equal(result.draftsByResumeId.get('resume-1').resume.sampleDisplay.showInformation, false);
+  assert.deepEqual(result.syncPlan.upsertResumeIds, ['resume-1']);
+});
+
+test('sync API preserves an existing permanent sample dismissal', () => {
+  const incomingDraft = {
+    ...createDraft('Same Resume'),
+    resume: updateSampleDisplay(createDraft('Same Resume').resume, {
+      hasStarted: true,
+      showInformation: true,
+    }),
+  };
+  const preservedDraft = preservePermanentSampleDismissal(incomingDraft, {
+    resume: {
+      sampleDisplay: {
+        isDismissed: true,
+      },
+    },
+  });
+
+  assert.equal(preservedDraft.resume.sampleDisplay.isDismissed, true);
+  assert.equal(preservedDraft.resume.sampleDisplay.showInformation, false);
 });
 
 test('outbox acknowledgement matching requires the exact operation version and revision', () => {
