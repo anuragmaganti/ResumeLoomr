@@ -1264,6 +1264,17 @@ test('preview mobile chrome rules do not reflow printable resume content', () =>
   assert.doesNotMatch(previewCss, /@media \(max-width: 720px\)[\s\S]*?\.personalDetails[\s\S]*?flex-wrap:\s*wrap/);
 });
 
+test('resume rail uses stable container-driven columns instead of viewport-sized tiles', () => {
+  const appCss = fs.readFileSync('src/App.css', 'utf8');
+
+  assert.match(appCss, /\.resumeSubbar\s*\{[\s\S]*?container-name:\s*resume-rail/);
+  assert.match(appCss, /\.resumePillStrip\s*\{[\s\S]*?--resume-rail-columns:\s*2/);
+  assert.match(appCss, /grid-template-columns:\s*repeat\(var\(--resume-rail-columns\),\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(appCss, /@container resume-rail \(min-width:\s*1030px\)\s*\{[\s\S]*?--resume-rail-columns:\s*6/);
+  assert.match(appCss, /\.resumePill\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0/);
+  assert.match(appCss, /\.resumeNewButton\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0/);
+});
+
 test('preview print CSS uses physical page geometry instead of mobile viewport geometry', () => {
   const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
   const appCss = fs.readFileSync('src/App.css', 'utf8');
