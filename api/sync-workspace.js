@@ -290,7 +290,6 @@ export function mergeCloudWorkspaceForWrite(incomingWorkspace, currentData, { de
       current.organization,
       resumeIds,
       {
-        preferPrimaryOnTie: true,
         primaryResumeIds: incoming.resumeIds,
         secondaryResumeIds: current.resumeIds,
       },

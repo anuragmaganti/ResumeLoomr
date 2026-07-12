@@ -28,6 +28,7 @@ import {
   getEffectivePersonalAlignment,
   getPreviewModel,
   materializeAndReorderSectionBlockEntries,
+  mergeWorkspaceOrganizations,
   moveSectionHeaderField,
   moveSectionBlockEntry,
   getResumePresentationVars,
@@ -2089,6 +2090,8 @@ test('preview mobile chrome rules do not reflow printable resume content', () =>
 test('resume rail uses stable container-driven columns instead of viewport-sized tiles', () => {
   const appCss = fs.readFileSync('src/App.css', 'utf8');
   const railComponent = fs.readFileSync('src/components/resumeWorkspaceRail.jsx', 'utf8');
+  const railView = fs.readFileSync('src/components/resumeWorkspaceRailView.jsx', 'utf8');
+  const railDrag = fs.readFileSync('src/components/resumeWorkspaceRailDrag.js', 'utf8');
 
   assert.match(appCss, /\.resumeSubbar\s*\{[\s\S]*?container-name:\s*resume-rail/);
   assert.match(appCss, /\.resumePillStrip\s*\{[\s\S]*?--resume-rail-columns:\s*2/);
@@ -2099,22 +2102,24 @@ test('resume rail uses stable container-driven columns instead of viewport-sized
   assert.match(appCss, /\.resumePill\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0/);
   assert.match(appCss, /\.resumeNewButton\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0/);
   assert.match(appCss, /\.resumeRailCell:has\(\.entryMenu\.isOpen\)\s*\{[\s\S]*?z-index:\s*60/);
-  assert.match(railComponent, /animateLayoutChanges:\s*disableSortableLayoutAnimation/);
+  assert.match(railView, /animateLayoutChanges:\s*disableSortableLayoutAnimation/);
   assert.match(railComponent, /buildResumeRailLayout\(layoutOrganization, displayedOpenFolderIds, columns\)/);
-  assert.match(railComponent, /placement\.surfaceRows\.map\([\s\S]*?className="resumeFolderClusterSurface"/);
-  assert.match(railComponent, /dragDisabled=\{isRenaming \|\| isOpen \|\| isTransitioning\}/);
-  assert.match(railComponent, /const animationOrder = placement\.children\.length - index - 1/);
-  assert.match(railComponent, /delay: shouldReduceMotion \? 0 : index \* itemStagger/);
+  assert.match(railView, /placement\.surfaceRows\.map\([\s\S]*?className="resumeFolderClusterSurface"/);
+  assert.match(railView, /dragDisabled=\{isRenaming \|\| isOpen \|\| isTransitioning\}/);
+  assert.match(railView, /const animationOrder = placement\.children\.length - index - 1/);
+  assert.match(railView, /delay: shouldReduceMotion \? 0 : index \* itemStagger/);
   assert.match(railComponent, /closingFolderSnapshots\.values\(\)[\s\S]*?<ClosingFolderLayer/);
   assert.match(railComponent, /onDragMove=\{handleDragMove\}/);
   assert.doesNotMatch(railComponent, /onDragOver=/);
-  assert.match(railComponent, /getFolderResumeInsertionIndex\(pointer, rect, placement, targetCount\)/);
-  assert.match(railComponent, /getFinalFolderPlacementRect\(placement\)/);
+  assert.match(railDrag, /getFolderResumeInsertionIndex\(pointer, rect, placement, targetCount\)/);
+  assert.match(railDrag, /getFolderPlacementRect\(metrics, placement\)/);
   assert.doesNotMatch(railComponent, /dragOverTargetRef|stableItemCollisionRef/);
   assert.match(railComponent, /<SortableContext items=\{rootSortableIds\} strategy=\{railSortingStrategy\}>/);
   assert.match(railComponent, /dragCollisionRectsRef/);
   assert.match(railComponent, /activeResumePlacementKeyRef\.current === placementKey/);
   assert.doesNotMatch(railComponent, /rectSortingStrategy/);
+  assert.match(railComponent, /from '\.\/resumeWorkspaceRailDrag\.js'/);
+  assert.match(railComponent, /from '\.\/resumeWorkspaceRailView\.jsx'/);
 });
 
 test('preview print CSS uses physical page geometry instead of mobile viewport geometry', () => {
@@ -2382,7 +2387,7 @@ test('login merge restores cloud folder organization into a blank browser', () =
   assert.deepEqual(result.workspace.organization.folders['cloud-folder'].resumeIds, ['cloud-1', 'cloud-2']);
 });
 
-test('login merge keeps newer placement, older-only folders, and unioned folder tombstones', () => {
+test('login merge keeps local placement, cloud-only folders, and unioned folder tombstones', () => {
   const sharedDraftOne = createDraft('One');
   const sharedDraftTwo = createDraft('Two');
   const localWorkspace = normalizeWorkspaceIndex({
@@ -2446,6 +2451,83 @@ test('login merge keeps newer placement, older-only folders, and unioned folder 
     new Set(['removed-locally', 'removed-in-cloud']),
   );
   assert.equal(result.syncPlan.workspaceNeedsSync, true);
+});
+
+test('login merge keeps local organization despite a future cloud clock', () => {
+  const sharedDraftOne = createDraft('One');
+  const sharedDraftTwo = createDraft('Two');
+  const localWorkspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2']),
+    organization: {
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      rootItems: [
+        { type: 'resume', id: 'r2' },
+        { type: 'resume', id: 'r1' },
+      ],
+      folders: {},
+    },
+  });
+  const cloudWorkspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2']),
+    organization: {
+      updatedAt: '2099-01-01T00:00:00.000Z',
+      rootItems: [
+        { type: 'resume', id: 'r1' },
+        { type: 'resume', id: 'r2' },
+      ],
+      folders: {},
+    },
+  });
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace,
+    localDraftsByResumeId: new Map([
+      ['r1', sharedDraftOne],
+      ['r2', sharedDraftTwo],
+    ]),
+    cloudWorkspace,
+    cloudDraftsByResumeId: new Map([
+      ['r1', sharedDraftOne],
+      ['r2', sharedDraftTwo],
+    ]),
+  });
+
+  assert.deepEqual(result.workspace.organization.rootItems, [
+    { type: 'resume', id: 'r2' },
+    { type: 'resume', id: 'r1' },
+  ]);
+  assert.equal(result.syncPlan.workspaceNeedsSync, true);
+});
+
+test('folder tombstones remain durable beyond the former normalization cap', () => {
+  const removedFolderIds = Array.from({ length: 250 }, (_, index) => `removed-${index}`);
+  const normalized = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1']),
+    organization: {
+      rootItems: [{ type: 'resume', id: 'r1' }],
+      folders: {},
+      removedFolderIds,
+    },
+  });
+  const staleOrganization = {
+    rootItems: [
+      { type: 'folder', id: 'removed-0' },
+      { type: 'resume', id: 'r1' },
+    ],
+    folders: {
+      'removed-0': { id: 'removed-0', name: 'Old folder', resumeIds: [] },
+    },
+    removedFolderIds: [],
+  };
+  const merged = mergeWorkspaceOrganizations(
+    normalized.organization,
+    staleOrganization,
+    ['r1'],
+  );
+
+  assert.equal(normalized.organization.removedFolderIds.length, 250);
+  assert.ok(normalized.organization.removedFolderIds.includes('removed-0'));
+  assert.equal(merged.folders['removed-0'], undefined);
+  assert.equal(merged.rootItems.some((item) => item.id === 'removed-0'), false);
 });
 
 test('sync API workspace documents round trip folder organization', () => {
@@ -2529,6 +2611,40 @@ test('cloud workspace writes preserve concurrent browser folders and honor delet
   assert.equal(afterDelete.organization.folders['cloud-folder'].resumeIds.length, 0);
   assert.equal(afterFolderRemoval.organization.folders['cloud-folder'], undefined);
   assert.ok(afterFolderRemoval.organization.removedFolderIds.includes('cloud-folder'));
+});
+
+test('accepted cloud workspace writes ignore client clock skew', () => {
+  const currentWorkspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2']),
+    organization: {
+      updatedAt: '2099-01-01T00:00:00.000Z',
+      rootItems: [
+        { type: 'resume', id: 'r1' },
+        { type: 'resume', id: 'r2' },
+      ],
+      folders: {},
+    },
+  });
+  const incomingWorkspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2']),
+    organization: {
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      rootItems: [
+        { type: 'resume', id: 'r2' },
+        { type: 'resume', id: 'r1' },
+      ],
+      folders: {},
+    },
+  });
+  const merged = mergeCloudWorkspaceForWrite(
+    incomingWorkspace,
+    createWorkspaceDoc(currentWorkspace),
+  );
+
+  assert.deepEqual(merged.organization.rootItems, [
+    { type: 'resume', id: 'r2' },
+    { type: 'resume', id: 'r1' },
+  ]);
 });
 
 test('login merge syncs sample display preference without duplicating identical content', () => {

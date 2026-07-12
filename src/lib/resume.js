@@ -1247,7 +1247,7 @@ export function normalizeWorkspaceOrganization(candidate = {}, resumeIds = []) {
     (Array.isArray(candidate?.removedFolderIds) ? candidate.removedFolderIds : [])
       .map(trimText)
       .filter(Boolean),
-  )].slice(-200);
+  )];
   const removedFolderIdSet = new Set(removedFolderIds);
   const rawFolders = candidate?.folders && typeof candidate.folders === 'object' ? candidate.folders : {};
   const folders = {};
@@ -1349,20 +1349,16 @@ export function mergeWorkspaceOrganizations(
   secondaryCandidate,
   resumeIds,
   {
-    preferPrimaryOnTie = true,
     primaryResumeIds = resumeIds,
     secondaryResumeIds = resumeIds,
   } = {},
 ) {
   const primary = normalizeWorkspaceOrganization(primaryCandidate, primaryResumeIds);
   const secondary = normalizeWorkspaceOrganization(secondaryCandidate, secondaryResumeIds);
-  const primaryTimestamp = Date.parse(primary.updatedAt || '') || 0;
-  const secondaryTimestamp = Date.parse(secondary.updatedAt || '') || 0;
-  const primaryIsBase = primaryTimestamp === secondaryTimestamp
-    ? preferPrimaryOnTie
-    : primaryTimestamp > secondaryTimestamp;
-  const base = primaryIsBase ? primary : secondary;
-  const older = primaryIsBase ? secondary : primary;
+  // The caller establishes authority. Client wall clocks are not reliable
+  // enough to resolve organization conflicts across browsers.
+  const base = primary;
+  const older = secondary;
   const removedFolderIds = [...new Set([
     ...primary.removedFolderIds,
     ...secondary.removedFolderIds,

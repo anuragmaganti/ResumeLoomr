@@ -1004,18 +1004,29 @@ export function mergeLocalAndCloudWorkspaces({
   const activeResumeId = nextResumeIdSet.has(preferredActiveResumeId)
     ? preferredActiveResumeId
     : (nextResumeIds[0] || normalizedLocalWorkspace.activeResumeId || normalizedCloudWorkspace.activeResumeId || '');
+  const primaryOrganization = localHasContent
+    ? normalizedLocalWorkspace.organization
+    : normalizedCloudWorkspace.organization;
+  const secondaryOrganization = localHasContent
+    ? normalizedCloudWorkspace.organization
+    : normalizedLocalWorkspace.organization;
+  const primaryOrganizationResumeIds = localHasContent
+    ? normalizedLocalWorkspace.resumeIds
+    : normalizedCloudWorkspace.resumeIds;
+  const secondaryOrganizationResumeIds = localHasContent
+    ? normalizedCloudWorkspace.resumeIds
+    : normalizedLocalWorkspace.resumeIds;
   let workspace = normalizeWorkspaceIndex({
     activeResumeId,
     resumeIds: nextResumeIds,
     meta: mergedMeta,
     organization: mergeWorkspaceOrganizations(
-      normalizedLocalWorkspace.organization,
-      normalizedCloudWorkspace.organization,
+      primaryOrganization,
+      secondaryOrganization,
       nextResumeIds,
       {
-        preferPrimaryOnTie: localHasContent,
-        primaryResumeIds: normalizedLocalWorkspace.resumeIds,
-        secondaryResumeIds: normalizedCloudWorkspace.resumeIds,
+        primaryResumeIds: primaryOrganizationResumeIds,
+        secondaryResumeIds: secondaryOrganizationResumeIds,
       },
     ),
   });
