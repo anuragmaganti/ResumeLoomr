@@ -138,7 +138,7 @@ export function getRootPointerDestination({
     return null;
   }
 
-  const rootPlacements = targetLayout.placements.filter((placement) => placement.item.type !== 'new');
+  const rootPlacements = targetLayout.placements;
   if (rootPlacements.length === 0) {
     return { type: 'root', insertionIndex: 0, targetItem: null, position: 'before' };
   }
@@ -160,6 +160,20 @@ export function getRootPointerDestination({
   });
 
   const targetItem = nearest.placement.item;
+  if (targetItem.type === 'new') {
+    const finalIndex = targetOrganization.rootItems.length;
+    const lastRootItem = targetOrganization.rootItems.at(-1) || null;
+    const pointerIsAfter = finalIndex === 0
+      || pointer.x >= nearest.rect.left + nearest.rect.width / 2;
+
+    return {
+      type: 'root',
+      insertionIndex: pointerIsAfter ? finalIndex : Math.max(0, finalIndex - 1),
+      targetItem: lastRootItem,
+      position: pointerIsAfter ? 'after' : 'before',
+    };
+  }
+
   const pointerIsAfter = pointer.y > nearest.rect.bottom
     || (
       pointer.y >= nearest.rect.top

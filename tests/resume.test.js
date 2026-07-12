@@ -78,6 +78,10 @@ import {
   moveOrganizationRootItemToIndex,
   isPointerWithinFolderPlacementSurface,
 } from '../src/lib/workspaceOrganization.js';
+import {
+  getRailGridMetrics,
+  getRootPointerDestination,
+} from '../src/components/resumeWorkspaceRailDrag.js';
 import { calculatePreviewPageBreaks } from '../src/lib/previewPagination.js';
 import { getSaveStatusPresentation } from '../src/lib/saveStatus.js';
 import {
@@ -2111,6 +2115,42 @@ test('resume rail uses stable container-driven columns instead of viewport-sized
   assert.doesNotMatch(railComponent, /rectSortingStrategy/);
   assert.match(railComponent, /from '\.\/resumeWorkspaceRailDrag\.js'/);
   assert.match(railComponent, /from '\.\/resumeWorkspaceRailView\.jsx'/);
+});
+
+test('resume rail terminal cell supports insertion on either side of the final root item', () => {
+  const rootItems = Array.from({ length: 7 }, (_, index) => ({
+    type: 'resume',
+    id: `resume-${index + 1}`,
+  }));
+  const organization = { rootItems, folders: {} };
+  const metrics = getRailGridMetrics({ left: 0, top: 0, width: 1200 }, 6);
+  const terminalRowY = metrics.top + metrics.rowStride * 1.4;
+  const terminalCellLeftX = metrics.left + metrics.cellWidth * 0.25;
+  const terminalCellRightX = metrics.left + metrics.cellWidth * 0.75;
+  const options = {
+    baseOrganization: organization,
+    draggedItem: rootItems[0],
+    draggedResumeIds: [rootItems[0].id],
+    openFolderIds: new Set(),
+    columns: 6,
+    metrics,
+  };
+
+  const beforeFinal = getRootPointerDestination({
+    ...options,
+    pointer: { x: terminalCellLeftX, y: terminalRowY },
+  });
+  const afterFinal = getRootPointerDestination({
+    ...options,
+    pointer: { x: terminalCellRightX, y: terminalRowY },
+  });
+
+  assert.equal(beforeFinal.insertionIndex, 5);
+  assert.equal(beforeFinal.position, 'before');
+  assert.equal(beforeFinal.targetItem.id, 'resume-7');
+  assert.equal(afterFinal.insertionIndex, 6);
+  assert.equal(afterFinal.position, 'after');
+  assert.equal(afterFinal.targetItem.id, 'resume-7');
 });
 
 test('preview print CSS uses physical page geometry instead of mobile viewport geometry', () => {
