@@ -68,6 +68,7 @@ import {
 } from '../src/lib/resume.js';
 import {
   buildResumeRailLayout,
+  collapseResumeBundleForDragPreview,
   getFolderPlacementCellRect,
   getFolderResumeInsertionIndex,
   getFolderResumeDropIntent,
@@ -1450,6 +1451,38 @@ test('organization movement supports ordered resume bundles across root and fold
     { type: 'resume', id: 'r1' },
   ]);
   assert.deepEqual(movedBackToRoot.folders['folder-1'].resumeIds, ['r2', 'r4']);
+});
+
+test('multi-resume movement preserves its cross-container source until the bundle is committed', () => {
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'resume', id: 'r1' },
+      { type: 'folder', id: 'folder-1' },
+      { type: 'resume', id: 'r4' },
+      { type: 'folder', id: 'folder-2' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'First', resumeIds: ['r2', 'r3'] },
+      'folder-2': { id: 'folder-2', name: 'Second', resumeIds: ['r5'] },
+    },
+  }, ['r1', 'r2', 'r3', 'r4', 'r5']);
+  const selectedIds = ['r1', 'r3', 'r5'];
+  const sourceOrder = getOrganizationVisualResumeIds(organization);
+  const preview = collapseResumeBundleForDragPreview(
+    organization,
+    selectedIds,
+    'r3',
+    'r3',
+  );
+
+  const moved = moveOrganizationResumeBundle(organization, selectedIds, {
+    containerId: 'folder-2',
+  });
+
+  assert.deepEqual(sourceOrder, ['r1', 'r2', 'r3', 'r4', 'r5']);
+  assert.deepEqual(getOrganizationVisualResumeIds(organization), sourceOrder);
+  assert.deepEqual(getOrganizationVisualResumeIds(preview), ['r2', 'r3', 'r4']);
+  assert.deepEqual(moved.folders['folder-2'].resumeIds, ['r1', 'r3', 'r5']);
 });
 
 test('organization movement transfers a resume between folders without duplicating it', () => {

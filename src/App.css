@@ -694,6 +694,41 @@ html[data-theme="dark"] .resumeFolderTone4 {
   font-weight: 800;
 }
 
+.resumeDragStack {
+  position: relative;
+  width: 100%;
+  height: 38px;
+  pointer-events: none;
+}
+
+.resumeDragStackLayer {
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 52%, var(--color-border));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--color-surface-elevated) 76%, var(--color-accent-soft) 24%);
+  box-shadow:
+    0 4px 12px color-mix(in srgb, var(--color-text) 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--color-surface) 72%, transparent);
+  transform: translate(
+    calc(var(--resume-drag-stack-layer) * 4px),
+    calc(var(--resume-drag-stack-layer) * -3px)
+  );
+}
+
+.resumeDragStack .resumePillOverlay {
+  position: relative;
+  z-index: var(--resume-drag-stack-depth);
+  height: 100%;
+}
+
+.resumeBundleSourceGhost {
+  position: absolute;
+  z-index: 3;
+  min-height: 0;
+  pointer-events: none;
+}
+
 .resumePill:not(.isActive):not(.isSelected):hover {
   border-color: var(--color-border-strong);
   background: var(--color-surface-muted);

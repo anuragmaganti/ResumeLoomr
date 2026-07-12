@@ -24,6 +24,7 @@ import {
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from '../lib/sortableSensors.js';
 import {
   buildResumeRailLayout,
+  collapseResumeBundleForDragPreview,
   createWorkspaceItemId,
   getFolderResumeDropIntent,
   getOrganizationResumePlacement,
@@ -98,6 +99,7 @@ export default function ResumeWorkspaceRail({
   const activeDragItemRef = useRef(null);
   const dragResumeIdsRef = useRef([]);
   const dragOrganizationRef = useRef(null);
+  const dragVisualOrganizationRef = useRef(null);
   const dragBaseOrganizationRef = useRef(null);
   const dragCollisionRectsRef = useRef(new Map());
   const dragPointerCoordinatesRef = useRef(null);
@@ -112,6 +114,7 @@ export default function ResumeWorkspaceRail({
   const [renameValue, setRenameValue] = useState('');
   const [activeDragItem, setActiveDragItem] = useState(null);
   const [dragResumeIds, setDragResumeIds] = useState([]);
+  const [bundleSourceGhosts, setBundleSourceGhosts] = useState([]);
   const [dragOrganization, setDragOrganization] = useState(null);
   const [dropTargetFolderId, setDropTargetFolderId] = useState('');
   const [rootInsertTarget, setRootInsertTarget] = useState({ folderId: '', position: '' });
@@ -600,7 +603,7 @@ export default function ResumeWorkspaceRail({
   }
 
   function updateDragOrganization(updater) {
-    const current = dragOrganizationRef.current;
+    const current = dragVisualOrganizationRef.current;
     const base = dragBaseOrganizationRef.current;
 
     if (!current || !base) {
@@ -608,13 +611,32 @@ export default function ResumeWorkspaceRail({
     }
 
     const next = updater(base);
+    const activeItem = activeDragItemRef.current;
+    const previewOrganization = activeItem?.type === 'resume' && dragResumeIdsRef.current.length > 1
+      ? collapseResumeBundleForDragPreview(
+          next,
+          dragResumeIdsRef.current,
+          activeItem.id,
+          dragResumeIdsRef.current[0],
+        )
+      : next;
 
-    if (next === current || workspaceOrganizationsEqual(next, current)) {
+    const fullOrganizationUnchanged = Boolean(
+      dragOrganizationRef.current
+      && workspaceOrganizationsEqual(next, dragOrganizationRef.current)
+    );
+    const previewOrganizationUnchanged = Boolean(
+      current && workspaceOrganizationsEqual(previewOrganization, current)
+    );
+    if (fullOrganizationUnchanged && previewOrganizationUnchanged) {
       return;
     }
 
     dragOrganizationRef.current = next;
-    pendingDragOrganizationRef.current = next;
+    if (previewOrganizationUnchanged) return;
+
+    dragVisualOrganizationRef.current = previewOrganization;
+    pendingDragOrganizationRef.current = previewOrganization;
 
     if (dragRenderFrameRef.current !== null) {
       return;
@@ -656,11 +678,37 @@ export default function ResumeWorkspaceRail({
     activeDragItemRef.current = item;
     dragResumeIdsRef.current = nextDragResumeIds;
     dragOrganizationRef.current = organization;
+    const initialPreviewOrganization = item.type === 'resume' && nextDragResumeIds.length > 1
+      ? collapseResumeBundleForDragPreview(
+          organization,
+          nextDragResumeIds,
+          item.id,
+          item.id,
+        )
+      : organization;
+    const railRect = railRef.current?.getBoundingClientRect();
+    const selectedIdSet = new Set(nextDragResumeIds);
+    const nextSourceGhosts = nextDragResumeIds.length > 1 && railRect
+      ? [...railRef.current.querySelectorAll('.resumePill[data-resume-id]')]
+          .filter((node) => selectedIdSet.has(node.dataset.resumeId))
+          .map((node) => {
+            const rect = node.getBoundingClientRect();
+            return {
+              id: node.dataset.resumeId,
+              top: rect.top - railRect.top,
+              left: rect.left - railRect.left,
+              width: rect.width,
+              height: rect.height,
+            };
+          })
+      : [];
+    dragVisualOrganizationRef.current = initialPreviewOrganization;
     dragBaseOrganizationRef.current = organization;
     dragCollisionRectsRef.current = new Map();
     setActiveDragItem(item);
-    setDragOrganization(organization);
+    setDragOrganization(initialPreviewOrganization);
     setDragResumeIds(nextDragResumeIds);
+    setBundleSourceGhosts(nextSourceGhosts);
     setDropTargetFolderId('');
     setRootInsertTargetIfChanged(setRootInsertTarget);
     dragOpenFolderIdsRef.current = new Set(openFolderIds);
@@ -693,7 +741,7 @@ export default function ResumeWorkspaceRail({
     return resolveOpenFolderPointerDestination({
       pointer,
       baseOrganization: dragBaseOrganizationRef.current,
-      currentOrganization: dragOrganizationRef.current || organization,
+      currentOrganization: dragVisualOrganizationRef.current || organization,
       draggedResumeIds: dragResumeIdsRef.current,
       openFolderIds,
       columns,
@@ -876,7 +924,7 @@ export default function ResumeWorkspaceRail({
     }
 
     const placement = getOrganizationResumePlacement(
-      dragOrganizationRef.current || organization,
+      dragVisualOrganizationRef.current || organization,
       overItem.id,
     );
     return placement?.containerId && placement.containerId !== 'root'
@@ -1046,11 +1094,13 @@ export default function ResumeWorkspaceRail({
     activeDragItemRef.current = null;
     dragResumeIdsRef.current = [];
     dragOrganizationRef.current = null;
+    dragVisualOrganizationRef.current = null;
     dragBaseOrganizationRef.current = null;
     dragCollisionRectsRef.current = new Map();
     dragPointerCoordinatesRef.current = null;
     setActiveDragItem(null);
     setDragResumeIds([]);
+    setBundleSourceGhosts([]);
     setDragOrganization(null);
     setDropTargetFolderId('');
     setRootInsertTargetIfChanged(setRootInsertTarget);
@@ -1263,6 +1313,19 @@ export default function ResumeWorkspaceRail({
                     toneIndex={snapshot.toneIndex}
                     resumeById={resumeById}
                     activeResumeId={activeResumeId}
+                  />
+                ))}
+                {bundleSourceGhosts.map((ghost) => (
+                  <div
+                    key={`bundle-source:${ghost.id}`}
+                    className="resumePill resumeBundleSourceGhost isSortingPlaceholder"
+                    style={{
+                      top: ghost.top,
+                      left: ghost.left,
+                      width: ghost.width,
+                      height: ghost.height,
+                    }}
+                    aria-hidden="true"
                   />
                 ))}
               </Motion.div>

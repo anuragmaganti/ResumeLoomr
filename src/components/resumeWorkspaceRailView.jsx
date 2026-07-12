@@ -336,7 +336,7 @@ export function ResumeTile({
           isSelected ? 'isSelected' : '',
           isRenaming ? 'isEditing' : '',
           isDragging ? 'isSortingPlaceholder' : '',
-        ].filter(Boolean).join(' ')}>
+        ].filter(Boolean).join(' ')} data-resume-id={resume.id}>
           {isRenaming ? (
             <form className="resumePillRenameForm" data-dnd-no-drag="true" onSubmit={(event) => {
               event.preventDefault();
@@ -793,12 +793,29 @@ export function DragPreview({ activeItem, resumeById, organization, folderToneBy
   }
 
   const resume = resumeById.get(activeItem.id);
-  return resume ? (
+  if (!resume) return null;
+
+  const stackDepth = Math.min(5, groupCount);
+  const previewTile = (
     <div className={`resumePill resumePillOverlay${activeResumeId === resume.id ? ' isActive' : ''}`}>
       <span className="resumePillButton"><span className="resumePillLabel">{resume.name}</span></span>
       {groupCount > 1 ? <span className="resumeDragCount">{groupCount}</span> : null}
     </div>
-  ) : null;
+  );
+
+  return groupCount > 1 ? (
+    <div className="resumeDragStack" style={{ '--resume-drag-stack-depth': stackDepth }}>
+      {Array.from({ length: stackDepth - 1 }, (_, index) => (
+        <span
+          key={`stack-layer-${index}`}
+          className="resumeDragStackLayer"
+          style={{ '--resume-drag-stack-layer': stackDepth - index - 1 }}
+          aria-hidden="true"
+        />
+      ))}
+      {previewTile}
+    </div>
+  ) : previewTile;
 }
 
 export function RootReleaseDropZone({ isVisible }) {

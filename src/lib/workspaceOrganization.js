@@ -286,6 +286,56 @@ export function moveOrganizationResumeBundle(organization, resumeIds, destinatio
   return next;
 }
 
+export function collapseResumeBundleForDragPreview(
+  organization,
+  resumeIds,
+  representativeResumeId,
+  anchorResumeId = representativeResumeId,
+) {
+  const movedIds = [...new Set(resumeIds)].filter(Boolean);
+  if (movedIds.length <= 1 || !movedIds.includes(representativeResumeId)) {
+    return organization;
+  }
+
+  const movedSet = new Set(movedIds);
+  const anchorPlacement = getOrganizationResumePlacement(organization, anchorResumeId);
+  if (!anchorPlacement) return organization;
+
+  const removedBeforeAnchor = movedIds.reduce((count, resumeId) => {
+    const placement = getOrganizationResumePlacement(organization, resumeId);
+    return count + Number(
+      placement?.containerId === anchorPlacement.containerId
+      && placement.index < anchorPlacement.index,
+    );
+  }, 0);
+  const insertionIndex = Math.max(0, anchorPlacement.index - removedBeforeAnchor);
+  const next = cloneOrganization(organization);
+
+  next.rootItems = next.rootItems.filter((item) => (
+    item.type !== 'resume' || !movedSet.has(item.id)
+  ));
+  Object.values(next.folders).forEach((folder) => {
+    folder.resumeIds = folder.resumeIds.filter((resumeId) => !movedSet.has(resumeId));
+  });
+
+  if (anchorPlacement.containerId !== 'root' && next.folders[anchorPlacement.containerId]) {
+    const targetResumeIds = next.folders[anchorPlacement.containerId].resumeIds;
+    targetResumeIds.splice(
+      Math.min(insertionIndex, targetResumeIds.length),
+      0,
+      representativeResumeId,
+    );
+  } else {
+    next.rootItems.splice(
+      Math.min(insertionIndex, next.rootItems.length),
+      0,
+      { type: 'resume', id: representativeResumeId },
+    );
+  }
+
+  return next;
+}
+
 export function moveOrganizationRootItemToIndex(organization, activeItem, rootIndex) {
   if (!activeItem?.id || !Number.isInteger(rootIndex)) {
     return organization;
