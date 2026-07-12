@@ -177,6 +177,29 @@ function FolderShape() {
   );
 }
 
+function ResumePlaceholderShape() {
+  return (
+    <svg
+      className="resumePlaceholderShape"
+      aria-hidden="true"
+      viewBox="0 0 200 38"
+      preserveAspectRatio="none"
+      focusable="false"
+    >
+      <rect className="resumePlaceholderShapeFill" x="1" y="1" width="198" height="36" rx="10" />
+      <rect
+        className="resumePlaceholderShapeOutline"
+        x="1"
+        y="1"
+        width="198"
+        height="36"
+        rx="10"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 export function BatchDeleteDialog({ resumeCount, folderCount, isDeleting, isSignedIn, onCancel, onConfirm }) {
   const dialogRef = useRef(null);
   const cancelButtonRef = useRef(null);
@@ -313,7 +336,9 @@ export function ResumeBundleSourcePlaceholder({ id, row, column, motionReady = t
       transition={{ layout: shouldReduceMotion || !motionReady ? { duration: 0 } : RAIL_DRAG_LAYOUT_TRANSITION }}
       aria-hidden="true"
     >
-      <div className="resumePill resumeBundleSourcePlaceholder isSortingPlaceholder" />
+      <div className="resumePill resumeBundleSourcePlaceholder isSortingPlaceholder">
+        <ResumePlaceholderShape />
+      </div>
     </Motion.div>
   );
 }
@@ -361,6 +386,7 @@ export function ResumeTile({
           isRenaming ? 'isEditing' : '',
           isDragging ? 'isSortingPlaceholder' : '',
         ].filter(Boolean).join(' ')} data-resume-id={resume.id}>
+          {isDragging ? <ResumePlaceholderShape /> : null}
           {isRenaming ? (
             <form className="resumePillRenameForm" data-dnd-no-drag="true" onSubmit={(event) => {
               event.preventDefault();
