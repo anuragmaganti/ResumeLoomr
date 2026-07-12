@@ -79,15 +79,6 @@ function getSessionStorage(storage) {
   return window.sessionStorage;
 }
 
-function isStorageLike(value) {
-  return Boolean(
-    value &&
-      typeof value.getItem === 'function' &&
-      typeof value.setItem === 'function' &&
-      typeof value.removeItem === 'function',
-  );
-}
-
 function safeParse(rawValue) {
   if (!rawValue) {
     return null;
@@ -121,8 +112,8 @@ export function readConnectedAccount(storage) {
   };
 }
 
-export function writeConnectedAccount(user, optionsOrStorage, storage) {
-  const targetStorage = getStorage(storage || (isStorageLike(optionsOrStorage) ? optionsOrStorage : null));
+export function writeConnectedAccount(user, storage) {
+  const targetStorage = getStorage(storage);
 
   if (!targetStorage || !user?.uid) {
     return null;

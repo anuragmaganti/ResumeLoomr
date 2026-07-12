@@ -296,7 +296,7 @@ export function createWorkspaceResumeId() {
   return createId();
 }
 
-export function createWorkspaceFolderId() {
+function createWorkspaceFolderId() {
   return createId();
 }
 
@@ -1715,21 +1715,6 @@ export function createDuplicateResumeName(sourceName = DEFAULT_RESUME_LABEL, exi
   }
 
   return sanitizeWorkspaceResumeName(`${DEFAULT_RESUME_LABEL} copy ${Date.now()}`, DEFAULT_RESUME_LABEL);
-}
-
-export function reorderWorkspaceResumesToMatch(workspace, orderedResumeIds) {
-  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
-  const requestedIds = Array.isArray(orderedResumeIds) ? orderedResumeIds : [];
-  const existingIds = new Set(normalizedWorkspace.resumeIds);
-  const nextIds = [
-    ...requestedIds.filter((id) => existingIds.has(id)),
-    ...normalizedWorkspace.resumeIds.filter((id) => !requestedIds.includes(id)),
-  ];
-
-  return normalizeWorkspaceIndex({
-    ...normalizedWorkspace,
-    resumeIds: nextIds,
-  });
 }
 
 export function removeWorkspaceResumes(workspace, requestedResumeIds, { now = '' } = {}) {

@@ -5,7 +5,7 @@ import {
 
 export const FOLDER_AUTO_OPEN_DELAY_MS = 320;
 export const FOLDER_AUTO_CLOSE_DELAY_MS = 140;
-export const FOLDER_MOTION_DURATION_SECONDS = 0.18;
+const FOLDER_MOTION_DURATION_SECONDS = 0.18;
 export const RAIL_ROW_HEIGHT_PX = 38;
 export const RAIL_ROW_GAP_PX = 7;
 export const RAIL_PADDING_BLOCK_PX = 8;

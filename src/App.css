@@ -2450,24 +2450,6 @@ html[data-theme="dark"] .signedOutPrompt {
   box-shadow: 0 0 0 4px var(--color-accent-soft);
 }
 
-.optionCheckboxCard {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
-  padding: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
-  background: var(--color-surface-muted);
-  color: var(--color-text-subtle);
-  font-size: 0.78rem;
-  line-height: 1.35;
-}
-
-.optionCheckboxCard input {
-  margin-top: 2px;
-}
-
 .authError {
   margin: 0;
   padding: 10px 12px;

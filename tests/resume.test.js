@@ -48,7 +48,6 @@ import {
   reorderSectionBlockEntriesToMatch,
   reorderSectionBlockTextListItem,
   reorderResumeSectionBlocksToMatch,
-  reorderWorkspaceResumesToMatch,
   removeWorkspaceResumes,
   setPersonalContactOrder,
   setPersonalHeaderOrder,
@@ -1889,14 +1888,6 @@ test('open folder resumes wrap horizontally across as many full-width rows as ne
     { row: 2, column: 2 },
   ]);
   assert.equal(layout.rowCount, 3);
-});
-
-test('workspace reorder helper preserves active resume and exact rail order', () => {
-  const workspace = createWorkspace(['r1', 'r2', 'r3'], { activeResumeId: 'r2' });
-  const reordered = reorderWorkspaceResumesToMatch(workspace, ['r3', 'r1', 'r2']);
-
-  assert.deepEqual(reordered.resumeIds, ['r3', 'r1', 'r2']);
-  assert.equal(reordered.activeResumeId, 'r2');
 });
 
 test('workspace batch deletion preserves order and an active resume that survives', () => {
