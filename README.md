@@ -18,7 +18,7 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 - Edit a structured resume form while the live preview updates immediately.
 - Click any editable text in the live preview to open the matching editor field.
 - Drag sections, entries, and bullet points directly inside the live preview to reorder them.
-- Drag sections in the editor rail and drag resume tabs in the resume rail with dnd-kit sortable interactions.
+- Drag sections in the editor rail and organize resume tiles or folders in the workspace rail with dnd-kit sortable interactions.
 - Fresh empty resumes offer import or start-from-scratch; scratch resumes use Personal plus Education, Experience, Internships, Projects, and Skills, with render-only sample placeholders until real content is added.
 - Add repeatable sections such as Research, Teaching, Leadership, Volunteering, Certifications, Languages, Awards, Publications, Presentations, Patents, Professional Affiliations, and custom sections.
 - Rename section titles inline, including temporarily blank names that fall back to an untitled section label on blur.
@@ -28,10 +28,11 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 
 - Preview uses the same data and presentation settings as print output.
 - Print/Save uses browser print output with resume-specific document title naming.
-- The live preview supports hover affordances, click-to-edit, drag-to-reorder, entry header layout editing, and separator controls without printing helper UI.
+- The live preview supports hover affordances, click-to-edit, drag-to-reorder, entry header layout editing, margin controls, and separator controls without printing helper UI.
 - `Full page` preview scales a Letter-size page to the visible workspace while print output remains physical page size.
 - Personal details stay first; every other section is ordered by the resume’s section block list.
 - Personal contact order, headline/contact order, compact summary width, entry header layout, and separator styling can be adjusted directly from the preview while field data stays structured.
+- Fictional sample information remains render-only, can be reordered safely, and can be permanently dismissed per resume without entering saved resume fields.
 - Page margins can be adjusted directly from the preview; text size, line gap, entry gap, heading size, and name size remain in the compact settings rail.
 - Two print templates are available today: `Compact` as the default and `Executive` as an alternate layout.
 
@@ -47,9 +48,10 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 ### Multi-Resume Workspace
 
 - Create, rename, duplicate, delete, reorder, and switch between resumes.
-- Select multiple resume tabs and delete them together through one guarded local-first operation; the workspace always retains at least one resume.
-- Resume tabs live in a wrapping rail under the main header.
-- Resume rail order is user-controlled and persists locally and through cloud sync.
+- Select multiple resumes to batch-delete them or place them into a new folder; the workspace always retains at least one resume.
+- Folders expand inline inside the wrapping rail, support multiple open folders, and allow resume movement within, into, or out of folders.
+- Removing a folder ungroups its resumes instead of deleting them; deleted folder identities remain tombstoned so stale browsers cannot restore them.
+- Resume and folder order, membership, names, and colors persist locally and through cloud sync.
 - A single browser workspace supports up to `100` resumes.
 - Each resume keeps its own content, ordered section blocks, template, and presentation settings.
 
@@ -60,6 +62,7 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 - Local saves update the visible `Saved locally` timestamp from the actual local save time.
 - Local drafts include `localRevision` metadata to prevent stale tab saves from overwriting newer local changes.
 - `localStorage` is kept only for small compatibility markers, theme/settings, and fallback/migration helpers.
+- Workspace organization is stored separately from resume bodies, so folder operations never rewrite resume content.
 - On sign-out, users can clearly choose whether to keep local resumes editable on that browser or sync first and remove its local copies; neither choice deletes cloud resumes.
 
 ### Account Sync
@@ -70,6 +73,7 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 - Sync is background-only: UI actions never wait for Firestore to finish.
 - A durable local outbox queues cloud operations for workspace updates, draft upserts, and deletes.
 - Outbox acknowledgements are version-aware using `id`, `operationVersion`, and `localRevision`, so an old in-flight sync cannot clear a newer local edit.
+- Accepted workspace operations determine folder placement without trusting browser wall clocks, preventing clock skew from blocking later cross-device organization changes.
 - Sync operations are scoped to the signed-in Firebase account to avoid cross-account writes from shared browsers.
 - A service worker requests Background Sync where supported; otherwise queued changes sync on reconnect or the next app open.
 - Login always performs a safe local/cloud merge so existing browser resumes and cloud resumes are preserved instead of one side replacing the other.
@@ -129,6 +133,8 @@ syncMeta        local sync metadata
 accountBinding  browser/account connection metadata
 ```
 
+The workspace record also carries normalized root items, folders, folder membership, stable folder colors, and removed-folder tombstones. Resume drafts remain independent records.
+
 ## Key Decisions
 
 - **Local first, cloud second:** the editor remains usable even if the network, Firebase, or Vercel sync is unavailable.
@@ -137,6 +143,7 @@ accountBinding  browser/account connection metadata
 - **Source-first AI import:** the importer preserves source order and content by compiling from a detected source document instead of asking the AI to produce the final app schema in one large response.
 - **Server-only secrets:** Gemini and Firebase Admin credentials live only in Vercel/server environments.
 - **Versioned sync acknowledgements:** stale cloud responses cannot clear newer local outbox work.
+- **Organization without content rewrites:** folders and rail order sync as workspace metadata rather than rewriting resume drafts.
 - **No trusted-device Firestore cache mode:** the app no longer relies on Firestore’s browser cache for correctness; IndexedDB is the durable local workspace.
 
 ## Tech Stack
@@ -146,6 +153,7 @@ accountBinding  browser/account connection metadata
 - JavaScript
 - Plain CSS stylesheets
 - dnd-kit for sortable resume rails, section rails, and preview reordering
+- Motion for position-only folder expansion and rail layout transitions
 - IndexedDB via `idb`
 - Firebase Auth
 - Firestore
@@ -241,10 +249,10 @@ The test suite covers:
 
 - Block-first resume normalization and editing helpers
 - Section creation, renaming, ordering, deletion, and validation
-- Multi-resume selection and guarded batch deletion
+- Multi-resume selection, folder organization, cross-container movement, and guarded batch deletion
 - Preview model rendering, sample resumes, separator settings, and print presentation variables
 - Saved-local timestamp behavior
-- Local/cloud login merge behavior
+- Local/cloud login merge, clock-skew handling, and durable folder deletion behavior
 - Account-scoped sync operations
 - Versioned outbox acknowledgements
 - AI import file validation and source-document compilation
@@ -293,4 +301,4 @@ npx firebase-tools deploy --only firestore:rules --project resumeloomr
 
 ## Status
 
-The app is currently optimized around a block-first model, direct preview editing/reordering, local-first IndexedDB persistence, Firebase-backed account sync, and source-first Gemini resume import.
+The app is currently optimized around a block-first model, direct preview editing/reordering, organized multi-resume workspaces, local-first IndexedDB persistence, Firebase-backed account sync, and source-first Gemini resume import.
