@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   closestCenter,
@@ -83,6 +83,7 @@ export default function ResumeWorkspaceRail({
   onRenameResumeFolder,
   onSetResumeOrganization,
   onDeleteResume,
+  workspaceReady,
   authUser,
 }) {
   const shouldReduceMotion = useReducedMotion();
@@ -107,6 +108,8 @@ export default function ResumeWorkspaceRail({
   const pendingDragOrganizationRef = useRef(null);
   const activeResumePlacementKeyRef = useRef('');
   const [columns, setColumns] = useState(2);
+  const [hasMeasuredColumns, setHasMeasuredColumns] = useState(false);
+  const [motionReady, setMotionReady] = useState(false);
   const [openFolderIds, setOpenFolderIds] = useState(loadOpenFolderIds);
   const [closingFolderSnapshots, setClosingFolderSnapshots] = useState(new Map());
   const [selectionKeys, setSelectionKeys] = useState(new Set());
@@ -201,16 +204,18 @@ export default function ResumeWorkspaceRail({
     setRootDropRef(node);
   }, [setRootDropRef]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = railRef.current;
 
     if (!node || typeof ResizeObserver === 'undefined') {
+      setHasMeasuredColumns(true);
       return undefined;
     }
 
     const updateColumns = () => {
       const value = Number.parseInt(getComputedStyle(node).getPropertyValue('--resume-rail-columns'), 10);
       setColumns(Number.isFinite(value) ? value : 2);
+      setHasMeasuredColumns(true);
     };
     const observer = new ResizeObserver(updateColumns);
     observer.observe(node);
@@ -219,6 +224,27 @@ export default function ResumeWorkspaceRail({
   }, []);
 
   useEffect(() => {
+    if (!workspaceReady || !hasMeasuredColumns) {
+      setMotionReady(false);
+      return undefined;
+    }
+
+    let secondFrameId = 0;
+    const firstFrameId = window.requestAnimationFrame(() => {
+      secondFrameId = window.requestAnimationFrame(() => setMotionReady(true));
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrameId);
+      window.cancelAnimationFrame(secondFrameId);
+    };
+  }, [hasMeasuredColumns, workspaceReady]);
+
+  useEffect(() => {
+    if (!workspaceReady) {
+      return;
+    }
+
     setSelectionKeys((current) => new Set([...current].filter((key) => validSelectionKeys.has(key))));
     setOpenFolderIds((current) => new Set([...current].filter((folderId) => validFolderIds.has(folderId))));
     setClosingFolderSnapshots((current) => new Map(
@@ -233,7 +259,7 @@ export default function ResumeWorkspaceRail({
         autoFolderCloseTimersRef.current.delete(folderId);
       }
     });
-  }, [validFolderIds, validSelectionKeys]);
+  }, [validFolderIds, validSelectionKeys, workspaceReady]);
 
   useEffect(() => {
     const nextScope = authUser?.uid || 'guest';
@@ -265,6 +291,10 @@ export default function ResumeWorkspaceRail({
   }, [organization]);
 
   useEffect(() => {
+    if (!workspaceReady) {
+      return;
+    }
+
     const placement = getOrganizationResumePlacement(organization, activeResumeId);
     const placementKey = `${activeResumeId}:${placement?.containerId || ''}`;
 
@@ -284,9 +314,13 @@ export default function ResumeWorkspaceRail({
       });
       setOpenFolderIds((current) => new Set(current).add(placement.containerId));
     }
-  }, [activeResumeId, organization]);
+  }, [activeResumeId, organization, workspaceReady]);
 
   useEffect(() => {
+    if (!workspaceReady) {
+      return;
+    }
+
     try {
       window.localStorage.setItem(
         WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
@@ -295,7 +329,7 @@ export default function ResumeWorkspaceRail({
     } catch {
       // Folder state is a local preference; organization remains persisted in the workspace.
     }
-  }, [openFolderIds, validFolderIds]);
+  }, [openFolderIds, validFolderIds, workspaceReady]);
 
   useEffect(() => () => {
     window.clearTimeout(folderHoverTimerRef.current);
@@ -1232,6 +1266,7 @@ export default function ResumeWorkspaceRail({
   }
 
   const resumeTileProps = {
+    motionReady,
     onSetActiveResume,
     onStartRename: (resume) => startRename('resume', resume),
     onRenameValueChange: setRenameValue,
@@ -1264,7 +1299,7 @@ export default function ResumeWorkspaceRail({
                 ].filter(Boolean).join(' ')}
                 initial={false}
                 animate={{ height: railHeight }}
-                transition={shouldReduceMotion ? { duration: 0 } : {
+                transition={shouldReduceMotion || !motionReady ? { duration: 0 } : {
                   height: activeDragItem ? RAIL_DRAG_LAYOUT_TRANSITION : RAIL_LAYOUT_TRANSITION,
                 }}
               >
@@ -1275,9 +1310,9 @@ export default function ResumeWorkspaceRail({
                         <Motion.div
                           key="new-resume"
                           className="resumeRailCell"
-                          layout="position"
+                          layout={motionReady ? 'position' : false}
                           style={{ gridRow: placement.row + 1, gridColumn: placement.column + 1 }}
-                          transition={shouldReduceMotion ? { duration: 0 } : {
+                          transition={shouldReduceMotion || !motionReady ? { duration: 0 } : {
                             layout: activeDragItem ? RAIL_DRAG_LAYOUT_TRANSITION : RAIL_LAYOUT_TRANSITION,
                           }}
                         >
@@ -1318,6 +1353,7 @@ export default function ResumeWorkspaceRail({
                           onRemoveFolder={removeFolder}
                           isDropTarget={dropTargetFolderId === folder.id}
                           rootInsertPosition={rootInsertTarget.folderId === folder.id ? rootInsertTarget.position : ''}
+                          motionReady={motionReady}
                         />
                       );
                     }

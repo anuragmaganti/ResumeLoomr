@@ -43,6 +43,7 @@ export default function Header({
   onRenameResumeFolder,
   onSetResumeOrganization,
   onDeleteResume,
+  workspaceReady,
   authUser,
   authReady,
   firebaseEnabled,
@@ -99,6 +100,7 @@ export default function Header({
         onRenameResumeFolder={onRenameResumeFolder}
         onSetResumeOrganization={onSetResumeOrganization}
         onDeleteResume={onDeleteResume}
+        workspaceReady={workspaceReady}
         authUser={authUser}
       />
     </div>

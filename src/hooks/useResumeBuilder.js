@@ -1414,6 +1414,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     flushActiveCloudDraft,
     saveState,
     syncState,
+    localReady,
     templateOptions: TEMPLATE_OPTIONS,
     resumeList,
     workspaceOrganization: workspace.organization,

@@ -258,6 +258,7 @@ function SortableCell({
   row,
   column,
   motion = null,
+  motionReady = true,
   children,
 }) {
   const shouldReduceMotion = useReducedMotion();
@@ -273,14 +274,14 @@ function SortableCell({
     disabled,
     animateLayoutChanges: disableSortableLayoutAnimation,
   });
-  const layoutTransition = shouldReduceMotion
+  const layoutTransition = shouldReduceMotion || !motionReady
     ? { duration: 0 }
     : (active ? RAIL_DRAG_LAYOUT_TRANSITION : RAIL_LAYOUT_TRANSITION);
 
   return (
     <Motion.div
       className="resumeRailCell"
-      layout="position"
+      layout={motionReady ? 'position' : false}
       initial={motion?.initial}
       animate={motion?.animate}
       transition={{ layout: layoutTransition, ...motion?.transition }}
@@ -317,6 +318,7 @@ export function ResumeTile({
   onMoveResumeToRoot,
   onToggleSelected,
   motion,
+  motionReady = true,
 }) {
   const sortableId = createWorkspaceItemId('resume', resume.id);
   const longPressRename = useLongPressRename(() => onStartRename(resume), isRenaming);
@@ -328,6 +330,7 @@ export function ResumeTile({
       row={row}
       column={column}
       motion={motion}
+      motionReady={motionReady}
     >
       {(isDragging, dragProps) => (
         <div className={[
@@ -417,6 +420,7 @@ function FolderTile({
   isTransitioning = false,
   isDropTarget,
   rootInsertPosition,
+  motionReady = true,
   containsActiveResume,
   isSelected,
   isRenaming,
@@ -440,6 +444,7 @@ function FolderTile({
       dragDisabled={isRenaming || isOpen || isTransitioning}
       row={row}
       column={column}
+      motionReady={motionReady}
     >
       {(isDragging, dragProps, isOver) => (
         <div className={[
@@ -544,6 +549,7 @@ export function FolderCluster({
   onRemoveFolder,
   isDropTarget,
   rootInsertPosition,
+  motionReady = true,
 }) {
   const shouldReduceMotion = useReducedMotion();
   const { active } = useDndContext();
@@ -556,8 +562,8 @@ export function FolderCluster({
     () => sortableResumeIds.map((resumeId) => createWorkspaceItemId('resume', resumeId)),
     [sortableResumeIds],
   );
-  const expansionTransition = shouldReduceMotion ? { duration: 0 } : FOLDER_MOTION_TRANSITION;
-  const layoutTransition = shouldReduceMotion
+  const expansionTransition = shouldReduceMotion || !motionReady ? { duration: 0 } : FOLDER_MOTION_TRANSITION;
+  const layoutTransition = shouldReduceMotion || !motionReady
     ? { duration: 0 }
     : (active ? RAIL_DRAG_LAYOUT_TRANSITION : RAIL_LAYOUT_TRANSITION);
   const itemStagger = getFolderItemStaggerSeconds(placement.children.length);
@@ -580,7 +586,7 @@ export function FolderCluster({
         '--folder-cluster-columns': placement.width,
         '--folder-cluster-rows': placement.height,
       }}
-      layout="position"
+      layout={motionReady ? 'position' : false}
       transition={{ layout: layoutTransition }}
     >
       <div className="resumeFolderClusterGrid">
@@ -592,7 +598,7 @@ export function FolderCluster({
               gridRow: surfaceRow.row + 1,
               gridColumn: `${surfaceRow.column + 1} / span ${surfaceRow.span}`,
             }}
-            initial={shouldReduceMotion ? false : {
+            initial={shouldReduceMotion || !motionReady ? false : {
               opacity: 0,
               clipPath: 'inset(0% 100% 0% 0% round 14px)',
             }}
@@ -616,6 +622,7 @@ export function FolderCluster({
           isTransitioning={isClosing}
           isDropTarget={isDropTarget}
           rootInsertPosition={rootInsertPosition}
+          motionReady={motionReady}
           containsActiveResume={folder.resumeIds.includes(activeResumeId)}
           isSelected={isFolderSelected}
           isRenaming={isRenamingFolder}
@@ -659,10 +666,11 @@ export function FolderCluster({
                   renameValue={renameValue}
                   canAddResume={canAddResume}
                   canDeleteActiveResume={canDeleteActiveResume}
+                  motionReady={motionReady}
                   motion={{
-                    initial: shouldReduceMotion ? false : foldedState,
+                    initial: shouldReduceMotion || !motionReady ? false : foldedState,
                     animate: { opacity: 1, x: 0, y: 0 },
-                    transition: shouldReduceMotion ? { duration: 0 } : {
+                    transition: shouldReduceMotion || !motionReady ? { duration: 0 } : {
                       ...FOLDER_MOTION_TRANSITION,
                       delay: animationOrder * itemStagger,
                     },
@@ -679,12 +687,12 @@ export function FolderCluster({
         {placement.isOpen && placement.emptyCell ? (
           <Motion.span
             className="resumeFolderEmptyLabel"
-            initial={shouldReduceMotion ? false : {
+            initial={shouldReduceMotion || !motionReady ? false : {
               opacity: 0,
               ...getFolderItemOrigin(placement.tile, placement.emptyCell),
             }}
             animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={shouldReduceMotion ? { duration: 0 } : FOLDER_MOTION_TRANSITION}
+            transition={shouldReduceMotion || !motionReady ? { duration: 0 } : FOLDER_MOTION_TRANSITION}
             style={{
               gridRow: placement.emptyCell.row + 1,
               gridColumn: placement.emptyCell.column + 1,

@@ -192,6 +192,7 @@ function App() {
     dismissNotice,
     saveState,
     syncState,
+    localReady,
     conflict,
     resolveConflictWithCloud,
     resolveConflictWithLocal,
@@ -797,6 +798,7 @@ function App() {
           onRenameResumeFolder={renameResumeFolder}
           onSetResumeOrganization={setResumeOrganization}
           onDeleteResume={deleteResumes}
+          workspaceReady={localReady}
           authUser={auth.user}
           authReady={auth.authReady}
           firebaseEnabled={auth.firebaseEnabled}
