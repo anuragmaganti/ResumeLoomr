@@ -3421,9 +3421,9 @@ export default function ResumePreview({
             const text = getPreviewBulletText(bullet);
 
             return text ? (
-                <ul className="previewEntryList previewDragOverlay previewDragOverlay--bullet">
-                    <li>{text}</li>
-                </ul>
+                <div className="previewDragOverlay previewDragOverlay--bullet">
+                    {text}
+                </div>
             ) : null;
         }
 
