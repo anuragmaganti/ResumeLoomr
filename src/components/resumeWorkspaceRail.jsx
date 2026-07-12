@@ -1288,11 +1288,11 @@ export default function ResumeWorkspaceRail({
       <div className={`resumeSelectionFooter${selectionCount ? ' isVisible' : ''}`} aria-hidden={!selectionCount}>
         <div className="resumeSelectionFooterClip">
           <div className="resumeSelectionToolbar">
-            <span className="resumeSelectionCount">
-              <span className="resumeSelectionCountDot" aria-hidden="true" />
-              {selectionCount} selected
-            </span>
-            <div className="resumeSelectionActions">
+            <div className="resumeSelectionPrimary">
+              <span className="resumeSelectionCount">
+                <span className="resumeSelectionCountDot" aria-hidden="true" />
+                {selectionCount} selected
+              </span>
               <button
                 type="button"
                 className="button buttonSecondary resumeSelectionFolder"
@@ -1304,6 +1304,8 @@ export default function ResumeWorkspaceRail({
                 <FolderAddIcon />
                 Add to new folder
               </button>
+            </div>
+            <div className="resumeSelectionActions">
               <button
                 type="button"
                 className="button buttonDanger resumeSelectionDelete"

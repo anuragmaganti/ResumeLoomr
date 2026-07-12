@@ -1027,6 +1027,13 @@ html[data-theme="dark"] .resumePill.isActive {
   box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
 
+.resumeSelectionPrimary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
 .button.resumeSelectionClear {
   min-height: 28px;
   padding: 0 10px;
@@ -1096,16 +1103,16 @@ html[data-theme="dark"] .resumePill.isActive {
 @media screen and (max-width: 620px) {
   .resumeSelectionToolbar {
     align-items: flex-start;
+    gap: 8px;
+  }
+
+  .resumeSelectionPrimary {
+    flex-wrap: wrap;
   }
 
   .resumeSelectionActions {
     flex-wrap: wrap;
     justify-content: flex-end;
-  }
-
-  .button.resumeSelectionFolder {
-    order: -1;
-    width: 100%;
   }
 }
 

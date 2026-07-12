@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { SortableContext, useSortable } from '@dnd-kit/sortable';
@@ -22,6 +22,75 @@ import {
   getFolderToneClass,
   railSortingStrategy,
 } from './resumeWorkspaceRailSupport.js';
+
+const RENAME_LONG_PRESS_MS = 550;
+const RENAME_LONG_PRESS_MOVE_PX = 6;
+
+function useLongPressRename(onLongPress, disabled = false) {
+  const timerRef = useRef(null);
+  const pressRef = useRef(null);
+  const suppressClickRef = useRef(false);
+  const onLongPressRef = useRef(onLongPress);
+
+  useEffect(() => {
+    onLongPressRef.current = onLongPress;
+  }, [onLongPress]);
+
+  const clearPress = useCallback(() => {
+    window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+    pressRef.current = null;
+  }, []);
+
+  useEffect(() => clearPress, [clearPress]);
+
+  function handlePointerDown(event) {
+    if (
+      disabled
+      || event.button !== 0
+      || !event.target.closest('[data-long-press-rename="true"]')
+    ) {
+      return;
+    }
+
+    clearPress();
+    suppressClickRef.current = false;
+    pressRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+
+    timerRef.current = window.setTimeout(() => {
+      suppressClickRef.current = true;
+      clearPress();
+      onLongPressRef.current();
+    }, RENAME_LONG_PRESS_MS);
+  }
+
+  function handlePointerMove(event) {
+    const press = pressRef.current;
+    if (!press || event.pointerId !== press.pointerId) return;
+    if (
+      Math.abs(event.clientX - press.x) >= RENAME_LONG_PRESS_MOVE_PX
+      || Math.abs(event.clientY - press.y) >= RENAME_LONG_PRESS_MOVE_PX
+    ) {
+      clearPress();
+    }
+  }
+
+  function handlePointerEnd(event) {
+    if (event.pointerId === pressRef.current?.pointerId) clearPress();
+  }
+
+  function consumeClick() {
+    if (!suppressClickRef.current) return false;
+    suppressClickRef.current = false;
+    return true;
+  }
+
+  return { handlePointerDown, handlePointerMove, handlePointerEnd, clearPress, consumeClick };
+}
 
 function SelectionControl({ item, isSelected, onToggle }) {
   return (
@@ -250,6 +319,7 @@ export function ResumeTile({
   motion,
 }) {
   const sortableId = createWorkspaceItemId('resume', resume.id);
+  const longPressRename = useLongPressRename(() => onStartRename(resume), isRenaming);
   return (
     <SortableCell
       id={sortableId}
@@ -293,13 +363,22 @@ export function ResumeTile({
               type="button"
               className="resumePillButton"
               {...dragProps}
+              onPointerDown={(event) => {
+                dragProps.onPointerDown?.(event);
+                longPressRename.handlePointerDown(event);
+              }}
+              onPointerMove={longPressRename.handlePointerMove}
+              onPointerUp={longPressRename.handlePointerEnd}
+              onPointerCancel={longPressRename.handlePointerEnd}
+              onPointerLeave={longPressRename.clearPress}
               onClick={() => {
+                if (longPressRename.consumeClick()) return;
                 if (!isDragging) onSetActiveResume(resume.id);
               }}
               onDoubleClick={() => onStartRename(resume)}
               aria-pressed={isActive}
             >
-              <span className="resumePillLabel">{resume.name}</span>
+              <span className="resumePillLabel" data-long-press-rename="true">{resume.name}</span>
             </button>
           )}
           <span className="resumePillActions">
@@ -351,6 +430,7 @@ function FolderTile({
   onRemoveFolder,
 }) {
   const sortableId = createWorkspaceItemId('folder', folder.id);
+  const longPressRename = useLongPressRename(() => onStartRename(folder), isRenaming);
 
   return (
     <SortableCell
@@ -400,13 +480,22 @@ function FolderTile({
               type="button"
               className="resumeFolderButton"
               {...dragProps}
+              onPointerDown={(event) => {
+                dragProps.onPointerDown?.(event);
+                longPressRename.handlePointerDown(event);
+              }}
+              onPointerMove={longPressRename.handlePointerMove}
+              onPointerUp={longPressRename.handlePointerEnd}
+              onPointerCancel={longPressRename.handlePointerEnd}
+              onPointerLeave={longPressRename.clearPress}
               aria-expanded={isOpen}
               aria-controls={`resume-folder-contents-${folder.id}`}
               onClick={() => {
+                if (longPressRename.consumeClick()) return;
                 if (!isDragging) onToggleOpen(folder.id);
               }}
             >
-              <span className="resumeFolderName">{folder.name}</span>
+              <span className="resumeFolderName" data-long-press-rename="true">{folder.name}</span>
               <span className="resumeFolderCount">{folder.resumeIds.length}</span>
             </button>
           )}
