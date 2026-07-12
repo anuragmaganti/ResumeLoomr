@@ -8,7 +8,10 @@ import {
   MAX_WORKSPACE_FOLDER_NAME_LENGTH,
   MAX_WORKSPACE_RESUME_NAME_LENGTH,
 } from '../lib/resume.js';
-import { createWorkspaceItemId } from '../lib/workspaceOrganization.js';
+import {
+  createWorkspaceItemId,
+  isResumeBundleSourcePlaceholder,
+} from '../lib/workspaceOrganization.js';
 import EntryActionMenu from './forms/entryActionMenu';
 import {
   FOLDER_MOTION_TRANSITION,
@@ -281,8 +284,9 @@ function SortableCell({
   return (
     <Motion.div
       className="resumeRailCell"
-      layout={motionReady ? 'position' : false}
-      initial={motion?.initial}
+      data-rail-motion-key={id}
+      layout={motionReady && !active ? 'position' : false}
+      initial={active ? false : motion?.initial}
       animate={motion?.animate}
       transition={{ layout: layoutTransition, ...motion?.transition }}
       style={{ gridRow: row, gridColumn: column + 1, ...motion?.style }}
@@ -293,6 +297,23 @@ function SortableCell({
       >
         {children(isDragging, dragDisabled ? {} : { ...attributes, ...listeners }, isOver)}
       </div>
+    </Motion.div>
+  );
+}
+
+export function ResumeBundleSourcePlaceholder({ id, row, column, motionReady = true }) {
+  const shouldReduceMotion = useReducedMotion();
+  const { active } = useDndContext();
+  return (
+    <Motion.div
+      className="resumeRailCell"
+      data-rail-motion-key={id}
+      layout={motionReady && !active ? 'position' : false}
+      style={{ gridRow: row, gridColumn: column + 1 }}
+      transition={{ layout: shouldReduceMotion || !motionReady ? { duration: 0 } : RAIL_DRAG_LAYOUT_TRANSITION }}
+      aria-hidden="true"
+    >
+      <div className="resumePill resumeBundleSourcePlaceholder isSortingPlaceholder" />
     </Motion.div>
   );
 }
@@ -586,7 +607,7 @@ export function FolderCluster({
         '--folder-cluster-columns': placement.width,
         '--folder-cluster-rows': placement.height,
       }}
-      layout={motionReady ? 'position' : false}
+      layout={motionReady && !active ? 'position' : false}
       transition={{ layout: layoutTransition }}
     >
       <div className="resumeFolderClusterGrid">
@@ -594,6 +615,7 @@ export function FolderCluster({
           <Motion.div
             key={`surface:${folder.id}:${surfaceRow.row}`}
             className="resumeFolderClusterSurface"
+            data-rail-motion-key={`folder-surface:${folder.id}:${surfaceRow.row}`}
             style={{
               gridRow: surfaceRow.row + 1,
               gridColumn: `${surfaceRow.column + 1} / span ${surfaceRow.span}`,
@@ -641,7 +663,15 @@ export function FolderCluster({
               const resume = resumeById.get(cell.resumeId);
 
               if (!resume) {
-                return null;
+                return isResumeBundleSourcePlaceholder(cell.resumeId) ? (
+                  <ResumeBundleSourcePlaceholder
+                    key={`source:${cell.resumeId}`}
+                    id={cell.resumeId}
+                    row={cell.row + 1}
+                    column={cell.column}
+                    motionReady={motionReady}
+                  />
+                ) : null;
               }
 
               const origin = getFolderItemOrigin(placement.tile, cell);

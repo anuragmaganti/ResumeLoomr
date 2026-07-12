@@ -759,10 +759,8 @@ html.isWorkspaceDropInvalid * {
   cursor: not-allowed !important;
 }
 
-.resumeBundleSourceGhost {
-  position: absolute;
-  z-index: 3;
-  min-height: 0;
+.resumeBundleSourcePlaceholder {
+  height: 100%;
   pointer-events: none;
 }
 

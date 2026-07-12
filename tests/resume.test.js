@@ -69,18 +69,24 @@ import {
 import {
   buildResumeRailLayout,
   collapseResumeBundleForDragPreview,
+  createResumeBundleDragPreview,
   getFolderPlacementCellRect,
   getFolderResumeInsertionIndex,
   getFolderResumeDropIntent,
   getOrganizationResumePlacement,
   getOrganizationVisualResumeIds,
+  isResumeBundleSourcePlaceholder,
   moveOrganizationResumeBundle,
   moveOrganizationRootItem,
   moveOrganizationRootItemToIndex,
   isPointerWithinFolderPlacementSurface,
 } from '../src/lib/workspaceOrganization.js';
 import {
+  applyOpenFolderPointerDestination,
+  applyRootPointerDestination,
+  chooseResumePointerDestination,
   getRailGridMetrics,
+  getOpenFolderPointerDestination,
   getRootPointerDestination,
 } from '../src/components/resumeWorkspaceRailDrag.js';
 import { calculatePreviewPageBreaks } from '../src/lib/previewPagination.js';
@@ -1485,6 +1491,31 @@ test('multi-resume movement preserves its cross-container source until the bundl
   assert.deepEqual(moved.folders['folder-2'].resumeIds, ['r1', 'r3', 'r5']);
 });
 
+test('multi-resume drag preview reserves every source cell until drop', () => {
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [{ type: 'folder', id: 'folder-1' }, { type: 'resume', id: 'r5' }],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'First', resumeIds: ['r1', 'r2', 'r3', 'r4'] },
+    },
+  }, ['r1', 'r2', 'r3', 'r4', 'r5']);
+  const selectedIds = ['r1', 'r2', 'r3'];
+  const moved = moveOrganizationResumeBundle(organization, selectedIds, {
+    containerId: 'root',
+    overResumeId: 'r5',
+    after: true,
+  });
+  const preview = createResumeBundleDragPreview(organization, moved, selectedIds, 'r2');
+  const sourceCells = preview.folders['folder-1'].resumeIds.slice(0, 3);
+
+  assert.equal(sourceCells.filter(isResumeBundleSourcePlaceholder).length, 3);
+  assert.equal(preview.folders['folder-1'].resumeIds[3], 'r4');
+  assert.deepEqual(
+    preview.rootItems.filter((item) => item.type === 'resume' && !isResumeBundleSourcePlaceholder(item.id)),
+    [{ type: 'resume', id: 'r5' }, { type: 'resume', id: 'r2' }],
+  );
+  assert.deepEqual(organization.folders['folder-1'].resumeIds, ['r1', 'r2', 'r3', 'r4']);
+});
+
 test('organization movement transfers a resume between folders without duplicating it', () => {
   const organization = normalizeWorkspaceOrganization({
     rootItems: [
@@ -1576,6 +1607,150 @@ test('folder resume drop intent reserves edges for root insertion', () => {
   assert.equal(getFolderResumeDropIntent({ x: 200, y: 83 }, rect), 'after');
 });
 
+test('root folder-edge placement wins over an expanded folder collision', () => {
+  const rootDestination = {
+    type: 'root',
+    insertionIndex: 1,
+    targetItem: { type: 'folder', id: 'folder-2' },
+    position: 'before',
+    folderEdgeIntent: 'before',
+  };
+  const openFolderDestination = {
+    type: 'folder',
+    folderId: 'folder-1',
+    insertionIndex: 2,
+  };
+
+  assert.deepEqual(
+    chooseResumePointerDestination(rootDestination, openFolderDestination),
+    { rootDestination, openFolderDestination: null },
+  );
+});
+
+test('expanded folder contents still win away from a root folder edge', () => {
+  const rootDestination = {
+    type: 'root',
+    insertionIndex: 1,
+    targetItem: { type: 'folder', id: 'folder-1' },
+    position: 'before',
+  };
+  const openFolderDestination = {
+    type: 'folder',
+    folderId: 'folder-1',
+    insertionIndex: 2,
+  };
+
+  assert.deepEqual(
+    chooseResumePointerDestination(rootDestination, openFolderDestination),
+    { rootDestination: null, openFolderDestination },
+  );
+});
+
+test('auto-opening a folder cannot replace a between-folders root destination', () => {
+  const resumeIds = ['r1', 'r2', 'r3', 'r4', 'r5'];
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'resume', id: 'r1' },
+      { type: 'folder', id: 'folder-1' },
+      { type: 'folder', id: 'folder-2' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'First', resumeIds: ['r2', 'r3'] },
+      'folder-2': { id: 'folder-2', name: 'Second', resumeIds: ['r4', 'r5'] },
+    },
+  }, resumeIds);
+  const metrics = getRailGridMetrics({ left: 0, top: 0, width: 800 }, 4);
+  const pointer = {
+    x: metrics.left + metrics.columnStride - 2,
+    y: metrics.top + 19,
+  };
+  const common = {
+    pointer,
+    baseOrganization: organization,
+    draggedItem: { type: 'resume', id: 'r1' },
+    draggedResumeIds: ['r1'],
+    columns: 4,
+    metrics,
+  };
+  const rootDestination = getRootPointerDestination({
+    ...common,
+    openFolderIds: new Set(),
+  });
+  const openFolderDestination = getOpenFolderPointerDestination({
+    ...common,
+    currentOrganization: organization,
+    openFolderIds: new Set(['folder-1']),
+  });
+  const chosen = chooseResumePointerDestination(rootDestination, openFolderDestination);
+  const moved = applyRootPointerDestination(
+    organization,
+    common.draggedItem,
+    common.draggedResumeIds,
+    chosen.rootDestination,
+  );
+
+  assert.equal(rootDestination.folderEdgeIntent, 'before');
+  assert.equal(openFolderDestination.folderId, 'folder-1');
+  assert.equal(chosen.openFolderDestination, null);
+  assert.deepEqual(moved.rootItems, [
+    { type: 'folder', id: 'folder-1' },
+    { type: 'resume', id: 'r1' },
+    { type: 'folder', id: 'folder-2' },
+  ]);
+});
+
+test('a resume dropped left of a first-column folder stays at root', () => {
+  const rootResumeIds = ['r1', 'r2', 'r3', 'r4'];
+  const resumeIds = [...rootResumeIds, 'dragged', 'folder-child'];
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      ...rootResumeIds.map((id) => ({ type: 'resume', id })),
+      { type: 'folder', id: 'folder-1' },
+      { type: 'resume', id: 'dragged' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'Folder', resumeIds: ['folder-child'] },
+    },
+  }, resumeIds);
+  const metrics = getRailGridMetrics({ left: 0, top: 0, width: 800 }, 4);
+  const pointer = {
+    x: metrics.left + 4,
+    y: metrics.top + metrics.rowStride + 19,
+  };
+  const common = {
+    pointer,
+    baseOrganization: organization,
+    draggedItem: { type: 'resume', id: 'dragged' },
+    draggedResumeIds: ['dragged'],
+    columns: 4,
+    metrics,
+  };
+  const rootDestination = getRootPointerDestination({
+    ...common,
+    openFolderIds: new Set(),
+  });
+  const openFolderDestination = getOpenFolderPointerDestination({
+    ...common,
+    currentOrganization: organization,
+    openFolderIds: new Set(['folder-1']),
+  });
+  const chosen = chooseResumePointerDestination(rootDestination, openFolderDestination);
+  const moved = applyRootPointerDestination(
+    organization,
+    common.draggedItem,
+    common.draggedResumeIds,
+    chosen.rootDestination,
+  );
+
+  assert.equal(chosen.rootDestination.targetItem.id, 'folder-1');
+  assert.equal(chosen.rootDestination.position, 'before');
+  assert.deepEqual(moved.rootItems.slice(-2), [
+    { type: 'resume', id: 'dragged' },
+    { type: 'folder', id: 'folder-1' },
+  ]);
+  assert.deepEqual(moved.folders['folder-1'].resumeIds, ['folder-child']);
+});
+
 test('open-folder collision only includes visibly painted folder cells', () => {
   const placement = {
     isOpen: true,
@@ -1625,7 +1800,7 @@ test('auto-open folder collision cells use their final grid positions', () => {
   assert.equal(getFolderPlacementCellRect(rect, placement, placement.children[0]).left, 303.5);
 });
 
-test('folder resume insertion follows the pointer grid instead of animated child rectangles', () => {
+test('folder resume insertion gives each child cell one stable destination', () => {
   const rect = { left: 100, top: 50, width: 400, height: 83 };
   const sameRowPlacement = {
     isOpen: true,
@@ -1634,7 +1809,7 @@ test('folder resume insertion follows the pointer grid instead of animated child
   };
 
   assert.equal(getFolderResumeInsertionIndex({ x: 320, y: 69 }, rect, sameRowPlacement, 2), 0);
-  assert.equal(getFolderResumeInsertionIndex({ x: 380, y: 69 }, rect, sameRowPlacement, 2), 1);
+  assert.equal(getFolderResumeInsertionIndex({ x: 380, y: 69 }, rect, sameRowPlacement, 2), 0);
   assert.equal(getFolderResumeInsertionIndex({ x: 420, y: 69 }, rect, sameRowPlacement, 2), 1);
   assert.equal(getFolderResumeInsertionIndex({ x: 485, y: 69 }, rect, sameRowPlacement, 2), 2);
 
@@ -1645,7 +1820,7 @@ test('folder resume insertion follows the pointer grid instead of animated child
   };
 
   assert.equal(getFolderResumeInsertionIndex({ x: 120, y: 114 }, rect, wrappedPlacement, 2), 0);
-  assert.equal(getFolderResumeInsertionIndex({ x: 180, y: 114 }, rect, wrappedPlacement, 2), 1);
+  assert.equal(getFolderResumeInsertionIndex({ x: 180, y: 114 }, rect, wrappedPlacement, 2), 0);
   assert.equal(getFolderResumeInsertionIndex({ x: 220, y: 114 }, rect, wrappedPlacement, 2), 1);
   assert.equal(getFolderResumeInsertionIndex({ x: 285, y: 114 }, rect, wrappedPlacement, 2), 2);
   assert.equal(getFolderResumeInsertionIndex({ x: 200, y: 69 }, rect, sameRowPlacement, 0), 0);
@@ -2150,16 +2325,18 @@ test('resume rail uses stable container-driven columns instead of viewport-sized
   assert.match(railComponent, /from '\.\/resumeWorkspaceRailView\.jsx'/);
 });
 
-test('resume rail terminal cell supports insertion on either side of the final root item', () => {
+test('resume rail cells use stable destinations and New is the dedicated terminal target', () => {
   const rootItems = Array.from({ length: 7 }, (_, index) => ({
     type: 'resume',
     id: `resume-${index + 1}`,
   }));
-  const organization = { rootItems, folders: {} };
+  const organization = normalizeWorkspaceOrganization({ rootItems, folders: {} }, rootItems.map((item) => item.id));
   const metrics = getRailGridMetrics({ left: 0, top: 0, width: 1200 }, 6);
+  const finalItemY = metrics.top + metrics.rowStride * 0.4;
+  const finalItemLeftX = metrics.left + metrics.columnStride * 5 + metrics.cellWidth * 0.1;
+  const finalItemRightX = metrics.left + metrics.columnStride * 5 + metrics.cellWidth * 0.9;
   const terminalRowY = metrics.top + metrics.rowStride * 1.4;
-  const terminalCellLeftX = metrics.left + metrics.cellWidth * 0.25;
-  const terminalCellRightX = metrics.left + metrics.cellWidth * 0.75;
+  const terminalCellX = metrics.left + metrics.cellWidth * 0.5;
   const options = {
     baseOrganization: organization,
     draggedItem: rootItems[0],
@@ -2169,21 +2346,168 @@ test('resume rail terminal cell supports insertion on either side of the final r
     metrics,
   };
 
-  const beforeFinal = getRootPointerDestination({
+  const finalItemFromLeft = getRootPointerDestination({
     ...options,
-    pointer: { x: terminalCellLeftX, y: terminalRowY },
+    pointer: { x: finalItemLeftX, y: finalItemY },
+  });
+  const finalItemFromRight = getRootPointerDestination({
+    ...options,
+    pointer: { x: finalItemRightX, y: finalItemY },
   });
   const afterFinal = getRootPointerDestination({
     ...options,
-    pointer: { x: terminalCellRightX, y: terminalRowY },
+    pointer: { x: terminalCellX, y: terminalRowY },
   });
 
-  assert.equal(beforeFinal.insertionIndex, 5);
-  assert.equal(beforeFinal.position, 'before');
-  assert.equal(beforeFinal.targetItem.id, 'resume-7');
+  assert.equal(finalItemFromLeft.insertionIndex, 5);
+  assert.equal(finalItemFromLeft.position, 'before');
+  assert.equal(finalItemFromLeft.targetItem.id, 'resume-7');
+  assert.equal(finalItemFromRight.insertionIndex, 5);
+  assert.equal(finalItemFromRight.position, 'before');
+  assert.equal(finalItemFromRight.targetItem.id, 'resume-7');
   assert.equal(afterFinal.insertionIndex, 6);
   assert.equal(afterFinal.position, 'after');
   assert.equal(afterFinal.targetItem.id, 'resume-7');
+});
+
+test('root resume placement changes symmetrically at adjacent cell boundaries', () => {
+  const resumeIds = ['r1', 'r2', 'r3', 'r4'];
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: resumeIds.map((id) => ({ type: 'resume', id })),
+    folders: {},
+  }, resumeIds);
+  const metrics = getRailGridMetrics({ left: 0, top: 0, width: 800 }, 4);
+  const options = {
+    baseOrganization: organization,
+    draggedItem: { type: 'resume', id: 'r2' },
+    draggedResumeIds: ['r2'],
+    openFolderIds: new Set(),
+    columns: 4,
+    metrics,
+  };
+  const pointerY = metrics.top + 19;
+  const previousCell = getRootPointerDestination({
+    ...options,
+    pointer: { x: metrics.left + metrics.cellWidth - 1, y: pointerY },
+  });
+  const sourceCell = getRootPointerDestination({
+    ...options,
+    pointer: { x: metrics.left + metrics.columnStride + 1, y: pointerY },
+  });
+  const nextCell = getRootPointerDestination({
+    ...options,
+    pointer: { x: metrics.left + metrics.columnStride * 2 + 1, y: pointerY },
+  });
+
+  assert.deepEqual(
+    applyRootPointerDestination(organization, options.draggedItem, ['r2'], previousCell)
+      .rootItems.map((item) => item.id),
+    ['r2', 'r1', 'r3', 'r4'],
+  );
+  assert.deepEqual(
+    applyRootPointerDestination(organization, options.draggedItem, ['r2'], sourceCell)
+      .rootItems.map((item) => item.id),
+    ['r1', 'r2', 'r3', 'r4'],
+  );
+  assert.deepEqual(
+    applyRootPointerDestination(organization, options.draggedItem, ['r2'], nextCell)
+      .rootItems.map((item) => item.id),
+    ['r1', 'r3', 'r2', 'r4'],
+  );
+});
+
+test('multi-resume root hit testing uses the same source-reserved layout as its preview', () => {
+  const rootItems = ['r1', 'r2', 'r3', 'r4', 'r5'].map((id) => ({ type: 'resume', id }));
+  const organization = normalizeWorkspaceOrganization(
+    { rootItems, folders: {} },
+    rootItems.map((item) => item.id),
+  );
+  const draggedResumeIds = ['r1', 'r2', 'r3'];
+  const metrics = getRailGridMetrics({ left: 0, top: 0, width: 1000 }, 5);
+  draggedResumeIds.forEach((activeResumeId) => {
+    const destination = getRootPointerDestination({
+      pointer: {
+        x: metrics.left + metrics.columnStride * 4 + metrics.cellWidth * 0.25,
+        y: metrics.top + 19,
+      },
+      baseOrganization: organization,
+      draggedItem: { type: 'resume', id: activeResumeId },
+      draggedResumeIds,
+      openFolderIds: new Set(),
+      columns: 5,
+      metrics,
+      preserveSourceSlots: true,
+    });
+    const moved = applyRootPointerDestination(
+      organization,
+      { type: 'resume', id: activeResumeId },
+      draggedResumeIds,
+      destination,
+    );
+    const preview = createResumeBundleDragPreview(
+      organization,
+      moved,
+      draggedResumeIds,
+      activeResumeId,
+    );
+
+    assert.equal(destination.insertionIndex, 4);
+    assert.deepEqual(moved.rootItems.map((item) => item.id), ['r4', 'r1', 'r2', 'r3', 'r5']);
+    assert.equal(getOrganizationResumePlacement(preview, activeResumeId).index, 4);
+  });
+});
+
+test('multi-resume folder hit testing stays aligned while source cells remain reserved', () => {
+  const resumeIds = ['r1', 'r2', 'r3', 'r4', 'r5'];
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [{ type: 'folder', id: 'folder-1' }],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'Folder', resumeIds },
+    },
+  }, resumeIds);
+  const draggedResumeIds = ['r1', 'r2', 'r3'];
+  const openFolderIds = new Set(['folder-1']);
+  const columns = 5;
+  const metrics = getRailGridMetrics({ left: 0, top: 0, width: 1000 }, columns);
+  draggedResumeIds.forEach((activeResumeId) => {
+    const sourcePreview = createResumeBundleDragPreview(
+      organization,
+      organization,
+      draggedResumeIds,
+      activeResumeId,
+    );
+    const placement = buildResumeRailLayout(sourcePreview, openFolderIds, columns).placements[0];
+    const folderRect = {
+      left: metrics.left,
+      top: metrics.top,
+      width: metrics.width,
+      height: placement.height * 38 + Math.max(0, placement.height - 1) * 7,
+    };
+    const finalChildCell = placement.children[4];
+    const finalChildRect = getFolderPlacementCellRect(folderRect, placement, finalChildCell);
+    const destination = getOpenFolderPointerDestination({
+      pointer: { x: finalChildRect.left + finalChildRect.width * 0.25, y: finalChildRect.top + 19 },
+      baseOrganization: organization,
+      currentOrganization: sourcePreview,
+      draggedResumeIds,
+      openFolderIds,
+      columns,
+      metrics,
+      preserveSourceSlots: true,
+      activeResumeId,
+    });
+    const moved = applyOpenFolderPointerDestination(organization, draggedResumeIds, destination);
+    const preview = createResumeBundleDragPreview(
+      organization,
+      moved,
+      draggedResumeIds,
+      activeResumeId,
+    );
+
+    assert.equal(destination.insertionIndex, 4);
+    assert.deepEqual(moved.folders['folder-1'].resumeIds, ['r4', 'r1', 'r2', 'r3', 'r5']);
+    assert.equal(getOrganizationResumePlacement(preview, activeResumeId).index, 4);
+  });
 });
 
 test('preview print CSS uses physical page geometry instead of mobile viewport geometry', () => {

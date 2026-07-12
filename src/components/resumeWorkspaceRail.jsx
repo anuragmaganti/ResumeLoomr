@@ -24,11 +24,12 @@ import {
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from '../lib/sortableSensors.js';
 import {
   buildResumeRailLayout,
-  collapseResumeBundleForDragPreview,
+  createResumeBundleDragPreview,
   createWorkspaceItemId,
   getFolderResumeDropIntent,
   getOrganizationResumePlacement,
   getOrganizationVisualResumeIds,
+  isResumeBundleSourcePlaceholder,
   moveOrganizationResumeBundle,
   moveOrganizationRootItem,
   parseWorkspaceItemId,
@@ -53,6 +54,7 @@ import {
 import {
   applyOpenFolderPointerDestination,
   applyRootPointerDestination,
+  chooseResumePointerDestination,
   getOpenFolderPointerDestination as resolveOpenFolderPointerDestination,
   getRailGridMetrics,
   getRootPointerDestination as resolveRootPointerDestination,
@@ -65,6 +67,7 @@ import {
   DragPreview,
   FolderAddIcon,
   FolderCluster,
+  ResumeBundleSourcePlaceholder,
   ResumeTile,
   RootReleaseDropZone,
 } from './resumeWorkspaceRailView.jsx';
@@ -105,6 +108,9 @@ export default function ResumeWorkspaceRail({
   const dragCollisionRectsRef = useRef(new Map());
   const dragPointerCoordinatesRef = useRef(null);
   const dragRenderFrameRef = useRef(null);
+  const dragLayoutRectsRef = useRef(null);
+  const dragLayoutAnimationsRef = useRef(new Map());
+  const isDropLayoutSettlingRef = useRef(false);
   const pendingDragOrganizationRef = useRef(null);
   const activeResumePlacementKeyRef = useRef('');
   const [columns, setColumns] = useState(2);
@@ -117,7 +123,6 @@ export default function ResumeWorkspaceRail({
   const [renameValue, setRenameValue] = useState('');
   const [activeDragItem, setActiveDragItem] = useState(null);
   const [dragResumeIds, setDragResumeIds] = useState([]);
-  const [bundleSourceGhosts, setBundleSourceGhosts] = useState([]);
   const [isDragOutsideRail, setIsDragOutsideRail] = useState(false);
   const [dragOrganization, setDragOrganization] = useState(null);
   const [dropTargetFolderId, setDropTargetFolderId] = useState('');
@@ -338,7 +343,52 @@ export default function ResumeWorkspaceRail({
     autoFolderCloseTimersRef.current.clear();
     folderCloseTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
     folderCloseTimersRef.current.clear();
+    dragLayoutAnimationsRef.current.forEach((animation) => animation.cancel());
+    dragLayoutAnimationsRef.current.clear();
   }, []);
+
+  useLayoutEffect(() => {
+    const previousRects = dragLayoutRectsRef.current;
+    dragLayoutRectsRef.current = null;
+    const isDropLayoutSettling = isDropLayoutSettlingRef.current;
+    isDropLayoutSettlingRef.current = false;
+
+    if (
+      (!activeDragItemRef.current && !isDropLayoutSettling)
+      || !previousRects
+      || shouldReduceMotion
+    ) {
+      return;
+    }
+
+    railRef.current?.querySelectorAll('[data-rail-motion-key]').forEach((node) => {
+      const key = node.dataset.railMotionKey;
+      const previousRect = previousRects.get(key);
+      if (!previousRect || typeof node.animate !== 'function') return;
+
+      dragLayoutAnimationsRef.current.get(key)?.cancel();
+      dragLayoutAnimationsRef.current.delete(key);
+      const nextRect = node.getBoundingClientRect();
+      const deltaX = previousRect.left - nextRect.left;
+      const deltaY = previousRect.top - nextRect.top;
+
+      if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
+
+      const animation = node.animate([
+        { transform: `translate(${deltaX}px, ${deltaY}px)` },
+        { transform: 'translate(0, 0)' },
+      ], {
+        duration: 190,
+        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      });
+      dragLayoutAnimationsRef.current.set(key, animation);
+      animation.finished.catch(() => {}).finally(() => {
+        if (dragLayoutAnimationsRef.current.get(key) === animation) {
+          dragLayoutAnimationsRef.current.delete(key);
+        }
+      });
+    });
+  }, [dragOrganization, shouldReduceMotion]);
 
   function toggleSelection(type, id) {
     const key = createWorkspaceItemId(type, id);
@@ -664,6 +714,8 @@ export default function ResumeWorkspaceRail({
         return;
       }
 
+      dragLayoutRectsRef.current = captureRailLayoutRects();
+
       setDragOrganization((renderedOrganization) => (
         renderedOrganization
         && workspaceOrganizationsEqual(renderedOrganization, pendingOrganization)
@@ -673,6 +725,15 @@ export default function ResumeWorkspaceRail({
     });
   }
 
+  function captureRailLayoutRects() {
+    return new Map(
+      [...(railRef.current?.querySelectorAll('[data-rail-motion-key]') || [])].map((node) => [
+        node.dataset.railMotionKey,
+        node.getBoundingClientRect(),
+      ]),
+    );
+  }
+
   function updateDragOrganization(updater) {
     const base = dragBaseOrganizationRef.current;
     if (!dragVisualOrganizationRef.current || !base) return;
@@ -680,11 +741,11 @@ export default function ResumeWorkspaceRail({
     const next = updater(base);
     const activeItem = activeDragItemRef.current;
     const previewOrganization = activeItem?.type === 'resume' && dragResumeIdsRef.current.length > 1
-      ? collapseResumeBundleForDragPreview(
+      ? createResumeBundleDragPreview(
+          base,
           next,
           dragResumeIdsRef.current,
           activeItem.id,
-          dragResumeIdsRef.current[0],
         )
       : next;
 
@@ -729,29 +790,12 @@ export default function ResumeWorkspaceRail({
     dragOrganizationRef.current = organization;
     // Keep the grabbed node in its real source cell until DragOverlay captures its origin.
     const initialPreviewOrganization = organization;
-    const railRect = railRef.current?.getBoundingClientRect();
-    const selectedIdSet = new Set(nextDragResumeIds);
-    const nextSourceGhosts = nextDragResumeIds.length > 1 && railRect
-      ? [...railRef.current.querySelectorAll('.resumePill[data-resume-id]')]
-          .filter((node) => selectedIdSet.has(node.dataset.resumeId))
-          .map((node) => {
-            const rect = node.getBoundingClientRect();
-            return {
-              id: node.dataset.resumeId,
-              top: rect.top - railRect.top,
-              left: rect.left - railRect.left,
-              width: rect.width,
-              height: rect.height,
-            };
-          })
-      : [];
     dragVisualOrganizationRef.current = initialPreviewOrganization;
     dragBaseOrganizationRef.current = organization;
     dragCollisionRectsRef.current = new Map();
     setActiveDragItem(item);
     setDragOrganization(initialPreviewOrganization);
     setDragResumeIds(nextDragResumeIds);
-    setBundleSourceGhosts(nextSourceGhosts);
     setIsDragOutsideRail(false);
     setDropTargetFolderId('');
     setRootInsertTargetIfChanged(setRootInsertTarget);
@@ -770,18 +814,24 @@ export default function ResumeWorkspaceRail({
   }
 
   function getRootPointerDestination(pointer = dragPointerCoordinatesRef.current) {
+    const preserveSourceSlots = dragResumeIdsRef.current.length > 1;
+    const rootLayoutOpenFolderIds = activeDragItemRef.current
+      ? dragOpenFolderIdsRef.current
+      : openFolderIds;
     return resolveRootPointerDestination({
       pointer,
       baseOrganization: dragBaseOrganizationRef.current,
       draggedItem: activeDragItemRef.current,
       draggedResumeIds: dragResumeIdsRef.current,
-      openFolderIds,
+      openFolderIds: rootLayoutOpenFolderIds,
       columns,
       metrics: getFinalRailGridMetrics(),
+      preserveSourceSlots,
     });
   }
 
   function getOpenFolderPointerDestination(pointer = dragPointerCoordinatesRef.current) {
+    const preserveSourceSlots = dragResumeIdsRef.current.length > 1;
     return resolveOpenFolderPointerDestination({
       pointer,
       baseOrganization: dragBaseOrganizationRef.current,
@@ -790,19 +840,31 @@ export default function ResumeWorkspaceRail({
       openFolderIds,
       columns,
       metrics: getFinalRailGridMetrics(),
+      preserveSourceSlots,
+      activeResumeId: activeDragItemRef.current?.id || '',
     });
   }
 
-  function resolveResumeDragOrganization(event, draggedResumeIds) {
+  function getResumePointerDestinations(pointer = dragPointerCoordinatesRef.current) {
+    return chooseResumePointerDestination(
+      getRootPointerDestination(pointer),
+      getOpenFolderPointerDestination(pointer),
+    );
+  }
+
+  function resolveResumeDragOrganization(
+    event,
+    draggedResumeIds,
+    destinations = getResumePointerDestinations(),
+  ) {
     const baseOrganization = dragBaseOrganizationRef.current;
     if (!baseOrganization) return dragOrganizationRef.current;
 
-    const openFolderDestination = getOpenFolderPointerDestination();
+    const { openFolderDestination, rootDestination } = destinations;
     if (openFolderDestination) {
       return applyOpenFolderPointerDestination(baseOrganization, draggedResumeIds, openFolderDestination);
     }
 
-    const rootDestination = getRootPointerDestination();
     if (rootDestination) {
       return applyRootPointerDestination(
         baseOrganization,
@@ -993,10 +1055,10 @@ export default function ResumeWorkspaceRail({
 
       const baseOrganization = dragBaseOrganizationRef.current;
       const sourcePreview = draggedItem.type === 'resume' && draggedResumeIds.length > 1
-        ? collapseResumeBundleForDragPreview(
+        ? createResumeBundleDragPreview(
+            baseOrganization,
             baseOrganization,
             draggedResumeIds,
-            draggedItem.id,
             draggedItem.id,
           )
         : baseOrganization;
@@ -1006,8 +1068,11 @@ export default function ResumeWorkspaceRail({
 
     setIsDragOutsideRail(false);
 
+    const resumePointerDestinations = draggedItem.type === 'resume'
+      ? getResumePointerDestinations()
+      : null;
     if (draggedItem.type === 'resume') {
-      const openFolderDestination = getOpenFolderPointerDestination();
+      const { openFolderDestination } = resumePointerDestinations;
       if (openFolderDestination) {
         window.clearTimeout(folderHoverTimerRef.current);
         updateAutoFolderHover(openFolderDestination.folderId);
@@ -1033,7 +1098,8 @@ export default function ResumeWorkspaceRail({
       }
     }
 
-    const rootDestination = getRootPointerDestination();
+    const rootDestination = resumePointerDestinations?.rootDestination
+      || (draggedItem.type === 'folder' ? getRootPointerDestination() : null);
     if (rootDestination) {
       if (rootDestination.type === 'closed-folder') {
         updateAutoFolderHover(rootDestination.folderId);
@@ -1145,7 +1211,7 @@ export default function ResumeWorkspaceRail({
     setDropTargetFolderId('');
   }
 
-  function resetDragState({ restoreOpenFolders = false } = {}) {
+  function resetDragState({ restoreOpenFolders = false, settleLayout = false } = {}) {
     window.clearTimeout(folderHoverTimerRef.current);
     window.cancelAnimationFrame(dragRenderFrameRef.current);
     dragRenderFrameRef.current = null;
@@ -1164,9 +1230,14 @@ export default function ResumeWorkspaceRail({
     dragBaseOrganizationRef.current = null;
     dragCollisionRectsRef.current = new Map();
     dragPointerCoordinatesRef.current = null;
+    if (!settleLayout) {
+      dragLayoutRectsRef.current = null;
+      isDropLayoutSettlingRef.current = false;
+    }
+    dragLayoutAnimationsRef.current.forEach((animation) => animation.cancel());
+    dragLayoutAnimationsRef.current.clear();
     setActiveDragItem(null);
     setDragResumeIds([]);
-    setBundleSourceGhosts([]);
     setIsDragOutsideRail(false);
     setDragOrganization(null);
     setDropTargetFolderId('');
@@ -1179,15 +1250,22 @@ export default function ResumeWorkspaceRail({
     const baseOrganization = dragBaseOrganizationRef.current;
     const draggedItem = activeDragItemRef.current;
     const droppedOutside = !pointerIsInsideRailDropArea(dragPointerCoordinatesRef.current);
-    const openFolderDestination = !droppedOutside && draggedItem?.type === 'resume'
-      ? getOpenFolderPointerDestination()
-      : null;
-    const rootDestination = droppedOutside || openFolderDestination ? null : getRootPointerDestination();
+    const resumePointerDestinations = !droppedOutside && draggedItem?.type === 'resume'
+      ? getResumePointerDestinations()
+      : { openFolderDestination: null, rootDestination: null };
+    const openFolderDestination = resumePointerDestinations.openFolderDestination;
+    const rootDestination = droppedOutside || openFolderDestination
+      ? null
+      : (resumePointerDestinations.rootDestination || getRootPointerDestination());
     const hasValidDestination = !droppedOutside && Boolean(openFolderDestination || rootDestination || event.over);
     const finalOrganization = droppedOutside
       ? baseOrganization
       : (draggedItem?.type === 'resume'
-      ? resolveResumeDragOrganization(event, dragResumeIdsRef.current)
+      ? resolveResumeDragOrganization(
+          event,
+          dragResumeIdsRef.current,
+          resumePointerDestinations,
+        )
       : (
           baseOrganization && rootDestination
             ? applyRootPointerDestination(baseOrganization, draggedItem, [], rootDestination)
@@ -1205,6 +1283,8 @@ export default function ResumeWorkspaceRail({
         destinationFolderId = rootDestination.folderId;
       } else if (finalResumePlacement?.containerId !== 'root') {
         destinationFolderId = finalResumePlacement?.containerId || '';
+      } else if (rootDestination?.type === 'root') {
+        destinationFolderId = '';
       } else if (overItem?.type === 'folder') {
         destinationFolderId = overItem.id;
       } else if (
@@ -1227,6 +1307,8 @@ export default function ResumeWorkspaceRail({
     );
 
     if (changed) {
+      dragLayoutRectsRef.current = captureRailLayoutRects();
+      isDropLayoutSettlingRef.current = true;
       onSetResumeOrganization(finalOrganization, 'organize-resumes');
       setOpenFolderIds(() => {
         const next = new Set(dragOpenFolderIdsRef.current);
@@ -1235,7 +1317,10 @@ export default function ResumeWorkspaceRail({
       });
       clearSelection();
     }
-    resetDragState({ restoreOpenFolders: !changed || !hasValidDestination || !baseStillCurrent });
+    resetDragState({
+      restoreOpenFolders: !changed || !hasValidDestination || !baseStillCurrent,
+      settleLayout: changed,
+    });
   }
 
   function handleDragCancel() {
@@ -1310,7 +1395,8 @@ export default function ResumeWorkspaceRail({
                         <Motion.div
                           key="new-resume"
                           className="resumeRailCell"
-                          layout={motionReady ? 'position' : false}
+                          data-rail-motion-key="new"
+                          layout={motionReady && !activeDragItem ? 'position' : false}
                           style={{ gridRow: placement.row + 1, gridColumn: placement.column + 1 }}
                           transition={shouldReduceMotion || !motionReady ? { duration: 0 } : {
                             layout: activeDragItem ? RAIL_DRAG_LAYOUT_TRANSITION : RAIL_LAYOUT_TRANSITION,
@@ -1359,7 +1445,17 @@ export default function ResumeWorkspaceRail({
                     }
 
                     const resume = resumeById.get(item.id);
-                    if (!resume) return null;
+                    if (!resume) {
+                      return isResumeBundleSourcePlaceholder(item.id) ? (
+                        <ResumeBundleSourcePlaceholder
+                          key={`source:${item.id}`}
+                          id={item.id}
+                          row={placement.row + 1}
+                          column={placement.column}
+                          motionReady={motionReady}
+                        />
+                      ) : null;
+                    }
                     return (
                       <ResumeTile
                         key={`resume:${resume.id}`}
@@ -1385,19 +1481,6 @@ export default function ResumeWorkspaceRail({
                     toneIndex={snapshot.toneIndex}
                     resumeById={resumeById}
                     activeResumeId={activeResumeId}
-                  />
-                ))}
-                {bundleSourceGhosts.map((ghost) => (
-                  <div
-                    key={`bundle-source:${ghost.id}`}
-                    className="resumePill resumeBundleSourceGhost isSortingPlaceholder"
-                    style={{
-                      top: ghost.top,
-                      left: ghost.left,
-                      width: ghost.width,
-                      height: ghost.height,
-                    }}
-                    aria-hidden="true"
                   />
                 ))}
               </Motion.div>

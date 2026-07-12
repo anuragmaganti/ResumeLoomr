@@ -1,3 +1,5 @@
+export const RESUME_RAIL_INSERT_AFTER_RATIO = 0.68;
+
 function cloneOrganization(organization) {
   return {
     ...organization,
@@ -224,13 +226,16 @@ export function getFolderResumeInsertionIndex(
   const targetLinearIndex = firstChildLinearIndex + targetIndex;
   const targetRow = Math.floor(targetLinearIndex / columns);
   const targetColumn = targetLinearIndex % columns;
-  const targetCenterX = targetColumn * columnStride + cellWidth / 2;
-
   if (pointerRow !== targetRow) {
     return pointerRow > targetRow ? targetIndex + 1 : targetIndex;
   }
 
-  return localX >= targetCenterX ? targetIndex + 1 : targetIndex;
+  if (targetIndex === targetCount - 1) {
+    const trailingThreshold = targetColumn * columnStride + cellWidth * RESUME_RAIL_INSERT_AFTER_RATIO;
+    return localX >= trailingThreshold ? targetCount : targetIndex;
+  }
+
+  return targetIndex;
 }
 
 export function moveOrganizationResumeBundle(organization, resumeIds, destination) {
@@ -332,6 +337,90 @@ export function collapseResumeBundleForDragPreview(
       { type: 'resume', id: representativeResumeId },
     );
   }
+
+  return next;
+}
+
+const RESUME_BUNDLE_SOURCE_PLACEHOLDER_PREFIX = '__resume-bundle-source__:';
+
+function createResumeBundleSourcePlaceholderId(resumeId) {
+  return `${RESUME_BUNDLE_SOURCE_PLACEHOLDER_PREFIX}${resumeId}`;
+}
+
+export function isResumeBundleSourcePlaceholder(resumeId) {
+  return typeof resumeId === 'string' && resumeId.startsWith(RESUME_BUNDLE_SOURCE_PLACEHOLDER_PREFIX);
+}
+
+export function createResumeBundleSourcePreview(organization, resumeIds, activeResumeId) {
+  const movedSet = new Set(resumeIds);
+  const next = cloneOrganization(organization);
+  const replaceSourceId = (resumeId) => (
+    movedSet.has(resumeId) && resumeId !== activeResumeId
+      ? createResumeBundleSourcePlaceholderId(resumeId)
+      : resumeId
+  );
+
+  next.rootItems = next.rootItems.map((item) => (
+    item.type === 'resume' && movedSet.has(item.id) && item.id !== activeResumeId
+      ? { type: 'resume', id: createResumeBundleSourcePlaceholderId(item.id) }
+      : item
+  ));
+  Object.values(next.folders).forEach((folder) => {
+    folder.resumeIds = folder.resumeIds.map(replaceSourceId);
+  });
+  return next;
+}
+
+export function createResumeBundleDragPreview(
+  sourceOrganization,
+  movedOrganization,
+  resumeIds,
+  activeResumeId,
+) {
+  const movedIds = [...new Set(resumeIds)].filter(Boolean);
+  if (movedIds.length <= 1 || !movedIds.includes(activeResumeId)) {
+    return movedOrganization;
+  }
+
+  if (workspaceOrganizationsEqual(sourceOrganization, movedOrganization)) {
+    return createResumeBundleSourcePreview(sourceOrganization, movedIds, activeResumeId);
+  }
+
+  const collapsedTarget = collapseResumeBundleForDragPreview(
+    movedOrganization,
+    movedIds,
+    activeResumeId,
+    movedIds[0],
+  );
+  const next = cloneOrganization(collapsedTarget);
+  const sourcePlacements = movedIds
+    .map((resumeId) => ({
+      resumeId,
+      placement: getOrganizationResumePlacement(sourceOrganization, resumeId),
+    }))
+    .filter(({ placement }) => placement)
+    .sort((first, second) => first.placement.index - second.placement.index);
+
+  sourcePlacements.forEach(({ resumeId, placement }) => {
+    const placeholderId = createResumeBundleSourcePlaceholderId(resumeId);
+    if (placement.containerId === 'root') {
+      next.rootItems.splice(
+        Math.min(placement.index, next.rootItems.length),
+        0,
+        { type: 'resume', id: placeholderId },
+      );
+      return;
+    }
+
+    const folder = next.folders[placement.containerId];
+    if (folder) {
+      folder.resumeIds.splice(
+        Math.min(placement.index, folder.resumeIds.length),
+        0,
+        placeholderId,
+      );
+    }
+  });
 
   return next;
 }

@@ -1,11 +1,14 @@
 import {
   buildResumeRailLayout,
+  createResumeBundleSourcePreview,
   getFolderPlacementCellRect,
   getFolderResumeDropIntent,
   getFolderResumeInsertionIndex,
+  isResumeBundleSourcePlaceholder,
   isPointerWithinFolderPlacementSurface,
   moveOrganizationResumeBundle,
   moveOrganizationRootItemToIndex,
+  RESUME_RAIL_INSERT_AFTER_RATIO,
 } from '../lib/workspaceOrganization.js';
 import {
   RAIL_PADDING_BLOCK_PX,
@@ -17,13 +20,13 @@ import {
 export function isPointerAfterItem(pointer, rect) {
   if (!pointer || !rect) return false;
 
-  const centerX = rect.left + rect.width / 2;
+  const afterThresholdX = rect.left + rect.width * RESUME_RAIL_INSERT_AFTER_RATIO;
   const centerY = rect.top + rect.height / 2;
   const rowThreshold = rect.height * 0.45;
 
   return Math.abs(pointer.y - centerY) > rowThreshold
     ? pointer.y > centerY
-    : pointer.x > centerX;
+    : pointer.x > afterThresholdX;
 }
 
 export function getRailGridMetrics(railRect, columns) {
@@ -57,6 +60,24 @@ function getRailCellRect(metrics, row, column) {
     width: metrics.cellWidth,
     height: RAIL_ROW_HEIGHT_PX,
   };
+}
+
+function getFolderRootEdgeIntent(pointer, rect) {
+  if (!pointer || !rect) return '';
+
+  const gapInset = RAIL_ROW_GAP_PX / 2;
+  const isInTileRow = (
+    pointer.y >= rect.top - gapInset
+    && pointer.y <= rect.bottom + gapInset
+  );
+  const isNearTile = (
+    pointer.x >= rect.left - gapInset
+    && pointer.x <= rect.right + gapInset
+  );
+  if (!isInTileRow || !isNearTile) return '';
+
+  const intent = getFolderResumeDropIntent(pointer, rect);
+  return intent === 'inside' ? '' : intent;
 }
 
 function getFolderPlacementRect(metrics, placement) {
@@ -111,14 +132,13 @@ export function getRootPointerDestination({
   openFolderIds,
   columns,
   metrics,
+  preserveSourceSlots = false,
 }) {
   if (!pointer || !baseOrganization || !draggedItem || !metrics) return null;
 
-  const targetOrganization = organizationWithoutDraggedItems(
-    baseOrganization,
-    draggedItem,
-    draggedResumeIds,
-  );
+  const targetOrganization = preserveSourceSlots && draggedItem.type === 'resume'
+    ? createResumeBundleSourcePreview(baseOrganization, draggedResumeIds, draggedItem.id)
+    : organizationWithoutDraggedItems(baseOrganization, draggedItem, draggedResumeIds);
   const targetLayout = buildResumeRailLayout({
     ...targetOrganization,
     rootItems: [...targetOrganization.rootItems, { type: 'new', id: 'new' }],
@@ -138,13 +158,29 @@ export function getRootPointerDestination({
     return null;
   }
 
-  const rootPlacements = targetLayout.placements;
+  const draggedResumeSet = new Set(draggedResumeIds);
+  const rootPlacements = targetLayout.placements
+    .map((placement, index) => ({ placement, index }))
+    .filter(({ placement }) => (
+      preserveSourceSlots
+      || placement.item.type !== 'resume'
+      || (
+        !draggedResumeSet.has(placement.item.id)
+        && !isResumeBundleSourcePlaceholder(placement.item.id)
+      )
+    ));
   if (rootPlacements.length === 0) {
-    return { type: 'root', insertionIndex: 0, targetItem: null, position: 'before' };
+    return {
+      type: 'root',
+      insertionIndex: 0,
+      targetItem: null,
+      position: 'before',
+      preserveSourceSlots,
+    };
   }
 
   let nearest = null;
-  rootPlacements.forEach((placement, index) => {
+  rootPlacements.forEach(({ placement, index }) => {
     const tile = placement.tile || { row: 0, column: placement.column };
     const rect = getRailCellRect(metrics, placement.row + tile.row, tile.column);
     const dx = Math.max(rect.left - pointer.x, 0, pointer.x - rect.right);
@@ -154,8 +190,16 @@ export function getRootPointerDestination({
     const score = dx * dx + dy * dy;
     const centerScore = centerDx * centerDx + centerDy * centerDy;
 
-    if (!nearest || score < nearest.score || (score === nearest.score && centerScore < nearest.centerScore)) {
-      nearest = { index, placement, rect, score, centerScore };
+    const containsPointer = pointIsWithinRect(pointer, rect);
+    if (
+      !nearest
+      || (containsPointer && !nearest.containsPointer)
+      || (
+        containsPointer === nearest.containsPointer
+        && (score < nearest.score || (score === nearest.score && centerScore < nearest.centerScore))
+      )
+    ) {
+      nearest = { index, placement, rect, score, centerScore, containsPointer };
     }
   });
 
@@ -163,40 +207,56 @@ export function getRootPointerDestination({
   if (targetItem.type === 'new') {
     const finalIndex = targetOrganization.rootItems.length;
     const lastRootItem = targetOrganization.rootItems.at(-1) || null;
-    const pointerIsAfter = finalIndex === 0
-      || pointer.x >= nearest.rect.left + nearest.rect.width / 2;
 
     return {
       type: 'root',
-      insertionIndex: pointerIsAfter ? finalIndex : Math.max(0, finalIndex - 1),
+      insertionIndex: finalIndex,
       targetItem: lastRootItem,
-      position: pointerIsAfter ? 'after' : 'before',
+      position: 'after',
+      preserveSourceSlots,
     };
   }
 
-  const pointerIsAfter = pointer.y > nearest.rect.bottom
-    || (
-      pointer.y >= nearest.rect.top
-      && pointer.x > nearest.rect.left + nearest.rect.width / 2
-    );
-  const position = pointerIsAfter ? 'after' : 'before';
+  if (draggedItem.type === 'resume' && targetItem.type === 'folder') {
+    const folderEdgeIntent = getFolderRootEdgeIntent(pointer, nearest.rect);
+    if (folderEdgeIntent) {
+      return {
+        type: 'root',
+        insertionIndex: nearest.index + (folderEdgeIntent === 'after' ? 1 : 0),
+        targetItem,
+        position: folderEdgeIntent,
+        folderEdgeIntent,
+        preserveSourceSlots,
+      };
+    }
 
-  if (
-    draggedItem.type === 'resume'
-    && targetItem.type === 'folder'
-    && !openFolderIds.has(targetItem.id)
-    && pointIsWithinRect(pointer, nearest.rect)
-    && getFolderResumeDropIntent(pointer, nearest.rect) === 'inside'
-  ) {
-    return { type: 'closed-folder', folderId: targetItem.id };
+    if (
+      !openFolderIds.has(targetItem.id)
+      && pointIsWithinRect(pointer, nearest.rect)
+    ) {
+      return { type: 'closed-folder', folderId: targetItem.id };
+    }
   }
 
   return {
     type: 'root',
-    insertionIndex: nearest.index + (pointerIsAfter ? 1 : 0),
+    insertionIndex: nearest.index,
     targetItem,
-    position,
+    position: 'before',
+    preserveSourceSlots,
   };
+}
+
+export function chooseResumePointerDestination(rootDestination, openFolderDestination) {
+  if (rootDestination?.folderEdgeIntent) {
+    return { rootDestination, openFolderDestination: null };
+  }
+
+  if (openFolderDestination) {
+    return { rootDestination: null, openFolderDestination };
+  }
+
+  return { rootDestination, openFolderDestination: null };
 }
 
 export function applyRootPointerDestination(baseOrganization, draggedItem, draggedResumeIds, destination) {
@@ -206,11 +266,19 @@ export function applyRootPointerDestination(baseOrganization, draggedItem, dragg
     });
   }
 
+  const draggedResumeSet = new Set(draggedResumeIds);
+  const cleanRootIndex = destination.preserveSourceSlots
+    ? baseOrganization.rootItems
+        .slice(0, destination.insertionIndex)
+        .filter((item) => item.type !== 'resume' || !draggedResumeSet.has(item.id))
+        .length
+    : destination.insertionIndex;
+
   return draggedItem.type === 'folder'
     ? moveOrganizationRootItemToIndex(baseOrganization, draggedItem, destination.insertionIndex)
     : moveOrganizationResumeBundle(baseOrganization, draggedResumeIds, {
       containerId: 'root',
-      rootIndex: destination.insertionIndex,
+      rootIndex: cleanRootIndex,
     });
 }
 
@@ -222,12 +290,17 @@ export function getOpenFolderPointerDestination({
   openFolderIds,
   columns,
   metrics,
+  preserveSourceSlots = false,
+  activeResumeId = '',
 }) {
   if (!pointer || !baseOrganization || !metrics) return null;
 
+  const hitTestOrganization = preserveSourceSlots
+    ? createResumeBundleSourcePreview(baseOrganization, draggedResumeIds, activeResumeId)
+    : currentOrganization;
   const currentRailLayout = buildResumeRailLayout({
-    ...currentOrganization,
-    rootItems: [...currentOrganization.rootItems, { type: 'new', id: 'new' }],
+    ...hitTestOrganization,
+    rootItems: [...hitTestOrganization.rootItems, { type: 'new', id: 'new' }],
   }, openFolderIds, columns);
 
   for (const placement of currentRailLayout.placements) {
@@ -247,9 +320,11 @@ export function getOpenFolderPointerDestination({
     }
 
     const draggedSet = new Set(draggedResumeIds);
-    const targetCount = (baseOrganization.folders[placement.folderId]?.resumeIds || [])
-      .filter((resumeId) => !draggedSet.has(resumeId))
-      .length;
+    const targetCount = preserveSourceSlots
+      ? (hitTestOrganization.folders[placement.folderId]?.resumeIds || []).length
+      : (baseOrganization.folders[placement.folderId]?.resumeIds || [])
+          .filter((resumeId) => !draggedSet.has(resumeId))
+          .length;
     const insertionIndex = pointIsWithinRect(pointer, tileRect)
       ? targetCount
       : getFolderResumeInsertionIndex(pointer, rect, placement, targetCount);
@@ -258,6 +333,7 @@ export function getOpenFolderPointerDestination({
       type: 'folder',
       folderId: placement.folderId,
       insertionIndex: insertionIndex ?? targetCount,
+      preserveSourceSlots,
     };
   }
 
@@ -280,10 +356,16 @@ export function applyOpenFolderPointerDestination(
   const draggedSet = new Set(draggedResumeIds);
   const targetResumeIds = (baseOrganization.folders[destination.folderId]?.resumeIds || [])
     .filter((resumeId) => !draggedSet.has(resumeId));
-  const insertionIndex = Math.max(
+  const visualInsertionIndex = Math.max(
     0,
     Math.min(targetResumeIds.length, destination.insertionIndex),
   );
+  const insertionIndex = destination.preserveSourceSlots
+    ? (baseOrganization.folders[destination.folderId]?.resumeIds || [])
+        .slice(0, destination.insertionIndex)
+        .filter((resumeId) => !draggedSet.has(resumeId))
+        .length
+    : visualInsertionIndex;
 
   return moveOrganizationResumeBundle(baseOrganization, draggedResumeIds, {
     containerId: destination.folderId,
