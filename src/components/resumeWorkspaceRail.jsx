@@ -115,6 +115,7 @@ export default function ResumeWorkspaceRail({
   const [activeDragItem, setActiveDragItem] = useState(null);
   const [dragResumeIds, setDragResumeIds] = useState([]);
   const [bundleSourceGhosts, setBundleSourceGhosts] = useState([]);
+  const [isDragOutsideRail, setIsDragOutsideRail] = useState(false);
   const [dragOrganization, setDragOrganization] = useState(null);
   const [dropTargetFolderId, setDropTargetFolderId] = useState('');
   const [rootInsertTarget, setRootInsertTarget] = useState({ folderId: '', position: '' });
@@ -247,6 +248,11 @@ export default function ResumeWorkspaceRail({
       resetDragState({ restoreOpenFolders: true });
     }
   }, [authUser?.uid]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('isWorkspaceDropInvalid', isDragOutsideRail);
+    return () => document.documentElement.classList.remove('isWorkspaceDropInvalid');
+  }, [isDragOutsideRail]);
 
   useEffect(() => {
     if (
@@ -602,41 +608,14 @@ export default function ResumeWorkspaceRail({
     return closestCenter(collisionArgs);
   }
 
-  function updateDragOrganization(updater) {
-    const current = dragVisualOrganizationRef.current;
-    const base = dragBaseOrganizationRef.current;
+  function queueDragVisualOrganization(nextOrganization) {
+    if (
+      dragVisualOrganizationRef.current
+      && workspaceOrganizationsEqual(nextOrganization, dragVisualOrganizationRef.current)
+    ) return;
 
-    if (!current || !base) {
-      return;
-    }
-
-    const next = updater(base);
-    const activeItem = activeDragItemRef.current;
-    const previewOrganization = activeItem?.type === 'resume' && dragResumeIdsRef.current.length > 1
-      ? collapseResumeBundleForDragPreview(
-          next,
-          dragResumeIdsRef.current,
-          activeItem.id,
-          dragResumeIdsRef.current[0],
-        )
-      : next;
-
-    const fullOrganizationUnchanged = Boolean(
-      dragOrganizationRef.current
-      && workspaceOrganizationsEqual(next, dragOrganizationRef.current)
-    );
-    const previewOrganizationUnchanged = Boolean(
-      current && workspaceOrganizationsEqual(previewOrganization, current)
-    );
-    if (fullOrganizationUnchanged && previewOrganizationUnchanged) {
-      return;
-    }
-
-    dragOrganizationRef.current = next;
-    if (previewOrganizationUnchanged) return;
-
-    dragVisualOrganizationRef.current = previewOrganization;
-    pendingDragOrganizationRef.current = previewOrganization;
+    dragVisualOrganizationRef.current = nextOrganization;
+    pendingDragOrganizationRef.current = nextOrganization;
 
     if (dragRenderFrameRef.current !== null) {
       return;
@@ -660,6 +639,42 @@ export default function ResumeWorkspaceRail({
     });
   }
 
+  function updateDragOrganization(updater) {
+    const base = dragBaseOrganizationRef.current;
+    if (!dragVisualOrganizationRef.current || !base) return;
+
+    const next = updater(base);
+    const activeItem = activeDragItemRef.current;
+    const previewOrganization = activeItem?.type === 'resume' && dragResumeIdsRef.current.length > 1
+      ? collapseResumeBundleForDragPreview(
+          next,
+          dragResumeIdsRef.current,
+          activeItem.id,
+          dragResumeIdsRef.current[0],
+        )
+      : next;
+
+    dragOrganizationRef.current = next;
+    queueDragVisualOrganization(previewOrganization);
+  }
+
+  function pointerIsInsideRailDropArea(pointer) {
+    if (!pointer) return true;
+
+    const dropNodes = [
+      railRef.current,
+      document.querySelector('.resumeRootReleaseTarget'),
+    ].filter(Boolean);
+
+    return dropNodes.some((node) => {
+      const rect = node.getBoundingClientRect();
+      return pointer.x >= rect.left - RAIL_ROW_GAP_PX / 2
+        && pointer.x <= rect.right + RAIL_ROW_GAP_PX / 2
+        && pointer.y >= rect.top - RAIL_ROW_GAP_PX / 2
+        && pointer.y <= rect.bottom + RAIL_ROW_GAP_PX / 2;
+    });
+  }
+
   function handleDragStart(event) {
     cancelRename();
     window.clearTimeout(folderHoverTimerRef.current);
@@ -678,14 +693,8 @@ export default function ResumeWorkspaceRail({
     activeDragItemRef.current = item;
     dragResumeIdsRef.current = nextDragResumeIds;
     dragOrganizationRef.current = organization;
-    const initialPreviewOrganization = item.type === 'resume' && nextDragResumeIds.length > 1
-      ? collapseResumeBundleForDragPreview(
-          organization,
-          nextDragResumeIds,
-          item.id,
-          item.id,
-        )
-      : organization;
+    // Keep the grabbed node in its real source cell until DragOverlay captures its origin.
+    const initialPreviewOrganization = organization;
     const railRect = railRef.current?.getBoundingClientRect();
     const selectedIdSet = new Set(nextDragResumeIds);
     const nextSourceGhosts = nextDragResumeIds.length > 1 && railRect
@@ -709,6 +718,7 @@ export default function ResumeWorkspaceRail({
     setDragOrganization(initialPreviewOrganization);
     setDragResumeIds(nextDragResumeIds);
     setBundleSourceGhosts(nextSourceGhosts);
+    setIsDragOutsideRail(false);
     setDropTargetFolderId('');
     setRootInsertTargetIfChanged(setRootInsertTarget);
     dragOpenFolderIdsRef.current = new Set(openFolderIds);
@@ -940,6 +950,28 @@ export default function ResumeWorkspaceRail({
       return;
     }
 
+    if (!pointerIsInsideRailDropArea(dragPointerCoordinatesRef.current)) {
+      window.clearTimeout(folderHoverTimerRef.current);
+      updateAutoFolderHover('');
+      setDropTargetFolderId('');
+      setRootInsertTargetIfChanged(setRootInsertTarget);
+      setIsDragOutsideRail(true);
+
+      const baseOrganization = dragBaseOrganizationRef.current;
+      const sourcePreview = draggedItem.type === 'resume' && draggedResumeIds.length > 1
+        ? collapseResumeBundleForDragPreview(
+            baseOrganization,
+            draggedResumeIds,
+            draggedItem.id,
+            draggedItem.id,
+          )
+        : baseOrganization;
+      queueDragVisualOrganization(sourcePreview);
+      return;
+    }
+
+    setIsDragOutsideRail(false);
+
     if (draggedItem.type === 'resume') {
       const openFolderDestination = getOpenFolderPointerDestination();
       if (openFolderDestination) {
@@ -1101,6 +1133,7 @@ export default function ResumeWorkspaceRail({
     setActiveDragItem(null);
     setDragResumeIds([]);
     setBundleSourceGhosts([]);
+    setIsDragOutsideRail(false);
     setDragOrganization(null);
     setDropTargetFolderId('');
     setRootInsertTargetIfChanged(setRootInsertTarget);
@@ -1111,18 +1144,21 @@ export default function ResumeWorkspaceRail({
     const overItem = event.over ? parseWorkspaceItemId(event.over.id) : null;
     const baseOrganization = dragBaseOrganizationRef.current;
     const draggedItem = activeDragItemRef.current;
-    const openFolderDestination = draggedItem?.type === 'resume'
+    const droppedOutside = !pointerIsInsideRailDropArea(dragPointerCoordinatesRef.current);
+    const openFolderDestination = !droppedOutside && draggedItem?.type === 'resume'
       ? getOpenFolderPointerDestination()
       : null;
-    const rootDestination = openFolderDestination ? null : getRootPointerDestination();
-    const hasValidDestination = Boolean(openFolderDestination || rootDestination || event.over);
-    const finalOrganization = draggedItem?.type === 'resume'
+    const rootDestination = droppedOutside || openFolderDestination ? null : getRootPointerDestination();
+    const hasValidDestination = !droppedOutside && Boolean(openFolderDestination || rootDestination || event.over);
+    const finalOrganization = droppedOutside
+      ? baseOrganization
+      : (draggedItem?.type === 'resume'
       ? resolveResumeDragOrganization(event, dragResumeIdsRef.current)
       : (
           baseOrganization && rootDestination
             ? applyRootPointerDestination(baseOrganization, draggedItem, [], rootDestination)
             : dragOrganizationRef.current
-        );
+        ));
     dragOrganizationRef.current = finalOrganization;
     const finalResumePlacement = draggedItem?.type === 'resume' && finalOrganization
       ? getOrganizationResumePlacement(finalOrganization, draggedItem.id)
@@ -1340,6 +1376,7 @@ export default function ResumeWorkspaceRail({
                   folderToneById={folderToneById}
                   groupCount={dragResumeIds.length}
                   activeResumeId={activeResumeId}
+                  isDropInvalid={isDragOutsideRail}
                 />
               </DragOverlay>,
               document.body,

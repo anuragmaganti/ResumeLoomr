@@ -774,7 +774,19 @@ export function ClosingFolderLayer({ folderId, placement, toneIndex, resumeById,
   );
 }
 
-export function DragPreview({ activeItem, resumeById, organization, folderToneById, groupCount, activeResumeId }) {
+function InvalidDropBadge({ show }) {
+  return show ? <span className="resumeDropInvalidBadge" aria-hidden="true" /> : null;
+}
+
+export function DragPreview({
+  activeItem,
+  resumeById,
+  organization,
+  folderToneById,
+  groupCount,
+  activeResumeId,
+  isDropInvalid,
+}) {
   if (!activeItem?.id) {
     return null;
   }
@@ -782,12 +794,13 @@ export function DragPreview({ activeItem, resumeById, organization, folderToneBy
   if (activeItem.type === 'folder') {
     const folder = organization.folders[activeItem.id];
     return folder ? (
-      <div className={`resumeFolderTile resumeFolderTileOverlay ${getFolderToneClass(folderToneById.get(folder.id))}`}>
+      <div className={`resumeFolderTile resumeFolderTileOverlay ${getFolderToneClass(folderToneById.get(folder.id))}${isDropInvalid ? ' isDropInvalid' : ''}`}>
         <FolderShape />
         <span className="resumeFolderButton">
           <span className="resumeFolderName">{folder.name}</span>
           <span className="resumeFolderCount">{folder.resumeIds.length}</span>
         </span>
+        <InvalidDropBadge show={isDropInvalid} />
       </div>
     ) : null;
   }
@@ -797,14 +810,15 @@ export function DragPreview({ activeItem, resumeById, organization, folderToneBy
 
   const stackDepth = Math.min(5, groupCount);
   const previewTile = (
-    <div className={`resumePill resumePillOverlay${activeResumeId === resume.id ? ' isActive' : ''}`}>
+    <div className={`resumePill resumePillOverlay${activeResumeId === resume.id ? ' isActive' : ''}${isDropInvalid ? ' isDropInvalid' : ''}`}>
       <span className="resumePillButton"><span className="resumePillLabel">{resume.name}</span></span>
       {groupCount > 1 ? <span className="resumeDragCount">{groupCount}</span> : null}
+      <InvalidDropBadge show={isDropInvalid && groupCount <= 1} />
     </div>
   );
 
   return groupCount > 1 ? (
-    <div className="resumeDragStack" style={{ '--resume-drag-stack-depth': stackDepth }}>
+    <div className={`resumeDragStack${isDropInvalid ? ' isDropInvalid' : ''}`} style={{ '--resume-drag-stack-depth': stackDepth }}>
       {Array.from({ length: stackDepth - 1 }, (_, index) => (
         <span
           key={`stack-layer-${index}`}
@@ -814,6 +828,7 @@ export function DragPreview({ activeItem, resumeById, organization, folderToneBy
         />
       ))}
       {previewTile}
+      <InvalidDropBadge show={isDropInvalid} />
     </div>
   ) : previewTile;
 }
