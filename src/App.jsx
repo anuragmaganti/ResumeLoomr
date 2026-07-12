@@ -200,6 +200,7 @@ function App() {
     flushActiveCloudDraft,
     templateOptions,
     resumeList,
+    workspaceOrganization,
     activeResumeId,
     activeResumeName,
     canAddResume,
@@ -210,7 +211,9 @@ function App() {
     replaceResumeDraft,
     duplicateActiveResume,
     renameActiveResume,
-    reorderResumes,
+    createResumeFolder,
+    renameResumeFolder,
+    setResumeOrganization,
     deleteResumes,
   } = useResumeBuilder({
     user: builderUser,
@@ -781,6 +784,7 @@ function App() {
         <Header
           onPrint={handlePrint}
           resumeList={resumeList}
+          workspaceOrganization={workspaceOrganization}
           activeResumeId={activeResumeId}
           activeResumeName={activeResumeName}
           canAddResume={canAddResume}
@@ -789,7 +793,9 @@ function App() {
           onCreateResume={createResume}
           onDuplicateResume={duplicateActiveResume}
           onRenameResume={renameActiveResume}
-          onReorderResumes={reorderResumes}
+          onCreateResumeFolder={createResumeFolder}
+          onRenameResumeFolder={renameResumeFolder}
+          onSetResumeOrganization={setResumeOrganization}
           onDeleteResume={deleteResumes}
           authUser={auth.user}
           authReady={auth.authReady}

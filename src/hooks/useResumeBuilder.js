@@ -13,6 +13,7 @@ import {
   createDuplicateResumeName,
   createEmptyResume,
   createNextResumeName,
+  createWorkspaceFolderFromResumes,
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
   dismissSampleInformation,
@@ -25,6 +26,7 @@ import {
   materializeAndReorderSectionBlockEntries,
   normalizeDraftPayload,
   normalizeWorkspaceIndex,
+  placeWorkspaceResumeAfter,
   removeResumeSectionBlock,
   removeSectionBlockEducationCustomSection,
   removeSectionBlockEducationProgram,
@@ -33,8 +35,9 @@ import {
   reorderSectionBlockEntriesToMatch,
   reorderSectionBlockTextListItem,
   reorderResumeSectionBlocksToMatch,
-  reorderWorkspaceResumesToMatch,
+  removeWorkspaceFolders,
   removeWorkspaceResumes,
+  renameWorkspaceFolder,
   sanitizeWorkspaceResumeName,
   setPersonalContactOrder,
   setSampleTextListOrder,
@@ -49,6 +52,7 @@ import {
   updateSectionBlockEntry,
   updateSectionBlockTextList,
   updateSectionTitle,
+  updateWorkspaceOrganization as applyWorkspaceOrganization,
   validateResume,
 } from '../lib/resume.js';
 import {
@@ -853,7 +857,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const nextResumeId = createWorkspaceResumeId();
     const nextResumeName = createNextResumeName(existingNames);
     const nextDraft = createSavedDraftState(createBlankDraftState());
-    const nextWorkspace = normalizeWorkspaceIndex({
+    const workspaceWithResume = normalizeWorkspaceIndex({
       ...currentWorkspace,
       activeResumeId: nextResumeId,
       resumeIds: [...currentWorkspace.resumeIds, nextResumeId],
@@ -862,6 +866,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         [nextResumeId]: createWorkspaceResumeMeta(nextResumeName, nextDraft.savedAt),
       },
     });
+    const nextWorkspace = applyWorkspaceOrganization(workspaceWithResume, workspaceWithResume.organization);
 
     commitWorkspace(nextWorkspace, { persist: false });
     persistLocalDraftSnapshot({
@@ -892,7 +897,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const nextResumeId = createWorkspaceResumeId();
     const nextResumeName = sanitizeWorkspaceResumeName(sourceName, createNextResumeName(existingNames));
     const nextDraft = createSavedDraftState(createBlankDraftState());
-    const nextWorkspace = normalizeWorkspaceIndex({
+    const workspaceWithResume = normalizeWorkspaceIndex({
       ...currentWorkspace,
       activeResumeId: nextResumeId,
       resumeIds: [...currentWorkspace.resumeIds, nextResumeId],
@@ -901,6 +906,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         [nextResumeId]: createWorkspaceResumeMeta(nextResumeName, nextDraft.savedAt),
       },
     });
+    const nextWorkspace = applyWorkspaceOrganization(workspaceWithResume, workspaceWithResume.organization);
 
     commitWorkspace(nextWorkspace, { persist: false });
     persistLocalDraftSnapshot({
@@ -969,7 +975,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const sourceName = currentWorkspace.meta[sourceResumeId]?.name || '';
     const duplicateName = createDuplicateResumeName(sourceName, existingNames);
     const duplicateDraft = createSavedDraftState(currentDraftRef.current);
-    const nextWorkspace = normalizeWorkspaceIndex({
+    const nextWorkspace = placeWorkspaceResumeAfter(normalizeWorkspaceIndex({
       ...currentWorkspace,
       activeResumeId: nextResumeId,
       resumeIds: [...currentWorkspace.resumeIds, nextResumeId],
@@ -977,7 +983,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         ...currentWorkspace.meta,
         [nextResumeId]: createWorkspaceResumeMeta(duplicateName, duplicateDraft.savedAt),
       },
-    });
+    }), nextResumeId, sourceResumeId);
 
     commitWorkspace(nextWorkspace, { persist: false });
     persistLocalDraftSnapshot({
@@ -1020,35 +1026,91 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     scheduleCloudSync('rename-resume', 500);
   }
 
-  async function reorderResumes(nextResumeIds) {
-    const currentWorkspace = workspaceRef.current;
-    const nextWorkspace = reorderWorkspaceResumesToMatch(currentWorkspace, nextResumeIds);
-
-    if (nextWorkspace.resumeIds.join('\u0000') === currentWorkspace.resumeIds.join('\u0000')) {
-      return;
+  async function createResumeFolder(resumeIds) {
+    if (conflictRef.current) {
+      setNotice({ tone: 'warning', message: 'Resolve the current save conflict before organizing resumes.' });
+      return '';
     }
 
-    persistCurrentEditorDraft({ reason: 'resume-reorder', persistWorkspace: false });
-    commitWorkspace(nextWorkspace, { reason: 'resume-reorder' });
+    const result = createWorkspaceFolderFromResumes(workspaceRef.current, resumeIds);
+
+    if (!result.folderId) {
+      return '';
+    }
+
+    commitWorkspace(result.workspace, { reason: 'create-resume-folder' });
+    return result.folderId;
   }
 
-  async function deleteResumes(requestedResumeIds = null) {
+  function renameResumeFolder(folderId, name) {
+    if (conflictRef.current) {
+      setNotice({ tone: 'warning', message: 'Resolve the current save conflict before renaming a folder.' });
+      return false;
+    }
+
+    const currentWorkspace = workspaceRef.current;
+    const nextWorkspace = renameWorkspaceFolder(currentWorkspace, folderId, name);
+
+    if (nextWorkspace === currentWorkspace) {
+      return false;
+    }
+
+    commitWorkspace(nextWorkspace, { reason: 'rename-resume-folder' });
+    return true;
+  }
+
+  function setResumeOrganization(nextOrganization, reason = 'organize-resumes') {
+    if (conflictRef.current) {
+      setNotice({ tone: 'warning', message: 'Resolve the current save conflict before organizing resumes.' });
+      return false;
+    }
+
+    const nextWorkspace = applyWorkspaceOrganization(workspaceRef.current, nextOrganization);
+    commitWorkspace(nextWorkspace, { reason });
+    return true;
+  }
+
+  async function deleteResumes(requestedResumeIds = null, requestedFolderIds = []) {
     const currentWorkspace = workspaceRef.current;
     const resumeIdsToDelete = Array.isArray(requestedResumeIds)
       ? requestedResumeIds
       : [currentWorkspace.activeResumeId];
-    let deletion = removeWorkspaceResumes(
-      currentWorkspace,
-      resumeIdsToDelete,
-    );
+    const folderIdsToRemove = Array.isArray(requestedFolderIds) ? requestedFolderIds : [];
+    const buildDeletion = (sourceWorkspace) => {
+      const folderRemoval = removeWorkspaceFolders(sourceWorkspace, folderIdsToRemove);
 
-    if (deletion.rejectedReason || conflictRef.current) {
+      if (resumeIdsToDelete.length === 0) {
+        return {
+          workspace: folderRemoval.workspace,
+          deletedResumeIds: [],
+          removedFolderIds: folderRemoval.removedFolderIds,
+          rejectedReason: '',
+        };
+      }
+
+      return {
+        ...removeWorkspaceResumes(folderRemoval.workspace, resumeIdsToDelete),
+        removedFolderIds: folderRemoval.removedFolderIds,
+      };
+    };
+    let deletion = buildDeletion(currentWorkspace);
+
+    if (
+      deletion.rejectedReason === 'all'
+      || (deletion.rejectedReason && deletion.removedFolderIds.length === 0)
+      || conflictRef.current
+    ) {
       if (conflictRef.current) {
         setNotice({ tone: 'warning', message: 'Resolve the current save conflict before deleting a resume.' });
       } else if (deletion.rejectedReason === 'all') {
         setNotice({ tone: 'warning', message: 'Keep at least one resume in this browser.' });
       }
       return false;
+    }
+
+    if (deletion.deletedResumeIds.length === 0 && deletion.removedFolderIds.length > 0) {
+      commitWorkspace(deletion.workspace, { reason: 'remove-resume-folders' });
+      return true;
     }
 
     const deletedIds = new Set(deletion.deletedResumeIds);
@@ -1065,7 +1127,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         return false;
       }
 
-      deletion = removeWorkspaceResumes(saveResult?.workspace || workspaceRef.current, resumeIdsToDelete);
+      deletion = buildDeletion(saveResult?.workspace || workspaceRef.current);
 
       if (deletion.rejectedReason) {
         return false;
@@ -1171,7 +1233,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const existingNames = currentWorkspace.resumeIds.map((resumeId) => currentWorkspace.meta[resumeId]?.name || '');
     const copyName = createDuplicateResumeName(sourceName, existingNames);
     const copyDraft = createSavedDraftState(currentDraftRef.current);
-    const nextWorkspace = normalizeWorkspaceIndex({
+    const nextWorkspace = placeWorkspaceResumeAfter(normalizeWorkspaceIndex({
       ...currentWorkspace,
       activeResumeId: nextResumeId,
       resumeIds: [...currentWorkspace.resumeIds, nextResumeId],
@@ -1179,7 +1241,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         ...currentWorkspace.meta,
         [nextResumeId]: createWorkspaceResumeMeta(copyName, copyDraft.savedAt),
       },
-    });
+    }), nextResumeId, currentConflict.resumeId);
 
     conflictRef.current = null;
     setConflict(null);
@@ -1354,6 +1416,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     syncState,
     templateOptions: TEMPLATE_OPTIONS,
     resumeList,
+    workspaceOrganization: workspace.organization,
     activeResumeId,
     activeResumeName: workspace.meta[activeResumeId]?.name || '',
     canAddResume,
@@ -1364,7 +1427,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     replaceResumeDraft,
     duplicateActiveResume,
     renameActiveResume: renameResume,
-    reorderResumes,
+    createResumeFolder,
+    renameResumeFolder,
+    setResumeOrganization,
     deleteResumes,
   };
 }

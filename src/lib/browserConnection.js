@@ -2,6 +2,7 @@ import {
   DRAFT_STORAGE_KEY,
   RESUME_STORAGE_KEY_PREFIX,
   WORKSPACE_INDEX_STORAGE_KEY,
+  WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
 } from './resume.js';
 import {
   LOCAL_WORKSPACE_PRESENT_KEY,
@@ -218,6 +219,7 @@ export async function clearLocalResumeWorkspaceData(storage) {
 
     if (
       key === WORKSPACE_INDEX_STORAGE_KEY ||
+      key === WORKSPACE_OPEN_FOLDERS_STORAGE_KEY ||
       key === DRAFT_STORAGE_KEY ||
       key === LOCAL_WORKSPACE_PRESENT_KEY ||
       STALE_LOCAL_STORAGE_KEYS.includes(key) ||

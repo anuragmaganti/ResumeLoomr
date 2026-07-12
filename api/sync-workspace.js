@@ -2,6 +2,7 @@ import {
   createDraftPayload,
   createWorkspaceResumeMeta,
   dismissSampleInformation,
+  mergeWorkspaceOrganizations,
   normalizeDraftPayload,
   normalizeWorkspaceIndex,
 } from '../src/lib/resume.js';
@@ -12,7 +13,7 @@ import {
 } from '../server/firebaseAdmin.js';
 import { createHash } from 'node:crypto';
 
-const CLOUD_WORKSPACE_SCHEMA_VERSION = 1;
+const CLOUD_WORKSPACE_SCHEMA_VERSION = 2;
 const CLOUD_WORKSPACE_RESUME_LIMIT = 100;
 const CLOUD_DRAFT_MAX_BYTES = 850_000;
 const MAX_SYNC_OPERATIONS = 250;
@@ -148,7 +149,7 @@ export function partitionSyncOperationsByAccount(operations, accountUid) {
   };
 }
 
-function createWorkspaceDoc(workspace, { deviceId = 'browser', sessionId = 'background-sync', updatedAt = new Date().toISOString(), version = Date.now() } = {}) {
+export function createWorkspaceDoc(workspace, { deviceId = 'browser', sessionId = 'background-sync', updatedAt = new Date().toISOString(), version = Date.now() } = {}) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const resumeIds = normalizedWorkspace.resumeIds.slice(0, CLOUD_WORKSPACE_RESUME_LIMIT);
   const activeResumeId = resumeIds.includes(normalizedWorkspace.activeResumeId)
@@ -168,6 +169,7 @@ function createWorkspaceDoc(workspace, { deviceId = 'browser', sessionId = 'back
         ),
       ]),
     ),
+    organization: normalizedWorkspace.organization,
     updatedAt,
     version,
     deviceId,
@@ -248,11 +250,51 @@ function cloudDocToDraft(data) {
   };
 }
 
-function cloudWorkspaceFromDoc(data) {
+export function cloudWorkspaceFromDoc(data) {
   return normalizeWorkspaceIndex({
     activeResumeId: data?.activeResumeId,
     resumeIds: data?.resumeIds,
     meta: data?.meta,
+    organization: data?.organization,
+  });
+}
+
+export function mergeCloudWorkspaceForWrite(incomingWorkspace, currentData, { deletedResumeIds = [] } = {}) {
+  const incoming = normalizeWorkspaceIndex(incomingWorkspace);
+  const current = cloudWorkspaceFromDoc(currentData);
+  const deletedIds = new Set(deletedResumeIds);
+  const resumeIds = [...new Set([...incoming.resumeIds, ...current.resumeIds])]
+    .filter((resumeId) => !deletedIds.has(resumeId))
+    .slice(0, CLOUD_WORKSPACE_RESUME_LIMIT);
+  const meta = Object.fromEntries(resumeIds.map((resumeId, index) => {
+    const incomingMeta = incoming.meta[resumeId];
+    const currentMeta = current.meta[resumeId];
+    const incomingIsNewer = getTimestamp(incomingMeta?.updatedAt) >= getTimestamp(currentMeta?.updatedAt);
+    const preferredMeta = incomingIsNewer ? incomingMeta : currentMeta;
+
+    return [
+      resumeId,
+      createWorkspaceResumeMeta(preferredMeta?.name || `Resume ${index + 1}`, preferredMeta?.updatedAt || ''),
+    ];
+  }));
+  const activeResumeId = resumeIds.includes(incoming.activeResumeId)
+    ? incoming.activeResumeId
+    : (resumeIds.includes(current.activeResumeId) ? current.activeResumeId : resumeIds[0] || '');
+
+  return normalizeWorkspaceIndex({
+    activeResumeId,
+    resumeIds,
+    meta,
+    organization: mergeWorkspaceOrganizations(
+      incoming.organization,
+      current.organization,
+      resumeIds,
+      {
+        preferPrimaryOnTie: true,
+        primaryResumeIds: incoming.resumeIds,
+        secondaryResumeIds: current.resumeIds,
+      },
+    ),
   });
 }
 
@@ -311,6 +353,7 @@ async function readCloudSnapshot(uid) {
       : orderedResumeIds[0],
     resumeIds: orderedResumeIds,
     meta,
+    organization: storedWorkspace?.organization,
   });
 
   await workspaceRef.set(createWorkspaceDoc(workspace), { merge: false });
@@ -407,7 +450,16 @@ async function applySyncOperations(uid, operations) {
       const currentVersion = Number(workspaceSnapshot?.exists ? workspaceSnapshot.data()?.version || 0 : 0);
 
       if (shouldAcceptSyncOperation(workspaceWrite.operation, workspaceCursorSnapshot?.data?.())) {
-        transaction.set(workspaceWrite.ref, createWorkspaceDoc(workspace, {
+        const acceptedDeleteResumeIds = deleteWrites
+          .filter((write, index) => shouldAcceptSyncOperation(write.operation, deleteCursorSnapshots[index]?.data?.()))
+          .map((write) => write.operation.resumeId);
+        const mergedWorkspace = mergeCloudWorkspaceForWrite(
+          workspace,
+          workspaceSnapshot?.exists ? workspaceSnapshot.data() : null,
+          { deletedResumeIds: acceptedDeleteResumeIds },
+        );
+
+        transaction.set(workspaceWrite.ref, createWorkspaceDoc(mergedWorkspace, {
           updatedAt: new Date().toISOString(),
           version: currentVersion + 1,
         }), { merge: false });

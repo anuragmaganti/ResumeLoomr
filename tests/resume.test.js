@@ -20,6 +20,7 @@ import {
   createFreshWorkspaceDraft,
   createNextResumeName,
   createResumeStorageKey,
+  createWorkspaceFolderFromResumes,
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
   dismissSampleInformation,
@@ -36,7 +37,12 @@ import {
   normalizePersonalContactOrder,
   normalizePersonalHeaderOrder,
   normalizeResumeSettings,
+  normalizeWorkspaceFolderToneIndex,
+  normalizeWorkspaceOrganization,
   normalizeWorkspaceIndex,
+  placeWorkspaceResumeAfter,
+  removeWorkspaceFolders,
+  renameWorkspaceFolder,
   removeResumeSectionBlock,
   reorderSectionBlockEntriesToMatch,
   reorderSectionBlockTextListItem,
@@ -60,11 +66,25 @@ import {
   updateSectionTitle,
   validateResume,
 } from '../src/lib/resume.js';
+import {
+  buildResumeRailLayout,
+  getFolderPlacementCellRect,
+  getFolderResumeInsertionIndex,
+  getFolderResumeDropIntent,
+  getOrganizationResumePlacement,
+  getOrganizationVisualResumeIds,
+  moveOrganizationResumeBundle,
+  moveOrganizationRootItem,
+  moveOrganizationRootItemToIndex,
+  isPointerWithinFolderPlacementSurface,
+} from '../src/lib/workspaceOrganization.js';
 import { calculatePreviewPageBreaks } from '../src/lib/previewPagination.js';
 import { getSaveStatusPresentation } from '../src/lib/saveStatus.js';
 import {
+  clearLocalResumeWorkspaceData,
   createSignOutStoragePreference,
   getSignOutStorageMode,
+  hasLocalResumeWorkspaceData,
 } from '../src/lib/browserConnection.js';
 import {
   createOutboxAckDescriptor,
@@ -80,7 +100,10 @@ import {
   getOperationAcksFromResponse,
 } from '../src/lib/backgroundSync.js';
 import {
+  cloudWorkspaceFromDoc,
+  createWorkspaceDoc,
   getSyncCursorId,
+  mergeCloudWorkspaceForWrite,
   operationBelongsToSyncAccount,
   partitionSyncOperationsByAccount,
   preservePermanentSampleDismissal,
@@ -149,6 +172,25 @@ test('account settings maps sign-out choices to the existing browser storage pre
     allow: false,
     skipPrompt: true,
   });
+});
+
+test('folder open state is cleared with browser resume data but is not itself resume data', async () => {
+  const values = new Map([
+    ['resumeloomr:open-folders:v1', JSON.stringify(['folder-1'])],
+    ['unrelated', 'keep'],
+  ]);
+  const storage = {
+    get length() { return values.size; },
+    key(index) { return [...values.keys()][index] || null; },
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); },
+  };
+
+  assert.equal(hasLocalResumeWorkspaceData(storage), false);
+  await clearLocalResumeWorkspaceData(storage);
+  assert.equal(storage.getItem('resumeloomr:open-folders:v1'), null);
+  assert.equal(storage.getItem('unrelated'), 'keep');
 });
 import {
   validateImportResumeFile,
@@ -1137,6 +1179,717 @@ test('workspace helpers support local-first resume ordering and naming', () => {
   assert.ok(createDuplicateResumeName('abcdefghijklmnopqrstuvwxyz'.repeat(2), []).length <= MAX_WORKSPACE_RESUME_NAME_LENGTH);
 });
 
+test('workspace organization normalizes flat workspaces and enforces one placement per resume', () => {
+  const flatWorkspace = createWorkspace(['r1', 'r2', 'r3']);
+  assert.deepEqual(flatWorkspace.organization.rootItems, [
+    { type: 'resume', id: 'r1' },
+    { type: 'resume', id: 'r2' },
+    { type: 'resume', id: 'r3' },
+  ]);
+
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'resume', id: 'r1' },
+      { type: 'folder', id: 'folder-1' },
+      { type: 'resume', id: 'r2' },
+      { type: 'resume', id: 'missing' },
+    ],
+    folders: {
+      'folder-1': {
+        id: 'folder-1',
+        name: 'Applications',
+        resumeIds: ['r2', 'r1', 'r2'],
+      },
+    },
+  }, ['r1', 'r2', 'r3']);
+
+  assert.deepEqual(organization.folders['folder-1'], {
+    id: 'folder-1',
+    name: 'Applications',
+    toneIndex: normalizeWorkspaceFolderToneIndex(undefined, 'folder-1'),
+    resumeIds: ['r2', 'r1'],
+  });
+  assert.deepEqual(organization.rootItems, [
+    { type: 'folder', id: 'folder-1' },
+    { type: 'resume', id: 'r3' },
+  ]);
+  assert.deepEqual(getOrganizationVisualResumeIds(organization), ['r2', 'r1', 'r3']);
+});
+
+test('folder creation preserves visual order and uses the earliest selected root anchor', () => {
+  const workspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2', 'r3', 'r4']),
+    organization: {
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      rootItems: [
+        { type: 'resume', id: 'r1' },
+        { type: 'folder', id: 'folder-old' },
+        { type: 'resume', id: 'r4' },
+      ],
+      folders: {
+        'folder-old': {
+          id: 'folder-old',
+          name: 'Existing',
+          resumeIds: ['r2', 'r3'],
+        },
+      },
+    },
+  });
+  const result = createWorkspaceFolderFromResumes(workspace, ['r4', 'r2'], {
+    folderId: 'folder-new',
+    now: '2026-02-01T00:00:00.000Z',
+  });
+
+  assert.equal(result.folderId, 'folder-new');
+  assert.deepEqual(result.movedResumeIds, ['r2', 'r4']);
+  assert.deepEqual(result.workspace.organization.rootItems, [
+    { type: 'resume', id: 'r1' },
+    { type: 'folder', id: 'folder-new' },
+    { type: 'folder', id: 'folder-old' },
+  ]);
+  assert.deepEqual(result.workspace.organization.folders['folder-new'].resumeIds, ['r2', 'r4']);
+  assert.deepEqual(result.workspace.organization.folders['folder-old'].resumeIds, ['r3']);
+  assert.ok(result.workspace.organization.folders['folder-new'].toneIndex >= 0);
+  assert.notEqual(
+    result.workspace.organization.folders['folder-new'].toneIndex,
+    result.workspace.organization.folders['folder-old'].toneIndex,
+  );
+});
+
+test('folder tone identity survives normalization and does not depend on root order', () => {
+  const first = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'folder', id: 'folder-a' },
+      { type: 'folder', id: 'folder-b' },
+    ],
+    folders: {
+      'folder-a': { id: 'folder-a', name: 'A', toneIndex: 4, resumeIds: ['r1'] },
+      'folder-b': { id: 'folder-b', name: 'B', resumeIds: ['r2'] },
+    },
+  }, ['r1', 'r2']);
+  const reordered = normalizeWorkspaceOrganization({
+    ...first,
+    rootItems: [...first.rootItems].reverse(),
+  }, ['r1', 'r2']);
+
+  assert.equal(first.folders['folder-a'].toneIndex, 4);
+  assert.equal(reordered.folders['folder-a'].toneIndex, 4);
+  assert.equal(
+    reordered.folders['folder-b'].toneIndex,
+    normalizeWorkspaceFolderToneIndex(undefined, 'folder-b'),
+  );
+});
+
+test('folder removal ungroups children in place and records a folder tombstone', () => {
+  const workspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2', 'r3', 'r4']),
+    organization: {
+      rootItems: [
+        { type: 'resume', id: 'r1' },
+        { type: 'folder', id: 'folder-1' },
+        { type: 'resume', id: 'r4' },
+      ],
+      folders: {
+        'folder-1': { id: 'folder-1', name: 'Folder', resumeIds: ['r2', 'r3'] },
+      },
+    },
+  });
+  const result = removeWorkspaceFolders(workspace, ['folder-1'], {
+    now: '2026-02-01T00:00:00.000Z',
+  });
+
+  assert.deepEqual(result.workspace.organization.rootItems, [
+    { type: 'resume', id: 'r1' },
+    { type: 'resume', id: 'r2' },
+    { type: 'resume', id: 'r3' },
+    { type: 'resume', id: 'r4' },
+  ]);
+  assert.equal(result.workspace.organization.folders['folder-1'], undefined);
+  assert.deepEqual(result.workspace.organization.removedFolderIds, ['folder-1']);
+});
+
+test('deleting a foldered resume preserves every remaining folder and placement', () => {
+  const workspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2', 'r3']),
+    activeResumeId: 'r1',
+    organization: {
+      updatedAt: '2026-02-01T00:00:00.000Z',
+      rootItems: [
+        { type: 'folder', id: 'folder-1' },
+        { type: 'resume', id: 'r3' },
+      ],
+      folders: {
+        'folder-1': {
+          id: 'folder-1',
+          name: 'Applications',
+          resumeIds: ['r1', 'r2'],
+        },
+      },
+    },
+  });
+  const firstDeletion = removeWorkspaceResumes(workspace, ['r1'], {
+    now: '2026-03-01T00:00:00.000Z',
+  });
+  const secondDeletion = removeWorkspaceResumes(firstDeletion.workspace, ['r2'], {
+    now: '2026-04-01T00:00:00.000Z',
+  });
+
+  assert.deepEqual(firstDeletion.workspace.organization.rootItems, [
+    { type: 'folder', id: 'folder-1' },
+    { type: 'resume', id: 'r3' },
+  ]);
+  assert.deepEqual(firstDeletion.workspace.organization.folders['folder-1'].resumeIds, ['r2']);
+  assert.deepEqual(secondDeletion.workspace.organization.rootItems, [
+    { type: 'folder', id: 'folder-1' },
+    { type: 'resume', id: 'r3' },
+  ]);
+  assert.deepEqual(secondDeletion.workspace.organization.folders['folder-1'].resumeIds, []);
+  assert.ok(
+    Date.parse(secondDeletion.workspace.organization.updatedAt)
+      >= Date.parse(firstDeletion.workspace.organization.updatedAt),
+  );
+});
+
+test('combined folder removal and resume deletion keeps non-selected children at root', () => {
+  const workspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2', 'r3']),
+    organization: {
+      rootItems: [
+        { type: 'folder', id: 'folder-1' },
+        { type: 'resume', id: 'r3' },
+      ],
+      folders: {
+        'folder-1': { id: 'folder-1', name: 'Folder', resumeIds: ['r1', 'r2'] },
+      },
+    },
+  });
+  const folderRemoval = removeWorkspaceFolders(workspace, ['folder-1'], {
+    now: '2026-02-01T00:00:00.000Z',
+  });
+  const deletion = removeWorkspaceResumes(folderRemoval.workspace, ['r1'], {
+    now: '2026-02-02T00:00:00.000Z',
+  });
+
+  assert.deepEqual(deletion.workspace.organization.rootItems, [
+    { type: 'resume', id: 'r2' },
+    { type: 'resume', id: 'r3' },
+  ]);
+  assert.deepEqual(deletion.workspace.organization.removedFolderIds, ['folder-1']);
+});
+
+test('folder names fall back safely and receive deterministic duplicate suffixes', () => {
+  const first = createWorkspaceFolderFromResumes(createWorkspace(['r1', 'r2']), ['r1'], {
+    folderId: 'folder-1',
+    now: '2026-02-01T00:00:00.000Z',
+  }).workspace;
+  const secondResult = createWorkspaceFolderFromResumes(first, ['r2'], {
+    folderId: 'folder-2',
+    now: '2026-02-02T00:00:00.000Z',
+  });
+  const renamed = renameWorkspaceFolder(secondResult.workspace, 'folder-2', '', {
+    now: '2026-02-03T00:00:00.000Z',
+  });
+
+  assert.equal(first.organization.folders['folder-1'].name, 'New folder');
+  assert.equal(secondResult.workspace.organization.folders['folder-2'].name, 'New folder 2');
+  assert.equal(renamed.organization.folders['folder-2'].name, 'New folder 2');
+});
+
+test('duplicate placement keeps a copied resume beside its source container', () => {
+  const workspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2', 'r3']),
+    organization: {
+      rootItems: [
+        { type: 'folder', id: 'folder-1' },
+        { type: 'resume', id: 'r3' },
+      ],
+      folders: {
+        'folder-1': { id: 'folder-1', name: 'Folder', resumeIds: ['r1'] },
+      },
+    },
+  });
+  const next = placeWorkspaceResumeAfter(workspace, 'r2', 'r1', {
+    now: '2026-02-01T00:00:00.000Z',
+  });
+
+  assert.deepEqual(next.organization.folders['folder-1'].resumeIds, ['r1', 'r2']);
+  assert.deepEqual(getOrganizationResumePlacement(next.organization, 'r2'), {
+    containerId: 'folder-1',
+    index: 1,
+  });
+});
+
+test('organization movement supports ordered resume bundles across root and folders', () => {
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'resume', id: 'r1' },
+      { type: 'folder', id: 'folder-1' },
+      { type: 'resume', id: 'r4' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'Folder', resumeIds: ['r2', 'r3'] },
+    },
+  }, ['r1', 'r2', 'r3', 'r4']);
+  const movedIntoFolder = moveOrganizationResumeBundle(organization, ['r1', 'r4'], {
+    containerId: 'folder-1',
+    overResumeId: 'r3',
+  });
+  const movedBackToRoot = moveOrganizationResumeBundle(movedIntoFolder, ['r3', 'r1'], {
+    containerId: 'root',
+    overResumeId: 'r4',
+  });
+
+  assert.deepEqual(movedIntoFolder.folders['folder-1'].resumeIds, ['r2', 'r1', 'r4', 'r3']);
+  assert.deepEqual(movedBackToRoot.rootItems, [
+    { type: 'folder', id: 'folder-1' },
+    { type: 'resume', id: 'r3' },
+    { type: 'resume', id: 'r1' },
+  ]);
+  assert.deepEqual(movedBackToRoot.folders['folder-1'].resumeIds, ['r2', 'r4']);
+});
+
+test('organization movement transfers a resume between folders without duplicating it', () => {
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'folder', id: 'folder-1' },
+      { type: 'folder', id: 'folder-2' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'One', resumeIds: ['r1', 'r2'] },
+      'folder-2': { id: 'folder-2', name: 'Two', resumeIds: ['r3', 'r4'] },
+    },
+  }, ['r1', 'r2', 'r3', 'r4']);
+  const moved = moveOrganizationResumeBundle(organization, ['r2'], {
+    containerId: 'folder-2',
+    overResumeId: 'r4',
+  });
+
+  assert.deepEqual(moved.folders['folder-1'].resumeIds, ['r1']);
+  assert.deepEqual(moved.folders['folder-2'].resumeIds, ['r3', 'r2', 'r4']);
+  assert.deepEqual(getOrganizationVisualResumeIds(moved), ['r1', 'r3', 'r2', 'r4']);
+});
+
+test('moving a resume out of a folder can place it beside its source folder', () => {
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'resume', id: 'r1' },
+      { type: 'folder', id: 'folder-1' },
+      { type: 'resume', id: 'r4' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'One', resumeIds: ['r2', 'r3'] },
+    },
+  }, ['r1', 'r2', 'r3', 'r4']);
+  const moved = moveOrganizationResumeBundle(organization, ['r2'], {
+    containerId: 'root',
+    afterRootItem: { type: 'folder', id: 'folder-1' },
+  });
+
+  assert.deepEqual(moved.rootItems, [
+    { type: 'resume', id: 'r1' },
+    { type: 'folder', id: 'folder-1' },
+    { type: 'resume', id: 'r2' },
+    { type: 'resume', id: 'r4' },
+  ]);
+  assert.deepEqual(moved.folders['folder-1'].resumeIds, ['r3']);
+  assert.deepEqual(getOrganizationVisualResumeIds(moved), ['r1', 'r3', 'r2', 'r4']);
+});
+
+test('resume movement can insert at root before or after a folder', () => {
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'folder', id: 'folder-1' },
+      { type: 'folder', id: 'folder-2' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'One', resumeIds: ['r1'] },
+      'folder-2': { id: 'folder-2', name: 'Two', resumeIds: ['r2'] },
+    },
+  }, ['r1', 'r2']);
+  const beforeSecond = moveOrganizationResumeBundle(organization, ['r1'], {
+    containerId: 'root',
+    overRootItem: { type: 'folder', id: 'folder-2' },
+    after: false,
+  });
+  const afterSecond = moveOrganizationResumeBundle(beforeSecond, ['r1'], {
+    containerId: 'root',
+    overRootItem: { type: 'folder', id: 'folder-2' },
+    after: true,
+  });
+
+  assert.deepEqual(beforeSecond.rootItems, [
+    { type: 'folder', id: 'folder-1' },
+    { type: 'resume', id: 'r1' },
+    { type: 'folder', id: 'folder-2' },
+  ]);
+  assert.deepEqual(afterSecond.rootItems, [
+    { type: 'folder', id: 'folder-1' },
+    { type: 'folder', id: 'folder-2' },
+    { type: 'resume', id: 'r1' },
+  ]);
+});
+
+test('folder resume drop intent reserves edges for root insertion', () => {
+  const rect = { left: 100, right: 300, top: 40, bottom: 78 };
+
+  assert.equal(getFolderResumeDropIntent({ x: 200, y: 59 }, rect), 'inside');
+  assert.equal(getFolderResumeDropIntent({ x: 110, y: 59 }, rect), 'before');
+  assert.equal(getFolderResumeDropIntent({ x: 290, y: 59 }, rect), 'after');
+  assert.equal(getFolderResumeDropIntent({ x: 200, y: 35 }, rect), 'before');
+  assert.equal(getFolderResumeDropIntent({ x: 200, y: 83 }, rect), 'after');
+});
+
+test('open-folder collision only includes visibly painted folder cells', () => {
+  const placement = {
+    isOpen: true,
+    width: 4,
+    height: 2,
+    surfaceRows: [
+      { row: 0, column: 1, span: 3 },
+      { row: 1, column: 0, span: 1 },
+    ],
+  };
+  const rect = { left: 100, top: 50, width: 400, height: 83 };
+
+  assert.equal(isPointerWithinFolderPlacementSurface({ x: 255, y: 69 }, rect, placement), true);
+  assert.equal(isPointerWithinFolderPlacementSurface({ x: 150, y: 69 }, rect, placement), false);
+  assert.equal(isPointerWithinFolderPlacementSurface({ x: 150, y: 114 }, rect, placement), true);
+  assert.equal(isPointerWithinFolderPlacementSurface({ x: 255, y: 114 }, rect, placement), false);
+  assert.equal(isPointerWithinFolderPlacementSurface({ x: 201, y: 69 }, rect, placement), false);
+  assert.equal(
+    isPointerWithinFolderPlacementSurface({ x: 201, y: 69 }, rect, placement, { includeGaps: true }),
+    true,
+  );
+  assert.equal(
+    isPointerWithinFolderPlacementSurface({ x: 150, y: 69 }, rect, placement, { includeGaps: true }),
+    false,
+  );
+});
+
+test('auto-open folder collision cells use their final grid positions', () => {
+  const placement = {
+    isOpen: true,
+    width: 4,
+    tile: { row: 0, column: 1 },
+    children: [{ resumeId: 'r1', row: 0, column: 2 }],
+  };
+  const rect = { left: 100, top: 50, width: 400, height: 38 };
+
+  assert.deepEqual(getFolderPlacementCellRect(rect, placement, placement.tile), {
+    x: 201.75,
+    y: 50,
+    top: 50,
+    right: 296.5,
+    bottom: 88,
+    left: 201.75,
+    width: 94.75,
+    height: 38,
+  });
+  assert.equal(getFolderPlacementCellRect(rect, placement, placement.children[0]).left, 303.5);
+});
+
+test('folder resume insertion follows the pointer grid instead of animated child rectangles', () => {
+  const rect = { left: 100, top: 50, width: 400, height: 83 };
+  const sameRowPlacement = {
+    isOpen: true,
+    width: 4,
+    tile: { row: 0, column: 1 },
+  };
+
+  assert.equal(getFolderResumeInsertionIndex({ x: 320, y: 69 }, rect, sameRowPlacement, 2), 0);
+  assert.equal(getFolderResumeInsertionIndex({ x: 380, y: 69 }, rect, sameRowPlacement, 2), 1);
+  assert.equal(getFolderResumeInsertionIndex({ x: 420, y: 69 }, rect, sameRowPlacement, 2), 1);
+  assert.equal(getFolderResumeInsertionIndex({ x: 485, y: 69 }, rect, sameRowPlacement, 2), 2);
+
+  const wrappedPlacement = {
+    isOpen: true,
+    width: 4,
+    tile: { row: 0, column: 3 },
+  };
+
+  assert.equal(getFolderResumeInsertionIndex({ x: 120, y: 114 }, rect, wrappedPlacement, 2), 0);
+  assert.equal(getFolderResumeInsertionIndex({ x: 180, y: 114 }, rect, wrappedPlacement, 2), 1);
+  assert.equal(getFolderResumeInsertionIndex({ x: 220, y: 114 }, rect, wrappedPlacement, 2), 1);
+  assert.equal(getFolderResumeInsertionIndex({ x: 285, y: 114 }, rect, wrappedPlacement, 2), 2);
+  assert.equal(getFolderResumeInsertionIndex({ x: 200, y: 69 }, rect, sameRowPlacement, 0), 0);
+  assert.equal(getFolderResumeInsertionIndex(null, rect, sameRowPlacement, 2), null);
+});
+
+test('root folder movement never nests folders and preserves the moved folder contents', () => {
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'folder', id: 'folder-1' },
+      { type: 'resume', id: 'r3' },
+      { type: 'folder', id: 'folder-2' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'One', resumeIds: ['r1'] },
+      'folder-2': { id: 'folder-2', name: 'Two', resumeIds: ['r2'] },
+    },
+  }, ['r1', 'r2', 'r3']);
+  const moved = moveOrganizationRootItem(
+    organization,
+    { type: 'folder', id: 'folder-2' },
+    { type: 'resume', id: 'r3' },
+    false,
+  );
+
+  assert.deepEqual(moved.rootItems, [
+    { type: 'folder', id: 'folder-1' },
+    { type: 'folder', id: 'folder-2' },
+    { type: 'resume', id: 'r3' },
+  ]);
+  assert.deepEqual(moved.folders['folder-2'].resumeIds, ['r2']);
+});
+
+test('root folder movement ignores its own drop target', () => {
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'resume', id: 'r1' },
+      { type: 'folder', id: 'folder-1' },
+      { type: 'resume', id: 'r2' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'Folder', resumeIds: ['r3'] },
+    },
+  }, ['r1', 'r2', 'r3']);
+  const unchanged = moveOrganizationRootItem(
+    organization,
+    { type: 'folder', id: 'folder-1' },
+    { type: 'folder', id: 'folder-1' },
+    true,
+  );
+
+  assert.equal(unchanged, organization);
+  assert.deepEqual(unchanged.rootItems, organization.rootItems);
+});
+
+test('root resume and folder movement accept deterministic insertion indexes', () => {
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'resume', id: 'r1' },
+      { type: 'folder', id: 'folder-1' },
+      { type: 'resume', id: 'r3' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'Folder', resumeIds: ['r2'] },
+    },
+  }, ['r1', 'r2', 'r3']);
+  const resumeFirst = moveOrganizationResumeBundle(organization, ['r3'], {
+    containerId: 'root',
+    rootIndex: 0,
+  });
+  const folderFirst = moveOrganizationRootItemToIndex(
+    resumeFirst,
+    { type: 'folder', id: 'folder-1' },
+    0,
+  );
+
+  assert.deepEqual(resumeFirst.rootItems, [
+    { type: 'resume', id: 'r3' },
+    { type: 'resume', id: 'r1' },
+    { type: 'folder', id: 'folder-1' },
+  ]);
+  assert.deepEqual(folderFirst.rootItems, [
+    { type: 'folder', id: 'folder-1' },
+    { type: 'resume', id: 'r3' },
+    { type: 'resume', id: 'r1' },
+  ]);
+  assert.deepEqual(folderFirst.folders['folder-1'].resumeIds, ['r2']);
+});
+
+function railPlacementsOverlap(first, second) {
+  const getCells = (placement) => new Set(
+    placement.isOpen
+      ? placement.surfaceRows.flatMap((surfaceRow) => (
+        Array.from({ length: surfaceRow.span }, (_, offset) => (
+          `${placement.row + surfaceRow.row}:${surfaceRow.column + offset}`
+        ))
+      ))
+      : [`${placement.row + (placement.tile?.row || 0)}:${placement.tile?.column ?? placement.column}`],
+  );
+  const firstCells = getCells(first);
+  return [...getCells(second)].some((cell) => firstCells.has(cell));
+}
+
+test('resume rail cluster packing stays bounded and collision-free from two through six columns', () => {
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'folder', id: 'folder-1' },
+      { type: 'resume', id: 'r4' },
+      { type: 'folder', id: 'folder-2' },
+      { type: 'resume', id: 'r5' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'One', resumeIds: ['r1', 'r2'] },
+      'folder-2': { id: 'folder-2', name: 'Two', resumeIds: ['r3'] },
+    },
+  }, ['r1', 'r2', 'r3', 'r4', 'r5']);
+
+  [2, 3, 4, 5, 6].forEach((columns) => {
+    const layout = buildResumeRailLayout(organization, new Set(['folder-1', 'folder-2']), columns);
+    const folderPlacements = layout.placements.filter((placement) => placement.item.type === 'folder');
+
+    assert.equal(folderPlacements.length, 2);
+    layout.placements.forEach((placement, index) => {
+      assert.ok(placement.column >= 0);
+      assert.ok(placement.column + placement.width <= columns);
+      assert.ok(placement.row >= 0);
+      assert.ok(placement.row + placement.height <= layout.rowCount);
+      layout.placements.slice(index + 1).forEach((otherPlacement) => {
+        assert.equal(railPlacementsOverlap(placement, otherPlacement), false);
+      });
+    });
+    folderPlacements.forEach((placement) => {
+      const folder = organization.folders[placement.folderId];
+      assert.equal(placement.isOpen, true);
+      assert.equal(placement.children.length, folder.resumeIds.length);
+      assert.ok(placement.width * placement.height >= folder.resumeIds.length + 1);
+    });
+  });
+});
+
+test('each open folder tile stays immediately before its resumes in the cell stream', () => {
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'folder', id: 'folder-1' },
+      { type: 'folder', id: 'folder-2' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'One', resumeIds: ['r1', 'r2'] },
+      'folder-2': { id: 'folder-2', name: 'Two', resumeIds: ['r3', 'r4', 'r5', 'r6', 'r7'] },
+    },
+  }, ['r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7']);
+  const layout = buildResumeRailLayout(organization, new Set(['folder-1', 'folder-2']), 6);
+  const first = layout.placements.find((placement) => placement.folderId === 'folder-1');
+  const second = layout.placements.find((placement) => placement.folderId === 'folder-2');
+
+  assert.deepEqual({ row: first.row, column: first.column, width: first.width, height: first.height }, {
+    row: 0, column: 0, width: 6, height: 1,
+  });
+  assert.equal(first.tile.column, 0);
+  assert.deepEqual({ row: second.row, column: second.column, width: second.width, height: second.height }, {
+    row: 0, column: 0, width: 6, height: 2,
+  });
+  assert.equal(second.tile.column, 3);
+  assert.deepEqual(second.children.map(({ row, column }) => ({ row, column })), [
+    { row: 0, column: 4 },
+    { row: 0, column: 5 },
+    { row: 1, column: 0 },
+    { row: 1, column: 1 },
+    { row: 1, column: 2 },
+  ]);
+  assert.equal(railPlacementsOverlap(first, second), false);
+});
+
+test('the 2 5 2 2 2 folder case flows continuously without reserving empty cells', () => {
+  const resumeIds = Array.from({ length: 13 }, (_, index) => `r${index + 1}`);
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [1, 2, 3, 4, 5].map((index) => ({ type: 'folder', id: `folder-${index}` })),
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'One', resumeIds: ['r1', 'r2'] },
+      'folder-2': { id: 'folder-2', name: 'Two', resumeIds: ['r3', 'r4', 'r5', 'r6', 'r7'] },
+      'folder-3': { id: 'folder-3', name: 'Three', resumeIds: ['r8', 'r9'] },
+      'folder-4': { id: 'folder-4', name: 'Four', resumeIds: ['r10', 'r11'] },
+      'folder-5': { id: 'folder-5', name: 'Five', resumeIds: ['r12', 'r13'] },
+    },
+  }, resumeIds);
+  const layout = buildResumeRailLayout(
+    organization,
+    new Set(['folder-1', 'folder-2', 'folder-3', 'folder-4', 'folder-5']),
+    6,
+  );
+
+  assert.equal(layout.rowCount, 3);
+  assert.equal(layout.placements.length, 5);
+  assert.deepEqual(
+    layout.placements.map((placement) => ({
+      id: placement.folderId,
+      row: placement.row,
+      column: placement.column,
+      width: placement.width,
+      height: placement.height,
+    })),
+    [
+      { id: 'folder-1', row: 0, column: 0, width: 6, height: 1 },
+      { id: 'folder-2', row: 0, column: 0, width: 6, height: 2 },
+      { id: 'folder-3', row: 1, column: 0, width: 6, height: 1 },
+      { id: 'folder-4', row: 2, column: 0, width: 6, height: 1 },
+      { id: 'folder-5', row: 2, column: 0, width: 6, height: 1 },
+    ],
+  );
+  assert.deepEqual(layout.placements.map((placement) => placement.tile.column), [0, 3, 3, 0, 3]);
+  layout.placements.forEach((placement, index) => {
+    const occupiedCells = [placement.tile, ...placement.children]
+      .map((cell) => `${cell.row}:${cell.column}`);
+    assert.equal(new Set(occupiedCells).size, occupiedCells.length);
+    assert.equal(placement.children.length, organization.folders[placement.folderId].resumeIds.length);
+    layout.placements.slice(index + 1).forEach((otherPlacement) => {
+      assert.equal(railPlacementsOverlap(placement, otherPlacement), false);
+    });
+  });
+});
+
+test('the next folder starts immediately after a wrapped open folder', () => {
+  const resumeIds = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6'];
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [
+      { type: 'folder', id: 'folder-1' },
+      { type: 'folder', id: 'folder-2' },
+      { type: 'folder', id: 'folder-3' },
+    ],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'One', resumeIds: ['r1'] },
+      'folder-2': { id: 'folder-2', name: 'Two', resumeIds: ['r2', 'r3', 'r4', 'r5', 'r6'] },
+      'folder-3': { id: 'folder-3', name: 'Three', resumeIds: [] },
+    },
+  }, resumeIds);
+  const layout = buildResumeRailLayout(
+    organization,
+    new Set(['folder-1', 'folder-2']),
+    6,
+  );
+  const second = layout.placements.find((placement) => placement.folderId === 'folder-2');
+  const third = layout.placements.find((placement) => placement.folderId === 'folder-3');
+
+  assert.deepEqual(second.surfaceRows, [
+    { row: 0, column: 2, span: 4 },
+    { row: 1, column: 0, span: 2 },
+  ]);
+  assert.deepEqual({
+    row: third.row + third.tile.row,
+    column: third.tile.column,
+  }, { row: 1, column: 2 });
+  assert.equal(layout.rowCount, 2);
+});
+
+test('open folder resumes wrap horizontally across as many full-width rows as needed', () => {
+  const resumeIds = Array.from({ length: 8 }, (_, index) => `r${index + 1}`);
+  const organization = normalizeWorkspaceOrganization({
+    rootItems: [{ type: 'folder', id: 'folder-1' }],
+    folders: {
+      'folder-1': { id: 'folder-1', name: 'One', resumeIds },
+    },
+  }, resumeIds);
+  const layout = buildResumeRailLayout(organization, new Set(['folder-1']), 3);
+  const [folder] = layout.placements;
+
+  assert.deepEqual({ row: folder.row, column: folder.column, width: folder.width, height: folder.height }, {
+    row: 0, column: 0, width: 3, height: 3,
+  });
+  assert.deepEqual(folder.children.map(({ row, column }) => ({ row, column })), [
+    { row: 0, column: 1 },
+    { row: 0, column: 2 },
+    { row: 1, column: 0 },
+    { row: 1, column: 1 },
+    { row: 1, column: 2 },
+    { row: 2, column: 0 },
+    { row: 2, column: 1 },
+    { row: 2, column: 2 },
+  ]);
+  assert.equal(layout.rowCount, 3);
+});
+
 test('workspace reorder helper preserves active resume and exact rail order', () => {
   const workspace = createWorkspace(['r1', 'r2', 'r3'], { activeResumeId: 'r2' });
   const reordered = reorderWorkspaceResumesToMatch(workspace, ['r3', 'r1', 'r2']);
@@ -1335,13 +2088,33 @@ test('preview mobile chrome rules do not reflow printable resume content', () =>
 
 test('resume rail uses stable container-driven columns instead of viewport-sized tiles', () => {
   const appCss = fs.readFileSync('src/App.css', 'utf8');
+  const railComponent = fs.readFileSync('src/components/resumeWorkspaceRail.jsx', 'utf8');
 
   assert.match(appCss, /\.resumeSubbar\s*\{[\s\S]*?container-name:\s*resume-rail/);
   assert.match(appCss, /\.resumePillStrip\s*\{[\s\S]*?--resume-rail-columns:\s*2/);
   assert.match(appCss, /grid-template-columns:\s*repeat\(var\(--resume-rail-columns\),\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(appCss, /\.resumePillStrip\s*\{[\s\S]*?row-gap:\s*7px/);
+  assert.match(appCss, /\.resumePillStrip\s*\{[\s\S]*?grid-auto-rows:\s*38px/);
   assert.match(appCss, /@container resume-rail \(min-width:\s*1030px\)\s*\{[\s\S]*?--resume-rail-columns:\s*6/);
   assert.match(appCss, /\.resumePill\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0/);
   assert.match(appCss, /\.resumeNewButton\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0/);
+  assert.match(appCss, /\.resumeRailCell:has\(\.entryMenu\.isOpen\)\s*\{[\s\S]*?z-index:\s*60/);
+  assert.match(railComponent, /animateLayoutChanges:\s*disableSortableLayoutAnimation/);
+  assert.match(railComponent, /buildResumeRailLayout\(layoutOrganization, displayedOpenFolderIds, columns\)/);
+  assert.match(railComponent, /placement\.surfaceRows\.map\([\s\S]*?className="resumeFolderClusterSurface"/);
+  assert.match(railComponent, /dragDisabled=\{isRenaming \|\| isOpen \|\| isTransitioning\}/);
+  assert.match(railComponent, /const animationOrder = placement\.children\.length - index - 1/);
+  assert.match(railComponent, /delay: shouldReduceMotion \? 0 : index \* itemStagger/);
+  assert.match(railComponent, /closingFolderSnapshots\.values\(\)[\s\S]*?<ClosingFolderLayer/);
+  assert.match(railComponent, /onDragMove=\{handleDragMove\}/);
+  assert.doesNotMatch(railComponent, /onDragOver=/);
+  assert.match(railComponent, /getFolderResumeInsertionIndex\(pointer, rect, placement, targetCount\)/);
+  assert.match(railComponent, /getFinalFolderPlacementRect\(placement\)/);
+  assert.doesNotMatch(railComponent, /dragOverTargetRef|stableItemCollisionRef/);
+  assert.match(railComponent, /<SortableContext items=\{rootSortableIds\} strategy=\{railSortingStrategy\}>/);
+  assert.match(railComponent, /dragCollisionRectsRef/);
+  assert.match(railComponent, /activeResumePlacementKeyRef\.current === placementKey/);
+  assert.doesNotMatch(railComponent, /rectSortingStrategy/);
 });
 
 test('preview print CSS uses physical page geometry instead of mobile viewport geometry', () => {
@@ -1576,6 +2349,186 @@ test('login merge preserves local and cloud content without dropping either side
   assert.deepEqual(result.workspace.resumeIds, ['local-1', 'cloud-1']);
   assert.equal(result.syncPlan.workspaceNeedsSync, true);
   assert.deepEqual(result.syncPlan.upsertResumeIds, ['local-1']);
+});
+
+test('login merge restores cloud folder organization into a blank browser', () => {
+  const cloudWorkspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['cloud-1', 'cloud-2'], { activeResumeId: 'cloud-2' }),
+    organization: {
+      updatedAt: '2026-02-01T00:00:00.000Z',
+      rootItems: [{ type: 'folder', id: 'cloud-folder' }],
+      folders: {
+        'cloud-folder': {
+          id: 'cloud-folder',
+          name: 'Cloud folder',
+          resumeIds: ['cloud-1', 'cloud-2'],
+        },
+      },
+    },
+  });
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace: createWorkspace(['local-blank']),
+    localDraftsByResumeId: new Map([['local-blank', createDraft('')]]),
+    cloudWorkspace,
+    cloudDraftsByResumeId: new Map([
+      ['cloud-1', createDraft('Cloud One')],
+      ['cloud-2', createDraft('Cloud Two')],
+    ]),
+  });
+
+  assert.deepEqual(result.workspace.organization.rootItems, [
+    { type: 'folder', id: 'cloud-folder' },
+  ]);
+  assert.deepEqual(result.workspace.organization.folders['cloud-folder'].resumeIds, ['cloud-1', 'cloud-2']);
+});
+
+test('login merge keeps newer placement, older-only folders, and unioned folder tombstones', () => {
+  const sharedDraftOne = createDraft('One');
+  const sharedDraftTwo = createDraft('Two');
+  const localWorkspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2']),
+    organization: {
+      updatedAt: '2026-03-01T00:00:00.000Z',
+      rootItems: [
+        { type: 'folder', id: 'local-folder' },
+        { type: 'resume', id: 'r2' },
+      ],
+      folders: {
+        'local-folder': {
+          id: 'local-folder',
+          name: 'Local',
+          resumeIds: ['r1'],
+        },
+      },
+      removedFolderIds: ['removed-locally'],
+    },
+  });
+  const cloudWorkspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2', 'r3']),
+    organization: {
+      updatedAt: '2026-02-01T00:00:00.000Z',
+      rootItems: [
+        { type: 'folder', id: 'removed-locally' },
+        { type: 'folder', id: 'cloud-folder' },
+        { type: 'resume', id: 'r1' },
+        { type: 'resume', id: 'r2' },
+      ],
+      folders: {
+        'removed-locally': { id: 'removed-locally', name: 'Old', resumeIds: [] },
+        'cloud-folder': {
+          id: 'cloud-folder',
+          name: 'Cloud',
+          resumeIds: ['r3'],
+        },
+      },
+      removedFolderIds: ['removed-in-cloud'],
+    },
+  });
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace,
+    localDraftsByResumeId: new Map([
+      ['r1', sharedDraftOne],
+      ['r2', sharedDraftTwo],
+    ]),
+    cloudWorkspace,
+    cloudDraftsByResumeId: new Map([
+      ['r1', sharedDraftOne],
+      ['r2', sharedDraftTwo],
+      ['r3', createDraft('Three')],
+    ]),
+  });
+
+  assert.deepEqual(result.workspace.organization.folders['local-folder'].resumeIds, ['r1']);
+  assert.deepEqual(result.workspace.organization.folders['cloud-folder'].resumeIds, ['r3']);
+  assert.equal(result.workspace.organization.folders['removed-locally'], undefined);
+  assert.deepEqual(
+    new Set(result.workspace.organization.removedFolderIds),
+    new Set(['removed-locally', 'removed-in-cloud']),
+  );
+  assert.equal(result.syncPlan.workspaceNeedsSync, true);
+});
+
+test('sync API workspace documents round trip folder organization', () => {
+  const workspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2']),
+    organization: {
+      updatedAt: '2026-03-01T00:00:00.000Z',
+      rootItems: [{ type: 'folder', id: 'folder-1' }],
+      folders: {
+        'folder-1': {
+          id: 'folder-1',
+          name: 'Interviews',
+          toneIndex: 3,
+          resumeIds: ['r1', 'r2'],
+        },
+      },
+      removedFolderIds: ['folder-old'],
+    },
+  });
+  const cloudDocument = createWorkspaceDoc(workspace, {
+    updatedAt: '2026-03-01T00:00:00.000Z',
+    version: 42,
+  });
+  const restored = cloudWorkspaceFromDoc(cloudDocument);
+
+  assert.equal(cloudDocument.schemaVersion, 2);
+  assert.equal(restored.organization.folders['folder-1'].toneIndex, 3);
+  assert.deepEqual(restored.organization, workspace.organization);
+});
+
+test('cloud workspace writes preserve concurrent browser folders and honor deletes', () => {
+  const currentWorkspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['cloud-1']),
+    organization: {
+      updatedAt: '2026-02-01T00:00:00.000Z',
+      rootItems: [{ type: 'folder', id: 'cloud-folder' }],
+      folders: {
+        'cloud-folder': {
+          id: 'cloud-folder',
+          name: 'Cloud folder',
+          resumeIds: ['cloud-1'],
+        },
+      },
+    },
+  });
+  const incomingWorkspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['local-1']),
+    organization: {
+      updatedAt: '2026-03-01T00:00:00.000Z',
+      rootItems: [{ type: 'folder', id: 'local-folder' }],
+      folders: {
+        'local-folder': {
+          id: 'local-folder',
+          name: 'Local folder',
+          resumeIds: ['local-1'],
+        },
+      },
+    },
+  });
+  const currentDocument = createWorkspaceDoc(currentWorkspace, {
+    updatedAt: '2026-02-01T00:00:00.000Z',
+    version: 8,
+  });
+  const merged = mergeCloudWorkspaceForWrite(incomingWorkspace, currentDocument);
+  const afterDelete = mergeCloudWorkspaceForWrite(incomingWorkspace, currentDocument, {
+    deletedResumeIds: ['cloud-1'],
+  });
+  const incomingWithFolderTombstone = normalizeWorkspaceIndex({
+    ...incomingWorkspace,
+    organization: {
+      ...incomingWorkspace.organization,
+      removedFolderIds: ['cloud-folder'],
+    },
+  });
+  const afterFolderRemoval = mergeCloudWorkspaceForWrite(incomingWithFolderTombstone, currentDocument);
+
+  assert.deepEqual(merged.resumeIds, ['local-1', 'cloud-1']);
+  assert.deepEqual(merged.organization.folders['local-folder'].resumeIds, ['local-1']);
+  assert.deepEqual(merged.organization.folders['cloud-folder'].resumeIds, ['cloud-1']);
+  assert.deepEqual(afterDelete.resumeIds, ['local-1']);
+  assert.equal(afterDelete.organization.folders['cloud-folder'].resumeIds.length, 0);
+  assert.equal(afterFolderRemoval.organization.folders['cloud-folder'], undefined);
+  assert.ok(afterFolderRemoval.organization.removedFolderIds.includes('cloud-folder'));
 });
 
 test('login merge syncs sample display preference without duplicating identical content', () => {

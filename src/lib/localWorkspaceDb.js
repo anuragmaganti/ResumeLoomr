@@ -10,8 +10,10 @@ import {
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
   dismissSampleInformation,
+  mergeWorkspaceOrganizations,
   normalizeDraftPayload,
   normalizeWorkspaceIndex,
+  placeWorkspaceResumeAfter,
   trimText,
 } from './resume.js';
 
@@ -837,6 +839,7 @@ export function mergeLocalAndCloudWorkspaces({
   const existingNames = [];
   const upsertResumeIds = new Set();
   const warnings = [];
+  const conflictCopySources = [];
 
   function addResume({ resumeId, draft, meta = {}, origin = 'cloud', forceUpsert = false }) {
     if (!resumeId || mergedDrafts.has(resumeId) || tombstonedResumeIds.has(resumeId)) {
@@ -857,7 +860,7 @@ export function mergeLocalAndCloudWorkspaces({
     }
   }
 
-  function addConflictCopy({ draft, meta = {} }) {
+  function addConflictCopy({ sourceResumeId, draft, meta = {} }) {
     const copyId = createUniqueResumeId(existingIds);
     const copyName = createConflictCopyName(meta.name || 'Resume', existingNames);
 
@@ -871,6 +874,7 @@ export function mergeLocalAndCloudWorkspaces({
       origin: 'copy',
       forceUpsert: true,
     });
+    conflictCopySources.push({ copyId, sourceResumeId });
   }
 
   if (!localHasContent && cloudHasContent) {
@@ -937,6 +941,7 @@ export function mergeLocalAndCloudWorkspaces({
           forceUpsert: true,
         });
         addConflictCopy({
+          sourceResumeId: resumeId,
           draft: cloudDraft,
           meta: normalizedCloudWorkspace.meta[resumeId],
         });
@@ -951,6 +956,7 @@ export function mergeLocalAndCloudWorkspaces({
           forceUpsert: createDraftContentHash(mergedCloudDraft) !== cloudFullHash,
         });
         addConflictCopy({
+          sourceResumeId: resumeId,
           draft: localDraft,
           meta: normalizedLocalWorkspace.meta[resumeId],
         });
@@ -998,10 +1004,23 @@ export function mergeLocalAndCloudWorkspaces({
   const activeResumeId = nextResumeIdSet.has(preferredActiveResumeId)
     ? preferredActiveResumeId
     : (nextResumeIds[0] || normalizedLocalWorkspace.activeResumeId || normalizedCloudWorkspace.activeResumeId || '');
-  const workspace = normalizeWorkspaceIndex({
+  let workspace = normalizeWorkspaceIndex({
     activeResumeId,
     resumeIds: nextResumeIds,
     meta: mergedMeta,
+    organization: mergeWorkspaceOrganizations(
+      normalizedLocalWorkspace.organization,
+      normalizedCloudWorkspace.organization,
+      nextResumeIds,
+      {
+        preferPrimaryOnTie: localHasContent,
+        primaryResumeIds: normalizedLocalWorkspace.resumeIds,
+        secondaryResumeIds: normalizedCloudWorkspace.resumeIds,
+      },
+    ),
+  });
+  conflictCopySources.forEach(({ copyId, sourceResumeId }) => {
+    workspace = placeWorkspaceResumeAfter(workspace, copyId, sourceResumeId);
   });
   const cloudHasWorkspace = normalizedCloudWorkspace.resumeIds.length > 0 && cloudDrafts.size > 0;
   const deleteResumeIds = Array.from(tombstonedResumeIds).filter((resumeId) => (
