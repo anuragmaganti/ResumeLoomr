@@ -626,7 +626,7 @@ html[data-theme="dark"] .resumePage {
   box-sizing: border-box;
   pointer-events: none;
   max-width: calc(100vw - 32px);
-  border-radius: 12px;
+  border-radius: 4px;
   border: 1px solid var(--color-accent-strong);
   outline: 0;
   background: color-mix(in srgb, var(--resume-page-bg, var(--color-surface-elevated)) 82%, var(--color-accent-soft) 18%);
