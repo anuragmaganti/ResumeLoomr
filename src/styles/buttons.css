@@ -61,7 +61,7 @@
 
 .buttonSecondary {
   border-color: var(--color-border);
-  background: linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-muted));
+  background: var(--color-surface-elevated);
   color: var(--color-text);
   box-shadow: var(--shadow-xs);
 }
@@ -69,14 +69,6 @@
 .buttonSecondary:not(:disabled):hover {
   border-color: var(--color-border-strong);
   background: var(--color-surface-muted);
-}
-
-html[data-theme="dark"] .buttonSecondary {
-  background: linear-gradient(180deg, #1e1e1e, #171717);
-}
-
-html[data-theme="dark"] .buttonSecondary:not(:disabled):hover {
-  background: #202020;
 }
 
 .buttonGhost {
@@ -246,7 +238,11 @@ html[data-theme="dark"] .buttonSecondary:not(:disabled):hover {
   padding: 14px 16px;
   border-color: color-mix(in srgb, var(--color-border) 76%, transparent);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--color-surface-muted) 64%, var(--color-surface) 36%);
+  background: color-mix(
+    in oklch,
+    var(--color-surface-elevated) 48%,
+    var(--color-surface) 52%
+  );
   color: var(--color-text-subtle);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 4%, transparent);
   text-align: left;
@@ -309,7 +305,7 @@ html[data-theme="dark"] .buttonSecondary:not(:disabled):hover {
 
 .tabs .tabButton:not(:disabled):hover {
   border-color: var(--color-border-strong);
-  background: var(--color-surface-muted);
+  background: var(--color-surface-elevated);
   color: var(--color-text);
   box-shadow: var(--shadow-sm);
 }

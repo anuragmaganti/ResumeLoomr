@@ -5,54 +5,7 @@
   position: relative;
   isolation: isolate;
   min-height: 100vh;
-  background:
-    radial-gradient(
-      circle at 14% 10%,
-      var(--color-app-wash-left),
-      transparent 34%
-    ),
-    radial-gradient(
-      circle at 84% 14%,
-      var(--color-app-wash-right),
-      transparent 30%
-    ),
-    radial-gradient(
-      circle at 16% 90%,
-      var(--color-app-wash-bottom-left-warm),
-      transparent 32%
-    ),
-    radial-gradient(
-      circle at 10% 92%,
-      var(--color-app-wash-bottom-left),
-      transparent 28%
-    ),
-    radial-gradient(
-      circle at 50% 100%,
-      var(--color-app-wash-bottom),
-      transparent 42%
-    ),
-    radial-gradient(circle at top left, var(--color-app-glow), transparent 32%),
-    linear-gradient(180deg, var(--color-app-top) 0%, var(--color-bg) 100%);
-}
-
-.app::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    linear-gradient(180deg, var(--color-app-veil), transparent 24%),
-    radial-gradient(
-      circle at 22% 18%,
-      var(--color-app-highlight-left),
-      transparent 18%
-    ),
-    radial-gradient(
-      circle at 78% 10%,
-      var(--color-app-highlight-right),
-      transparent 16%
-    );
+  background: var(--color-bg);
 }
 
 .appShell {
@@ -90,7 +43,7 @@
   align-items: center;
   padding: 8px 10px;
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-surface) 94%, var(--color-surface-muted));
+  background: var(--color-surface);
 }
 
 .brand {
@@ -170,7 +123,7 @@ html[data-theme="dark"] .brandLogo--dark {
   min-width: 0;
   padding: 9px 10px;
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-surface) 94%, var(--color-surface-muted));
+  background: var(--color-surface);
 }
 
 .resumePillStrip {
@@ -296,7 +249,7 @@ html[data-theme="dark"] .resumeFolderTone4 {
   padding: 3px 3px 3px 9px;
   border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
   border-radius: 11px;
-  background: var(--color-surface-soft);
+  background: var(--color-surface-elevated);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 4%, transparent);
   user-select: none;
   -webkit-user-select: none;
@@ -556,7 +509,7 @@ html[data-theme="dark"] .resumeFolderTone4 {
   padding: 0 7px;
   border: 1px solid var(--color-accent-border);
   border-radius: 8px;
-  background: var(--color-surface);
+  background: var(--color-surface-elevated);
   color: var(--color-text);
   font-size: 0.75rem;
   font-weight: 700;
@@ -886,7 +839,7 @@ html[data-theme="dark"] .resumePill.isActive {
   padding: 0 8px;
   border: 1px solid var(--color-accent-border);
   border-radius: 9px;
-  background: var(--color-surface);
+  background: var(--color-surface-elevated);
   color: var(--color-text);
   font-size: 0.75rem;
   font-weight: 700;
@@ -1481,7 +1434,7 @@ html[data-theme="dark"] .resumePill.isActive {
   z-index: 1;
   width: min(440px, 100%);
   padding: var(--space-6);
-  background: var(--color-surface);
+  background: var(--color-surface-elevated);
 }
 
 .importResumeDialog {
@@ -1499,8 +1452,7 @@ html[data-theme="dark"] .resumePill.isActive {
   height: 42px;
   border: 1px solid var(--color-border);
   border-radius: 999px;
-  background:
-    linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-muted));
+  background: var(--color-surface-elevated);
   color: var(--color-text-subtle);
   box-shadow: var(--shadow-md);
   cursor: pointer;
@@ -1533,8 +1485,7 @@ html[data-theme="dark"] .resumePill.isActive {
   height: 42px;
   border: 1px solid var(--color-border);
   border-radius: 999px;
-  background:
-    linear-gradient(180deg, var(--color-surface-elevated), var(--color-surface-muted));
+  background: var(--color-surface-elevated);
   color: var(--color-text-subtle);
   box-shadow: var(--shadow-md);
   cursor: pointer;
@@ -1679,7 +1630,7 @@ html[data-theme="dark"] .resumePill.isActive {
   overflow: auto;
   border-color: color-mix(in srgb, var(--color-border-strong) 56%, var(--color-border));
   border-radius: 18px;
-  background: color-mix(in srgb, var(--color-surface) 96%, var(--color-surface-muted));
+  background: var(--color-surface-elevated);
   box-shadow:
     0 24px 64px color-mix(in srgb, #0f172a 22%, transparent),
     0 4px 14px color-mix(in srgb, #0f172a 10%, transparent);
@@ -1955,8 +1906,8 @@ html[data-theme="dark"] .accountSettingsPanel {
   height: 15px;
   border: 1px solid var(--color-border-strong);
   border-radius: 999px;
-  background: var(--color-surface);
-  box-shadow: inset 0 0 0 3px var(--color-surface);
+  background: var(--color-surface-elevated);
+  box-shadow: inset 0 0 0 3px var(--color-surface-elevated);
 }
 
 .signOutBehaviorOption.isSelected .signOutBehaviorCheck {
@@ -2056,7 +2007,7 @@ html[data-theme="dark"] .accountSettingsPanel {
   padding: clamp(19px, 4vw, 22px);
   border: 1px solid color-mix(in srgb, var(--color-border-strong) 58%, var(--color-border));
   border-radius: 20px;
-  background: color-mix(in srgb, var(--color-surface) 97%, var(--color-surface-muted));
+  background: var(--color-surface-elevated);
   box-shadow:
     0 28px 72px color-mix(in srgb, #0f172a 24%, transparent),
     0 5px 18px color-mix(in srgb, #0f172a 11%, transparent);
@@ -2490,7 +2441,7 @@ html[data-theme="dark"] .signedOutPrompt {
 }
 
 .authModeTab.isActive {
-  background: var(--color-surface);
+  background: var(--color-surface-elevated);
   color: var(--color-text);
   box-shadow: var(--shadow-xs);
 }
@@ -2690,7 +2641,7 @@ html[data-theme="dark"] .signedOutPrompt {
 }
 
 .mobileWorkspaceButton.isActive {
-  background: var(--color-surface-muted);
+  background: var(--color-surface-elevated);
   color: var(--color-text);
   box-shadow: var(--shadow-xs);
 }
@@ -2946,7 +2897,7 @@ html[data-theme="dark"] .signedOutPrompt {
   padding: 2px;
   border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--color-surface-muted) 64%, var(--color-surface) 36%);
+  background: var(--color-surface-elevated);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-surface-elevated) 44%, transparent);
 }
 
@@ -3591,7 +3542,7 @@ html[data-theme="dark"] .sectionAddDialogBackdrop {
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--color-border-strong) 58%, var(--color-border));
   border-radius: 18px;
-  background: color-mix(in srgb, var(--color-surface) 96%, var(--color-surface-muted));
+  background: var(--color-surface-elevated);
   box-shadow:
     0 24px 64px color-mix(in srgb, #0f172a 22%, transparent),
     0 4px 14px color-mix(in srgb, #0f172a 10%, transparent);
@@ -3662,7 +3613,7 @@ html[data-theme="dark"] .sectionAddDialog {
   padding: 0 9px;
   border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
   border-radius: 9px;
-  background: color-mix(in srgb, var(--color-surface-muted) 66%, var(--color-surface) 34%);
+  background: var(--color-surface-elevated);
   color: var(--color-text);
   font-size: 0.72rem;
   font-weight: 680;
