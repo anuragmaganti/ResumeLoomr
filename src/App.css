@@ -2,6 +2,7 @@
   --workspace-sticky-top: 24px;
   --workspace-preview-max-width: 952px;
   --workspace-content-max-width: 1400px;
+  --rail-gap: var(--space-2);
   position: relative;
   isolation: isolate;
   min-height: 100vh;
@@ -16,7 +17,7 @@
 
 .panel {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-panel);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   transition:
@@ -28,9 +29,9 @@
   position: relative;
   z-index: 40;
   display: grid;
-  gap: var(--space-2);
+  gap: var(--rail-gap);
   width: min(100%, var(--workspace-content-max-width));
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--rail-gap);
   min-width: 0;
 }
 
@@ -42,7 +43,7 @@
   gap: var(--space-3);
   align-items: center;
   padding: 8px 10px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-panel);
   background: var(--color-surface);
 }
 
@@ -93,7 +94,7 @@ html[data-theme="dark"] .brandLogo--dark {
   min-height: 31px;
   margin: 7px 4px 0;
   border: 1px dashed color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--color-accent-soft) 34%, var(--color-surface) 66%);
   color: var(--color-text-subtle);
   font-size: 0.6875rem;
@@ -122,7 +123,7 @@ html[data-theme="dark"] .brandLogo--dark {
   width: 100%;
   min-width: 0;
   padding: 9px 10px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-panel);
   background: var(--color-surface);
 }
 
@@ -140,7 +141,7 @@ html[data-theme="dark"] .brandLogo--dark {
   min-width: 0;
   max-width: 100%;
   padding: 4px;
-  border-radius: 12px;
+  border-radius: var(--radius-item);
   overflow: visible;
   transition:
     background-color var(--transition-fast),
@@ -248,7 +249,7 @@ html[data-theme="dark"] .resumeFolderTone4 {
   min-height: 38px;
   padding: 3px 3px 3px 9px;
   border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
-  border-radius: 11px;
+  border-radius: var(--radius-item);
   background: var(--color-surface-elevated);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 4%, transparent);
   user-select: none;
@@ -383,7 +384,7 @@ html[data-theme="dark"] .resumeFolderTone4 {
   top: 4px;
   bottom: 2px;
   width: 3px;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: var(--color-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-soft) 72%, transparent);
   content: '';
@@ -463,7 +464,7 @@ html[data-theme="dark"] .resumeFolderTone4 {
   height: 18px;
   margin-left: 6px;
   padding-inline: 5px;
-  border-radius: 6px;
+  border-radius: var(--radius-compact);
   background: color-mix(in srgb, var(--color-surface-elevated) 78%, transparent);
   color: var(--color-text-subtle);
   font-size: 0.625rem;
@@ -508,7 +509,7 @@ html[data-theme="dark"] .resumeFolderTone4 {
   min-height: 25px;
   padding: 0 7px;
   border: 1px solid var(--color-accent-border);
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   background: var(--color-surface-elevated);
   color: var(--color-text);
   font-size: 0.75rem;
@@ -537,7 +538,7 @@ html[data-theme="dark"] .resumeFolderTone4 {
   position: relative;
   z-index: 0;
   margin: -3px;
-  border-radius: 14px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 12%, var(--color-surface) 88%);
   box-shadow: 0 2px 5px color-mix(in srgb, var(--folder-accent, var(--color-accent)) 10%, transparent);
   pointer-events: none;
@@ -620,7 +621,7 @@ html[data-theme="dark"] .resumeFolderTone4 {
   min-width: 0;
   min-height: 38px;
   border: 1px dashed color-mix(in srgb, var(--folder-accent, var(--color-accent)) 40%, var(--color-border));
-  border-radius: 11px;
+  border-radius: var(--radius-item);
   background: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 4%, var(--color-surface-soft));
   color: var(--color-text-muted);
   font-size: 0.6875rem;
@@ -640,7 +641,7 @@ html[data-theme="dark"] .resumeFolderTone4 {
   min-width: 22px;
   height: 22px;
   padding-inline: 6px;
-  border-radius: 7px;
+  border-radius: var(--radius-small);
   background: var(--color-accent);
   color: #fff;
   font-size: 0.6875rem;
@@ -658,7 +659,7 @@ html[data-theme="dark"] .resumeFolderTone4 {
   position: absolute;
   inset: 0;
   border: 1px solid color-mix(in srgb, var(--color-accent) 52%, var(--color-border));
-  border-radius: 11px;
+  border-radius: var(--radius-item);
   background: color-mix(in srgb, var(--color-surface-elevated) 76%, var(--color-accent-soft) 24%);
   box-shadow:
     0 4px 12px color-mix(in srgb, var(--color-text) 12%, transparent),
@@ -690,7 +691,7 @@ html[data-theme="dark"] .resumeFolderTone4 {
   width: 19px;
   height: 19px;
   border: 2px solid var(--color-error);
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: color-mix(in srgb, var(--color-surface-elevated) 92%, transparent);
   box-shadow: 0 2px 7px color-mix(in srgb, var(--color-text) 16%, transparent);
 }
@@ -702,7 +703,7 @@ html[data-theme="dark"] .resumeFolderTone4 {
   left: 50%;
   width: 12px;
   height: 2px;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: var(--color-error);
   transform: translate(-50%, -50%) rotate(-45deg);
 }
@@ -838,7 +839,7 @@ html[data-theme="dark"] .resumePill.isActive {
   min-height: 30px;
   padding: 0 8px;
   border: 1px solid var(--color-accent-border);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--color-surface-elevated);
   color: var(--color-text);
   font-size: 0.75rem;
@@ -966,7 +967,7 @@ html[data-theme="dark"] .resumePill.isActive {
   width: 17px;
   height: 17px;
   border: 1px solid color-mix(in srgb, var(--color-text-muted) 72%, var(--color-border));
-  border-radius: 5px;
+  border-radius: var(--radius-compact);
   background: color-mix(in srgb, var(--color-surface-elevated) 88%, transparent);
   color: #ffffff;
   box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 10%, transparent);
@@ -1048,7 +1049,7 @@ html[data-theme="dark"] .resumePill.isActive {
   margin: 7px 1px 0;
   padding: 6px 7px 6px 9px;
   border: 1px solid color-mix(in srgb, var(--color-accent) 18%, var(--color-border));
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--color-accent-soft) 36%, var(--color-surface) 64%);
 }
 
@@ -1067,7 +1068,7 @@ html[data-theme="dark"] .resumePill.isActive {
   width: 6px;
   height: 6px;
   flex: 0 0 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
@@ -1082,7 +1083,7 @@ html[data-theme="dark"] .resumePill.isActive {
 .button.resumeSelectionClear {
   min-height: 28px;
   padding: 0 10px;
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   font-size: 0.6875rem;
   font-weight: 750;
 }
@@ -1097,7 +1098,7 @@ html[data-theme="dark"] .resumePill.isActive {
   width: 14px;
   height: 14px;
   flex: 0 0 14px;
-  border-radius: 5px;
+  border-radius: var(--radius-compact);
   background: color-mix(in srgb, var(--color-surface-elevated) 72%, transparent);
   color: currentColor;
 }
@@ -1110,7 +1111,7 @@ html[data-theme="dark"] .resumePill.isActive {
   left: 50%;
   width: 8px;
   height: 1.4px;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: currentColor;
   transform: translate(-50%, -50%);
 }
@@ -1221,7 +1222,7 @@ html[data-theme="dark"] .resumePill.isActive {
   min-height: 34px;
   padding: 0 10px;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   font-size: 0.8125rem;
   font-weight: 800;
   white-space: nowrap;
@@ -1240,7 +1241,7 @@ html[data-theme="dark"] .resumePill.isActive {
   min-height: 54px;
   padding: 7px 8px 7px 9px;
   border: 1px solid color-mix(in srgb, var(--color-border-strong) 74%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--color-surface-elevated) 94%, transparent);
   color: var(--color-text);
   box-shadow:
@@ -1256,7 +1257,7 @@ html[data-theme="dark"] .resumePill.isActive {
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--color-surface-muted);
   color: var(--color-text-muted);
 }
@@ -1325,7 +1326,7 @@ html[data-theme="dark"] .resumePill.isActive {
 .noticeToastRetry {
   min-height: 30px;
   padding: 0 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   color: var(--color-accent-strong);
   font-size: 0.68rem;
   font-weight: 780;
@@ -1335,7 +1336,7 @@ html[data-theme="dark"] .resumePill.isActive {
   width: 30px;
   height: 30px;
   padding: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-control);
 }
 
 .noticeToastDismiss svg {
@@ -1382,7 +1383,7 @@ html[data-theme="dark"] .resumePill.isActive {
   margin-bottom: var(--space-4);
   padding: 14px 16px;
   border: 1px solid var(--color-warning);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background: var(--color-warning-soft);
   color: var(--color-text);
 }
@@ -1451,7 +1452,7 @@ html[data-theme="dark"] .resumePill.isActive {
   width: 42px;
   height: 42px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: var(--color-surface-elevated);
   color: var(--color-text-subtle);
   box-shadow: var(--shadow-md);
@@ -1484,7 +1485,7 @@ html[data-theme="dark"] .resumePill.isActive {
   width: 42px;
   height: 42px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: var(--color-surface-elevated);
   color: var(--color-text-subtle);
   box-shadow: var(--shadow-md);
@@ -1629,7 +1630,7 @@ html[data-theme="dark"] .resumePill.isActive {
   padding: 11px 12px 12px;
   overflow: auto;
   border-color: color-mix(in srgb, var(--color-border-strong) 56%, var(--color-border));
-  border-radius: 18px;
+  border-radius: var(--radius-dialog);
   background: var(--color-surface-elevated);
   box-shadow:
     0 24px 64px color-mix(in srgb, #0f172a 22%, transparent),
@@ -1668,7 +1669,7 @@ html[data-theme="dark"] .accountSettingsPanel {
   height: 28px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
@@ -1710,7 +1711,7 @@ html[data-theme="dark"] .accountSettingsPanel {
   width: 34px;
   height: 34px;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--color-surface-muted);
   color: var(--color-text-muted);
 }
@@ -1756,7 +1757,7 @@ html[data-theme="dark"] .accountSettingsPanel {
   width: 6px;
   height: 6px;
   flex: 0 0 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: var(--color-text-muted);
 }
 
@@ -1824,7 +1825,7 @@ html[data-theme="dark"] .accountSettingsPanel {
   min-height: 48px;
   padding: 7px 8px;
   border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
-  border-radius: 11px;
+  border-radius: var(--radius-item);
   background: color-mix(in srgb, var(--color-surface-muted) 58%, var(--color-surface) 42%);
   cursor: pointer;
   transition:
@@ -1862,7 +1863,7 @@ html[data-theme="dark"] .accountSettingsPanel {
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   background: color-mix(in srgb, var(--color-surface-elevated) 72%, transparent);
   color: var(--color-text-muted);
 }
@@ -1905,7 +1906,7 @@ html[data-theme="dark"] .accountSettingsPanel {
   width: 15px;
   height: 15px;
   border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: var(--color-surface-elevated);
   box-shadow: inset 0 0 0 3px var(--color-surface-elevated);
 }
@@ -1919,7 +1920,7 @@ html[data-theme="dark"] .accountSettingsPanel {
   width: 100%;
   min-height: 36px;
   margin-top: 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   box-shadow: none;
   font-size: 0.78rem;
 }
@@ -1934,7 +1935,7 @@ html[data-theme="dark"] .accountSettingsPanel {
   margin-top: 10px;
   padding: 10px;
   border: 1px solid var(--color-danger-border);
-  border-radius: 12px;
+  border-radius: var(--radius-item);
   background: var(--color-danger-bg);
 }
 
@@ -1987,7 +1988,7 @@ html[data-theme="dark"] .accountSettingsPanel {
 .browserDataActions .button {
   min-height: 32px;
   padding-inline: 12px;
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   font-size: 0.72rem;
 }
 
@@ -2006,7 +2007,7 @@ html[data-theme="dark"] .accountSettingsPanel {
   width: min(470px, 100%);
   padding: clamp(19px, 4vw, 22px);
   border: 1px solid color-mix(in srgb, var(--color-border-strong) 58%, var(--color-border));
-  border-radius: 20px;
+  border-radius: var(--radius-sheet);
   background: var(--color-surface-elevated);
   box-shadow:
     0 28px 72px color-mix(in srgb, #0f172a 24%, transparent),
@@ -2054,7 +2055,7 @@ html[data-theme="dark"] .signedOutPrompt {
   flex: 0 0 30px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
@@ -2112,7 +2113,7 @@ html[data-theme="dark"] .signedOutPrompt {
   min-height: 67px;
   padding: 10px 12px;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
+  border-radius: var(--radius-card);
   background: var(--color-surface-muted);
   color: var(--color-text);
   text-align: left;
@@ -2164,7 +2165,7 @@ html[data-theme="dark"] .signedOutPrompt {
   place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: 11px;
+  border-radius: var(--radius-item);
   background: var(--color-surface-elevated);
   color: var(--color-text-muted);
 }
@@ -2264,7 +2265,7 @@ html[data-theme="dark"] .signedOutPrompt {
   width: 17px;
   height: 17px;
   border: 1px solid var(--color-border-strong);
-  border-radius: 5px;
+  border-radius: var(--radius-compact);
   background: var(--color-input-bg);
   color: #fff;
   transition:
@@ -2333,7 +2334,7 @@ html[data-theme="dark"] .signedOutPrompt {
 .signedOutPromptNote {
   padding: var(--space-3);
   border: 1px solid var(--color-info-border);
-  border-radius: 16px;
+  border-radius: var(--radius-popover);
   background: var(--color-info-soft);
   color: var(--color-text);
   font-size: 0.84rem;
@@ -2404,7 +2405,7 @@ html[data-theme="dark"] .signedOutPrompt {
   width: 30px;
   height: 30px;
   border: 1px solid var(--color-danger-border);
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: var(--color-danger-bg);
   color: var(--color-error);
   font-weight: 800;
@@ -2425,14 +2426,14 @@ html[data-theme="dark"] .signedOutPrompt {
   margin-bottom: var(--space-3);
   padding: 4px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: var(--color-surface-muted);
 }
 
 .authModeTab {
   min-height: 32px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: transparent;
   color: var(--color-text-subtle);
   font-size: 0.78rem;
@@ -2489,7 +2490,7 @@ html[data-theme="dark"] .signedOutPrompt {
   min-height: 38px;
   padding: 0 12px;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-item);
   background: var(--color-input-bg);
   color: var(--color-text);
 }
@@ -2504,7 +2505,7 @@ html[data-theme="dark"] .signedOutPrompt {
   margin: 0;
   padding: 10px 12px;
   border: 1px solid var(--color-error-border);
-  border-radius: 12px;
+  border-radius: var(--radius-item);
   background: var(--color-error-soft);
   color: var(--color-error);
   font-size: 0.82rem;
@@ -2524,7 +2525,7 @@ html[data-theme="dark"] .signedOutPrompt {
   min-height: 132px;
   padding: var(--space-5);
   border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background:
     radial-gradient(circle at 16% 0%, var(--color-accent-soft), transparent 42%),
     var(--color-surface-muted);
@@ -2620,17 +2621,17 @@ html[data-theme="dark"] .signedOutPrompt {
 .mobileWorkspaceToggle {
   display: none;
   gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--rail-gap);
   padding: 4px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background: var(--color-surface);
 }
 
 .mobileWorkspaceButton {
   min-height: 44px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-item);
   background: transparent;
   color: var(--color-text-subtle);
   font-weight: 600;
@@ -2652,7 +2653,7 @@ html[data-theme="dark"] .signedOutPrompt {
   display: grid;
   width: min(100%, var(--workspace-content-max-width));
   grid-template-columns: clamp(430px, 44vw, 680px) minmax(0, 1fr);
-  gap: var(--space-4);
+  gap: var(--rail-gap);
   align-items: start;
 }
 
@@ -2667,7 +2668,7 @@ html[data-theme="dark"] .signedOutPrompt {
 .editorWorkspace {
   display: grid;
   grid-template-columns: clamp(104px, 10.5vw, 140px) minmax(0, 1fr);
-  gap: var(--space-4);
+  gap: var(--rail-gap);
   align-items: start;
 }
 
@@ -2675,14 +2676,14 @@ html[data-theme="dark"] .signedOutPrompt {
   position: sticky;
   top: var(--workspace-sticky-top);
   display: grid;
-  gap: var(--space-3);
+  gap: var(--rail-gap);
   align-self: start;
   justify-self: stretch;
   width: 100%;
   min-width: 0;
   max-height: calc(100dvh - var(--workspace-sticky-top) - 24px);
   overflow: auto;
-  padding-right: 2px;
+  padding-right: 0;
 }
 
 .editorSidebar::-webkit-scrollbar {
@@ -2691,7 +2692,7 @@ html[data-theme="dark"] .signedOutPrompt {
 
 .editorSidebar::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: color-mix(in srgb, var(--color-text-muted) 44%, transparent) padding-box;
 }
 
@@ -2704,6 +2705,7 @@ html[data-theme="dark"] .signedOutPrompt {
   min-width: 0;
   overflow: hidden;
   padding: 11px;
+  border-radius: var(--radius-panel);
 }
 
 .settingsRail.isStartPending,
@@ -2801,7 +2803,7 @@ html[data-theme="dark"] .signedOutPrompt {
   min-height: 29px;
   padding: 3px 2px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   background: transparent;
   text-align: center;
   transition: background-color var(--transition-base);
@@ -2848,7 +2850,7 @@ html[data-theme="dark"] .signedOutPrompt {
   width: 100%;
   padding: 2px;
   border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--color-input-bg);
 }
 
@@ -2857,7 +2859,7 @@ html[data-theme="dark"] .signedOutPrompt {
   min-height: 21px;
   padding: 0 5px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-compact);
   background: transparent;
   color: var(--color-text-muted);
   font-size: 0.5625rem;
@@ -2896,7 +2898,7 @@ html[data-theme="dark"] .signedOutPrompt {
   overflow: hidden;
   padding: 2px;
   border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--color-surface-elevated);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-surface-elevated) 44%, transparent);
 }
@@ -2968,7 +2970,7 @@ html[data-theme="dark"] .signedOutPrompt {
     gap: 2px;
     padding: 2px;
     border: 1px solid var(--color-border);
-    border-radius: 9px;
+    border-radius: var(--radius-control);
     background: var(--color-input-bg);
   }
 
@@ -2976,7 +2978,7 @@ html[data-theme="dark"] .signedOutPrompt {
     min-height: 20px;
     padding: 0 5px;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--radius-compact);
     background: transparent;
     font-size: 0.5625rem;
   }
@@ -3001,7 +3003,7 @@ html[data-theme="dark"] .signedOutPrompt {
   min-height: var(--settings-stepper-control-size);
   padding: 0;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-small);
   background: transparent;
   color: var(--color-text);
   font-size: var(--settings-stepper-font-size);
@@ -3025,7 +3027,7 @@ html[data-theme="dark"] .signedOutPrompt {
   width: min(288px, calc(100vw - 24px));
   max-height: calc(100vh - 24px);
   border: 1px solid color-mix(in srgb, var(--color-border-strong) 62%, var(--color-border));
-  border-radius: 16px;
+  border-radius: var(--radius-popover);
   background: color-mix(in srgb, var(--color-surface-elevated) 96%, transparent);
   color: var(--color-text);
   box-shadow:
@@ -3105,7 +3107,7 @@ html[data-theme="dark"] .separatorSettingsPopup {
 
 .separatorSliderValue {
   padding: 2px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: color-mix(in srgb, var(--color-surface-muted) 76%, transparent);
   color: var(--color-text-muted);
   font-size: 0.61rem;
@@ -3126,7 +3128,7 @@ html[data-theme="dark"] .separatorSettingsPopup {
 
 .separatorSliderControl input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: linear-gradient(
     to right,
     var(--color-accent) 0 var(--separator-slider-progress, 50%),
@@ -3141,7 +3143,7 @@ html[data-theme="dark"] .separatorSettingsPopup {
   box-sizing: border-box;
   margin-top: -6px;
   border: 2px solid var(--color-surface-elevated);
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: var(--color-accent);
   box-shadow: 0 1px 4px color-mix(in srgb, #020617 24%, transparent);
 }
@@ -3149,13 +3151,13 @@ html[data-theme="dark"] .separatorSettingsPopup {
 .separatorSliderControl input[type="range"]::-moz-range-track {
   height: 4px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: color-mix(in srgb, var(--color-border-strong) 58%, transparent);
 }
 
 .separatorSliderControl input[type="range"]::-moz-range-progress {
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: var(--color-accent);
 }
 
@@ -3164,7 +3166,7 @@ html[data-theme="dark"] .separatorSettingsPopup {
   height: 16px;
   box-sizing: border-box;
   border: 2px solid var(--color-surface-elevated);
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: var(--color-accent);
   box-shadow: 0 1px 4px color-mix(in srgb, #020617 24%, transparent);
 }
@@ -3207,7 +3209,7 @@ html[data-theme="dark"] .separatorSettingsPopup {
   justify-content: center;
   width: 18px;
   height: 16px;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   color: inherit;
   transition:
     background-color 150ms ease,
@@ -3229,7 +3231,7 @@ html[data-theme="dark"] .separatorSettingsPopup {
   gap: 3px;
   padding: 3px;
   border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--color-surface-muted) 76%, transparent);
 }
 
@@ -3237,7 +3239,7 @@ html[data-theme="dark"] .separatorSettingsPopup {
   min-height: 27px;
   padding: 0 7px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-small);
   background: transparent;
   color: var(--color-text-muted);
   font-size: 0.64rem;
@@ -3334,14 +3336,14 @@ html[data-theme="dark"] .separatorSettingsPopup {
     calc(100dvh - var(--workspace-sticky-top) - 24px)
   );
   overflow: hidden;
-
   padding: 18px;
+  border-radius: var(--radius-panel);
 }
 
 @media screen and (min-width: 721px) {
   .editorSidebar {
-    gap: var(--space-3);
-    padding-right: 2px;
+    gap: var(--rail-gap);
+    padding-right: 0;
   }
 
   .settingsRail,
@@ -3398,7 +3400,7 @@ html[data-theme="dark"] .separatorSettingsPopup {
   gap: 5px;
   padding: 0 0 0 7px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--color-surface-muted) 64%, transparent);
 }
 
@@ -3413,7 +3415,7 @@ html[data-theme="dark"] .separatorSettingsPopup {
   min-width: 26px;
   min-height: 26px;
   padding: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-small);
   box-shadow: none;
 }
 
@@ -3440,7 +3442,7 @@ html[data-theme="dark"] .separatorSettingsPopup {
   width: 100%;
   min-height: 30px;
   padding: 5px 6px;
-  border-radius: 12px;
+  border-radius: var(--radius-item);
   font-size: 1rem;
   line-height: 1;
 }
@@ -3459,7 +3461,7 @@ html[data-theme="dark"] .separatorSettingsPopup {
   width: 16px;
   height: 16px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-small);
   background: transparent;
   color: var(--color-text-muted);
   font-size: 0;
@@ -3481,7 +3483,7 @@ html[data-theme="dark"] .separatorSettingsPopup {
   left: 50%;
   width: 10px;
   height: 1.6px;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: currentColor;
   transform: translate(-50%, -50%);
 }
@@ -3541,7 +3543,7 @@ html[data-theme="dark"] .sectionAddDialogBackdrop {
   max-height: calc(100dvh - 32px);
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--color-border-strong) 58%, var(--color-border));
-  border-radius: 18px;
+  border-radius: var(--radius-dialog);
   background: var(--color-surface-elevated);
   box-shadow:
     0 24px 64px color-mix(in srgb, #0f172a 22%, transparent),
@@ -3612,7 +3614,7 @@ html[data-theme="dark"] .sectionAddDialog {
   min-height: 31px;
   padding: 0 9px;
   border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--color-surface-elevated);
   color: var(--color-text);
   font-size: 0.72rem;
@@ -3668,7 +3670,7 @@ html[data-theme="dark"] .sectionAddDialog {
     width: 100%;
     max-height: calc(100dvh - 20px);
     padding: 8px 10px 10px;
-    border-radius: 18px;
+    border-radius: var(--radius-dialog);
   }
 
   .sectionAddDialogGroups {
@@ -3690,7 +3692,7 @@ html[data-theme="dark"] .sectionAddDialog {
   .sectionAddDialogOption {
     min-height: 28px;
     padding: 0 7px;
-    border-radius: 8px;
+    border-radius: var(--radius-small);
     font-size: 0.6875rem;
   }
 }
@@ -3730,7 +3732,7 @@ html[data-theme="dark"] .sectionAddDialog {
 
 .formContainer::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-capsule);
   background: color-mix(in srgb, var(--color-text-muted) 44%, transparent) padding-box;
 }
 
@@ -3777,9 +3779,9 @@ html[data-theme="dark"] .sectionAddDialog {
   .app {
     --workspace-content-max-width: calc(
       clamp(104px, 10.5vw, 140px) +
-      var(--space-4) +
+      var(--rail-gap) +
       341.5px +
-      var(--space-4) +
+      var(--rail-gap) +
       var(--workspace-preview-max-width)
     );
   }
@@ -3812,10 +3814,10 @@ html[data-theme="dark"] .sectionAddDialog {
 
 @media screen and (min-width: 981px) {
   .workspace.isPreviewFitPageLayout {
-    --workspace-fit-page-editor-min: min(430px, calc(100% - 320px - var(--space-4)));
+    --workspace-fit-page-editor-min: min(430px, calc(100% - 320px - var(--rail-gap)));
     --workspace-fit-page-preview-width: min(
       var(--workspace-fit-page-width),
-      calc(100% - var(--workspace-fit-page-editor-min) - var(--space-4))
+      calc(100% - var(--workspace-fit-page-editor-min) - var(--rail-gap))
     );
     grid-template-columns:
       minmax(var(--workspace-fit-page-editor-min), 1fr)
@@ -3875,7 +3877,7 @@ html[data-theme="dark"] .sectionAddDialog {
 
   .editorWorkspace {
     grid-template-columns: 1fr;
-    gap: var(--space-5);
+    gap: var(--rail-gap);
   }
 
   .editorSidebar {

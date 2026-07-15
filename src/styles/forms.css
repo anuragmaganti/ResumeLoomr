@@ -18,7 +18,7 @@ form {
 .formSection {
   padding: var(--space-5);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background: var(--color-surface-elevated);
   box-shadow: none;
   transition:
@@ -130,7 +130,7 @@ form {
 .entrySummaryButton:focus-visible {
   outline: 3px solid var(--color-accent-soft);
   outline-offset: 4px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
 }
 
 .entrySummaryText {
@@ -194,7 +194,7 @@ form {
 .button.entryCollapseButton:focus-visible {
   outline: 3px solid var(--color-accent-soft);
   outline-offset: 4px;
-  border-radius: 8px;
+  border-radius: var(--radius-small);
 }
 
 .fieldGrid {
@@ -239,7 +239,7 @@ form {
 .field textarea {
   width: 100%;
   border: 1px solid var(--color-border);
-  border-radius: 9px;
+  border-radius: var(--radius-small);
   background: var(--color-input-bg);
   color: var(--color-text);
   padding: 13px 14px;
@@ -321,7 +321,7 @@ form {
 .nestedEntryCard {
   padding: var(--space-3);
   border: 1px solid var(--color-nested-border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--color-nested-bg);
 }
 
