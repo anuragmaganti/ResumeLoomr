@@ -26,6 +26,10 @@ import {
   createMixedSamplePreviewModel,
   createSamplePlaceholderResolver,
 } from './lib/sampleResumes.js';
+import {
+  readLocalStorageItem,
+  writeLocalStorageItem,
+} from './lib/browserStorage.js';
 
 const THEME_STORAGE_KEY = 'resumeloomr:theme';
 const EMPTY_SAMPLE_ORDER_OVERRIDES = {};
@@ -44,7 +48,7 @@ function App() {
       return 'light';
     }
 
-    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const savedTheme = readLocalStorageItem(THEME_STORAGE_KEY);
     if (savedTheme === 'light' || savedTheme === 'dark') {
       return savedTheme;
     }
@@ -206,7 +210,7 @@ function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    writeLocalStorageItem(THEME_STORAGE_KEY, theme);
 
     const themeColor = document.querySelector('meta[name="theme-color"]');
     if (themeColor) {

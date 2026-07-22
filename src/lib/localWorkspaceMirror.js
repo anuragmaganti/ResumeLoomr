@@ -9,17 +9,15 @@ import {
 } from './localWorkspaceKeys.js';
 import { normalizeWorkspaceIndex } from './workspace.js';
 import { createBlankDraftState, createFreshWorkspaceDraft } from './workspaceDraft.js';
+import {
+  getBrowserLocalStorage,
+  readStorageItem,
+  removeStorageItem,
+  writeStorageItem,
+} from './browserStorage.js';
 
 export function getLocalWorkspaceStorage() {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
+  return getBrowserLocalStorage();
 }
 
 function safeJsonParse(rawValue) {
@@ -34,48 +32,20 @@ function safeJsonParse(rawValue) {
   }
 }
 
-function withLocalWorkspaceStorage(operation) {
-  const storage = getLocalWorkspaceStorage();
-
-  if (!storage) {
-    return false;
-  }
-
-  try {
-    operation(storage);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function readLocalWorkspaceStorageValue(key) {
-  const storage = getLocalWorkspaceStorage();
-
-  if (!storage) {
-    return null;
-  }
-
-  try {
-    return storage.getItem(key);
-  } catch {
-    return null;
-  }
+  return readStorageItem(getLocalWorkspaceStorage(), key);
 }
 
 export function markLocalWorkspacePresent() {
-  return withLocalWorkspaceStorage((storage) => {
-    storage.setItem(LOCAL_WORKSPACE_PRESENT_KEY, 'true');
-  });
+  return writeStorageItem(getLocalWorkspaceStorage(), LOCAL_WORKSPACE_PRESENT_KEY, 'true');
 }
 
 export function writeLocalStorageWorkspace(workspace) {
-  const written = withLocalWorkspaceStorage((storage) => {
-    storage.setItem(
-      WORKSPACE_INDEX_STORAGE_KEY,
-      JSON.stringify(normalizeWorkspaceIndex(workspace)),
-    );
-  });
+  const written = writeStorageItem(
+    getLocalWorkspaceStorage(),
+    WORKSPACE_INDEX_STORAGE_KEY,
+    JSON.stringify(normalizeWorkspaceIndex(workspace)),
+  );
 
   if (written) {
     markLocalWorkspacePresent();
@@ -89,12 +59,11 @@ export function writeLocalStorageDraft(resumeId, draft) {
     return false;
   }
 
-  const written = withLocalWorkspaceStorage((storage) => {
-    storage.setItem(
-      createResumeStorageKey(resumeId),
-      JSON.stringify(serializeDraftState(draft)),
-    );
-  });
+  const written = writeStorageItem(
+    getLocalWorkspaceStorage(),
+    createResumeStorageKey(resumeId),
+    JSON.stringify(serializeDraftState(draft)),
+  );
 
   if (written) {
     markLocalWorkspacePresent();
@@ -108,9 +77,7 @@ export function removeLocalStorageDraft(resumeId) {
     return false;
   }
 
-  return withLocalWorkspaceStorage((storage) => {
-    storage.removeItem(createResumeStorageKey(resumeId));
-  });
+  return removeStorageItem(getLocalWorkspaceStorage(), createResumeStorageKey(resumeId));
 }
 
 export function readLegacyDraftFromLocalStorage(resumeId) {

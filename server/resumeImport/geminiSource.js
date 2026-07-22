@@ -136,6 +136,7 @@ function parseSourceDocumentWireOutput(text) {
       diagnostics: {
         validationIssueCount: parsedOutput.error.issues.length,
       },
+      expose: true,
     });
   }
 
@@ -153,6 +154,7 @@ function parseSourceMappingWireOutput(text) {
       diagnostics: {
         validationIssueCount: parsedOutput.error.issues.length,
       },
+      expose: true,
     });
   }
 

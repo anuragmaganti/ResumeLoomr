@@ -3,7 +3,7 @@ import {
   getAdminAuth,
   verifyFirebaseIdTokenHeader,
 } from '../server/firebaseAdmin.js';
-import { sendPrivateJson } from '../server/httpProtocol.js';
+import { sendPrivateError, sendPrivateJson } from '../server/httpProtocol.js';
 
 const SESSION_COOKIE_NAME = '__session';
 const SESSION_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -54,11 +54,18 @@ export default async function handler(req, res) {
   } catch (error) {
     const statusCode = error instanceof FirebaseAdminError ? error.statusCode : 500;
 
-    sendPrivateJson(res, statusCode, {
-      error: {
-        code: error?.code || 'sync-session/failed',
-        message: error?.message || 'Could not start browser sync session.',
-      },
+    if (statusCode >= 500) {
+      console.error(JSON.stringify({
+        level: 'error',
+        message: 'Browser sync session creation failed',
+        code: error?.code,
+        errorMessage: error?.message,
+      }));
+    }
+
+    sendPrivateError(res, statusCode, error, {
+      code: 'sync-session/failed',
+      message: 'Could not start browser sync session.',
     });
   }
 }

@@ -4,11 +4,16 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { parseCookieHeader } from './httpProtocol.js';
 
 export class FirebaseAdminError extends Error {
-  constructor(message, { statusCode = 500, code = 'firebase-admin/error' } = {}) {
+  constructor(message, {
+    statusCode = 500,
+    code = 'firebase-admin/error',
+    expose = statusCode < 500,
+  } = {}) {
     super(message);
     this.name = 'FirebaseAdminError';
     this.statusCode = statusCode;
     this.code = code;
+    this.expose = expose;
   }
 }
 

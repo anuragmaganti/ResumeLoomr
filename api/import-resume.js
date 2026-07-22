@@ -6,7 +6,7 @@ import {
   parseResumeWithGemini,
   verifyFirebaseIdToken,
 } from '../server/importResume.js';
-import { sendPrivateJson } from '../server/httpProtocol.js';
+import { sendPrivateError, sendPrivateJson } from '../server/httpProtocol.js';
 
 function logImportError(error, context = {}) {
   if (error instanceof ImportResumeError && error.statusCode < 500) {
@@ -64,20 +64,16 @@ export default async function handler(req, res) {
     });
 
     if (error instanceof ImportResumeError) {
-      sendPrivateJson(res, error.statusCode, {
-        error: {
-          code: error.code,
-          message: error.message,
-        },
+      sendPrivateError(res, error.statusCode, error, {
+        code: 'import/failed',
+        message: 'Resume import failed. Try again with another file.',
       });
       return;
     }
 
-    sendPrivateJson(res, 500, {
-      error: {
-        code: 'import/failed',
-        message: 'Resume import failed. Try again with another file.',
-      },
+    sendPrivateError(res, 500, error, {
+      code: 'import/failed',
+      message: 'Resume import failed. Try again with another file.',
     });
   }
 }

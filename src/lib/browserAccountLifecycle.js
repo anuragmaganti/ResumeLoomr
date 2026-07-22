@@ -17,7 +17,12 @@ export async function runBrowserSignOut({
   }
 
   if (allowSignedOutEditing && accountUid && !cloudSyncCompleted) {
-    await setSessionCleanupRequested(accountUid, true);
+    const sessionCleanupArmed = await setSessionCleanupRequested(accountUid, true);
+
+    if (!sessionCleanupArmed) {
+      return { status: 'session-cleanup-arm-failed' };
+    }
+
     await requestBackgroundSync();
   }
 

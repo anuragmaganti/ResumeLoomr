@@ -2,10 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  createPublicError,
+  HttpProtocolError,
   parseCookieHeader,
   readJsonRequestBody,
+  sendPrivateError,
   sendPrivateJson,
 } from '../server/httpProtocol.js';
+import { FirebaseAdminError } from '../server/firebaseAdmin.js';
+import { ImportResumeError } from '../server/resumeImport/error.js';
 
 test('private JSON responses disable caching and content sniffing', () => {
   const headers = new Map();
@@ -27,6 +32,78 @@ test('private JSON responses disable caching and content sniffing', () => {
   assert.equal(headers.get('Content-Type'), 'application/json; charset=utf-8');
   assert.equal(headers.get('Cache-Control'), 'private, no-store, max-age=0');
   assert.equal(headers.get('X-Content-Type-Options'), 'nosniff');
+});
+
+test('public error responses expose only explicitly safe details', () => {
+  const fallback = {
+    code: 'request/failed',
+    message: 'The request failed.',
+  };
+  const privateError = Object.assign(new Error('Database credentials are invalid.'), {
+    code: 'database/internal',
+  });
+  const publicError = new HttpProtocolError('The request body is invalid.', {
+    statusCode: 400,
+    code: 'request/invalid',
+  });
+
+  assert.deepEqual(createPublicError(privateError, fallback), fallback);
+  assert.deepEqual(createPublicError(publicError, fallback), {
+    code: 'request/invalid',
+    message: 'The request body is invalid.',
+  });
+});
+
+test('server error classes default 5xx details to private', () => {
+  const fallback = {
+    code: 'request/failed',
+    message: 'The request failed.',
+  };
+  const firebaseError = new FirebaseAdminError('Firebase Admin is not configured.');
+  const importError = new ImportResumeError('Provider account details are invalid.', {
+    statusCode: 503,
+    code: 'import/provider-failed',
+  });
+  const curatedImportError = new ImportResumeError('The import provider is temporarily unavailable.', {
+    statusCode: 503,
+    code: 'import/provider-unavailable',
+    expose: true,
+  });
+
+  assert.deepEqual(createPublicError(firebaseError, fallback), fallback);
+  assert.deepEqual(createPublicError(importError, fallback), fallback);
+  assert.deepEqual(createPublicError(curatedImportError, fallback), {
+    code: 'import/provider-unavailable',
+    message: 'The import provider is temporarily unavailable.',
+  });
+});
+
+test('private error responses keep internal details out of the response body', () => {
+  const headers = new Map();
+  const response = {
+    statusCode: 0,
+    body: '',
+    setHeader(name, value) {
+      headers.set(name, value);
+    },
+    end(body) {
+      this.body = body;
+    },
+  };
+
+  sendPrivateError(response, 500, new Error('FIREBASE_SERVICE_ACCOUNT_JSON is malformed.'), {
+    code: 'sync/failed',
+    message: 'Could not sync resumes.',
+  });
+
+  assert.equal(response.statusCode, 500);
+  assert.deepEqual(JSON.parse(response.body), {
+    error: {
+      code: 'sync/failed',
+      message: 'Could not sync resumes.',
+    },
+  });
+  assert.equal(headers.get('Cache-Control'), 'private, no-store, max-age=0');
 });
 
 test('cookie parsing tolerates malformed percent encoding', () => {

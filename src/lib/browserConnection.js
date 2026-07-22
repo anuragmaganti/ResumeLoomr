@@ -10,6 +10,14 @@ import {
 import {
   deleteLocalWorkspaceDatabase,
 } from './localWorkspaceDb.js';
+import {
+  getBrowserLocalStorage,
+  getBrowserSessionStorage,
+  listStorageKeys,
+  readStorageItem,
+  removeStorageItem,
+  writeStorageItem,
+} from './browserStorage.js';
 
 const CONNECTED_ACCOUNT_STORAGE_KEY = 'resumeloomr:connected-account:v1';
 const SIGNED_OUT_EDITING_PREFERENCE_KEY = 'resumeloomr:signed-out-editing-preference:v1';
@@ -64,27 +72,11 @@ const OBSOLETE_LOCAL_STORAGE_PREFIXES = [
 ];
 
 function getStorage(storage) {
-  if (storage) {
-    return storage;
-  }
-
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  return window.localStorage;
+  return getBrowserLocalStorage(storage);
 }
 
 function getSessionStorage(storage) {
-  if (storage) {
-    return storage;
-  }
-
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  return window.sessionStorage;
+  return getBrowserSessionStorage(storage);
 }
 
 function safeParse(rawValue) {
@@ -106,7 +98,7 @@ export function readConnectedAccount(storage) {
     return null;
   }
 
-  const account = safeParse(targetStorage.getItem(CONNECTED_ACCOUNT_STORAGE_KEY));
+  const account = safeParse(readStorageItem(targetStorage, CONNECTED_ACCOUNT_STORAGE_KEY));
 
   if (!account?.uid) {
     return null;
@@ -134,8 +126,9 @@ export function writeConnectedAccount(user, storage) {
     lastConnectedAt: new Date().toISOString(),
   };
 
-  targetStorage.setItem(CONNECTED_ACCOUNT_STORAGE_KEY, JSON.stringify(account));
-  return account;
+  return writeStorageItem(targetStorage, CONNECTED_ACCOUNT_STORAGE_KEY, JSON.stringify(account))
+    ? account
+    : null;
 }
 
 export function clearConnectedAccount(storage) {
@@ -145,7 +138,7 @@ export function clearConnectedAccount(storage) {
     return;
   }
 
-  targetStorage.removeItem(CONNECTED_ACCOUNT_STORAGE_KEY);
+  removeStorageItem(targetStorage, CONNECTED_ACCOUNT_STORAGE_KEY);
 }
 
 export function readSignedOutEditingPreference(storage) {
@@ -155,7 +148,7 @@ export function readSignedOutEditingPreference(storage) {
     return DEFAULT_SIGNED_OUT_EDITING_PREFERENCE;
   }
 
-  const preference = safeParse(targetStorage.getItem(SIGNED_OUT_EDITING_PREFERENCE_KEY));
+  const preference = safeParse(readStorageItem(targetStorage, SIGNED_OUT_EDITING_PREFERENCE_KEY));
 
   return {
     allow: typeof preference?.allow === 'boolean'
@@ -179,7 +172,7 @@ export function writeSignedOutEditingPreference(preference, storage) {
   };
 
   if (targetStorage) {
-    targetStorage.setItem(SIGNED_OUT_EDITING_PREFERENCE_KEY, JSON.stringify(nextPreference));
+    writeStorageItem(targetStorage, SIGNED_OUT_EDITING_PREFERENCE_KEY, JSON.stringify(nextPreference));
   }
 
   return nextPreference;
@@ -188,25 +181,22 @@ export function writeSignedOutEditingPreference(preference, storage) {
 export async function clearLocalResumeWorkspaceData(storage) {
   const targetStorage = getStorage(storage);
 
-  const keysToRemove = [];
-
-  for (let index = 0; targetStorage && index < targetStorage.length; index += 1) {
-    const key = targetStorage.key(index);
-
-    if (
-      WORKSPACE_LOCAL_STORAGE_KEYS.includes(key) ||
-      OBSOLETE_LOCAL_STORAGE_KEYS.includes(key) ||
-      key?.startsWith(RESUME_STORAGE_KEY_PREFIX) ||
-      OBSOLETE_LOCAL_STORAGE_PREFIXES.some((prefix) => key?.startsWith(prefix))
-    ) {
-      keysToRemove.push(key);
-    }
-  }
-
-  keysToRemove.forEach((key) => targetStorage?.removeItem(key));
+  const storageKeyResult = listStorageKeys(targetStorage);
+  const keysToRemove = storageKeyResult.keys.filter((key) => (
+    WORKSPACE_LOCAL_STORAGE_KEYS.includes(key) ||
+    OBSOLETE_LOCAL_STORAGE_KEYS.includes(key) ||
+    key?.startsWith(RESUME_STORAGE_KEY_PREFIX) ||
+    OBSOLETE_LOCAL_STORAGE_PREFIXES.some((prefix) => key?.startsWith(prefix))
+  ));
+  const mirrorCleanupResults = keysToRemove.map((key) => removeStorageItem(targetStorage, key));
+  const mirrorCleanupSucceeded = storageKeyResult.succeeded && mirrorCleanupResults.every(Boolean);
 
   if (typeof indexedDB !== 'undefined') {
     await deleteLocalWorkspaceDatabase();
+  }
+
+  if (!mirrorCleanupSucceeded) {
+    throw new Error('Browser resume storage could not be cleared completely.');
   }
 }
 
@@ -214,8 +204,25 @@ export async function clearBrowserResumeConnectionData({ storage, sessionStorage
   const targetStorage = getStorage(storage);
   const targetSessionStorage = getSessionStorage(sessionStorage);
 
-  await clearLocalResumeWorkspaceData(targetStorage);
-  targetStorage?.removeItem(CONNECTED_ACCOUNT_STORAGE_KEY);
-  targetStorage?.removeItem(SIGNED_OUT_EDITING_PREFERENCE_KEY);
-  OBSOLETE_SESSION_STORAGE_KEYS.forEach((key) => targetSessionStorage?.removeItem(key));
+  let cleanupError = null;
+
+  try {
+    await clearLocalResumeWorkspaceData(targetStorage);
+  } catch (error) {
+    cleanupError = error;
+  }
+
+  const localMetadataResults = !targetStorage ? [] : [
+    CONNECTED_ACCOUNT_STORAGE_KEY,
+    SIGNED_OUT_EDITING_PREFERENCE_KEY,
+  ].map((key) => removeStorageItem(targetStorage, key));
+  const sessionMetadataResults = !targetSessionStorage ? [] : OBSOLETE_SESSION_STORAGE_KEYS.map((key) => (
+    removeStorageItem(targetSessionStorage, key)
+  ));
+  const localMetadataCleared = localMetadataResults.every(Boolean);
+  const sessionMetadataCleared = sessionMetadataResults.every(Boolean);
+
+  if (cleanupError || !localMetadataCleared || !sessionMetadataCleared) {
+    throw cleanupError || new Error('Browser connection data could not be cleared completely.');
+  }
 }

@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto';
 const CLOUD_WORKSPACE_SCHEMA_VERSION = 2;
 const CLOUD_WORKSPACE_RESUME_LIMIT = 100;
 const CLOUD_DRAFT_MAX_BYTES = 850_000;
-const MAX_SYNC_OPERATIONS = 250;
+const MAX_SYNC_OPERATIONS = 150;
 
 function getSerializedByteSize(value) {
   const serialized = JSON.stringify(value);

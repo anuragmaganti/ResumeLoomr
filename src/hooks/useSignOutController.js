@@ -15,6 +15,7 @@ import { clearResumeSyncSession } from '../lib/syncSession.js';
 
 const SIGN_OUT_ERROR_MESSAGES = {
   'cloud-sync-incomplete': 'Cloud sync did not finish, so this browser was not cleared. Reconnect and try again.',
+  'session-cleanup-arm-failed': 'Secure background sync could not be prepared, so you are still signed in. Reload and try again.',
   'session-clear-failed': 'Secure sign-out could not finish. Check your connection and try again.',
   'auth-signout-failed': 'Sign-out could not finish. Check your connection and try again.',
 };

@@ -1,11 +1,16 @@
 const DEFAULT_MAX_JSON_BODY_BYTES = 4 * 1024 * 1024;
 
 export class HttpProtocolError extends Error {
-  constructor(message, { statusCode = 400, code = 'http/invalid-request' } = {}) {
+  constructor(message, {
+    statusCode = 400,
+    code = 'http/invalid-request',
+    expose = statusCode < 500,
+  } = {}) {
     super(message);
     this.name = 'HttpProtocolError';
     this.statusCode = statusCode;
     this.code = code;
+    this.expose = expose;
   }
 }
 
@@ -15,6 +20,28 @@ export function sendPrivateJson(res, statusCode, payload) {
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.end(JSON.stringify(payload));
+}
+
+export function createPublicError(error, fallback) {
+  const fallbackError = {
+    code: String(fallback?.code || 'request/failed'),
+    message: String(fallback?.message || 'The request could not be completed.'),
+  };
+
+  if (error?.expose !== true) {
+    return fallbackError;
+  }
+
+  return {
+    code: String(error?.code || fallbackError.code),
+    message: String(error?.message || fallbackError.message),
+  };
+}
+
+export function sendPrivateError(res, statusCode, error, fallback) {
+  sendPrivateJson(res, statusCode, {
+    error: createPublicError(error, fallback),
+  });
 }
 
 function assertBodySize(byteLength, maxBytes) {

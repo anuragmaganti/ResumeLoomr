@@ -65,6 +65,7 @@ export async function parseResumeWithGemini(file) {
     throw new ImportResumeError('Gemini is not configured.', {
       statusCode: 500,
       code: 'import/gemini-missing',
+      expose: false,
     });
   }
 

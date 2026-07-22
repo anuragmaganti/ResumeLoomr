@@ -27,6 +27,7 @@ export function parseGeminiJson(text) {
     throw new ImportResumeError('The AI response could not be parsed. Try another resume file.', {
       statusCode: 502,
       code: 'import/invalid-ai-response',
+      expose: true,
     });
   }
 }
@@ -130,13 +131,15 @@ function createGeminiUnavailableError(error, diagnostics = null) {
       statusCode: 503,
       code: 'import/ai-unavailable',
       diagnostics: providerDiagnostics,
+      expose: true,
     });
   }
 
-  return new ImportResumeError(message || 'The AI import service could not process this resume. Try again with another file.', {
+  return new ImportResumeError('The AI import service could not process this resume. Try again with another file.', {
     statusCode: statusCode >= 400 && statusCode < 500 ? 502 : 503,
     code: 'import/ai-provider-failed',
     diagnostics: providerDiagnostics,
+    expose: true,
   });
 }
 

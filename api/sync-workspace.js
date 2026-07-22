@@ -10,7 +10,11 @@ import {
   partitionSyncOperationsByAccount,
   readCloudSnapshot,
 } from '../server/syncWorkspace.js';
-import { readJsonRequestBody, sendPrivateJson } from '../server/httpProtocol.js';
+import {
+  readJsonRequestBody,
+  sendPrivateError,
+  sendPrivateJson,
+} from '../server/httpProtocol.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -115,11 +119,9 @@ export default async function handler(req, res) {
       }));
     }
 
-    sendPrivateJson(res, statusCode, {
-      error: {
-        code: error?.code || 'sync/failed',
-        message: error?.message || 'Could not sync resumes.',
-      },
+    sendPrivateError(res, statusCode, error, {
+      code: 'sync/failed',
+      message: 'Could not sync resumes.',
     });
   }
 }

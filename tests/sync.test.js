@@ -38,6 +38,7 @@ import {
   createWorkspaceDoc,
   getSyncCursorId,
   mergeCloudWorkspaceForWrite,
+  normalizeOperationList,
   operationBelongsToSyncAccount,
   partitionOversizedSyncOperations,
   partitionSyncOperationsByAccount,
@@ -50,6 +51,16 @@ import {
   createDraft,
   createWorkspace,
 } from './helpers/resumeFixtures.js';
+
+test('sync requests stay within the Firestore transaction write budget', () => {
+  const operations = Array.from({ length: 175 }, (_, index) => ({
+    id: `delete:${index}`,
+    type: 'deleteDraft',
+    resumeId: `resume-${index}`,
+  }));
+
+  assert.equal(normalizeOperationList({ operations }).length, 150);
+});
 
 test('draft content hashes ignore saved time but track content', () => {
   const firstDraft = createDraft('Resume A', '2026-01-01T00:00:00.000Z');
@@ -788,6 +799,27 @@ test('signed-out editing defers session cleanup when cloud sync remains queued',
     'background-sync',
     'sign-out',
   ]);
+});
+
+test('deferred sign-out stops when secure session cleanup cannot be persisted', async () => {
+  const calls = [];
+  const result = await runBrowserSignOut({
+    user: { uid: 'account-a' },
+    allowSignedOutEditing: true,
+    flushActiveCloudDraft: async () => false,
+    requestBackgroundSync: async () => calls.push('background-sync'),
+    setSessionCleanupRequested: async (uid, requested) => {
+      calls.push(`cleanup:${uid}:${requested}`);
+      return false;
+    },
+    clearSyncSession: async () => calls.push('clear-session'),
+    signOut: async () => calls.push('sign-out'),
+    clearLocalWorkspace: async () => calls.push('clear-local'),
+    reloadBrowser: () => calls.push('reload'),
+  });
+
+  assert.equal(result.status, 'session-cleanup-arm-failed');
+  assert.deepEqual(calls, ['cleanup:account-a:true']);
 });
 
 test('remove-on-sign-out clears data only after cloud, session, and auth succeed', async () => {
