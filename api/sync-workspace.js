@@ -10,12 +10,7 @@ import {
   partitionSyncOperationsByAccount,
   readCloudSnapshot,
 } from '../server/syncWorkspace.js';
-
-function sendJson(res, statusCode, payload) {
-  res.statusCode = statusCode;
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(payload));
-}
+import { sendPrivateJson } from '../server/httpProtocol.js';
 
 function readRequestBody(req) {
   if (req.body && typeof req.body === 'object') {
@@ -53,6 +48,17 @@ function readRequestBody(req) {
 }
 
 export default async function handler(req, res) {
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    res.setHeader('Allow', 'GET, POST');
+    sendPrivateJson(res, 405, {
+      error: {
+        code: 'sync/method-not-allowed',
+        message: 'Use GET or POST to sync resumes.',
+      },
+    });
+    return;
+  }
+
   try {
     const decodedUser = req.method === 'GET'
       ? await verifyFirebaseIdTokenHeader(req.headers.authorization)
@@ -62,7 +68,7 @@ export default async function handler(req, res) {
       const snapshot = await readCloudSnapshot(decodedUser.uid);
 
       if (!snapshot) {
-        sendJson(res, 404, {
+        sendPrivateJson(res, 404, {
           error: {
             code: 'sync/not-found',
             message: 'No cloud resumes found.',
@@ -71,27 +77,27 @@ export default async function handler(req, res) {
         return;
       }
 
-      sendJson(res, 200, snapshot);
+      sendPrivateJson(res, 200, snapshot);
       return;
     }
 
-    if (req.method !== 'POST') {
-      res.setHeader('Allow', 'GET, POST');
-      sendJson(res, 405, {
+    const body = await readRequestBody(req);
+
+    if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+      sendPrivateJson(res, 400, {
         error: {
-          code: 'sync/method-not-allowed',
-          message: 'Use POST to sync resumes.',
+          code: 'sync/invalid-json',
+          message: 'The sync request could not be read.',
         },
       });
       return;
     }
 
-    const body = await readRequestBody(req);
     const operations = normalizeOperationList(body);
     const requestAccountUid = typeof body?.accountUid === 'string' ? body.accountUid.trim() : '';
 
     if (operations.length === 0) {
-      sendJson(res, 200, {
+      sendPrivateJson(res, 200, {
         ok: true,
         syncedOperations: [],
         staleOperations: [],
@@ -104,7 +110,7 @@ export default async function handler(req, res) {
     }
 
     if (requestAccountUid && requestAccountUid !== decodedUser.uid) {
-      sendJson(res, 409, {
+      sendPrivateJson(res, 409, {
         error: {
           code: 'sync/account-mismatch',
           message: 'This browser sync session belongs to a different account.',
@@ -123,7 +129,7 @@ export default async function handler(req, res) {
       ? await applySyncOperations(decodedUser.uid, sizePartition.acceptedOperations)
       : { syncedOperations: [], staleOperations: [] };
 
-    sendJson(res, 200, {
+    sendPrivateJson(res, 200, {
       ok: true,
       syncedOperations,
       staleOperations,
@@ -144,7 +150,7 @@ export default async function handler(req, res) {
       }));
     }
 
-    sendJson(res, statusCode, {
+    sendPrivateJson(res, statusCode, {
       error: {
         code: error?.code || 'sync/failed',
         message: error?.message || 'Could not sync resumes.',

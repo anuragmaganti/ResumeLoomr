@@ -6,12 +6,7 @@ import {
   parseResumeWithGemini,
   verifyFirebaseIdToken,
 } from '../server/importResume.js';
-
-function sendJson(res, statusCode, payload) {
-  res.statusCode = statusCode;
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(payload));
-}
+import { sendPrivateJson } from '../server/httpProtocol.js';
 
 function logImportError(error, context = {}) {
   if (error instanceof ImportResumeError && error.statusCode < 500) {
@@ -35,7 +30,7 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
-    sendJson(res, 405, {
+    sendPrivateJson(res, 405, {
       error: {
         code: 'import/method-not-allowed',
         message: 'Use POST to import a resume.',
@@ -61,7 +56,7 @@ export default async function handler(req, res) {
       warningCount: parsedImport?.draft?.importWarnings?.length || 0,
       diagnostics: parsedImport?.diagnostics || undefined,
     }));
-    sendJson(res, 200, createImportResponseBody(parsedImport));
+    sendPrivateJson(res, 200, createImportResponseBody(parsedImport));
   } catch (error) {
     logImportError(error, {
       requestId,
@@ -69,7 +64,7 @@ export default async function handler(req, res) {
     });
 
     if (error instanceof ImportResumeError) {
-      sendJson(res, error.statusCode, {
+      sendPrivateJson(res, error.statusCode, {
         error: {
           code: error.code,
           message: error.message,
@@ -78,7 +73,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    sendJson(res, 500, {
+    sendPrivateJson(res, 500, {
       error: {
         code: 'import/failed',
         message: 'Resume import failed. Try again with another file.',
