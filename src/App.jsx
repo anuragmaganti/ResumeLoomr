@@ -13,13 +13,15 @@ import AccountSwitchPrompt from './components/accountSwitchPrompt';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/editorPanel';
 import SeparatorSettingsPopup from './components/separatorSettingsPopup';
+import NoticeToast from './components/noticeToast.jsx';
+import ResumeConflictBanner from './components/resumeConflictBanner.jsx';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
 import { useAccountSwitchGate } from './hooks/useAccountSwitchGate.js';
 import { usePreviewEditorController } from './hooks/usePreviewEditorController.js';
 import { useSeparatorSettingsController } from './hooks/useSeparatorSettingsController.js';
 import { useSignOutController } from './hooks/useSignOutController.js';
-import { importResumeFile } from './lib/importResume.js';
+import { useResumeImportController } from './hooks/useResumeImportController.js';
 import {
   createMixedSamplePreviewModel,
   createSamplePlaceholderResolver,
@@ -28,52 +30,12 @@ import {
 const THEME_STORAGE_KEY = 'resumeloomr:theme';
 const EMPTY_SAMPLE_ORDER_OVERRIDES = {};
 
-function NoticeToastIcon({ isSyncError }) {
-  if (isSyncError) {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-        <path d="M7.2 17.5H5.8a3.3 3.3 0 0 1-.45-6.57A6.5 6.5 0 0 1 18 9.65a4 4 0 0 1 .2 7.85h-1.4" />
-        <path d="m9 15 6 6M15 15l-6 6" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-      <path d="M12 3.5 21 20H3z" />
-      <path d="M12 9v4.5M12 17h.01" />
-    </svg>
-  );
-}
-
-function NoticeDismissIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 18 18" focusable="false">
-      <path d="m5 5 8 8M13 5l-8 8" />
-    </svg>
-  );
-}
-
-function getNoticeToastPresentation(notice, syncState) {
-  const isSyncError = syncState === 'error';
-  const isCloudUnavailable = isSyncError && notice?.message === 'Cloud sync is unavailable. Your local draft is still editable.';
-
-  return {
-    isSyncError,
-    title: isCloudUnavailable ? 'Cloud sync unavailable' : '',
-    message: isCloudUnavailable ? 'Your work is saved locally and remains editable.' : notice?.message,
-  };
-}
-
 function App() {
   const previewPanelRef = useRef(null);
   const documentTitleRef = useRef('ResumeLoomr | Professional Resume Builder');
-  const authUserRef = useRef(null);
   const [editorStageMaxHeight, setEditorStageMaxHeight] = useState(null);
   const auth = useFirebaseAuth();
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importState, setImportState] = useState({ status: 'idle' });
   const [previewLayout, setPreviewLayout] = useState({ mode: 'fitPage', width: 0 });
   const [emptyChoiceNudgeCount, setEmptyChoiceNudgeCount] = useState(0);
   const [isPrintRendering, setIsPrintRendering] = useState(false);
@@ -184,8 +146,6 @@ function App() {
   );
   const displayPreviewModel = isPrintRendering ? previewModel : (samplePreviewModel || previewModel);
   const isSamplePreview = Boolean(samplePreviewModel) && !isPrintRendering;
-  const isImportingResume = importState.status === 'processing';
-  const noticePresentation = getNoticeToastPresentation(notice, syncState);
   const {
     clearPreviewEditTarget,
     editorCaretTarget,
@@ -222,16 +182,26 @@ function App() {
     activeResumeId,
     onSettingChange: actions.setResumeSettingValue,
   });
+  const {
+    closeImport: closeImportResume,
+    isImporting: isImportingResume,
+    isModalOpen: isImportModalOpen,
+    openImport: handleImportResumeClick,
+    uploadResume: handleImportResumeUpload,
+  } = useResumeImportController({
+    authUser: auth.user,
+    openAuthModal: auth.openAuthModal,
+    endTransientSampleEntry: actions.endTransientSampleEntry,
+    createImportPlaceholderResume,
+    replaceResumeDraft,
+    showNotice,
+  });
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
       documentTitleRef.current = document.title || documentTitleRef.current;
     }
   }, []);
-
-  useEffect(() => {
-    authUserRef.current = auth.user;
-  }, [auth.user]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -319,70 +289,6 @@ function App() {
     setEmptyChoiceNudgeCount((count) => count + 1);
   }, []);
 
-  function handleImportResumeClick() {
-    actions.endTransientSampleEntry();
-
-    if (!auth.user) {
-      auth.openAuthModal();
-      return;
-    }
-
-    setIsImportModalOpen(true);
-  }
-
-  async function handleImportResumeUpload(file) {
-    if (!auth.user) {
-      setIsImportModalOpen(false);
-      auth.openAuthModal();
-      return;
-    }
-
-    const importUser = auth.user;
-    let placeholderResumeId = null;
-
-    setIsImportModalOpen(false);
-    setImportState({ status: 'processing', fileName: file.name });
-
-    try {
-      placeholderResumeId = await createImportPlaceholderResume({ sourceFileName: file.name });
-
-      if (!placeholderResumeId) {
-        throw new Error('Create or delete a resume before importing another file.');
-      }
-
-      setImportState({ status: 'processing', fileName: file.name, resumeId: placeholderResumeId });
-
-      const idToken = await importUser.getIdToken();
-      const importedDraft = await importResumeFile({ file, idToken });
-
-      if (authUserRef.current?.uid !== importUser.uid) {
-        showNotice({
-          tone: 'error',
-          message: 'The import finished after your account changed, so it was not applied.',
-        });
-        return;
-      }
-
-      await replaceResumeDraft(placeholderResumeId, importedDraft.draft, {
-        name: importedDraft.suggestedName || file.name,
-      });
-
-      if (importedDraft.draft?.importWarnings?.length > 0) {
-        showNotice({
-          tone: 'warning',
-          message: 'Imported resume added. Some sections may need review.',
-        });
-      }
-    } catch (error) {
-      showNotice({
-        tone: 'error',
-        message: error?.message || 'Resume import failed. The blank resume is still editable.',
-      });
-    } finally {
-      setImportState({ status: 'idle' });
-    }
-  }
-
   function handleAccountSwitchImport() {
     if (!importAccountSwitchLocalData()) {
       return;
@@ -448,7 +354,7 @@ function App() {
         <ImportResumeModal
           isOpen={isImportModalOpen}
           busy={isImportingResume}
-          onClose={() => setIsImportModalOpen(false)}
+          onClose={closeImportResume}
           onUpload={handleImportResumeUpload}
         />
 
@@ -495,57 +401,19 @@ function App() {
           onSignedOutEditingPreferenceChange={updateSignedOutEditingPreference}
         />
 
-        {notice && (
-          <div
-            className={`noticeToast noticeToast--${notice.tone}`}
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <span className="noticeToastIcon">
-              <NoticeToastIcon isSyncError={noticePresentation.isSyncError} />
-            </span>
-            <span className="noticeToastCopy">
-              {noticePresentation.title ? <strong>{noticePresentation.title}</strong> : null}
-              <span>{noticePresentation.message}</span>
-            </span>
-            <span className="noticeToastActions">
-              {noticePresentation.isSyncError ? (
-                <button type="button" className="noticeToastRetry" onClick={retryCloudSync}>
-                  Retry
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="noticeToastDismiss"
-                onClick={dismissNotice}
-                aria-label="Dismiss message"
-              >
-                <NoticeDismissIcon />
-              </button>
-            </span>
-          </div>
-        )}
+        <NoticeToast
+          notice={notice}
+          syncState={syncState}
+          onRetry={retryCloudSync}
+          onDismiss={dismissNotice}
+        />
 
-        {conflict && (
-          <div className="conflictBanner" role="alert">
-            <div>
-              <strong>This resume changed in another tab or device.</strong>
-              <span>Choose which version to keep before continuing.</span>
-            </div>
-            <div className="conflictActions">
-              <button type="button" className="button buttonSecondary" onClick={resolveConflictWithCloud}>
-                Use saved version
-              </button>
-              <button type="button" className="button buttonSecondary" onClick={resolveConflictWithLocal}>
-                Keep my edits
-              </button>
-              <button type="button" className="button buttonPrimary" onClick={saveConflictAsCopy}>
-                Save as copy
-              </button>
-            </div>
-          </div>
-        )}
+        <ResumeConflictBanner
+          conflict={conflict}
+          onUseSavedVersion={resolveConflictWithCloud}
+          onKeepLocalEdits={resolveConflictWithLocal}
+          onSaveAsCopy={saveConflictAsCopy}
+        />
 
         <div className="mobileWorkspaceToggle" role="tablist" aria-label="Workspace view">
           <button
