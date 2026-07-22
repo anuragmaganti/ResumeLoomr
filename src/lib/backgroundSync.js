@@ -68,16 +68,26 @@ export async function registerResumeSyncWorker() {
   }
 
   try {
-    const registration = await navigator.serviceWorker.register('/sync-worker.js');
+    const registration = await navigator.serviceWorker.register('/sync-worker.js', {
+      updateViaCache: 'none',
+    });
 
     registration.active?.postMessage({ type: 'SYNC_RESUME_OUTBOX' });
     return registration;
   } catch (error) {
-    if (import.meta.env.DEV) {
+    if (import.meta.env?.DEV) {
       console.warn('Resume sync worker registration failed', error);
     }
     return null;
   }
+}
+
+async function getResumeSyncWorkerRegistration() {
+  const existingRegistration = typeof navigator.serviceWorker.getRegistration === 'function'
+    ? await navigator.serviceWorker.getRegistration('/')
+    : null;
+
+  return existingRegistration || registerResumeSyncWorker();
 }
 
 export async function requestResumeBackgroundSync() {
@@ -86,17 +96,27 @@ export async function requestResumeBackgroundSync() {
   }
 
   try {
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await getResumeSyncWorkerRegistration();
+
+    if (!registration) {
+      return false;
+    }
 
     if (isBackgroundSyncSupported(registration)) {
       await registration.sync.register(RESUME_SYNC_TAG);
       return true;
     }
 
-    registration.active?.postMessage({ type: 'SYNC_RESUME_OUTBOX' });
+    const worker = registration.active || registration.waiting;
+
+    if (!worker) {
+      return false;
+    }
+
+    worker.postMessage({ type: 'SYNC_RESUME_OUTBOX' });
     return true;
   } catch (error) {
-    if (import.meta.env.DEV) {
+    if (import.meta.env?.DEV) {
       console.warn('Resume background sync request failed', error);
     }
     return false;
