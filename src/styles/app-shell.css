@@ -1,0 +1,74 @@
+.app {
+  --workspace-sticky-top: 24px;
+  --workspace-preview-max-width: 952px;
+  --workspace-content-max-width: 1400px;
+  --rail-gap: var(--space-2);
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.appShell {
+  width: min(1432px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: var(--space-8) 0 var(--space-10);
+}
+
+.panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition:
+    box-shadow var(--transition-base),
+    border-color var(--transition-base);
+}
+
+.headerStack {
+  position: relative;
+  z-index: 40;
+  display: grid;
+  gap: var(--rail-gap);
+  width: min(100%, var(--workspace-content-max-width));
+  margin-bottom: var(--rail-gap);
+  min-width: 0;
+}
+
+.topbar {
+  position: relative;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.brandLogo {
+  display: block;
+  width: auto;
+  height: 48px;
+  object-fit: contain;
+}
+
+.brandLogo--dark {
+  display: none;
+}
+
+html[data-theme="dark"] .brandLogo--light {
+  display: none;
+}
+
+html[data-theme="dark"] .brandLogo--dark {
+  display: block;
+}
+

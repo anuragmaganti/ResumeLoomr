@@ -1069,20 +1069,20 @@ test('local batch deletion accepts one normalized workspace snapshot without bro
   assert.equal(persistedWorkspace.activeResumeId, 'r3');
 });
 test('resume rail uses stable container-driven columns instead of viewport-sized tiles', () => {
-  const appCss = fs.readFileSync('src/App.css', 'utf8');
+  const railCss = fs.readFileSync('src/styles/workspace-rail.css', 'utf8');
   const railComponent = fs.readFileSync('src/components/resumeWorkspaceRail.jsx', 'utf8');
   const railView = fs.readFileSync('src/components/resumeWorkspaceRailView.jsx', 'utf8');
   const railDrag = fs.readFileSync('src/components/resumeWorkspaceRailDrag.js', 'utf8');
 
-  assert.match(appCss, /\.resumeSubbar\s*\{[\s\S]*?container-name:\s*resume-rail/);
-  assert.match(appCss, /\.resumePillStrip\s*\{[\s\S]*?--resume-rail-columns:\s*2/);
-  assert.match(appCss, /grid-template-columns:\s*repeat\(var\(--resume-rail-columns\),\s*minmax\(0,\s*1fr\)\)/);
-  assert.match(appCss, /\.resumePillStrip\s*\{[\s\S]*?row-gap:\s*7px/);
-  assert.match(appCss, /\.resumePillStrip\s*\{[\s\S]*?grid-auto-rows:\s*38px/);
-  assert.match(appCss, /@container resume-rail \(min-width:\s*1030px\)\s*\{[\s\S]*?--resume-rail-columns:\s*6/);
-  assert.match(appCss, /\.resumePill\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0/);
-  assert.match(appCss, /\.resumeNewButton\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0/);
-  assert.match(appCss, /\.resumeRailCell:has\(\.entryMenu\.isOpen\)\s*\{[\s\S]*?z-index:\s*60/);
+  assert.match(railCss, /\.resumeSubbar\s*\{[\s\S]*?container-name:\s*resume-rail/);
+  assert.match(railCss, /\.resumePillStrip\s*\{[\s\S]*?--resume-rail-columns:\s*2/);
+  assert.match(railCss, /grid-template-columns:\s*repeat\(var\(--resume-rail-columns\),\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(railCss, /\.resumePillStrip\s*\{[\s\S]*?row-gap:\s*7px/);
+  assert.match(railCss, /\.resumePillStrip\s*\{[\s\S]*?grid-auto-rows:\s*38px/);
+  assert.match(railCss, /@container resume-rail \(min-width:\s*1030px\)\s*\{[\s\S]*?--resume-rail-columns:\s*6/);
+  assert.match(railCss, /\.resumePill\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0/);
+  assert.match(railCss, /\.resumeNewButton\s*\{[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0/);
+  assert.match(railCss, /\.resumeRailCell:has\(\.entryMenu\.isOpen\)\s*\{[\s\S]*?z-index:\s*60/);
   assert.match(railView, /animateLayoutChanges:\s*disableSortableLayoutAnimation/);
   assert.match(railComponent, /buildResumeRailLayout\(layoutOrganization, displayedOpenFolderIds, columns\)/);
   assert.match(railView, /placement\.surfaceRows\.map\([\s\S]*?className="resumeFolderClusterSurface"/);

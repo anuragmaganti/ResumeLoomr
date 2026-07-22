@@ -1,0 +1,1206 @@
+.authOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+}
+
+.authBackdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(49, 88, 213, 0.18), transparent 30%),
+    rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(6px);
+}
+
+.authDialog {
+  position: relative;
+  z-index: 1;
+  width: min(440px, 100%);
+  padding: var(--space-6);
+  background: var(--color-surface-elevated);
+}
+
+.importResumeDialog {
+  width: min(480px, 100%);
+}
+
+.settingsLauncher {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 80;
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-capsule);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-subtle);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    background-color var(--transition-base);
+}
+
+.floatingSaveStatus {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 80;
+  min-height: 42px;
+  padding: 0 14px;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}
+
+.floatingThemeToggle {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 80;
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-capsule);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-subtle);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    background-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.floatingThemeToggle:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+
+.floatingThemeToggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  overflow: visible;
+}
+
+.themeSunRays,
+.themeSunCore,
+.themeMoon {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity 260ms ease,
+    transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.themeSunCore,
+.themeMoon {
+  fill: currentColor;
+}
+
+.floatingThemeToggle.is-light {
+  color: #d18a00;
+}
+
+.floatingThemeToggle.is-dark {
+  color: #9db4ff;
+}
+
+.floatingThemeToggle.is-light .themeSunRays,
+.floatingThemeToggle.is-light .themeSunCore {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+.floatingThemeToggle.is-light .themeMoon {
+  opacity: 0;
+  transform: scale(0.45) rotate(-42deg);
+}
+
+.floatingThemeToggle.is-dark .themeSunRays {
+  opacity: 0;
+  transform: scale(0.45) rotate(80deg);
+}
+
+.floatingThemeToggle.is-dark .themeSunCore {
+  opacity: 0;
+  transform: scale(0.55) rotate(80deg);
+}
+
+.floatingThemeToggle.is-dark .themeMoon {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+.floatingThemeToggle.isAnimating {
+  animation: themeIconPress 520ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes themeIconPress {
+  0% {
+    transform: scale(1);
+  }
+
+  42% {
+    transform: scale(0.88) rotate(-10deg);
+  }
+
+  76% {
+    transform: scale(1.08) rotate(6deg);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.settingsLauncher:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+
+.settingsLauncher svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.accountSettingsOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  pointer-events: none;
+}
+
+.accountSettingsBackdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--color-bg) 42%, transparent);
+  pointer-events: auto;
+  cursor: default;
+}
+
+.accountSettingsPanel {
+  position: absolute;
+  left: 18px;
+  bottom: 72px;
+  z-index: 1;
+  display: grid;
+  gap: 0;
+  width: min(400px, calc(100vw - 36px));
+  max-height: calc(100dvh - 96px);
+  padding: 11px 12px 12px;
+  overflow: auto;
+  border-color: color-mix(in srgb, var(--color-border-strong) 56%, var(--color-border));
+  border-radius: var(--radius-dialog);
+  background: var(--color-surface-elevated);
+  box-shadow:
+    0 24px 64px color-mix(in srgb, #0f172a 22%, transparent),
+    0 4px 14px color-mix(in srgb, #0f172a 10%, transparent);
+  pointer-events: auto;
+  outline: none;
+  animation: settingsPanelIn 170ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+html[data-theme="dark"] .accountSettingsPanel {
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.72),
+    0 4px 16px rgba(0, 0, 0, 0.46);
+}
+
+.accountSettingsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 1px 1px 10px 3px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent);
+}
+
+.accountSettingsHeader h2 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.accountSettingsClose {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
+}
+
+.accountSettingsClose:hover,
+.accountSettingsClose:focus-visible {
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  outline: none;
+}
+
+.accountSettingsClose svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.7;
+}
+
+.connectionSummary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 11px;
+  align-items: start;
+  padding: 12px 3px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent);
+}
+
+.connectionSummaryIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+}
+
+.connectionSummaryIcon.is-cloud {
+  border-color: var(--color-success-border);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.connectionSummaryIcon.is-remembered {
+  border-color: var(--color-info-border);
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+.connectionSummaryIconGraphic {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.connectionSummaryCopy {
+  min-width: 0;
+}
+
+.connectionStatusRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  color: var(--color-text-muted);
+  font-size: 0.66rem;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.connectionStatusDot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: var(--radius-capsule);
+  background: var(--color-text-muted);
+}
+
+.connectionStatusDot.is-cloud {
+  background: var(--color-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 13%, transparent);
+}
+
+.connectionStatusDot.is-remembered {
+  background: var(--color-info);
+}
+
+.connectionAccount {
+  margin: 0 0 4px;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 760;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connectionDescription {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.signOutBehaviorSection {
+  display: grid;
+  gap: 7px;
+  padding: 12px 2px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent);
+}
+
+.signOutBehaviorSection legend {
+  padding: 0;
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 760;
+  letter-spacing: -0.01em;
+}
+
+.accountSettingsSectionIntro {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.signOutBehaviorOptions {
+  display: grid;
+  gap: 5px;
+}
+
+.signOutBehaviorOption {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  min-height: 48px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border-radius: var(--radius-item);
+  background: color-mix(in srgb, var(--color-surface-muted) 58%, var(--color-surface) 42%);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.signOutBehaviorOption:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-muted);
+}
+
+.signOutBehaviorOption:focus-within {
+  outline: 2px solid var(--color-accent-soft);
+  outline-offset: 1px;
+}
+
+.signOutBehaviorOption.isSelected {
+  border-color: var(--color-accent-border);
+  background: color-mix(in srgb, var(--color-accent-soft) 62%, var(--color-surface) 38%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.signOutBehaviorOption > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.storageChoiceIconWrap {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--color-surface-elevated) 72%, transparent);
+  color: var(--color-text-muted);
+}
+
+.signOutBehaviorOption.isSelected .storageChoiceIconWrap {
+  background: color-mix(in srgb, var(--color-accent-soft) 76%, var(--color-surface-elevated));
+  color: var(--color-accent-strong);
+}
+
+.storageChoiceIcon {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.45;
+}
+
+.signOutBehaviorCopy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.signOutBehaviorCopy strong {
+  color: var(--color-text);
+  font-size: 0.74rem;
+  font-weight: 740;
+  line-height: 1.2;
+}
+
+.signOutBehaviorCopy small {
+  color: var(--color-text-subtle);
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+.signOutBehaviorCheck {
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-capsule);
+  background: var(--color-surface-elevated);
+  box-shadow: inset 0 0 0 3px var(--color-surface-elevated);
+}
+
+.signOutBehaviorOption.isSelected .signOutBehaviorCheck {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.accountSettingsPrimary {
+  width: 100%;
+  min-height: 36px;
+  margin-top: 12px;
+  border-radius: var(--radius-control);
+  box-shadow: none;
+  font-size: 0.78rem;
+}
+
+.browserDataSection {
+  display: grid;
+  gap: 9px;
+  padding: 12px 3px 1px;
+}
+
+.browserDataSection.isConfirming {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-item);
+  background: var(--color-danger-bg);
+}
+
+.browserDataCopy h3 {
+  margin: 0 0 3px;
+  color: var(--color-text);
+  font-size: 0.78rem;
+  letter-spacing: -0.02em;
+}
+
+.browserDataCopy p {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.69rem;
+  line-height: 1.4;
+}
+
+.browserDataRemoveButton {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-error);
+  font-size: 0.7rem;
+  font-weight: 740;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.browserDataRemoveButton:hover,
+.browserDataRemoveButton:focus-visible {
+  color: var(--color-danger-hover-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  outline: none;
+}
+
+.browserDataRemoveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.browserDataActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.browserDataActions .button {
+  min-height: 32px;
+  padding-inline: 12px;
+  border-radius: var(--radius-control);
+  font-size: 0.72rem;
+}
+
+.signedOutPromptOverlay {
+  padding: clamp(10px, 3vw, 20px);
+}
+
+.signedOutPromptBackdrop {
+  border: 0;
+  cursor: default;
+}
+
+.signedOutPrompt {
+  position: relative;
+  z-index: 1;
+  width: min(470px, 100%);
+  padding: clamp(19px, 4vw, 22px);
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 58%, var(--color-border));
+  border-radius: var(--radius-sheet);
+  background: var(--color-surface-elevated);
+  box-shadow:
+    0 28px 72px color-mix(in srgb, #0f172a 24%, transparent),
+    0 5px 18px color-mix(in srgb, #0f172a 11%, transparent);
+  outline: none;
+  animation: signedOutPromptIn 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+html[data-theme="dark"] .signedOutPrompt {
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.74),
+    0 6px 20px rgba(0, 0, 0, 0.46);
+}
+
+.signedOutPromptHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.signedOutPromptHeader h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: clamp(1.08rem, 3.8vw, 1.18rem);
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+
+.signedOutPromptEyebrow {
+  margin: 0 0 5px;
+  color: var(--color-text-muted);
+  font-size: 0.64rem;
+  font-weight: 780;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.signedOutPromptClose {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    color var(--transition-base);
+}
+
+.signedOutPromptClose:hover,
+.signedOutPromptClose:focus-visible {
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  outline: none;
+}
+
+.signedOutPromptClose:focus-visible {
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.signedOutPromptClose:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.signedOutPromptClose svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.7;
+}
+
+.signedOutPromptIntro {
+  margin: 9px 0 17px;
+  max-width: 38ch;
+  color: var(--color-text-subtle);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.signedOutPromptChoices {
+  display: grid;
+  gap: 8px;
+}
+
+.signedOutChoice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  min-height: 67px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.signedOutChoice:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.signedOutChoice:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.signedOutChoice:disabled {
+  opacity: 0.56;
+  cursor: wait;
+}
+
+.signedOutChoice--keep {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent-soft) 52%, var(--color-surface) 48%);
+}
+
+.signedOutChoice--keep:not(:disabled):hover,
+.signedOutChoice--keep:focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-soft) 74%, var(--color-surface) 26%);
+}
+
+.signedOutChoice--remove {
+  background: color-mix(in srgb, var(--color-surface-muted) 70%, var(--color-surface) 30%);
+}
+
+.signedOutChoice--remove:not(:disabled):hover,
+.signedOutChoice--remove:focus-visible {
+  border-color: var(--color-danger-border);
+  background: color-mix(in srgb, var(--color-danger-bg) 58%, var(--color-surface) 42%);
+}
+
+.signedOutChoiceIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-item);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-muted);
+}
+
+.signedOutChoice--keep .signedOutChoiceIcon {
+  background: color-mix(in srgb, var(--color-accent-soft) 76%, var(--color-surface-elevated));
+  color: var(--color-accent-strong);
+}
+
+.signedOutChoice--remove .signedOutChoiceIcon {
+  background: color-mix(in srgb, var(--color-danger-bg) 72%, var(--color-surface-elevated));
+  color: var(--color-error);
+}
+
+.signedOutChoiceIcon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.signedOutChoiceCopy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.signedOutChoiceCopy strong {
+  color: inherit;
+  font-size: 0.78rem;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.signedOutChoiceCopy small {
+  color: var(--color-text-subtle);
+  font-size: 0.69rem;
+  line-height: 1.35;
+}
+
+.signedOutChoiceArrow {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  transition: transform var(--transition-fast);
+}
+
+.signedOutChoice:not(:disabled):hover .signedOutChoiceArrow {
+  transform: translateX(2px);
+}
+
+.signedOutCloudNote {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 3px 0;
+  color: var(--color-text-subtle);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.signedOutCloudNote svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  fill: none;
+  stroke: var(--color-success);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.signedOutPromptRemember {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  color: var(--color-text-subtle);
+  font-size: 0.7rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.signedOutPromptRemember > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.signedOutRememberCheck {
+  display: inline-grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-compact);
+  background: var(--color-input-bg);
+  color: #fff;
+  transition:
+    border-color var(--transition-base),
+    background-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.signedOutRememberCheck svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  opacity: 0;
+  transform: scale(0.7);
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.signedOutPromptRemember > input:checked + .signedOutRememberCheck {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.signedOutPromptRemember > input:checked + .signedOutRememberCheck svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.signedOutPromptRemember > input:focus-visible + .signedOutRememberCheck {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.signedOutPromptRemember:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes signedOutPromptIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signedOutPrompt,
+  .signedOutChoice,
+  .signedOutChoiceArrow,
+  .signedOutRememberCheck svg {
+    animation: none;
+    transition: none;
+  }
+}
+
+.signedOutPromptNote {
+  padding: var(--space-3);
+  border: 1px solid var(--color-info-border);
+  border-radius: var(--radius-popover);
+  background: var(--color-info-soft);
+  color: var(--color-text);
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.accountSwitchPrompt {
+  width: min(520px, 100%);
+}
+
+.accountSwitchActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: var(--space-4);
+}
+
+.accountSwitchActions .button {
+  min-height: 38px;
+  padding-inline: 14px;
+  font-size: 0.78rem;
+}
+
+@keyframes settingsPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.authDialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.importResumeHeader {
+  align-items: center;
+}
+
+.authEyebrow {
+  margin: 0 0 6px;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.authDialog h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.authCloseButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-capsule);
+  background: var(--color-danger-bg);
+  color: var(--color-error);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.authIntro {
+  margin: var(--space-3) 0 var(--space-4);
+  color: var(--color-text-subtle);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.authModeTabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: var(--space-3);
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-capsule);
+  background: var(--color-surface-muted);
+}
+
+.authModeTab {
+  min-height: 32px;
+  border: 0;
+  border-radius: var(--radius-capsule);
+  background: transparent;
+  color: var(--color-text-subtle);
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.authModeTab.isActive {
+  background: var(--color-surface-elevated);
+  color: var(--color-text);
+  box-shadow: var(--shadow-xs);
+}
+
+.authGoogleButton,
+.authSubmitButton {
+  width: 100%;
+  min-height: 40px;
+}
+
+.authDivider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin: var(--space-4) 0;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.authDivider::before,
+.authDivider::after {
+  content: "";
+  height: 1px;
+  background: var(--color-border);
+}
+
+.authForm {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.authField {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-subtle);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.authField input {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-item);
+  background: var(--color-input-bg);
+  color: var(--color-text);
+}
+
+.authField input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-soft);
+}
+
+.authError {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-item);
+  background: var(--color-error-soft);
+  color: var(--color-error);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.importResumeForm {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.importResumeDropzone {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  min-height: 132px;
+  padding: var(--space-5);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(circle at 16% 0%, var(--color-accent-soft), transparent 42%),
+    var(--color-surface-muted);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    transform var(--transition-fast);
+}
+
+.importResumeDropzone:hover,
+.importResumeDropzone:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-soft);
+}
+
+.importResumeDropzone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.importResumeDropzoneIcon {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  transition:
+    transform var(--transition-fast),
+    color var(--transition-base);
+}
+
+.importResumeDropzone:hover .importResumeDropzoneIcon,
+.importResumeDropzone:focus-within .importResumeDropzoneIcon {
+  transform: translateY(-1px);
+}
+
+.importResumeDropzoneIcon svg {
+  display: block;
+  width: 82px;
+  height: 82px;
+}
+
+.importResumeIconPage {
+  fill: var(--color-accent-soft);
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.importResumeIconFold,
+.importResumeIconArrow,
+.importResumeIconTray {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+}
+
+.importResumeDropzoneTitle {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-text-subtle);
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.importResumeActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.importResumeActions .button {
+  min-height: 38px;
+  padding-inline: 14px;
+  font-size: 0.78rem;
+}
+

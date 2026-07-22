@@ -1,0 +1,397 @@
+.editorStage {
+  container-type: inline-size;
+  container-name: editor-stage;
+  position: sticky;
+  top: var(--workspace-sticky-top);
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  min-width: 0;
+  max-height: min(
+    var(--editor-stage-max-height, 999rem),
+    calc(100dvh - var(--workspace-sticky-top) - 24px)
+  );
+  overflow: hidden;
+  padding: 18px;
+  border-radius: var(--radius-panel);
+}
+
+@media screen and (min-width: 721px) {
+  .editorSidebar {
+    gap: var(--rail-gap);
+    padding-right: 0;
+  }
+
+  .settingsRail,
+  .editorRail {
+    padding: 13px;
+  }
+
+  .tabs {
+    --tabs-inset: 5px;
+    gap: 4px;
+    min-height: 40px;
+  }
+}
+
+.editorPanelHeader {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 0 2px 11px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 74%, transparent);
+  text-align: left;
+}
+
+.editorPanelHeading {
+  display: grid;
+  gap: 0;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 2px 0 0;
+}
+
+.editorPanelHeading h3 {
+  margin: 0;
+  white-space: nowrap;
+  font-size: 1.0625rem;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.editorPanelMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sectionPlacementControl {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  gap: 5px;
+  padding: 0 0 0 7px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-surface-muted) 64%, transparent);
+}
+
+.sectionPlacementLabel {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sectionPlacementControl .entryMenuButton {
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  border-radius: var(--radius-small);
+  box-shadow: none;
+}
+
+.tabs {
+  --tabs-inset: 4px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3px;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.sectionAddControl {
+  position: relative;
+  display: grid;
+  gap: 0;
+  margin-top: 0;
+}
+
+.sectionAddButton {
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 6px;
+  border-radius: var(--radius-item);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.tabButton.sectionAddButton {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.sectionAddButtonIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0;
+  line-height: 0;
+  text-align: center;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-surface-elevated) 64%, transparent);
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    transform var(--transition-fast);
+}
+
+.sectionAddButtonIcon::before,
+.sectionAddButtonIcon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 1.6px;
+  border-radius: var(--radius-capsule);
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.sectionAddButtonIcon::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.sectionAddButton:not(:disabled):hover .sectionAddButtonIcon,
+.sectionAddButton:not(:disabled):focus-visible .sectionAddButtonIcon {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-accent);
+  transform: none;
+}
+
+@media screen and (min-width: 721px) {
+  .tabButton.sectionAddButton {
+    min-height: 30px;
+    padding: 5px 6px;
+  }
+}
+
+.sectionAddDialogLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.sectionAddDialogLayer--anchored {
+  display: block;
+  padding: 0;
+}
+
+.sectionAddDialogBackdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--color-bg) 18%, transparent);
+  cursor: default;
+  pointer-events: auto;
+}
+
+html[data-theme="dark"] .sectionAddDialogBackdrop {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.sectionAddDialog {
+  position: relative;
+  display: grid;
+  gap: 0;
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 58%, var(--color-border));
+  border-radius: var(--radius-dialog);
+  background: var(--color-surface-elevated);
+  box-shadow:
+    0 24px 64px color-mix(in srgb, #0f172a 22%, transparent),
+    0 4px 14px color-mix(in srgb, #0f172a 10%, transparent);
+  pointer-events: auto;
+  transform-origin: top left;
+  animation: sectionAddDialogIn 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sectionAddDialogLayer--anchored .sectionAddDialog {
+  position: fixed;
+  left: var(--section-add-dialog-left);
+  top: var(--section-add-dialog-top);
+  width: var(--section-add-dialog-width);
+  max-height: calc(100dvh - var(--section-add-dialog-top) - 16px);
+}
+
+html[data-theme="dark"] .sectionAddDialog {
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.72),
+    0 4px 16px rgba(0, 0, 0, 0.46);
+}
+
+.sectionAddDialogGroups {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.sectionAddDialogGroup {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px 2px 11px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
+  border-radius: 0;
+  background: transparent;
+}
+
+.sectionAddDialogGroup:last-child {
+  padding-bottom: 2px;
+  border-bottom: 0;
+}
+
+.sectionAddDialogGroupLabel {
+  color: var(--color-text-muted);
+  font-size: 0.6rem;
+  font-weight: 760;
+  line-height: 1;
+  letter-spacing: 0.085em;
+  text-transform: uppercase;
+}
+
+.sectionAddDialogGroup--custom .sectionAddDialogGroupLabel {
+  display: none;
+}
+
+.sectionAddDialogOptionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.sectionAddDialogOption {
+  min-width: 0;
+  min-height: 31px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-elevated);
+  color: var(--color-text);
+  font-size: 0.72rem;
+  font-weight: 680;
+  line-height: 1.05;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.sectionAddDialogOption:hover,
+.sectionAddDialogOption:focus-visible {
+  border-color: var(--color-accent-border);
+  background: color-mix(in srgb, var(--color-accent-soft) 68%, var(--color-surface) 32%);
+  color: var(--color-text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 9%, transparent);
+  outline: none;
+}
+
+.sectionAddDialogOption:active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-soft) 82%, var(--color-surface) 18%);
+}
+
+@keyframes sectionAddDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media screen and (max-width: 720px) {
+  .sectionAddDialogLayer {
+    display: grid;
+    align-items: end;
+    padding: 10px;
+  }
+
+  .sectionAddDialog {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    gap: 0;
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    padding: 8px 10px 10px;
+    border-radius: var(--radius-dialog);
+  }
+
+  .sectionAddDialogGroups {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .sectionAddDialogGroup {
+    gap: 5px;
+    padding: 7px 2px 8px;
+  }
+
+  .sectionAddDialogOptionGrid,
+  .sectionAddDialogGroup .sectionAddDialogOptionGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .sectionAddDialogOption {
+    min-height: 28px;
+    padding: 0 7px;
+    border-radius: var(--radius-small);
+    font-size: 0.6875rem;
+  }
+}
+
+@media (max-height: 680px) {
+  .sectionAddDialog {
+    gap: 0;
+    padding: 7px 9px;
+  }
+
+  .sectionAddDialogGroup {
+    gap: 4px;
+    padding: 6px 2px 7px;
+  }
+
+  .sectionAddDialogGroupLabel {
+    font-size: 0.5625rem;
+  }
+
+  .sectionAddDialogOption {
+    min-height: 27px;
+    padding-inline: 7px;
+    font-size: 0.6875rem;
+  }
+}
+

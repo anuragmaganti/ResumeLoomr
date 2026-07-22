@@ -167,7 +167,7 @@ test('preview mobile chrome rules do not reflow printable resume content', () =>
 
 test('preview print CSS uses physical page geometry instead of mobile viewport geometry', () => {
   const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
-  const appCss = fs.readFileSync('src/App.css', 'utf8');
+  const appResponsiveCss = fs.readFileSync('src/styles/app-responsive.css', 'utf8');
   const previewComponent = fs.readFileSync('src/components/resumePreview.jsx', 'utf8');
   const previewLayoutHook = fs.readFileSync('src/components/useResumePreviewLayout.js', 'utf8');
   const builderHook = fs.readFileSync('src/hooks/useResumeBuilder.js', 'utf8');
@@ -176,8 +176,8 @@ test('preview print CSS uses physical page geometry instead of mobile viewport g
   const printCss = printStart >= 0 && pageRuleStart > printStart
     ? previewCss.slice(printStart, pageRuleStart)
     : '';
-  const appPrintStart = appCss.indexOf('@media print');
-  const appPrintCss = appPrintStart >= 0 ? appCss.slice(appPrintStart) : '';
+  const appPrintStart = appResponsiveCss.indexOf('@media print');
+  const appPrintCss = appPrintStart >= 0 ? appResponsiveCss.slice(appPrintStart) : '';
 
   assert.match(printCss, /\.previewPageViewport,\s*\.previewPageScaleShell,\s*\.previewPageScaleLayer\s*\{[\s\S]*?position:\s*static !important/);
   assert.match(printCss, /\.previewPageViewport,\s*\.previewPageScaleShell,\s*\.previewPageScaleLayer\s*\{[\s\S]*?width:\s*var\(--resume-print-content-width\) !important/);
