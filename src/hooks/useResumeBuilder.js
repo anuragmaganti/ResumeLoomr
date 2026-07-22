@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
-  DEFAULT_TEMPLATE,
-  TEMPLATE_OPTIONS,
   addResumeSectionBlock,
   addSectionBlockEducationCustomSection,
   addSectionBlockEducationProgram,
@@ -43,6 +41,10 @@ import {
   updateSectionTitle,
 } from '../lib/resume.js';
 import { getPreviewModel } from '../lib/resumePreviewModel.js';
+import {
+  DEFAULT_TEMPLATE,
+  TEMPLATE_OPTIONS,
+} from '../lib/resumeSettings.js';
 import { validateResume } from '../lib/resumeValidation.js';
 import {
   MAX_WORKSPACE_RESUMES,

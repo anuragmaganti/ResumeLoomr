@@ -3,10 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 import {
-  DEFAULT_TEMPLATE,
   MAX_RESUME_SECTIONS,
-  PERSONAL_CONTACT_FIELDS,
-  PERSONAL_HEADER_ROWS,
   SECTION_TEMPLATE_GROUPS,
   UNTITLED_SECTION_TITLE,
   addResumeSectionBlock,
@@ -17,17 +14,11 @@ import {
   didTransientSampleEntryChange,
   dismissSampleInformation,
   getDefaultEntryHeaderLayout,
-  getEffectivePersonalAlignment,
   materializeAndReorderSectionBlockEntries,
   moveSectionHeaderField,
   moveSectionBlockEntry,
-  getResumePresentationVars,
-  getResumePrintPageRule,
   moveResumeSectionBlock,
   normalizeDraftPayload,
-  normalizePersonalContactOrder,
-  normalizePersonalHeaderOrder,
-  normalizeResumeSettings,
   projectTransientSampleEntry,
   removeResumeSectionBlock,
   reorderSectionBlockEntriesToMatch,
@@ -51,6 +42,17 @@ import {
   updateSectionTitle,
 } from '../src/lib/resume.js';
 import { getPreviewModel } from '../src/lib/resumePreviewModel.js';
+import {
+  DEFAULT_TEMPLATE,
+  PERSONAL_CONTACT_FIELDS,
+  PERSONAL_HEADER_ROWS,
+  getEffectivePersonalAlignment,
+  getResumePresentationVars,
+  getResumePrintPageRule,
+  normalizePersonalContactOrder,
+  normalizePersonalHeaderOrder,
+  normalizeResumeSettings,
+} from '../src/lib/resumeSettings.js';
 import { validateResume } from '../src/lib/resumeValidation.js';
 import { createFreshWorkspaceDraft } from '../src/lib/workspaceDraft.js';
 import {

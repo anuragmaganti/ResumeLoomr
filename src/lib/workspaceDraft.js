@@ -1,8 +1,8 @@
 import {
-  DEFAULT_TEMPLATE,
   createDraftPayload,
   createEmptyResume,
 } from './resume.js';
+import { DEFAULT_TEMPLATE } from './resumeSettings.js';
 import {
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,

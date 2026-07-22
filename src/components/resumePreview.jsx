@@ -22,17 +22,19 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
     ENTRY_HEADER_LAYOUT_FIELDS,
+    getDefaultEntryHeaderLayout,
+    moveSectionHeaderField,
+    normalizeEntryHeaderLayout,
+} from '../lib/resume.js';
+import {
     PERSONAL_ALIGNMENT_OPTIONS,
     PERSONAL_CONTACT_FIELDS,
-    getDefaultEntryHeaderLayout,
     getEffectivePersonalAlignment,
     getResumePresentationVars,
     getResumePrintPageRule,
-    moveSectionHeaderField,
-    normalizeEntryHeaderLayout,
     normalizePersonalContactOrder,
     normalizePersonalHeaderOrder,
-} from '../lib/resume.js';
+} from '../lib/resumeSettings.js';
 import {
     CSS_PIXELS_PER_INCH,
     PRINT_PAGE_HEIGHT_PX,
