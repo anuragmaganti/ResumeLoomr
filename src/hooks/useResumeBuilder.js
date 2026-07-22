@@ -27,6 +27,7 @@ import {
   normalizeDraftPayload,
   normalizeWorkspaceIndex,
   placeWorkspaceResumeAfter,
+  projectTransientSampleEntry,
   removeResumeSectionBlock,
   removeSectionBlockEducationCustomSection,
   removeSectionBlockEducationProgram,
@@ -35,6 +36,7 @@ import {
   reorderSectionBlockEntriesToMatch,
   reorderSectionBlockTextListItem,
   reorderResumeSectionBlocksToMatch,
+  resolveTransientSampleEntry,
   removeWorkspaceFolders,
   removeWorkspaceResumes,
   renameWorkspaceFolder,
@@ -190,6 +192,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     [initialWorkspaceState.workspace.activeResumeId, initialWorkspaceState.draft.localRevision || ''],
   ]));
   const conflictRef = useRef(null);
+  const transientSampleEntryRef = useRef(null);
   const activeResumeId = workspace.activeResumeId;
   const errors = useMemo(() => validateResume(resume), [resume]);
   const previewModel = useMemo(() => getPreviewModel(resume), [resume]);
@@ -204,9 +207,10 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
 
   useEffect(() => {
     const localRevision = editorDraftRevisionRef.current || currentDraftRef.current.localRevision || '';
+    const persistableResume = resolveTransientSampleEntry(resume, transientSampleEntryRef.current);
 
     currentDraftRef.current = {
-      resume,
+      resume: persistableResume,
       template,
       savedAt,
       localRevision,
@@ -538,6 +542,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const nextSectionIds = getDraftEditorSectionIds(draftState);
 
     skipNextAutosaveRef.current = true;
+    transientSampleEntryRef.current = null;
     currentDraftRef.current = draftState;
     editorDraftResumeIdRef.current = resumeId;
     editorDraftRevisionRef.current = draftState.localRevision || '';
@@ -875,14 +880,88 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     editorMutationVersionRef.current += 1;
     setResume((currentResume) => {
       const nextResume = transform(currentResume);
+      const transient = transientSampleEntryRef.current;
+      const persistableResume = resolveTransientSampleEntry(nextResume, transient);
 
       currentDraftRef.current = {
         ...currentDraftRef.current,
-        resume: nextResume,
+        resume: persistableResume,
       };
 
       return nextResume;
     });
+  }
+
+  function prepareTransientSampleEntry(sectionId, previewEntry, previewEntryOrder) {
+    let projectedResume = null;
+
+    flushSync(() => {
+      skipNextAutosaveRef.current = true;
+      setResume((currentResume) => {
+        const canonicalResume = resolveTransientSampleEntry(currentResume, transientSampleEntryRef.current);
+        const result = projectTransientSampleEntry(
+          canonicalResume,
+          sectionId,
+          previewEntry,
+          previewEntryOrder,
+        );
+
+        transientSampleEntryRef.current = result.transient
+          ? { ...result.transient, resumeId: activeResumeIdRef.current }
+          : null;
+        projectedResume = result.resume;
+        currentDraftRef.current = {
+          ...currentDraftRef.current,
+          resume: resolveTransientSampleEntry(result.resume, transientSampleEntryRef.current),
+        };
+
+        return result.resume;
+      });
+    });
+
+    return projectedResume;
+  }
+
+  function endTransientSampleEntry({ sectionId = '', entryId = '' } = {}) {
+    const transient = transientSampleEntryRef.current;
+
+    if (
+      !transient ||
+      (sectionId && transient.sectionId !== sectionId) ||
+      (entryId && transient.entryId !== entryId)
+    ) {
+      return false;
+    }
+
+    flushSync(() => {
+      setResume((currentResume) => {
+        const canonicalResume = resolveTransientSampleEntry(currentResume, transient);
+
+        if (canonicalResume !== currentResume) {
+          skipNextAutosaveRef.current = true;
+        }
+
+        currentDraftRef.current = {
+          ...currentDraftRef.current,
+          resume: canonicalResume,
+        };
+        transientSampleEntryRef.current = null;
+
+        return canonicalResume;
+      });
+    });
+
+    return true;
+  }
+
+  function endTransientSampleEntryUnless(sectionId = '', entryId = '') {
+    const transient = transientSampleEntryRef.current;
+
+    if (!transient || (transient.sectionId === sectionId && transient.entryId === entryId)) {
+      return false;
+    }
+
+    return endTransientSampleEntry();
   }
 
   function changeTemplate(nextTemplate) {
@@ -938,6 +1017,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   }
 
   function printResume() {
+    endTransientSampleEntry();
     revealAllErrors();
     printViewRef.current = mobileViewRef.current;
     persistCurrentEditorDraft({ reason: 'print' });
@@ -1514,12 +1594,14 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       updateResume((currentResume) => updateSampleDisplay(currentResume, { hasStarted: true }));
     },
     setSampleInformationVisible(showInformation) {
+      endTransientSampleEntry();
       updateResume((currentResume) => updateSampleDisplay(currentResume, {
         hasStarted: true,
         showInformation,
       }));
     },
     dismissSampleInformation() {
+      endTransientSampleEntry();
       updateResume((currentResume) => dismissSampleInformation(currentResume));
     },
     setSampleTextListOrder(orderKey, orderedSourceIndexes) {
@@ -1527,6 +1609,8 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     },
     addResumeSection(templateId) {
       let nextSectionId = '';
+
+      endTransientSampleEntry();
 
       flushSync(() => {
         setSaveState('saving');
@@ -1547,6 +1631,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return nextSectionId;
     },
     removeResumeSection(sectionId) {
+      endTransientSampleEntry();
       updateResume((currentResume) => removeResumeSectionBlock(currentResume, sectionId));
     },
     updateSectionBlockEntry(sectionId, entryId, field, value) {
@@ -1562,6 +1647,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       updateResume((currentResume) => reorderSectionBlockEntriesToMatch(currentResume, sectionId, nextEntryIds));
     },
     materializeAndReorderSectionEntries(sectionId, nextEntryIds, sampleEntryBindings) {
+      endTransientSampleEntry();
       updateResume((currentResume) => (
         materializeAndReorderSectionBlockEntries(currentResume, sectionId, nextEntryIds, sampleEntryBindings)
       ));
@@ -1608,6 +1694,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     removeSectionBlockEducationProgram(sectionId, entryId, programIndex) {
       updateResume((currentResume) => removeSectionBlockEducationProgram(currentResume, sectionId, entryId, programIndex));
     },
+    prepareTransientSampleEntry,
+    endTransientSampleEntry,
+    endTransientSampleEntryUnless,
   };
 
   return {

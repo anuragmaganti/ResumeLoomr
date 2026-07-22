@@ -36,6 +36,10 @@ import {
   readSignedOutEditingPreference,
   writeSignedOutEditingPreference,
 } from './lib/browserConnection.js';
+import {
+  getPreviewEditorMutation,
+  readResumeEditorTargetValue,
+} from './lib/editorTargets.js';
 
 const THEME_STORAGE_KEY = 'resumeloomr:theme';
 const EMPTY_SAMPLE_ORDER_OVERRIDES = {};
@@ -82,6 +86,12 @@ function getPreviewEntryOrder(previewModel, sectionId) {
   const entries = Array.isArray(block?.entries) ? block.entries : [];
 
   return entries.map((entry) => entry.id).filter(Boolean);
+}
+
+function getPreviewEntry(previewModel, sectionId, entryId) {
+  const block = previewModel?.sectionBlocks?.find((section) => section.id === sectionId);
+
+  return block?.entries?.find((entry) => entry.id === entryId) || null;
 }
 
 function getPreviewEntrySampleBindings(previewModel, sectionId) {
@@ -152,6 +162,7 @@ function App() {
   }));
   const [signedOutEditingPreference, setSignedOutEditingPreference] = useState(() => readSignedOutEditingPreference());
   const previewEditRequestIdRef = useRef(0);
+  const responsiveProxyHandoffEntryRef = useRef(null);
   const previewPulseRequestIdRef = useRef(0);
   const [previewEditTarget, setPreviewEditTarget] = useState(null);
   const [previewPulseTarget, setPreviewPulseTarget] = useState(null);
@@ -483,7 +494,40 @@ function App() {
 
   function handlePreviewEditTarget(target) {
     if (!target?.sectionId || !target?.path) {
-      return;
+      return null;
+    }
+
+    let targetResume = resume;
+
+    if (target.preserveTransient) {
+      responsiveProxyHandoffEntryRef.current = target.entryId
+        ? { sectionId: target.sectionId, entryId: target.entryId }
+        : null;
+    } else if (isSamplePreview && target.entryId) {
+      const previewEntry = getPreviewEntry(displayPreviewModel, target.sectionId, target.entryId);
+
+      if (!previewEntry) {
+        return null;
+      }
+
+      targetResume = actions.prepareTransientSampleEntry(
+        target.sectionId,
+        previewEntry,
+        getPreviewEntryOrder(displayPreviewModel, target.sectionId),
+      );
+    } else {
+      actions.endTransientSampleEntry();
+    }
+
+    if (!targetResume || readResumeEditorTargetValue(targetResume, target) === null) {
+      return null;
+    }
+
+    if (target.stayInPreview) {
+      setPreviewEditTarget(null);
+      setActiveTab(target.sectionId);
+      setMobileView('preview');
+      return targetResume;
     }
 
     previewEditRequestIdRef.current += 1;
@@ -493,7 +537,73 @@ function App() {
     });
     setActiveTab(target.sectionId);
     setMobileView('editor');
+    return targetResume;
   }
+
+  const handlePreviewEditorHandoff = useCallback((target) => {
+    if (!target?.sectionId || !target?.path) {
+      return;
+    }
+
+    previewEditRequestIdRef.current += 1;
+    setPreviewEditTarget({
+      ...target,
+      stayInPreview: false,
+      requestId: previewEditRequestIdRef.current,
+    });
+    setActiveTab(target.sectionId);
+    setMobileView('editor');
+  }, [setActiveTab, setMobileView]);
+
+  const handlePreviewValueChange = useCallback((target, value) => {
+    const mutation = getPreviewEditorMutation(target, value);
+
+    if (!mutation) {
+      return;
+    }
+
+    switch (mutation.type) {
+      case 'personal':
+        actions.updatePersonalField(...mutation.args);
+        break;
+      case 'sectionTitle':
+        actions.updateSectionTitle(...mutation.args);
+        break;
+      case 'textList':
+        actions.updateSectionBlockTextList(...mutation.args);
+        break;
+      case 'educationProgram':
+        actions.updateSectionBlockEducationProgram(...mutation.args);
+        break;
+      case 'educationCustomSection':
+        actions.updateSectionBlockEducationCustomSection(...mutation.args);
+        break;
+      case 'entry':
+        actions.updateSectionBlockEntry(...mutation.args);
+        break;
+      default:
+        break;
+    }
+  }, [actions]);
+
+  const handlePreviewValueCommit = useCallback((target) => {
+    if (!target?.path) {
+      return;
+    }
+
+    markTouched(target.path);
+
+    if (target.field === '__title' && target.sectionId !== 'personal') {
+      actions.commitSectionTitle(target.sectionId);
+    }
+
+    if (target.entryId) {
+      actions.endTransientSampleEntry({
+        sectionId: target.sectionId,
+        entryId: target.entryId,
+      });
+    }
+  }, [actions, markTouched]);
 
   const handlePreviewPulseTarget = useCallback((target) => {
     if (!target?.path) {
@@ -629,9 +739,37 @@ function App() {
 
       return null;
     });
-  }, []);
+    actions.endTransientSampleEntry();
+  }, [actions]);
+
+  const handleEditorEntryFocus = useCallback((entryIdentity) => {
+    actions.endTransientSampleEntryUnless(
+      entryIdentity?.sectionId || '',
+      entryIdentity?.entryId || '',
+    );
+  }, [actions]);
+
+  const handleEditorEntryExit = useCallback((entryIdentity) => {
+    if (!entryIdentity?.sectionId || !entryIdentity?.entryId) {
+      return;
+    }
+
+    const handoffEntry = responsiveProxyHandoffEntryRef.current;
+
+    if (
+      handoffEntry?.sectionId === entryIdentity.sectionId
+      && handoffEntry?.entryId === entryIdentity.entryId
+    ) {
+      responsiveProxyHandoffEntryRef.current = null;
+      return;
+    }
+
+    actions.endTransientSampleEntry(entryIdentity);
+  }, [actions]);
 
   function handleImportResumeClick() {
+    actions.endTransientSampleEntry();
+
     if (!auth.user) {
       auth.openAuthModal();
       return;
@@ -1064,17 +1202,26 @@ function App() {
               onClearPreviewEditTarget={clearPreviewEditTarget}
               onPreviewPulseTarget={handlePreviewPulseTarget}
               onEditorCaretChange={updateEditorCaretTarget}
+              onEditorEntryFocus={handleEditorEntryFocus}
+              onEditorEntryExit={handleEditorEntryExit}
             />
           </div>
 
           <div className={`workspaceColumn workspaceColumnPreview ${mobileView === 'editor' ? 'isMobileHidden' : ''}`}>
             <ResumePreview
+              resume={resume}
+              resumeId={activeResumeId}
               previewModel={displayPreviewModel}
               template={template}
               settings={resume.settings}
               isSamplePreview={isSamplePreview}
               panelRef={previewPanelRef}
               onEditTarget={handlePreviewEditTarget}
+              onPreviewValueChange={handlePreviewValueChange}
+              onPreviewValueCommit={handlePreviewValueCommit}
+              onPreviewCaretChange={updateEditorCaretTarget}
+              onPreviewEditorHandoff={handlePreviewEditorHandoff}
+              onPreviewInteractionStart={actions.endTransientSampleEntry}
               onLayoutChange={handlePreviewLayoutChange}
               onReorderSections={handlePreviewReorderSections}
               onReorderSectionEntries={handlePreviewReorderSectionEntries}
@@ -1087,6 +1234,7 @@ function App() {
               onSummaryWidthChange={actions.setSummaryWidthPercent}
               onSeparatorSettingsOpen={handleSeparatorSettingsOpen}
               activeEditorCaret={editorCaretTarget}
+              isPrintRendering={isPrintRendering}
               previewPulseTarget={previewPulseTarget}
               showEmptyResumeChoice={shouldShowEmptyResumeChoice}
               emptyChoiceNudgeCount={emptyChoiceNudgeCount}

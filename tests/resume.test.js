@@ -23,6 +23,7 @@ import {
   createWorkspaceFolderFromResumes,
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
+  didTransientSampleEntryChange,
   dismissSampleInformation,
   getDefaultEntryHeaderLayout,
   getEffectivePersonalAlignment,
@@ -42,12 +43,14 @@ import {
   normalizeWorkspaceOrganization,
   normalizeWorkspaceIndex,
   placeWorkspaceResumeAfter,
+  projectTransientSampleEntry,
   removeWorkspaceFolders,
   renameWorkspaceFolder,
   removeResumeSectionBlock,
   reorderSectionBlockEntriesToMatch,
   reorderSectionBlockTextListItem,
   reorderResumeSectionBlocksToMatch,
+  resolveTransientSampleEntry,
   removeWorkspaceResumes,
   setPersonalContactOrder,
   setPersonalHeaderOrder,
@@ -934,6 +937,102 @@ test('sample-only entry reorders around real entries do not duplicate real edito
     'Bachmanity Capital',
   ]);
   assert.deepEqual(getSection(resume, 'experience').entries.map((entry) => entry.company), ['TWO', 'ONE']);
+});
+
+test('sample-only editor projection creates only the clicked blank entry and its list rows', () => {
+  const resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  const preview = createMixedSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
+  const previewSection = preview.sectionBlocks.find((section) => section.id === 'experience');
+  const realEntryIds = new Set(getSection(resume, 'experience').entries.map((entry) => entry.id));
+  const previewEntry = previewSection.entries.find((entry) => !realEntryIds.has(entry.id));
+  const result = projectTransientSampleEntry(
+    resume,
+    'experience',
+    previewEntry,
+    previewSection.entryOrder,
+  );
+  const projectedEntries = getSection(result.resume, 'experience').entries;
+
+  assert.equal(projectedEntries.length, getSection(resume, 'experience').entries.length + 1);
+  assert.equal(projectedEntries.some((entry) => entry.id === previewEntry.id), true);
+  assert.equal(projectedEntries.find((entry) => entry.id === previewEntry.id).company, '');
+  assert.equal(
+    projectedEntries.find((entry) => entry.id === previewEntry.id).activities.length,
+    previewEntry.activities.length,
+  );
+  assert.equal(result.transient.entryId, previewEntry.id);
+  assert.equal(result.transient.baselineEntry, null);
+  assert.deepEqual(getSection(resume, 'experience').entries.map((entry) => entry.id), [...realEntryIds]);
+});
+
+test('untouched sample editor projections resolve without persisting blank structure', () => {
+  const resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  const preview = createMixedSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
+  const previewSection = preview.sectionBlocks.find((section) => section.id === 'experience');
+  const realEntryIds = new Set(getSection(resume, 'experience').entries.map((entry) => entry.id));
+  const previewEntry = previewSection.entries.find((entry) => !realEntryIds.has(entry.id));
+  const projected = projectTransientSampleEntry(resume, 'experience', previewEntry, previewSection.entryOrder);
+  const resolved = resolveTransientSampleEntry(projected.resume, projected.transient);
+
+  assert.deepEqual(getSection(resolved, 'experience').entries, getSection(resume, 'experience').entries);
+
+  const edited = updateSectionBlockEntry(projected.resume, 'experience', previewEntry.id, 'company', 'Real company');
+  const promoted = resolveTransientSampleEntry(edited, projected.transient);
+
+  assert.equal(getSection(promoted, 'experience').entries.find((entry) => entry.id === previewEntry.id).company, 'Real company');
+});
+
+test('existing blank entries temporarily gain sample list rows and restore their baseline when empty', () => {
+  const resume = updateSampleDisplay(createEmptyResume(), { hasStarted: true, showInformation: true });
+  const preview = createMixedSamplePreviewModel(resume, 'resume-5', getPreviewModel(resume));
+  const previewSection = preview.sectionBlocks.find((section) => section.id === 'experience');
+  const previewEntry = previewSection.entries[0];
+  const baselineEntry = getSection(resume, 'experience').entries[0];
+  const projected = projectTransientSampleEntry(resume, 'experience', previewEntry, previewSection.entryOrder);
+  const projectedEntry = getSection(projected.resume, 'experience').entries[0];
+
+  assert.ok(projectedEntry.activities.length > baselineEntry.activities.length);
+  assert.deepEqual(
+    getSection(resolveTransientSampleEntry(projected.resume, projected.transient), 'experience').entries[0],
+    baselineEntry,
+  );
+});
+
+test('transient sample entry changes ignore blank projection rows and whitespace', () => {
+  const resume = createEmptyResume();
+  const section = resume.sections.find((candidate) => candidate.kind === 'roles');
+  const existingEntry = section.entries[0];
+  existingEntry.company = 'Real company';
+  const previewEntry = {
+    id: existingEntry.id,
+    activities: [
+      { text: 'Sample one', sourceIndex: 0 },
+      { text: 'Sample two', sourceIndex: 1 },
+    ],
+  };
+  const projection = projectTransientSampleEntry(resume, section.id, previewEntry, [existingEntry.id]);
+
+  assert.equal(didTransientSampleEntryChange(projection.resume, projection.transient), false);
+
+  const whitespaceEdit = updateSectionBlockTextList(
+    projection.resume,
+    section.id,
+    existingEntry.id,
+    'activities',
+    1,
+    '   ',
+  );
+  assert.equal(didTransientSampleEntryChange(whitespaceEdit, projection.transient), false);
+
+  const realEdit = updateSectionBlockTextList(
+    projection.resume,
+    section.id,
+    existingEntry.id,
+    'activities',
+    1,
+    'Built a real system',
+  );
+  assert.equal(didTransientSampleEntryChange(realEdit, projection.transient), true);
 });
 
 test('sample-only entry reorders materialize blank editor rows that preserve order', () => {

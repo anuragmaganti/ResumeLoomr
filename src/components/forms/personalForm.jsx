@@ -72,7 +72,9 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                     <div className="field">
                         <label htmlFor="email">Email address</label>
                         <input
-                            type="email"
+                            type="text"
+                            inputMode="email"
+                            autoComplete="email"
                             id="email"
                             name="email"
                             {...createEditorTargetAttributes(personalEditorPath('email'))}

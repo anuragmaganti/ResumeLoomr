@@ -555,6 +555,31 @@ html[data-theme="dark"] .resumePage {
     white-space: break-spaces;
 }
 
+.mobilePreviewEditorProxy {
+  position: fixed;
+  z-index: 1400;
+  box-sizing: border-box;
+  min-width: 1px;
+  min-height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  box-shadow: none;
+  opacity: 0.001;
+  overflow: hidden;
+  resize: none;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-text-fill-color: transparent;
+}
+
 @keyframes previewTextCaretBlink {
   0%,
   49% {
@@ -1970,6 +1995,7 @@ html[data-theme="dark"] .personalSection {
 
   .resumePageMarkers,
   .previewMarginControls,
+  .mobilePreviewEditorProxy,
   .sampleInformationToggle,
   .sectionSeparatorControl,
   .resumeEmptyChoiceOverlay,

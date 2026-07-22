@@ -6,6 +6,8 @@ import EntryActionMenu from "./forms/entryActionMenu";
 import EditorSettingsRail from "./editorSettingsRail";
 import {
     createEditorTargetAttributes,
+    getEditorEntryIdentity,
+    mapDisplayedCaretOffsetToSource,
     personalEditorPath,
     sectionTitleEditorPath
 } from "../lib/editorTargets";
@@ -71,11 +73,14 @@ export default function EditorPanel({
     placeholderFor,
     onClearPreviewEditTarget,
     onPreviewPulseTarget,
-    onEditorCaretChange
+    onEditorCaretChange,
+    onEditorEntryFocus,
+    onEditorEntryExit,
 }) {
     const handledPreviewRequestIdRef = useRef(0);
     const pendingAddedSectionIdRef = useRef("");
     const caretSyncFrameIdRef = useRef(0);
+    const activeEditorEntryRef = useRef(null);
     const resumeBlocks = Array.isArray(resume.sections) ? resume.sections : [];
     const activeBlock = resumeBlocks.find((section) => section.id === activeTab);
     const currentSectionTitleValue = activeTab === "personal"
@@ -168,6 +173,11 @@ export default function EditorPanel({
         });
     };
     const handleEditorFocus = (event) => {
+        const fieldElement = getEditorFieldElement(event.target);
+        const entryIdentity = getEditorEntryIdentity(fieldElement?.dataset.editorPath);
+
+        activeEditorEntryRef.current = entryIdentity;
+        onEditorEntryFocus?.(entryIdentity);
         syncEditorCaretFromEvent(event);
         pulsePreviewFromEditorEvent(event);
     };
@@ -212,6 +222,8 @@ export default function EditorPanel({
         window.setTimeout(() => {
             if (!editorStageElement.contains(document.activeElement)) {
                 onEditorCaretChange?.(null);
+                onEditorEntryExit?.(activeEditorEntryRef.current);
+                activeEditorEntryRef.current = null;
             }
         }, 0);
     };
@@ -270,7 +282,14 @@ export default function EditorPanel({
             focusElement?.focus({ preventScroll: true });
 
             if (focusElement && typeof focusElement.value === "string") {
-                const caretOffset = focusElement.value.length;
+                const caretOffset = Number.isFinite(previewEditTarget.sourceOffset)
+                    ? Math.max(0, Math.min(previewEditTarget.sourceOffset, focusElement.value.length))
+                    : mapDisplayedCaretOffsetToSource({
+                        displayText: previewEditTarget.displayText,
+                        sourceValue: focusElement.value,
+                        displayOffset: previewEditTarget.displayOffset,
+                        isPlaceholder: focusElement.value.trim() === "",
+                    });
 
                 try {
                     focusElement.setSelectionRange?.(caretOffset, caretOffset);

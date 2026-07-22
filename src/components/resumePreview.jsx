@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal, flushSync } from 'react-dom';
 import {
     closestCenter,
     DndContext,
@@ -41,7 +41,14 @@ import {
 } from '../lib/previewPagination.js';
 import {
     createPreviewEditAttributes,
+    getPreviewCaretOffsetFromPoint,
+    getPreviewEditorInputMode,
+    parseEditorTargetPath,
+    getPreviewEditorLabel,
+    isPreviewEditorTargetMultiline,
+    mapDisplayedCaretOffsetToSource,
     personalEditorPath,
+    readResumeEditorTargetValue,
     sectionEntryEditorPath,
     sectionEntryListEditorPath,
     sectionEntryNestedEditorPath,
@@ -1158,6 +1165,150 @@ function getPreviewScaleFromElement(resumeElement) {
     return Number.isFinite(scale) && scale > 0 ? scale : 1;
 }
 
+function isMobilePreviewEditingViewport() {
+    return typeof window !== 'undefined'
+        && window.matchMedia('(max-width: 980px)').matches;
+}
+
+function getMobileEditorProxyStyle(valueElement, resumeElement) {
+    if (!valueElement || !resumeElement || typeof window === 'undefined') {
+        return null;
+    }
+
+    const rect = valueElement.getBoundingClientRect();
+    const computedStyle = window.getComputedStyle(valueElement);
+    const previewScale = getPreviewScaleFromElement(resumeElement);
+    const renderedFontSize = Math.max(1, parseCssPixelValue(computedStyle.fontSize, 16));
+    const internalFontSize = Math.max(16, renderedFontSize);
+    const proxyScale = Math.max(0.01, previewScale * (renderedFontSize / internalFontSize));
+    const renderedLineHeight = parseCssPixelValue(computedStyle.lineHeight, renderedFontSize * 1.2);
+    const internalLineHeight = renderedLineHeight * (internalFontSize / renderedFontSize);
+    const renderedLetterSpacing = computedStyle.letterSpacing === 'normal'
+        ? 0
+        : parseCssPixelValue(computedStyle.letterSpacing, 0);
+
+    return {
+        top: `${rect.top}px`,
+        left: `${rect.left}px`,
+        width: `${Math.max(1, rect.width / proxyScale)}px`,
+        height: `${Math.max(internalLineHeight, rect.height / proxyScale)}px`,
+        fontFamily: computedStyle.fontFamily,
+        fontSize: `${internalFontSize}px`,
+        fontStyle: computedStyle.fontStyle,
+        fontWeight: computedStyle.fontWeight,
+        letterSpacing: `${renderedLetterSpacing * (internalFontSize / renderedFontSize)}px`,
+        lineHeight: `${internalLineHeight}px`,
+        textAlign: computedStyle.textAlign,
+        textTransform: computedStyle.textTransform,
+        transform: `scale(${proxyScale})`,
+        transformOrigin: 'top left',
+    };
+}
+
+function mobileProxyStylesMatch(currentStyle, nextStyle) {
+    if (!currentStyle || !nextStyle) {
+        return currentStyle === nextStyle;
+    }
+
+    const keys = Object.keys(nextStyle);
+    return keys.length === Object.keys(currentStyle).length
+        && keys.every((key) => currentStyle[key] === nextStyle[key]);
+}
+
+function MobilePreviewEditorProxy({
+    session,
+    inputRef,
+    onBlur,
+    onCaretEvent,
+    onChange,
+    onCommit,
+    onProxyTap,
+}) {
+    const isComposingRef = useRef(false);
+    const pointerDownRef = useRef(null);
+
+    if (!session || typeof document === 'undefined') {
+        return null;
+    }
+
+    const proxy = (
+        <textarea
+            ref={inputRef}
+            className="mobilePreviewEditorProxy"
+            data-mobile-preview-editor="true"
+            aria-label={getPreviewEditorLabel(session.target)}
+            value={session.value}
+            rows={session.isMultiline ? 3 : 1}
+            inputMode={session.inputMode}
+            enterKeyHint={session.isMultiline ? 'enter' : 'done'}
+            autoCapitalize={session.inputMode === 'text' ? 'sentences' : 'none'}
+            autoCorrect={session.inputMode === 'text' ? 'on' : 'off'}
+            spellCheck={session.inputMode === 'text'}
+            style={session.proxyStyle || undefined}
+            onBeforeInput={(event) => {
+                if (!session.isMultiline && event.nativeEvent.inputType === 'insertLineBreak') {
+                    event.preventDefault();
+                    onCommit();
+                }
+            }}
+            onBlur={onBlur}
+            onChange={onChange}
+            onCompositionStart={() => {
+                isComposingRef.current = true;
+            }}
+            onCompositionEnd={(event) => {
+                isComposingRef.current = false;
+                onCaretEvent(event);
+            }}
+            onFocus={onCaretEvent}
+            onInput={onCaretEvent}
+            onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    onCommit();
+                    return;
+                }
+
+                if (
+                    event.key === 'Enter'
+                    && !session.isMultiline
+                    && !isComposingRef.current
+                    && !event.nativeEvent.isComposing
+                ) {
+                    event.preventDefault();
+                    onCommit();
+                }
+            }}
+            onKeyUp={onCaretEvent}
+            onPointerDown={(event) => {
+                pointerDownRef.current = {
+                    pointerId: event.pointerId,
+                    x: event.clientX,
+                    y: event.clientY,
+                    timeStamp: event.timeStamp,
+                };
+            }}
+            onPointerUp={(event) => {
+                const pointerDown = pointerDownRef.current;
+                pointerDownRef.current = null;
+                const isShortTap = pointerDown?.pointerId === event.pointerId
+                    && event.timeStamp - pointerDown.timeStamp < 350
+                    && Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y) < 8;
+
+                if (isShortTap) {
+                    onProxyTap(event);
+                    return;
+                }
+
+                onCaretEvent(event);
+            }}
+            onSelect={onCaretEvent}
+        />
+    );
+
+    return createPortal(proxy, document.body);
+}
+
 function getCandidateBounds(element, resumeRect, previewScale, paddingTop) {
     const rect = element.getBoundingClientRect();
     const top = ((rect.top - resumeRect.top) / previewScale) - paddingTop;
@@ -1209,12 +1360,19 @@ function measurePreviewContentFlowHeight(resumeElement, paddingTop, fallbackHeig
 }
 
 export default function ResumePreview({
+    resume,
+    resumeId,
     previewModel,
     template,
     settings,
     isSamplePreview = false,
     panelRef,
     onEditTarget,
+    onPreviewValueChange,
+    onPreviewValueCommit,
+    onPreviewCaretChange,
+    onPreviewEditorHandoff,
+    onPreviewInteractionStart,
     onLayoutChange,
     onReorderSections,
     onReorderSectionEntries,
@@ -1227,6 +1385,7 @@ export default function ResumePreview({
     onSummaryWidthChange,
     onSeparatorSettingsOpen,
     activeEditorCaret,
+    isPrintRendering = false,
     previewPulseTarget,
     showEmptyResumeChoice = false,
     emptyChoiceNudgeCount = 0,
@@ -1247,12 +1406,20 @@ export default function ResumePreview({
     const headerLayoutDoubleClickRef = useRef(null);
     const headerLayoutLongPressRef = useRef(null);
     const personalChromeActiveRef = useRef(false);
+    const mobileEditorRef = useRef(null);
+    const mobileEditSessionRef = useRef(null);
+    const mobileCaretFrameRef = useRef(0);
+    const mobileBlurTimerRef = useRef(0);
+    const previewValueChangeRef = useRef(onPreviewValueChange);
+    const previewValueCommitRef = useRef(onPreviewValueCommit);
+    const previewCaretChangeRef = useRef(onPreviewCaretChange);
     const [activeDragMeta, setActiveDragMeta] = useState(null);
     const [activeDragRect, setActiveDragRect] = useState(null);
     const [activeHeaderLayout, setActiveHeaderLayout] = useState(null);
     const [hoverHeaderLayout, setHoverHeaderLayout] = useState(null);
     const [isPersonalChromeActive, setIsPersonalChromeActive] = useState(false);
     const [summaryWidthDrag, setSummaryWidthDrag] = useState(null);
+    const [mobileEditSession, setMobileEditSession] = useState(null);
     const isPreviewDragActive = Boolean(activeDragMeta?.type);
     const canShowHeaderLayoutHover = !activeDragMeta?.type || activeDragMeta.type === 'headerSlot';
     const [pageMetrics, setPageMetrics] = useState({
@@ -1308,6 +1475,360 @@ export default function ResumePreview({
                 : personalDetails.length > 0
         ))
     ), [personalDetails.length, personalHeaderOrder, previewModel.personal.headline]);
+
+    useEffect(() => {
+        previewValueChangeRef.current = onPreviewValueChange;
+        previewValueCommitRef.current = onPreviewValueCommit;
+        previewCaretChangeRef.current = onPreviewCaretChange;
+    }, [onPreviewCaretChange, onPreviewValueChange, onPreviewValueCommit]);
+
+    const findPreviewValueElement = useCallback((path) => {
+        if (!path || !resumeRef.current) {
+            return null;
+        }
+
+        return Array.from(resumeRef.current.querySelectorAll('[data-preview-caret-text="true"]'))
+            .find((element) => element.dataset.previewCaretPath === path) || null;
+    }, []);
+
+    const updateMobileProxyPosition = useCallback(() => {
+        const currentSession = mobileEditSessionRef.current;
+
+        if (!currentSession) {
+            return false;
+        }
+
+        const valueElement = findPreviewValueElement(currentSession.target.path);
+        const proxyStyle = getMobileEditorProxyStyle(valueElement, resumeRef.current);
+
+        if (!valueElement || !proxyStyle) {
+            return false;
+        }
+
+        if (!mobileProxyStylesMatch(currentSession.proxyStyle, proxyStyle)) {
+            const nextSession = { ...currentSession, proxyStyle };
+            mobileEditSessionRef.current = nextSession;
+            setMobileEditSession(nextSession);
+        }
+
+        return true;
+    }, [findPreviewValueElement]);
+
+    function scheduleMobileCaretSync(inputElement = mobileEditorRef.current) {
+        window.cancelAnimationFrame(mobileCaretFrameRef.current);
+        mobileCaretFrameRef.current = window.requestAnimationFrame(() => {
+            mobileCaretFrameRef.current = 0;
+            const currentSession = mobileEditSessionRef.current;
+
+            if (!currentSession || !inputElement || document.activeElement !== inputElement) {
+                return;
+            }
+
+            previewCaretChangeRef.current?.({
+                path: currentSession.target.path,
+                offset: Number.isFinite(inputElement.selectionStart)
+                    ? inputElement.selectionStart
+                    : currentSession.value.length,
+                value: currentSession.value,
+            });
+        });
+    }
+
+    function closeMobileEditSession({ commit = true } = {}) {
+        const currentSession = mobileEditSessionRef.current;
+
+        if (!currentSession) {
+            return;
+        }
+
+        window.clearTimeout(mobileBlurTimerRef.current);
+        window.cancelAnimationFrame(mobileCaretFrameRef.current);
+        mobileBlurTimerRef.current = 0;
+        mobileCaretFrameRef.current = 0;
+
+        if (commit) {
+            previewValueCommitRef.current?.(currentSession.target);
+        }
+
+        mobileEditSessionRef.current = null;
+        setMobileEditSession(null);
+        previewCaretChangeRef.current?.(null);
+
+        if (document.activeElement === mobileEditorRef.current) {
+            mobileEditorRef.current.blur();
+        }
+    }
+
+    function openMobileEditSession(target, valueElement, sourceResume = resume, sourceOffsetOverride = null) {
+        const sourceValue = readResumeEditorTargetValue(sourceResume, target);
+
+        if (sourceValue === null) {
+            return false;
+        }
+
+        const sourceOffset = Number.isFinite(sourceOffsetOverride)
+            ? Math.max(0, Math.min(sourceOffsetOverride, sourceValue.length))
+            : mapDisplayedCaretOffsetToSource({
+                displayText: target.displayText,
+                sourceValue,
+                displayOffset: target.displayOffset,
+                isPlaceholder: sourceValue.trim() === '',
+            });
+        const nextSession = {
+            target,
+            resumeId,
+            value: sourceValue,
+            isMultiline: isPreviewEditorTargetMultiline(target),
+            inputMode: getPreviewEditorInputMode(target),
+            proxyStyle: getMobileEditorProxyStyle(valueElement, resumeRef.current),
+        };
+
+        flushSync(() => {
+            mobileEditSessionRef.current = nextSession;
+            setMobileEditSession(nextSession);
+        });
+
+        const inputElement = mobileEditorRef.current;
+        inputElement?.focus({ preventScroll: true });
+
+        try {
+            inputElement?.setSelectionRange(sourceOffset, sourceOffset);
+        } catch {
+            // The textarea supports selection ranges; retain the end fallback if a browser refuses it.
+        }
+
+        scheduleMobileCaretSync(inputElement);
+        return true;
+    }
+
+    function handleMobileEditorChange(event) {
+        const currentSession = mobileEditSessionRef.current;
+
+        if (!currentSession) {
+            return;
+        }
+
+        const rawValue = event.target.value;
+        const nextValue = currentSession.isMultiline
+            ? rawValue
+            : rawValue.replace(/[\r\n]+/g, '');
+        const nextSession = { ...currentSession, value: nextValue };
+
+        mobileEditSessionRef.current = nextSession;
+        setMobileEditSession(nextSession);
+        previewValueChangeRef.current?.(currentSession.target, nextValue);
+        scheduleMobileCaretSync(event.currentTarget);
+    }
+
+    function handleMobileEditorBlur() {
+        const blurredSession = mobileEditSessionRef.current;
+
+        window.clearTimeout(mobileBlurTimerRef.current);
+        mobileBlurTimerRef.current = window.setTimeout(() => {
+            if (
+                blurredSession
+                && mobileEditSessionRef.current === blurredSession
+                && document.activeElement !== mobileEditorRef.current
+            ) {
+                closeMobileEditSession();
+            }
+        }, 0);
+    }
+
+    function handleMobileProxyTap(event) {
+        const currentSession = mobileEditSessionRef.current;
+        const inputElement = event.currentTarget;
+
+        if (!currentSession || !inputElement) {
+            return;
+        }
+
+        const previousPointerEvents = inputElement.style.pointerEvents;
+        inputElement.style.pointerEvents = 'none';
+        const underlyingElement = document.elementFromPoint(event.clientX, event.clientY);
+        const clickedValueElement = underlyingElement?.closest?.('[data-preview-caret-text="true"]');
+        const valueElement = clickedValueElement?.dataset.previewCaretPath === currentSession.target.path
+            ? clickedValueElement
+            : findPreviewValueElement(currentSession.target.path);
+        const displayText = valueElement?.dataset.previewCaretDisplay
+            ?? valueElement?.textContent
+            ?? currentSession.value;
+        const displayOffset = valueElement
+            ? getPreviewCaretOffsetFromPoint(valueElement, event.clientX, event.clientY)
+            : null;
+        inputElement.style.pointerEvents = previousPointerEvents;
+
+        const sourceOffset = mapDisplayedCaretOffsetToSource({
+            displayText,
+            sourceValue: currentSession.value,
+            displayOffset: Number.isFinite(displayOffset) ? displayOffset : currentSession.value.length,
+            isPlaceholder: currentSession.value.trim() === '',
+        });
+
+        inputElement.focus({ preventScroll: true });
+        inputElement.setSelectionRange(sourceOffset, sourceOffset);
+        scheduleMobileCaretSync(inputElement);
+    }
+
+    useEffect(() => {
+        const currentSession = mobileEditSessionRef.current;
+
+        if (!currentSession) {
+            return;
+        }
+
+        if (isPrintRendering || currentSession.resumeId !== resumeId) {
+            closeMobileEditSession();
+        }
+    }, [isPrintRendering, resumeId]);
+
+    useLayoutEffect(() => {
+        if (!mobileEditSession?.target.path || typeof window === 'undefined') {
+            return undefined;
+        }
+
+        let frameId = 0;
+        let missingTargetReads = 0;
+        const viewport = window.visualViewport;
+        const mediaQuery = window.matchMedia('(max-width: 980px)');
+
+        function readPosition() {
+            window.cancelAnimationFrame(frameId);
+            frameId = window.requestAnimationFrame(() => {
+                if (!mediaQuery.matches) {
+                    const currentSession = mobileEditSessionRef.current;
+                    const inputElement = mobileEditorRef.current;
+
+                    if (currentSession) {
+                        const sourceOffset = Number.isFinite(inputElement?.selectionStart)
+                            ? inputElement.selectionStart
+                            : currentSession.value.length;
+
+                        closeMobileEditSession({ commit: false });
+                        onPreviewEditorHandoff?.({
+                            ...currentSession.target,
+                            sourceOffset,
+                        });
+                    }
+                    return;
+                }
+
+                if (updateMobileProxyPosition()) {
+                    missingTargetReads = 0;
+                    return;
+                }
+
+                missingTargetReads += 1;
+
+                if (missingTargetReads >= 2) {
+                    closeMobileEditSession();
+                }
+            });
+        }
+
+        readPosition();
+        window.addEventListener('resize', readPosition);
+        window.addEventListener('scroll', readPosition, true);
+        viewport?.addEventListener('resize', readPosition);
+        viewport?.addEventListener('scroll', readPosition);
+        mediaQuery.addEventListener?.('change', readPosition);
+
+        const resizeObserver = typeof ResizeObserver === 'undefined'
+            ? null
+            : new ResizeObserver(readPosition);
+        if (resizeObserver && resumeRef.current) {
+            resizeObserver.observe(resumeRef.current);
+        }
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+            window.removeEventListener('resize', readPosition);
+            window.removeEventListener('scroll', readPosition, true);
+            viewport?.removeEventListener('resize', readPosition);
+            viewport?.removeEventListener('scroll', readPosition);
+            mediaQuery.removeEventListener?.('change', readPosition);
+            resizeObserver?.disconnect();
+        };
+    }, [mobileEditSession?.target.path, mobileEditSession?.value, onPreviewEditorHandoff, pageMetrics.scale, updateMobileProxyPosition]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !activeEditorCaret?.path) {
+            return undefined;
+        }
+
+        const mediaQuery = window.matchMedia('(max-width: 980px)');
+
+        function handoffEditorToMobile(event) {
+            if (!event.matches || mobileEditSessionRef.current || isPrintRendering) {
+                return;
+            }
+
+            const parsedTarget = parseEditorTargetPath(activeEditorCaret.path);
+            const valueElement = findPreviewValueElement(activeEditorCaret.path);
+
+            if (!parsedTarget || !valueElement) {
+                return;
+            }
+
+            const displayText = valueElement.dataset.previewCaretDisplay
+                ?? valueElement.textContent
+                ?? '';
+            const target = {
+                ...parsedTarget,
+                displayText,
+                displayOffset: Number.isFinite(activeEditorCaret.offset) ? activeEditorCaret.offset : 0,
+                stayInPreview: true,
+                preserveTransient: true,
+            };
+            const targetResume = onEditTarget?.(target);
+
+            if (targetResume) {
+                openMobileEditSession(
+                    target,
+                    valueElement,
+                    targetResume,
+                    activeEditorCaret.offset,
+                );
+            }
+        }
+
+        mediaQuery.addEventListener?.('change', handoffEditorToMobile);
+
+        return () => {
+            mediaQuery.removeEventListener?.('change', handoffEditorToMobile);
+        };
+    }, [activeEditorCaret, findPreviewValueElement, isPrintRendering, onEditTarget]);
+
+    useEffect(() => {
+        if (!mobileEditSession?.target.path || typeof document === 'undefined') {
+            return undefined;
+        }
+
+        function handleOutsidePointerDown(event) {
+            if (event.target.closest?.('[data-mobile-preview-editor="true"]')) {
+                return;
+            }
+
+            const editTarget = event.target.closest?.('[data-edit-section-id][data-edit-path]');
+
+            if (editTarget && resumeRef.current?.contains(editTarget)) {
+                return;
+            }
+
+            closeMobileEditSession();
+        }
+
+        document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+
+        return () => {
+            document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+        };
+    }, [mobileEditSession?.target.path]);
+
+    useEffect(() => () => {
+        window.clearTimeout(mobileBlurTimerRef.current);
+        window.cancelAnimationFrame(mobileCaretFrameRef.current);
+    }, []);
 
     useEffect(() => {
         if (!activeHeaderLayout?.sectionId || typeof document === 'undefined') {
@@ -1673,30 +2194,45 @@ export default function ResumePreview({
             Number.isFinite(activeEditorCaret.offset)
         );
 
-        if (!shouldShowCaret) {
-            return `${prefix}${displayText}${suffix}`;
-        }
-
-        const caretText = typeof activeEditorCaret.value === 'string'
+        const caretText = typeof activeEditorCaret?.value === 'string'
             ? activeEditorCaret.value
             : text;
-        const caretOffset = Math.max(0, Math.min(activeEditorCaret.offset, caretText.length));
+        const caretOffset = shouldShowCaret
+            ? Math.max(0, Math.min(activeEditorCaret.offset, caretText.length))
+            : 0;
         const beforeCaret = caretText.slice(0, caretOffset);
         const afterCaret = caretText.slice(caretOffset);
+        const renderedText = shouldShowCaret
+            ? (caretText || fallback)
+            : displayText;
 
         return (
             <>
-                {prefix}
-                {beforeCaret && (
-                    <span className="previewTextCaretSegment">{beforeCaret}</span>
-                )}
-                <span className="previewTextCaret" aria-hidden="true" />
-                {afterCaret ? (
-                    <span className="previewTextCaretSegment">{afterCaret}</span>
-                ) : (
-                    caretText ? '' : fallback
-                )}
-                {suffix}
+                {prefix ? (
+                    <span data-preview-caret-decoration="prefix">{prefix}</span>
+                ) : null}
+                <span
+                    data-preview-caret-text="true"
+                    data-preview-caret-path={path}
+                    data-preview-caret-display={renderedText}
+                >
+                    {shouldShowCaret ? (
+                        <>
+                            {beforeCaret && (
+                                <span className="previewTextCaretSegment">{beforeCaret}</span>
+                            )}
+                            <span className="previewTextCaret" aria-hidden="true" />
+                            {afterCaret ? (
+                                <span className="previewTextCaretSegment">{afterCaret}</span>
+                            ) : (
+                                caretText ? '' : fallback
+                            )}
+                        </>
+                    ) : displayText}
+                </span>
+                {suffix ? (
+                    <span data-preview-caret-decoration="suffix">{suffix}</span>
+                ) : null}
             </>
         );
     }
@@ -1813,16 +2349,67 @@ export default function ResumePreview({
 
         event.preventDefault();
 
-        onEditTarget({
+        const path = targetElement.dataset.editPath;
+        const clickedValueElement = event.target.closest('[data-preview-caret-text="true"]');
+        const valueElement = clickedValueElement?.dataset.previewCaretPath === path
+            ? clickedValueElement
+            : Array.from(targetElement.querySelectorAll('[data-preview-caret-text="true"]'))
+                .find((element) => element.dataset.previewCaretPath === path);
+        const displayText = valueElement?.dataset.previewCaretDisplay
+            ?? valueElement?.textContent
+            ?? '';
+        const clickedDecoration = event.target.closest('[data-preview-caret-decoration]');
+        let displayOffset = displayText.length;
+
+        if (clickedDecoration?.dataset.previewCaretDecoration === 'prefix') {
+            displayOffset = 0;
+        } else if (clickedDecoration?.dataset.previewCaretDecoration === 'suffix') {
+            displayOffset = displayText.length;
+        } else if (valueElement) {
+            const pointOffset = getPreviewCaretOffsetFromPoint(valueElement, event.clientX, event.clientY);
+
+            if (Number.isFinite(pointOffset)) {
+                displayOffset = pointOffset;
+            } else {
+                const valueRect = valueElement.getBoundingClientRect();
+                const isBeforeValue = event.clientY < valueRect.top
+                    || (event.clientY <= valueRect.bottom && event.clientX <= valueRect.left);
+
+                displayOffset = isBeforeValue ? 0 : displayText.length;
+            }
+        }
+
+        const editTarget = {
             sectionId: targetElement.dataset.editSectionId,
             field: targetElement.dataset.editField || '',
             entryId: targetElement.dataset.editEntryId || '',
             itemIndex: targetElement.dataset.editItemIndex ? Number(targetElement.dataset.editItemIndex) : undefined,
             nestedPath: targetElement.dataset.editNestedPath || '',
-            path: targetElement.dataset.editPath,
+            path,
+            displayText,
+            displayOffset,
             scrollX: window.scrollX,
             scrollY: window.scrollY,
-        });
+        };
+
+        if (isMobilePreviewEditingViewport()) {
+            if (
+                mobileEditSessionRef.current
+                && mobileEditSessionRef.current.target.path !== editTarget.path
+            ) {
+                closeMobileEditSession();
+            }
+
+            const targetResume = onEditTarget({ ...editTarget, stayInPreview: true });
+
+            if (targetResume) {
+                openMobileEditSession(editTarget, valueElement, targetResume);
+            }
+            return;
+        }
+
+        closeMobileEditSession();
+        onEditTarget(editTarget);
     }
 
     function suppressNextPreviewClick() {
@@ -2078,6 +2665,9 @@ export default function ResumePreview({
     }
 
     function handlePreviewDragStart(event) {
+        closeMobileEditSession();
+        onPreviewInteractionStart?.();
+
         if (!activeDragScrollRef.current.captured) {
             capturePreviewDragScroll();
         }
@@ -3755,6 +4345,15 @@ export default function ResumePreview({
                     </div>
                 </div>
             </section>
+            <MobilePreviewEditorProxy
+                session={mobileEditSession}
+                inputRef={mobileEditorRef}
+                onBlur={handleMobileEditorBlur}
+                onCaretEvent={(event) => scheduleMobileCaretSync(event.currentTarget)}
+                onChange={handleMobileEditorChange}
+                onCommit={() => closeMobileEditSession()}
+                onProxyTap={handleMobileProxyTap}
+            />
         </>
     )
 }
