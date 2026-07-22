@@ -58,6 +58,8 @@ export function initializeFirebaseAppCheck() {
     return;
   }
 
+  // This protects Firebase SDK traffic when console enforcement is enabled.
+  // Custom Vercel APIs authenticate independently with ID tokens or session cookies.
   initializeAppCheck(app, {
     provider: new ReCaptchaV3Provider(siteKey),
     isTokenAutoRefreshEnabled: true,

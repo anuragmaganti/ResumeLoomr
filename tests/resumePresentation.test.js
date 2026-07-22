@@ -205,10 +205,12 @@ test('preview print CSS uses physical page geometry instead of mobile viewport g
 
 test('empty sample content is replaced with the real preview model before print', () => {
   const appComponent = fs.readFileSync('src/App.jsx', 'utf8');
+  const printHook = fs.readFileSync('src/hooks/useResumePrint.js', 'utf8');
 
   assert.match(appComponent, /const displayPreviewModel = isPrintRendering \? previewModel : \(samplePreviewModel \|\| previewModel\)/);
-  assert.match(appComponent, /window\.addEventListener\('beforeprint', preparePrintPreview\)/);
-  assert.match(appComponent, /flushSync\(\(\) => setIsPrintRendering\(true\)\)/);
+  assert.match(appComponent, /const \{ handlePrint, isPrintRendering \} = useResumePrint/);
+  assert.match(printHook, /window\.addEventListener\('beforeprint', preparePrintPreview\)/);
+  assert.match(printHook, /flushSync\(\(\) => setIsPrintRendering\(true\)\)/);
 });
 
 test('below-heading section separators render on the final visible section', () => {

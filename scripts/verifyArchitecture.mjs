@@ -25,6 +25,18 @@ const ENTRYPOINTS = [
 ];
 const SERVER_ENTRYPOINTS = ENTRYPOINTS.filter((path) => path.startsWith('api/'));
 const PRODUCTION_MODULE_PREFIXES = ['src/', 'api/', 'server/', 'public/'];
+const DEPENDENCY_BOUNDARIES = [
+  {
+    importerPrefix: 'src/lib/',
+    forbiddenDependencyPrefixes: ['src/components/', 'src/hooks/'],
+    description: 'domain and infrastructure modules cannot depend on React UI',
+  },
+  {
+    importerPrefix: 'src/hooks/',
+    forbiddenDependencyPrefixes: ['src/components/'],
+    description: 'application hooks cannot depend on UI components',
+  },
+];
 
 function toRepositoryPath(path) {
   return relative(ROOT, path).replaceAll('\\', '/');
@@ -180,6 +192,20 @@ for (const entrypoint of ENTRYPOINTS) {
 
 for (const cycle of findCycles(graph)) {
   errors.push(`circular dependency: ${cycle}`);
+}
+
+for (const [module, dependencies] of graph) {
+  for (const boundary of DEPENDENCY_BOUNDARIES) {
+    if (!module.startsWith(boundary.importerPrefix)) {
+      continue;
+    }
+
+    for (const dependency of dependencies) {
+      if (boundary.forbiddenDependencyPrefixes.some((prefix) => dependency.startsWith(prefix))) {
+        errors.push(`${module}: ${boundary.description} (${dependency})`);
+      }
+    }
+  }
 }
 
 const clientReachable = collectReachable(graph, 'src/main.jsx');

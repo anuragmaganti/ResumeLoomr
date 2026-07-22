@@ -165,7 +165,9 @@ test('sync worker coalesces concurrent triggers and reruns once after the active
 
   context.syncOutbox = () => {
     callCount += 1;
-    return new Promise((resolve) => releases.push(resolve));
+    return new Promise((resolve) => {
+      releases.push(resolve);
+    });
   };
 
   const firstAttempt = context.requestOutboxSync();
@@ -173,7 +175,9 @@ test('sync worker coalesces concurrent triggers and reruns once after the active
 
   assert.equal(callCount, 1);
   releases.shift()();
-  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => {
+    setImmediate(resolve);
+  });
   assert.equal(callCount, 2);
   releases.shift()();
 

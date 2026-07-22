@@ -328,10 +328,12 @@ function updateEntry(entries, entryId, updater) {
 }
 
 export function updatePersonalField(resume, field, value) {
+  const normalizedResume = normalizeResume(resume);
+
   return {
-    ...normalizeResume(resume),
+    ...normalizedResume,
     personal: {
-      ...normalizeResume(resume).personal,
+      ...normalizedResume.personal,
       [field]: asText(value),
     },
   };

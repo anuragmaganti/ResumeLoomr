@@ -60,7 +60,7 @@ export function extractEndingDateText(line) {
   const endingDatePattern = new RegExp(`(?:${DATE_RANGE_SOURCE}|${DATE_TOKEN_SOURCE})\\s*$`, 'i');
   const match = text.match(endingDatePattern);
 
-  if (!match || match.index == null) {
+  if (!match || typeof match.index !== 'number') {
     return { beforeDate: text, dateText: '' };
   }
 

@@ -144,6 +144,7 @@ The workspace record also carries normalized root items, folders, folder members
 - **Versioned sync acknowledgements:** stale cloud responses cannot clear newer local outbox work.
 - **Organization without content rewrites:** folders and rail order sync as workspace metadata rather than rewriting resume drafts.
 - **No trusted-device Firestore cache mode:** the app no longer relies on Firestore’s browser cache for correctness; IndexedDB is the durable local workspace.
+- **Enforced dependency direction:** domain and infrastructure modules stay independent of React UI, and hooks cannot import components; the architecture check rejects cycles, unreachable production modules, and boundary violations.
 
 ## Tech Stack
 
@@ -279,6 +280,7 @@ npx --yes firebase-tools@15.24.0 emulators:exec --only firestore --project resum
 - Gemini and Firebase Admin credentials are server-only.
 - Firestore rules restrict users to their own workspace and resume documents.
 - Sync API routes verify Firebase identity server-side before cloud reads/writes.
+- Firebase App Check can attest Firebase SDK traffic when enforcement is enabled; custom Vercel APIs use separately verified Firebase ID tokens or HTTP-only session cookies.
 - Uploaded resume files are processed in memory by the import route and are not intentionally stored server-side.
 - Users can remove the account connection and local resume copies from browser settings.
 - On shared computers, users should disable keeping resumes available after sign out or clear the browser connection.

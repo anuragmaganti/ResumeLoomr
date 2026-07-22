@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import './App.css'
 import './styles/buttons.css'
 import './styles/forms.css'
@@ -22,39 +21,23 @@ import { usePreviewEditorController } from './hooks/usePreviewEditorController.j
 import { useSeparatorSettingsController } from './hooks/useSeparatorSettingsController.js';
 import { useSignOutController } from './hooks/useSignOutController.js';
 import { useResumeImportController } from './hooks/useResumeImportController.js';
+import { useAppTheme } from './hooks/useAppTheme.js';
+import { useEditorStageMaxHeight } from './hooks/useEditorStageMaxHeight.js';
+import { useResumePrint } from './hooks/useResumePrint.js';
 import {
   createMixedSamplePreviewModel,
   createSamplePlaceholderResolver,
 } from './lib/sampleResumes.js';
-import {
-  readLocalStorageItem,
-  writeLocalStorageItem,
-} from './lib/browserStorage.js';
 
-const THEME_STORAGE_KEY = 'resumeloomr:theme';
 const EMPTY_SAMPLE_ORDER_OVERRIDES = {};
 
 function App() {
   const previewPanelRef = useRef(null);
-  const documentTitleRef = useRef('ResumeLoomr | Professional Resume Builder');
-  const [editorStageMaxHeight, setEditorStageMaxHeight] = useState(null);
   const auth = useFirebaseAuth();
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [previewLayout, setPreviewLayout] = useState({ mode: 'fitPage', width: 0 });
   const [emptyChoiceNudgeCount, setEmptyChoiceNudgeCount] = useState(0);
-  const [isPrintRendering, setIsPrintRendering] = useState(false);
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') {
-      return 'light';
-    }
-
-    const savedTheme = readLocalStorageItem(THEME_STORAGE_KEY);
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      return savedTheme;
-    }
-
-    return 'light';
-  });
+  const { theme, toggleTheme } = useAppTheme();
   const {
     builderUser,
     clearLocalData: clearAccountSwitchLocalData,
@@ -115,6 +98,10 @@ function App() {
     user: builderUser,
     authReady: auth.authReady,
   });
+  const { handlePrint, isPrintRendering } = useResumePrint({
+    activeResumeName,
+    printResume,
+  });
   const {
     cancelSignOut: handleSignOutPromptCancel,
     chooseSignOutBehavior: handleSignedOutPromptChoice,
@@ -150,6 +137,11 @@ function App() {
   );
   const displayPreviewModel = isPrintRendering ? previewModel : (samplePreviewModel || previewModel);
   const isSamplePreview = Boolean(samplePreviewModel) && !isPrintRendering;
+  const editorStageMaxHeight = useEditorStageMaxHeight({
+    panelRef: previewPanelRef,
+    previewModel: displayPreviewModel,
+    template,
+  });
   const {
     clearPreviewEditTarget,
     editorCaretTarget,
@@ -200,87 +192,6 @@ function App() {
     replaceResumeDraft,
     showNotice,
   });
-
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      documentTitleRef.current = document.title || documentTitleRef.current;
-    }
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.style.colorScheme = theme;
-    writeLocalStorageItem(THEME_STORAGE_KEY, theme);
-
-    const themeColor = document.querySelector('meta[name="theme-color"]');
-    if (themeColor) {
-      themeColor.setAttribute('content', theme === 'dark' ? '#0f1726' : '#3158d5');
-    }
-
-    const favicon = document.querySelector('#app-favicon');
-    if (favicon) {
-      favicon.setAttribute('href', theme === 'dark' ? '/favicon-dark.png' : '/favicon-light.png');
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    function syncEditorHeight() {
-      if (window.innerWidth <= 980) {
-        setEditorStageMaxHeight(null);
-        return;
-      }
-
-      const previewPanelHeight = previewPanelRef.current?.offsetHeight ?? 0;
-      setEditorStageMaxHeight(previewPanelHeight > 0 ? previewPanelHeight : null);
-    }
-
-    syncEditorHeight();
-
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', syncEditorHeight);
-      return () => window.removeEventListener('resize', syncEditorHeight);
-    }
-
-    const observer = new ResizeObserver(() => {
-      syncEditorHeight();
-    });
-
-    if (previewPanelRef.current) {
-      observer.observe(previewPanelRef.current);
-    }
-
-    window.addEventListener('resize', syncEditorHeight);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', syncEditorHeight);
-    };
-  }, [template, displayPreviewModel]);
-
-  useEffect(() => {
-    function preparePrintPreview() {
-      flushSync(() => setIsPrintRendering(true));
-    }
-
-    function restoreDocumentTitle() {
-      document.title = documentTitleRef.current;
-      setIsPrintRendering(false);
-    }
-
-    window.addEventListener('beforeprint', preparePrintPreview);
-    window.addEventListener('afterprint', restoreDocumentTitle);
-
-    return () => {
-      window.removeEventListener('beforeprint', preparePrintPreview);
-      window.removeEventListener('afterprint', restoreDocumentTitle);
-    };
-  }, []);
-
-  function handlePrint() {
-    document.title = activeResumeName || 'Resume';
-    flushSync(() => setIsPrintRendering(true));
-    printResume();
-  }
 
   const handlePreviewLayoutChange = useCallback((nextLayout) => {
     setPreviewLayout((currentLayout) => (
@@ -399,7 +310,7 @@ function App() {
           busy={auth.authBusy || isDisconnecting}
           onOpen={() => setIsAccountSettingsOpen(true)}
           onClose={() => setIsAccountSettingsOpen(false)}
-          onToggleTheme={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
+          onToggleTheme={toggleTheme}
           onOpenAuth={handleOpenAuthFromSettings}
           onDisconnectBrowser={handleDisconnectBrowser}
           onSignedOutEditingPreferenceChange={updateSignedOutEditingPreference}

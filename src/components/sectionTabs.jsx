@@ -294,7 +294,6 @@ export default function SectionTabs({
             onReorderSections(nextSectionIds);
 
             setActiveTab(activeId);
-            return;
         }
     }
 

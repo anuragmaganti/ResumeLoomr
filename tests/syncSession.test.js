@@ -47,7 +47,9 @@ test('concurrent session requests for one account share a single network call', 
   assert.equal(firstRequest, secondRequest);
 
   while (!resolveRequest) {
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
   }
 
   resolveRequest();
@@ -92,7 +94,9 @@ test('switching accounts aborts the previous session request', async () => {
   });
 
   while (signals.length === 0) {
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
   }
 
   const secondRequest = ensureResumeSyncSession({

@@ -77,7 +77,9 @@ test('draft content hashes ignore saved time but track content', () => {
 test('saved draft state stamps a fresh save time', async () => {
   const oldDraft = createDraft('Fresh Save', '2000-01-01T03:10:00.000Z');
   const beforeSave = Date.now();
-  await new Promise((resolve) => setTimeout(resolve, 2));
+  await new Promise((resolve) => {
+    setTimeout(resolve, 2);
+  });
   const savedDraft = createSavedDraftState(oldDraft);
 
   assert.ok(Date.parse(savedDraft.savedAt) >= beforeSave);
