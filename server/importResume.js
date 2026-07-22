@@ -1,5 +1,3 @@
-import { createRequire } from 'node:module';
-import mammoth from 'mammoth';
 import { z } from 'zod';
 
 import { normalizeDraftPayload } from '../src/lib/resume.js';
@@ -7,6 +5,12 @@ import { getPreviewModel } from '../src/lib/resumePreviewModel.js';
 import { trimText } from '../src/lib/text.js';
 import { sanitizeWorkspaceResumeName } from '../src/lib/workspace.js';
 import { ImportResumeError } from './resumeImport/error.js';
+import {
+  assessExtractedResumeText,
+  extractDocxText,
+  extractPdfText,
+  normalizeExtractedResumeText,
+} from './resumeImport/fileText.js';
 import {
   DEFAULT_GEMINI_IMPORT_MODEL,
   createGeminiClient,
@@ -19,6 +23,16 @@ import {
   PDF_MIME_TYPE,
   isImageMimeType,
 } from './resumeImport/filePayload.js';
+import {
+  BULLET_MARKER_PATTERN,
+  DATE_RANGE_SOURCE,
+  DATE_TEXT_PATTERN,
+  DATE_TEXT_PATTERN_GLOBAL,
+  DATE_TOKEN_SOURCE,
+  PHONE_TEXT_PATTERN,
+  RESUME_SIGNAL_PATTERNS,
+  YEAR_TOKEN_SOURCE,
+} from './resumeImport/patterns.js';
 
 export { verifyFirebaseIdToken } from './resumeImport/auth.js';
 export { ImportResumeError } from './resumeImport/error.js';
@@ -31,37 +45,13 @@ export {
   IMPORT_FILE_MAX_BYTES,
   normalizeImportFilePayload,
 } from './resumeImport/filePayload.js';
+export { assessExtractedResumeText } from './resumeImport/fileText.js';
 export {
   createImportResponseBody,
   parseImportRequestBody,
 } from './resumeImport/http.js';
 
-const PDF_TEXT_EXTRACTION_TIMEOUT_MS = 2000;
-
-const TRUSTED_PDF_TEXT_MIN_CHARACTERS = 450;
-const TRUSTED_PDF_TEXT_MIN_WORDS = 75;
-const TRUSTED_PDF_TEXT_MIN_PRINTABLE_RATIO = 0.85;
-const TRUSTED_PDF_TEXT_MIN_RESUME_SIGNALS = 2;
 const IMPORT_SECTION_KINDS = ['education', 'roles', 'skills', 'projects', 'certifications', 'languages', 'awards', 'publications', 'custom'];
-const serverRequire = createRequire(import.meta.url);
-const PHONE_TEXT_PATTERN = /(?:\+?1[\s.-]?)?(?:\(?[\dxX]{3}\)?[\s.-]?)[\dxX]{3}[\s.-]?[\dxX]{4}/;
-const RESUME_SIGNAL_PATTERNS = [
-  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
-  PHONE_TEXT_PATTERN,
-  /(?<!@)\b(?:https?:\/\/|www\.|linkedin\.com|github\.com|portfolio|behance\.net|[a-z0-9](?:[a-z0-9-]*\.)+[a-z]{2,}(?:\/\S*)?)\S*/i,
-  /\b(?:19|20)\d{2}\b|\b(?:present|current)\b/i,
-  /\b(?:education|university|college|bachelor|master|degree|gpa|coursework|honors|certificate)\b/i,
-  /\b(?:experience|employment|work|company|engineer|manager|developer|analyst|intern|consultant|led|built|managed|designed|implemented|improved)\b/i,
-  /\b(?:skills|javascript|typescript|react|python|sql|excel|figma|aws|node|project management|communication|leadership)\b/i,
-];
-const BULLET_MARKER_PATTERN = /(?:[•●▪◦‣∙*➢➤▸►→◆◇■□▪▫]|\d+[.)]|[-–—])/;
-const YEAR_TOKEN_SOURCE = '(?:19|20)(?:\\d{2}|XX)';
-const MONTH_NAME_SOURCE = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
-const SEASON_NAME_SOURCE = '(?:spring|summer|fall|winter|autumn)';
-const DATE_TOKEN_SOURCE = `(?:(?:(?:${MONTH_NAME_SOURCE}|${SEASON_NAME_SOURCE})\\s*,?\\s*)?${YEAR_TOKEN_SOURCE}|(?:0?[1-9]|1[0-2])[/.-]${YEAR_TOKEN_SOURCE}|\\b(?:present|current)\\b)`;
-const DATE_RANGE_SOURCE = `(?:${MONTH_NAME_SOURCE}\\s*(?:[-–—]|to)\\s*${MONTH_NAME_SOURCE}\\s+${YEAR_TOKEN_SOURCE}|${DATE_TOKEN_SOURCE}\\s*(?:[-–—]|to|&|and)\\s*${DATE_TOKEN_SOURCE})`;
-const DATE_TEXT_PATTERN = new RegExp(`(?:${DATE_RANGE_SOURCE}|${DATE_TOKEN_SOURCE})`, 'i');
-const DATE_TEXT_PATTERN_GLOBAL = new RegExp(`(?:${DATE_RANGE_SOURCE}|${DATE_TOKEN_SOURCE})`, 'gi');
 
 const importStringJsonSchema = { type: 'string' };
 const importStringSchema = z.string().optional().default('');
@@ -164,67 +154,6 @@ const sourceMappingWireSchema = z.object({
     title: z.string().min(1),
   }).strict()).min(1),
 }).strict();
-
-async function extractDocxText(file) {
-  const result = await mammoth.extractRawText({ buffer: file.buffer });
-  return normalizeExtractedResumeText(result.value);
-}
-
-function normalizeExtractedResumeText(value) {
-  return (typeof value === 'string' ? value : '')
-    .split('\u0000').join('')
-    .replace(/\r\n?/g, '\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/[ \t]*\n[ \t]*/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-function countWords(value) {
-  const matches = normalizeExtractedResumeText(value).match(/\b[\p{L}\p{N}][\p{L}\p{N}'’.-]*\b/gu);
-  return matches?.length || 0;
-}
-
-function getPrintableCharacterRatio(value) {
-  const normalizedValue = normalizeExtractedResumeText(value);
-
-  if (!normalizedValue) {
-    return 0;
-  }
-
-  const printableCharacters = Array.from(normalizedValue).filter((character) => (
-    /[\p{L}\p{N}\p{P}\p{S}\s]/u.test(character)
-  )).length;
-
-  return printableCharacters / Array.from(normalizedValue).length;
-}
-
-function countResumeSignals(value) {
-  return RESUME_SIGNAL_PATTERNS.filter((pattern) => pattern.test(value)).length;
-}
-
-export function assessExtractedResumeText(text) {
-  const normalizedText = normalizeExtractedResumeText(text);
-  const nonWhitespaceCharacters = normalizedText.replace(/\s/g, '').length;
-  const wordCount = countWords(normalizedText);
-  const printableRatio = getPrintableCharacterRatio(normalizedText);
-  const resumeSignalCount = countResumeSignals(normalizedText);
-  const isTrustworthy = (
-    nonWhitespaceCharacters >= TRUSTED_PDF_TEXT_MIN_CHARACTERS &&
-    wordCount >= TRUSTED_PDF_TEXT_MIN_WORDS &&
-    printableRatio >= TRUSTED_PDF_TEXT_MIN_PRINTABLE_RATIO &&
-    resumeSignalCount >= TRUSTED_PDF_TEXT_MIN_RESUME_SIGNALS
-  );
-
-  return {
-    isTrustworthy,
-    text: normalizedText,
-    nonWhitespaceCharacters,
-    wordCount,
-    printableRatio,
-    resumeSignalCount,
-  };
-}
 
 function isLikelySourceBullet(line) {
   return new RegExp(`^${BULLET_MARKER_PATTERN.source}\\s+\\S`, 'u').test(trimText(line));
@@ -677,32 +606,6 @@ export function validateImportedDraftCoverage(draft, sourceCoverage) {
     ok: issues.length === 0,
     issues: Array.from(new Set(issues)),
   };
-}
-
-async function runWithTimeout(promise, ms) {
-  let timeoutId;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error('PDF text extraction timed out.'));
-    }, ms);
-  });
-
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-async function extractPdfText(file) {
-  try {
-    const parsePdf = serverRequire('pdf-parse');
-    const result = await runWithTimeout(parsePdf(file.buffer), PDF_TEXT_EXTRACTION_TIMEOUT_MS);
-
-    return normalizeExtractedResumeText(result.text);
-  } catch {
-    return '';
-  }
 }
 
 function isResumeContactLine(line) {
