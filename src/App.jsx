@@ -16,6 +16,7 @@ import SeparatorSettingsPopup from './components/separatorSettingsPopup';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
 import { usePreviewEditorController } from './hooks/usePreviewEditorController.js';
+import { useSeparatorSettingsController } from './hooks/useSeparatorSettingsController.js';
 import { importResumeFile } from './lib/importResume.js';
 import {
   clearResumeSyncSession,
@@ -99,8 +100,6 @@ function App() {
   const [previewLayout, setPreviewLayout] = useState({ mode: 'fitPage', width: 0 });
   const [emptyChoiceNudgeCount, setEmptyChoiceNudgeCount] = useState(0);
   const [isPrintRendering, setIsPrintRendering] = useState(false);
-  const [separatorSettingsAnchor, setSeparatorSettingsAnchor] = useState(null);
-  const separatorPointerExitTimerRef = useRef(null);
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') {
       return 'light';
@@ -221,94 +220,15 @@ function App() {
     setActiveTab,
     setMobileView,
   });
-
-  const closeSeparatorSettings = useCallback(({ restoreFocus = true } = {}) => {
-    const triggerElement = separatorSettingsAnchor?.triggerElement;
-
-    if (separatorPointerExitTimerRef.current) {
-      window.clearTimeout(separatorPointerExitTimerRef.current);
-      separatorPointerExitTimerRef.current = null;
-    }
-
-    setSeparatorSettingsAnchor(null);
-
-    if (restoreFocus) {
-      window.requestAnimationFrame(() => {
-        triggerElement?.focus?.();
-      });
-    }
-  }, [separatorSettingsAnchor]);
-
-  const handleSeparatorSettingsOpen = useCallback((anchor) => {
-    if (separatorPointerExitTimerRef.current) {
-      window.clearTimeout(separatorPointerExitTimerRef.current);
-      separatorPointerExitTimerRef.current = null;
-    }
-
-    setSeparatorSettingsAnchor(anchor);
-  }, []);
-
-  const cancelSeparatorPointerExit = useCallback(() => {
-    if (separatorPointerExitTimerRef.current) {
-      window.clearTimeout(separatorPointerExitTimerRef.current);
-      separatorPointerExitTimerRef.current = null;
-    }
-  }, []);
-
-  const scheduleSeparatorPointerExit = useCallback(() => {
-    cancelSeparatorPointerExit();
-    separatorPointerExitTimerRef.current = window.setTimeout(() => {
-      separatorPointerExitTimerRef.current = null;
-
-      if (document.querySelector('.resumePage:hover, .separatorSettingsPopup:hover')) {
-        return;
-      }
-
-      closeSeparatorSettings({ restoreFocus: false });
-    }, 120);
-  }, [cancelSeparatorPointerExit, closeSeparatorSettings]);
-
-  const handleSeparatorSettingChange = useCallback((settingId, value) => {
-    actions.setResumeSettingValue(settingId, value);
-  }, [actions]);
-
-  useEffect(() => {
-    setSeparatorSettingsAnchor(null);
-  }, [activeResumeId]);
-
-  useEffect(() => {
-    if (!separatorSettingsAnchor) {
-      return undefined;
-    }
-
-    function handleSeparatorRegionMouseMove(event) {
-      const target = event.target;
-      const isInsideInteractiveRegion = target instanceof Element && (
-        target.closest('.resumePage') || target.closest('.separatorSettingsPopup')
-      );
-
-      if (isInsideInteractiveRegion) {
-        cancelSeparatorPointerExit();
-        return;
-      }
-
-      scheduleSeparatorPointerExit();
-    }
-
-    document.addEventListener('mousemove', handleSeparatorRegionMouseMove, { passive: true });
-    document.addEventListener('mouseleave', scheduleSeparatorPointerExit);
-
-    return () => {
-      document.removeEventListener('mousemove', handleSeparatorRegionMouseMove);
-      document.removeEventListener('mouseleave', scheduleSeparatorPointerExit);
-    };
-  }, [cancelSeparatorPointerExit, scheduleSeparatorPointerExit, separatorSettingsAnchor]);
-
-  useEffect(() => () => {
-    if (separatorPointerExitTimerRef.current) {
-      window.clearTimeout(separatorPointerExitTimerRef.current);
-    }
-  }, []);
+  const {
+    anchor: separatorSettingsAnchor,
+    close: closeSeparatorSettings,
+    handleSettingChange: handleSeparatorSettingChange,
+    open: handleSeparatorSettingsOpen,
+  } = useSeparatorSettingsController({
+    activeResumeId,
+    onSettingChange: actions.setResumeSettingValue,
+  });
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
