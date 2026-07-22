@@ -10,42 +10,7 @@ import {
   partitionSyncOperationsByAccount,
   readCloudSnapshot,
 } from '../server/syncWorkspace.js';
-import { sendPrivateJson } from '../server/httpProtocol.js';
-
-function readRequestBody(req) {
-  if (req.body && typeof req.body === 'object') {
-    return Promise.resolve(req.body);
-  }
-
-  if (typeof req.body === 'string') {
-    try {
-      return Promise.resolve(JSON.parse(req.body));
-    } catch {
-      return Promise.resolve(null);
-    }
-  }
-
-  return new Promise((resolve, reject) => {
-    let rawBody = '';
-
-    req.on('data', (chunk) => {
-      rawBody += chunk;
-
-      if (rawBody.length > 4 * 1024 * 1024) {
-        reject(new Error('Request body is too large.'));
-        req.destroy();
-      }
-    });
-    req.on('end', () => {
-      try {
-        resolve(rawBody ? JSON.parse(rawBody) : {});
-      } catch {
-        resolve(null);
-      }
-    });
-    req.on('error', reject);
-  });
-}
+import { readJsonRequestBody, sendPrivateJson } from '../server/httpProtocol.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -81,7 +46,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const body = await readRequestBody(req);
+    const body = await readJsonRequestBody(req);
 
     if (body === null || typeof body !== 'object' || Array.isArray(body)) {
       sendPrivateJson(res, 400, {
