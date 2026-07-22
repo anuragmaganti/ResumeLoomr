@@ -17,13 +17,14 @@ import {
   createDraftContentHash,
   createSavedDraftState,
 } from '../src/lib/draftState.js';
+import { normalizeCloudWorkspaceSnapshot } from '../src/lib/cloudWorkspaceSnapshot.js';
 import { mergeLocalAndCloudWorkspaces } from '../src/lib/workspaceReconciliation.js';
 import {
   createOutboxAckDescriptor,
   filterOutboxOperationsForAccount,
   outboxOperationBelongsToAccount,
   outboxOperationMatchesAck,
-} from '../src/lib/localWorkspaceDb.js';
+} from '../src/lib/outboxProtocol.js';
 import {
   getOperationAcksFromResponse,
   partitionClientSyncOperations,
@@ -73,6 +74,27 @@ test('saved draft state stamps a fresh save time', async () => {
   });
 
   assert.match(blankSavedDraft.savedAt, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test('cloud workspace snapshots normalize only owned workspace drafts', () => {
+  const workspace = createWorkspace(['r1', 'r2'], { activeResumeId: 'r2' });
+  const snapshot = normalizeCloudWorkspaceSnapshot({
+    workspace,
+    workspaceVersion: 7,
+    drafts: {
+      r1: { ...createDraft('Cloud One'), cloudVersion: 3 },
+      ignored: createDraft('Not in workspace'),
+    },
+    tombstones: [{ resumeId: 'deleted' }],
+  });
+
+  assert.equal(snapshot.activeResumeId, 'r2');
+  assert.equal(snapshot.workspaceCloudVersion, 7);
+  assert.equal(snapshot.draftsByResumeId.get('r1').resume.personal.name, 'Cloud One');
+  assert.equal(snapshot.draftsByResumeId.get('r1').cloudVersion, 3);
+  assert.equal(snapshot.draftsByResumeId.has('ignored'), false);
+  assert.deepEqual(snapshot.tombstones, [{ resumeId: 'deleted' }]);
+  assert.equal(normalizeCloudWorkspaceSnapshot({ workspace: createWorkspace([]) }), null);
 });
 
 test('login merge restores cloud resumes into blank local workspaces', () => {
@@ -837,4 +859,3 @@ test('client sync batching isolates impossible operations and stays below the re
     'resume-4',
   ]);
 });
-

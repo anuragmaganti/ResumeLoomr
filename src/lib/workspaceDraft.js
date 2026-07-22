@@ -9,13 +9,17 @@ import {
   normalizeWorkspaceIndex,
 } from './workspace.js';
 
-export function createFreshWorkspaceDraft() {
-  const resumeId = createWorkspaceResumeId();
-  const draft = createDraftPayload({
+export function createBlankDraftState() {
+  return createDraftPayload({
     resume: createEmptyResume(),
     template: DEFAULT_TEMPLATE,
     savedAt: null,
   });
+}
+
+export function createFreshWorkspaceDraft() {
+  const resumeId = createWorkspaceResumeId();
+  const draft = createBlankDraftState();
   const workspace = normalizeWorkspaceIndex({
     activeResumeId: resumeId,
     resumeIds: [resumeId],

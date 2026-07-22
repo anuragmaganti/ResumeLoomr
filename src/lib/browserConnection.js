@@ -5,9 +5,9 @@ import {
   WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
 } from './workspace.js';
 import {
-  LOCAL_WORKSPACE_PRESENT_KEY,
   deleteLocalWorkspaceDatabase,
 } from './localWorkspaceDb.js';
+import { LOCAL_WORKSPACE_PRESENT_KEY } from './localWorkspaceMirror.js';
 
 const CONNECTED_ACCOUNT_STORAGE_KEY = 'resumeloomr:connected-account:v1';
 const SIGNED_OUT_EDITING_PREFERENCE_KEY = 'resumeloomr:signed-out-editing-preference:v1';

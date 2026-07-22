@@ -1,8 +1,6 @@
 import { deleteDB, openDB } from 'idb';
-import { createFreshWorkspaceDraft } from './workspaceDraft.js';
+import { createBlankDraftState } from './workspaceDraft.js';
 import {
-  WORKSPACE_INDEX_STORAGE_KEY,
-  createResumeStorageKey,
   normalizeWorkspaceIndex,
   removeWorkspaceResumes,
 } from './workspace.js';
@@ -13,19 +11,31 @@ import {
   normalizeDraftMap,
   normalizeDraftState,
   normalizeDraftWithRevision,
-  serializeDraftState,
 } from './draftState.js';
 import {
   filterTombstonesForAccount,
   mergeConcurrentLocalWorkspaces,
   normalizeTombstoneList,
 } from './workspaceReconciliation.js';
+import {
+  filterOutboxOperationsForAccount,
+  normalizeOutboxAckList,
+  outboxOperationMatchesAck,
+} from './outboxProtocol.js';
+import {
+  getLocalWorkspaceStorage,
+  markLocalWorkspacePresent,
+  readLegacyDraftFromLocalStorage,
+  readLegacyWorkspaceSnapshot,
+  removeLocalStorageDraft,
+  writeLocalStorageDraft,
+  writeLocalStorageWorkspace,
+} from './localWorkspaceMirror.js';
 
 const LOCAL_WORKSPACE_DB_NAME = 'resumeloomr-local-workspace';
 const LOCAL_WORKSPACE_DB_VERSION = 1;
 const LOCAL_WORKSPACE_ID = 'main';
 const LOCAL_ACCOUNT_BINDING_ID = 'current';
-export const LOCAL_WORKSPACE_PRESENT_KEY = 'resumeloomr:local-workspace-present:v1';
 
 const WORKSPACE_STORE = 'workspace';
 const DRAFTS_STORE = 'drafts';
@@ -46,7 +56,7 @@ function createSyncClientId() {
 }
 
 function getSyncOperationIdentity() {
-  const storage = getStorage();
+  const storage = getLocalWorkspaceStorage();
 
   if (!storage) {
     fallbackSyncClientId ||= createSyncClientId();
@@ -98,70 +108,6 @@ function getDraftRecordRevision(record) {
   return `legacy:${record?.updatedAt || record?.draft?.savedAt || 'unknown'}`;
 }
 
-function normalizeOutboxAckDescriptor(operation) {
-  if (!operation || typeof operation !== 'object') {
-    return null;
-  }
-
-  const id = trimText(operation.id);
-
-  if (!id) {
-    return null;
-  }
-
-  const rawCloudVersion = Number(operation.cloudVersion);
-
-  const descriptor = {
-    id,
-    operationVersion: Number(operation.operationVersion || 0) || 0,
-    localRevision: trimText(operation.localRevision),
-  };
-
-  if (Number.isSafeInteger(rawCloudVersion) && rawCloudVersion >= 0) {
-    descriptor.cloudVersion = rawCloudVersion;
-  }
-
-  if (trimText(operation.reason)) {
-    descriptor.reason = trimText(operation.reason);
-  }
-
-  return descriptor;
-}
-
-export function createOutboxAckDescriptor(operation) {
-  return normalizeOutboxAckDescriptor(operation);
-}
-
-export function outboxOperationMatchesAck(operation, ack) {
-  const normalizedAck = normalizeOutboxAckDescriptor(ack);
-
-  if (!operation || !normalizedAck || operation.id !== normalizedAck.id) {
-    return false;
-  }
-
-  const operationVersion = Number(operation.operationVersion || 0) || 0;
-  const operationRevision = trimText(operation.localRevision);
-
-  return (
-    operationVersion === normalizedAck.operationVersion &&
-    operationRevision === normalizedAck.localRevision
-  );
-}
-
-export function outboxOperationBelongsToAccount(operation, accountUid) {
-  const normalizedAccountUid = trimText(accountUid);
-
-  return Boolean(normalizedAccountUid) && trimText(operation?.accountUid) === normalizedAccountUid;
-}
-
-export function filterOutboxOperationsForAccount(operations, accountUid) {
-  if (!Array.isArray(operations)) {
-    return [];
-  }
-
-  return operations.filter((operation) => outboxOperationBelongsToAccount(operation, accountUid));
-}
-
 async function withLocalWorkspaceLock(callback) {
   const locks = typeof navigator !== 'undefined' ? navigator.locks : null;
 
@@ -178,113 +124,6 @@ function runLocalMutation(callback) {
 
   localMutationQueue = resultPromise.catch(() => null);
   return resultPromise;
-}
-
-function getStorage() {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  return window.localStorage;
-}
-
-function safeJsonParse(rawValue) {
-  if (!rawValue) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(rawValue);
-  } catch {
-    return null;
-  }
-}
-
-function markLocalWorkspacePresent() {
-  try {
-    getStorage()?.setItem(LOCAL_WORKSPACE_PRESENT_KEY, 'true');
-  } catch {
-    // IndexedDB remains the durable source of truth if localStorage is full.
-  }
-}
-
-function createBlankDraftState() {
-  const fresh = createFreshWorkspaceDraft();
-  return fresh.draft;
-}
-
-function writeLocalStorageWorkspace(workspace) {
-  try {
-    getStorage()?.setItem(WORKSPACE_INDEX_STORAGE_KEY, JSON.stringify(normalizeWorkspaceIndex(workspace)));
-    markLocalWorkspacePresent();
-  } catch {
-    markLocalWorkspacePresent();
-  }
-}
-
-function writeLocalStorageDraft(resumeId, draft) {
-  try {
-    getStorage()?.setItem(createResumeStorageKey(resumeId), JSON.stringify(serializeDraftState(draft)));
-    markLocalWorkspacePresent();
-  } catch {
-    markLocalWorkspacePresent();
-  }
-}
-
-function removeLocalStorageDraft(resumeId) {
-  try {
-    getStorage()?.removeItem(createResumeStorageKey(resumeId));
-  } catch {
-    // Best effort only.
-  }
-}
-
-function readLegacyDraftFromLocalStorage(resumeId) {
-  const storage = getStorage();
-
-  if (!storage || !resumeId) {
-    return null;
-  }
-
-  return normalizeDraftState(safeJsonParse(storage.getItem(createResumeStorageKey(resumeId))));
-}
-
-function readLegacyWorkspaceFromLocalStorage() {
-  const storage = getStorage();
-  const fresh = createFreshWorkspaceDraft();
-
-  if (!storage) {
-    return fresh;
-  }
-
-  const rawWorkspace = safeJsonParse(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY));
-
-  if (rawWorkspace) {
-    const workspace = normalizeWorkspaceIndex(rawWorkspace);
-
-    if (workspace.resumeIds.length > 0) {
-      const activeResumeId = workspace.activeResumeId || workspace.resumeIds[0];
-      const draft = readLegacyDraftFromLocalStorage(activeResumeId) || createBlankDraftState();
-
-      return {
-        workspace,
-        activeResumeId,
-        draft,
-      };
-    }
-  }
-
-  return fresh;
-}
-
-export function readLegacyWorkspaceSnapshot() {
-  const legacy = readLegacyWorkspaceFromLocalStorage();
-
-  return {
-    workspace: normalizeWorkspaceIndex(legacy.workspace),
-    activeResumeId: legacy.activeResumeId || legacy.workspace.activeResumeId,
-    draft: normalizeDraftState(legacy.draft),
-  };
 }
 
 async function getLocalWorkspaceDb() {
@@ -1030,12 +869,6 @@ export async function readPendingOutbox({ limit = 150, accountUid = null } = {})
   return scopedRecords
     .sort((a, b) => String(a.updatedAt).localeCompare(String(b.updatedAt)))
     .slice(0, limit);
-}
-
-function normalizeOutboxAckList(operations) {
-  return Array.isArray(operations)
-    ? operations.map(normalizeOutboxAckDescriptor).filter(Boolean)
-    : [];
 }
 
 export async function markOutboxSynced(operations) {

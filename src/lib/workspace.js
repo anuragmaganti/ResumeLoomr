@@ -45,6 +45,25 @@ export function createWorkspaceResumeMeta(name = DEFAULT_RESUME_LABEL, updatedAt
   };
 }
 
+export function updateWorkspaceResumeMeta(workspace, resumeId, updates = {}) {
+  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+
+  if (!resumeId || !normalizedWorkspace.meta[resumeId]) {
+    return normalizedWorkspace;
+  }
+
+  return normalizeWorkspaceIndex({
+    ...normalizedWorkspace,
+    meta: {
+      ...normalizedWorkspace.meta,
+      [resumeId]: {
+        ...normalizedWorkspace.meta[resumeId],
+        ...updates,
+      },
+    },
+  });
+}
+
 export function sanitizeWorkspaceFolderName(value, fallback = 'New folder') {
   const nextName = trimText(value).slice(0, MAX_WORKSPACE_FOLDER_NAME_LENGTH).trim();
 

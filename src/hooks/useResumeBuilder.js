@@ -7,7 +7,6 @@ import {
   addSectionBlockEntry,
   addSectionBlockTextListItem,
   commitSectionTitle,
-  createEmptyResume,
   dismissSampleInformation,
   moveResumeSectionBlock,
   moveSectionBlockEducationCustomSection,
@@ -44,7 +43,6 @@ import {
 } from '../lib/resumeSampleProjection.js';
 import { getPreviewModel } from '../lib/resumePreviewModel.js';
 import {
-  DEFAULT_TEMPLATE,
   TEMPLATE_OPTIONS,
 } from '../lib/resumeSettings.js';
 import { validateResume } from '../lib/resumeValidation.js';
@@ -61,12 +59,15 @@ import {
   removeWorkspaceResumes,
   renameWorkspaceFolder,
   sanitizeWorkspaceResumeName,
+  updateWorkspaceResumeMeta,
   updateWorkspaceOrganization as applyWorkspaceOrganization,
 } from '../lib/workspace.js';
+import { createBlankDraftState } from '../lib/workspaceDraft.js';
 import {
   createSavedDraftState,
   createUnsyncedDraftCopyState,
 } from '../lib/draftState.js';
+import { normalizeCloudWorkspaceSnapshot } from '../lib/cloudWorkspaceSnapshot.js';
 import {
   mergeLocalAndCloudWorkspaces,
 } from '../lib/workspaceReconciliation.js';
@@ -78,8 +79,8 @@ import {
   persistLoginMergedWorkspace,
   readLocalWorkspaceBundle,
   readLocalDraft,
-  readLegacyWorkspaceSnapshot,
 } from '../lib/localWorkspaceDb.js';
+import { readLegacyWorkspaceSnapshot } from '../lib/localWorkspaceMirror.js';
 import {
   createResumeSyncSession,
   pullCloudWorkspaceSnapshot,
@@ -87,14 +88,6 @@ import {
   requestResumeBackgroundSync,
   syncLocalOutbox,
 } from '../lib/backgroundSync.js';
-
-function createBlankDraftState() {
-  return {
-    resume: createEmptyResume(),
-    template: DEFAULT_TEMPLATE,
-    savedAt: null,
-  };
-}
 
 function getDraftEditorSectionIds(draft) {
   const blockIds = Array.isArray(draft?.resume?.sections)
@@ -106,60 +99,6 @@ function getDraftEditorSectionIds(draft) {
 
 function isOnline() {
   return typeof navigator === 'undefined' || navigator.onLine;
-}
-
-function withWorkspaceResumeMeta(workspace, resumeId, updates) {
-  if (!resumeId || !workspace.meta[resumeId]) {
-    return normalizeWorkspaceIndex(workspace);
-  }
-
-  return normalizeWorkspaceIndex({
-    ...workspace,
-    meta: {
-      ...workspace.meta,
-      [resumeId]: {
-        ...workspace.meta[resumeId],
-        ...updates,
-      },
-    },
-  });
-}
-
-function normalizeCloudSnapshot(payload) {
-  if (!payload || typeof payload !== 'object') {
-    return null;
-  }
-
-  const workspace = normalizeWorkspaceIndex(payload.workspace);
-  const rawDrafts = payload.drafts && typeof payload.drafts === 'object' ? payload.drafts : {};
-  const tombstones = Array.isArray(payload.tombstones) ? payload.tombstones : [];
-  const draftsByResumeId = new Map();
-
-  workspace.resumeIds.forEach((resumeId) => {
-    const draft = rawDrafts[resumeId];
-
-    if (draft) {
-      const normalizedDraft = normalizeDraftPayload(draft);
-      draftsByResumeId.set(resumeId, {
-        resume: normalizedDraft.resume,
-        template: normalizedDraft.template,
-        savedAt: draft.savedAt || null,
-        cloudVersion: Math.max(0, Number(draft.cloudVersion || 0) || 0),
-      });
-    }
-  });
-
-  if (workspace.resumeIds.length === 0 && tombstones.length === 0) {
-    return null;
-  }
-
-  return {
-    workspace,
-    draftsByResumeId,
-    activeResumeId: workspace.activeResumeId || workspace.resumeIds[0],
-    tombstones,
-    workspaceCloudVersion: Math.max(0, Number(payload.workspaceVersion || 0) || 0),
-  };
 }
 
 export function useResumeBuilder({ user = null, authReady = true } = {}) {
@@ -332,7 +271,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         setSyncState(isOnline() ? 'syncing' : 'offline');
         const idToken = await user.getIdToken();
         await createResumeSyncSession(idToken);
-        const cloudSnapshot = normalizeCloudSnapshot(await pullCloudWorkspaceSnapshot(idToken));
+        const cloudSnapshot = normalizeCloudWorkspaceSnapshot(await pullCloudWorkspaceSnapshot(idToken));
 
         const preMergeSave = await saveEditorDraftFromRefs({
           reason: 'login-premerge',
@@ -780,7 +719,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       const expectedRevision = draftRevisionByResumeIdRef.current.get(resumeId)
         || draftSnapshot.localRevision
         || '';
-      const nextWorkspace = withWorkspaceResumeMeta(workspaceRef.current, resumeId, {
+      const nextWorkspace = updateWorkspaceResumeMeta(workspaceRef.current, resumeId, {
         updatedAt: nextDraft.savedAt,
       });
 
@@ -1223,7 +1162,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const existingName = currentWorkspace.meta[resumeId]?.name || 'Imported resume';
     const nextName = sanitizeWorkspaceResumeName(name, existingName);
     const nextWorkspace = normalizeWorkspaceIndex({
-      ...withWorkspaceResumeMeta(currentWorkspace, resumeId, {
+      ...updateWorkspaceResumeMeta(currentWorkspace, resumeId, {
         name: nextName,
         updatedAt: nextDraft.savedAt,
       }),
@@ -1316,7 +1255,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     }
 
     const renamedAt = new Date().toISOString();
-    const nextWorkspace = withWorkspaceResumeMeta(currentWorkspace, targetResumeId, {
+    const nextWorkspace = updateWorkspaceResumeMeta(currentWorkspace, targetResumeId, {
       name: trimmedName,
       updatedAt: renamedAt,
     });

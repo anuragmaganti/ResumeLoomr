@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-import { createFreshWorkspaceDraft } from '../src/lib/workspaceDraft.js';
+import { createBlankDraftState, createFreshWorkspaceDraft } from '../src/lib/workspaceDraft.js';
+import { readLegacyWorkspaceSnapshot } from '../src/lib/localWorkspaceMirror.js';
 import {
   MAX_WORKSPACE_RESUME_NAME_LENGTH,
   MAX_WORKSPACE_RESUMES,
@@ -18,6 +19,7 @@ import {
   removeWorkspaceFolders,
   removeWorkspaceResumes,
   renameWorkspaceFolder,
+  updateWorkspaceResumeMeta,
 } from '../src/lib/workspace.js';
 import {
   buildResumeRailLayout,
@@ -56,6 +58,31 @@ test('workspace helpers support local-first resume ordering and naming', () => {
   assert.equal(createNextResumeName(['Resume 1', 'Resume 3']), 'Resume 2');
   assert.equal(createDuplicateResumeName('Resume no skills', ['Resume no skills']), 'Resume no skills copy');
   assert.ok(createDuplicateResumeName('abcdefghijklmnopqrstuvwxyz'.repeat(2), []).length <= MAX_WORKSPACE_RESUME_NAME_LENGTH);
+});
+
+test('blank drafts and resume metadata share canonical workspace helpers', () => {
+  const blankDraft = createBlankDraftState();
+  const workspace = createWorkspace(['r1', 'r2']);
+  const updatedWorkspace = updateWorkspaceResumeMeta(workspace, 'r2', {
+    name: 'Updated resume',
+    updatedAt: '2026-07-22T12:00:00.000Z',
+  });
+
+  assert.equal(blankDraft.template, 'compact');
+  assert.equal(blankDraft.savedAt, null);
+  assert.deepEqual(Object.keys(blankDraft.resume).sort(), ['personal', 'sampleDisplay', 'sections', 'settings']);
+  assert.equal(updatedWorkspace.meta.r2.name, 'Updated resume');
+  assert.equal(updatedWorkspace.meta.r2.updatedAt, '2026-07-22T12:00:00.000Z');
+  assert.deepEqual(updateWorkspaceResumeMeta(workspace, 'missing', { name: 'Ignored' }), workspace);
+});
+
+test('legacy workspace fallback returns a normalized fresh draft without browser storage', () => {
+  const snapshot = readLegacyWorkspaceSnapshot();
+
+  assert.equal(snapshot.workspace.activeResumeId, snapshot.activeResumeId);
+  assert.equal(snapshot.draft.savedAt, null);
+  assert.equal(snapshot.draft.localRevision, '');
+  assert.equal(snapshot.draft.cloudVersion, 0);
 });
 
 test('workspace organization normalizes flat workspaces and enforces one placement per resume', () => {
@@ -1232,4 +1259,3 @@ test('multi-resume folder hit testing stays aligned while source cells remain re
     assert.equal(getOrganizationResumePlacement(preview, activeResumeId).index, 4);
   });
 });
-

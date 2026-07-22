@@ -1,5 +1,4 @@
 import {
-  createOutboxAckDescriptor,
   markOutboxFailed,
   markOutboxStale,
   markOutboxSynced,
@@ -7,6 +6,7 @@ import {
   readPendingOutbox,
   setSyncSessionCleanupRequested,
 } from './localWorkspaceDb.js';
+import { createOutboxAckDescriptor } from './outboxProtocol.js';
 
 const RESUME_SYNC_TAG = 'resumeloomr-sync-outbox';
 const MAX_SYNC_REQUEST_BYTES = 3_000_000;
