@@ -1514,7 +1514,7 @@ export default function ResumePreview({
         return true;
     }, [findPreviewValueElement]);
 
-    function scheduleMobileCaretSync(inputElement = mobileEditorRef.current) {
+    const scheduleMobileCaretSync = useCallback((inputElement = mobileEditorRef.current) => {
         window.cancelAnimationFrame(mobileCaretFrameRef.current);
         mobileCaretFrameRef.current = window.requestAnimationFrame(() => {
             mobileCaretFrameRef.current = 0;
@@ -1532,7 +1532,7 @@ export default function ResumePreview({
                 value: currentSession.value,
             });
         });
-    }
+    }, []);
 
     function closeMobileEditSession({ commit = true } = {}) {
         const currentSession = mobileEditSessionRef.current;
@@ -1559,7 +1559,7 @@ export default function ResumePreview({
         }
     }
 
-    function openMobileEditSession(target, valueElement, sourceResume = resume, sourceOffsetOverride = null) {
+    const openMobileEditSession = useCallback((target, valueElement, sourceResume = resume, sourceOffsetOverride = null) => {
         const sourceValue = readResumeEditorTargetValue(sourceResume, target);
 
         if (sourceValue === null) {
@@ -1578,6 +1578,7 @@ export default function ResumePreview({
             target,
             resumeId,
             value: sourceValue,
+            selectionOffset: sourceOffset,
             isMultiline: isPreviewEditorTargetMultiline(target),
             inputMode: getPreviewEditorInputMode(target),
             proxyStyle: getMobileEditorProxyStyle(valueElement, resumeRef.current),
@@ -1587,19 +1588,39 @@ export default function ResumePreview({
             mobileEditSessionRef.current = nextSession;
             setMobileEditSession(nextSession);
         });
+        return true;
+    }, [resume, resumeId]);
+
+    useLayoutEffect(() => {
+        if (!mobileEditSession?.target.path) {
+            return;
+        }
 
         const inputElement = mobileEditorRef.current;
-        inputElement?.focus({ preventScroll: true });
+
+        if (!inputElement) {
+            return;
+        }
+
+        const sourceOffset = Number.isFinite(mobileEditSession.selectionOffset)
+            ? mobileEditSession.selectionOffset
+            : 0;
+
+        inputElement.focus({ preventScroll: true });
 
         try {
-            inputElement?.setSelectionRange(sourceOffset, sourceOffset);
+            inputElement.setSelectionRange(sourceOffset, sourceOffset);
         } catch {
-            // The textarea supports selection ranges; retain the end fallback if a browser refuses it.
+            // The textarea supports selection ranges; retain the start fallback if a browser refuses it.
         }
 
         scheduleMobileCaretSync(inputElement);
-        return true;
-    }
+    }, [
+        mobileEditSession?.resumeId,
+        mobileEditSession?.selectionOffset,
+        mobileEditSession?.target.path,
+        scheduleMobileCaretSync,
+    ]);
 
     function handleMobileEditorChange(event) {
         const currentSession = mobileEditSessionRef.current;
@@ -1758,8 +1779,8 @@ export default function ResumePreview({
 
         const mediaQuery = window.matchMedia('(max-width: 980px)');
 
-        function handoffEditorToMobile(event) {
-            if (!event.matches || mobileEditSessionRef.current || isPrintRendering) {
+        function handoffEditorToMobile() {
+            if (!mediaQuery.matches || mobileEditSessionRef.current || isPrintRendering) {
                 return;
             }
 
@@ -1792,12 +1813,15 @@ export default function ResumePreview({
             }
         }
 
+        handoffEditorToMobile();
+        window.addEventListener('resize', handoffEditorToMobile);
         mediaQuery.addEventListener?.('change', handoffEditorToMobile);
 
         return () => {
+            window.removeEventListener('resize', handoffEditorToMobile);
             mediaQuery.removeEventListener?.('change', handoffEditorToMobile);
         };
-    }, [activeEditorCaret, findPreviewValueElement, isPrintRendering, onEditTarget]);
+    }, [activeEditorCaret, findPreviewValueElement, isPrintRendering, onEditTarget, openMobileEditSession]);
 
     useEffect(() => {
         if (!mobileEditSession?.target.path || typeof document === 'undefined') {
