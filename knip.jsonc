@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "api/*.js",
+    "public/sync-worker.js",
+    "scripts/*.mjs",
+    "tests/*.test.js"
+  ],
+  "project": [
+    "src/**/*.{js,jsx}",
+    "api/**/*.js",
+    "server/**/*.js",
+    "public/**/*.js",
+    "scripts/**/*.mjs",
+    "tests/**/*.js"
+  ],
+  // pdf-parse is CommonJS-only here and is intentionally loaded with createRequire.
+  "ignoreDependencies": ["pdf-parse"]
+}

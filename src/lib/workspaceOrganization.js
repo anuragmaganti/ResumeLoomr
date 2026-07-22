@@ -1,3 +1,5 @@
+import { stableJson } from './stableJson.js';
+
 export const RESUME_RAIL_INSERT_AFTER_RATIO = 0.68;
 
 function cloneOrganization(organization) {
@@ -572,5 +574,5 @@ export function buildResumeRailLayout(organization, openFolderIds, columns) {
 }
 
 export function workspaceOrganizationsEqual(first, second) {
-  return JSON.stringify({ ...first, updatedAt: '' }) === JSON.stringify({ ...second, updatedAt: '' });
+  return stableJson({ ...first, updatedAt: '' }) === stableJson({ ...second, updatedAt: '' });
 }

@@ -1,60 +1,96 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal, flushSync } from 'react-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
-    closestCenter,
     DndContext,
     DragOverlay,
     MeasuringFrequency,
     MeasuringStrategy,
-    pointerWithin,
-    useDraggable,
-    useDroppable,
     useSensor,
     useSensors,
 } from '@dnd-kit/core';
 import {
-    arrayMove,
     horizontalListSortingStrategy,
     SortableContext,
     sortableKeyboardCoordinates,
-    useSortable,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import {
     ENTRY_HEADER_LAYOUT_FIELDS,
-    PERSONAL_ALIGNMENT_OPTIONS,
-    PERSONAL_CONTACT_FIELDS,
     getDefaultEntryHeaderLayout,
+    moveSectionHeaderField,
+    normalizeEntryHeaderLayout,
+} from '../lib/resumeEntryLayout.js';
+import {
+    PERSONAL_CONTACT_FIELDS,
     getEffectivePersonalAlignment,
     getResumePresentationVars,
     getResumePrintPageRule,
-    moveSectionHeaderField,
-    normalizeEntryHeaderLayout,
     normalizePersonalContactOrder,
     normalizePersonalHeaderOrder,
-} from '../lib/resume.js';
+} from '../lib/resumeSettings.js';
 import {
-    CSS_PIXELS_PER_INCH,
     PRINT_PAGE_HEIGHT_PX,
-    PRINT_PAGE_WIDTH_PX,
-    calculatePreviewPageBreaks,
 } from '../lib/previewPagination.js';
 import {
     createPreviewEditAttributes,
     getPreviewCaretOffsetFromPoint,
-    getPreviewEditorInputMode,
-    parseEditorTargetPath,
-    getPreviewEditorLabel,
-    isPreviewEditorTargetMultiline,
-    mapDisplayedCaretOffsetToSource,
     personalEditorPath,
-    readResumeEditorTargetValue,
     sectionEntryEditorPath,
     sectionEntryListEditorPath,
     sectionEntryNestedEditorPath,
     sectionTitleEditorPath,
 } from '../lib/editorTargets.js';
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from '../lib/sortableSensors.js';
+import MobilePreviewEditorProxy from './mobilePreviewEditorProxy.jsx';
+import PersonalAlignmentControls from './personalAlignmentControls.jsx';
+import {
+    EmptyResumeChoice,
+    PreviewMarginControls,
+    PreviewPageMarkers,
+    SampleInformationToggle,
+} from './resumePreviewControls.jsx';
+import {
+    isMobilePreviewEditingViewport,
+    parseCssPixelValue,
+} from './resumePreviewGeometry.js';
+import {
+    areCompatiblePreviewDragItems,
+    bulletDragId,
+    entryDragId,
+    getPreviewSortableElement,
+    headerSlotDragId,
+    moveIdWithinOrder,
+    parsePreviewDragId,
+    personalContactDragId,
+    personalHeaderDragId,
+    previewCollisionDetection,
+    previewVerticalListSortingStrategy,
+    sectionDragId,
+} from './resumePreviewDrag.js';
+import {
+    HeaderLayoutField,
+    HeaderLayoutHoverSlot,
+    HeaderLayoutSlot,
+} from './resumePreviewHeaderLayout.jsx';
+import {
+    SortablePersonalContact,
+    SortablePersonalHeaderRow,
+    SortablePreviewBullet,
+    SortablePreviewEntry,
+    SortablePreviewSection,
+    StaticPreviewBullet,
+    StaticPreviewEntry,
+    StaticPreviewSection,
+} from './resumePreviewSortables.jsx';
+import {
+    openSeparatorSettings,
+    previewSectionClassName,
+} from './resumePreviewSectionChrome.js';
+import { useMobilePreviewEditor } from './useMobilePreviewEditor.js';
+import {
+    useResumePreviewPageMetrics,
+    useResumePrintPageRule,
+    useWrappedEntryHeaderSeparators,
+} from './useResumePreviewLayout.js';
 
 function templateClassName(template) {
     return `resumePage--${template}`;
@@ -67,44 +103,13 @@ const personalLinkFieldMap = {
     custom: 'customField',
 };
 
-const DRAG_ID_SEPARATOR = '::';
 const DEFAULT_PREVIEW_PAGE_MIN_HEIGHT = PRINT_PAGE_HEIGHT_PX;
-const FIRST_SECTION_ENTRY_SNAP_DISTANCE_PX = 144;
-const PAGE_FIT_TOLERANCE_PX = 3;
 const SUMMARY_WIDTH_MIN_PERCENT = 75;
 const SUMMARY_WIDTH_MAX_PERCENT = 100;
-const PREVIEW_MARGIN_SETTING_MIN = -5;
-const PREVIEW_MARGIN_SETTING_MAX = 5;
 const HEADER_LAYOUT_DOUBLE_CLICK_MS = 420;
 const HEADER_LAYOUT_DOUBLE_CLICK_TOLERANCE_PX = 8;
 const HEADER_LAYOUT_LONG_PRESS_MS = 520;
 const HEADER_LAYOUT_LONG_PRESS_MOVE_TOLERANCE_PX = 8;
-
-function ImportStartIcon() {
-    return (
-        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-            <path d="M7 3.5h7l4 4V20.5H7z" />
-            <path d="M14 3.5v4h4M12.5 16V10.5m-2.5 2 2.5-2 2.5 2" />
-        </svg>
-    );
-}
-
-function ScratchStartIcon() {
-    return (
-        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-            <path d="m5 16.5-.8 3.3 3.3-.8L18 8.5 14.5 5z" />
-            <path d="m12.8 6.7 3.5 3.5M8.5 19.5h10.8" />
-        </svg>
-    );
-}
-
-function StartChoiceArrow() {
-    return (
-        <svg className="emptyStartArrow" aria-hidden="true" viewBox="0 0 18 18" focusable="false">
-            <path d="m7 4 5 5-5 5" />
-        </svg>
-    );
-}
 
 const ENTRY_HEADER_FIELD_META = {
     education: {
@@ -129,12 +134,6 @@ const ENTRY_HEADER_FIELD_META = {
     },
 };
 
-function parseCssPixelValue(value, fallback = 0) {
-    const parsed = Number.parseFloat(value);
-
-    return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function clampSummaryWidthPercent(value) {
     const numericValue = Number(value);
 
@@ -143,65 +142,6 @@ function clampSummaryWidthPercent(value) {
     }
 
     return Math.max(SUMMARY_WIDTH_MIN_PERCENT, Math.min(SUMMARY_WIDTH_MAX_PERCENT, Math.round(numericValue)));
-}
-
-function parseCssLengthToPixels(value, fallback = 0) {
-    const text = String(value || '').trim().toLowerCase();
-    const parsed = Number.parseFloat(text);
-
-    if (!Number.isFinite(parsed)) {
-        return fallback;
-    }
-
-    if (text.endsWith('in')) {
-        return parsed * CSS_PIXELS_PER_INCH;
-    }
-
-    return parsed;
-}
-
-function getPreviewStickyTop(frameElement) {
-    const frameStyles = window.getComputedStyle(frameElement);
-    const stickyTop = parseCssPixelValue(frameStyles.top, 0);
-
-    return Number.isFinite(stickyTop) ? stickyTop : 0;
-}
-
-function metricsAreEqual(current, next) {
-    return (
-        current.pageWidth === next.pageWidth &&
-        current.pageHeight === next.pageHeight &&
-        current.contentHeight === next.contentHeight &&
-        current.pageCount === next.pageCount &&
-        current.layoutWidth === next.layoutWidth &&
-        Math.abs(current.scale - next.scale) < 0.001 &&
-        current.pageBreaks.length === next.pageBreaks.length &&
-        current.pageBreaks.every((pageBreak, index) => pageBreak === next.pageBreaks[index])
-    );
-}
-
-function sectionDragId(sectionId) {
-    return ['section', sectionId].join(DRAG_ID_SEPARATOR);
-}
-
-function personalContactDragId(field) {
-    return ['personalContact', field].join(DRAG_ID_SEPARATOR);
-}
-
-function personalHeaderDragId(rowId) {
-    return ['personalHeader', rowId].join(DRAG_ID_SEPARATOR);
-}
-
-function entryDragId(sectionId, entryId) {
-    return ['entry', sectionId, entryId].join(DRAG_ID_SEPARATOR);
-}
-
-function bulletDragId(sectionId, entryId, field, itemIndex) {
-    return ['bullet', sectionId, entryId, field, itemIndex].join(DRAG_ID_SEPARATOR);
-}
-
-function headerSlotDragId(sectionId, entryId, lineIndex, side, slotIndex) {
-    return ['headerSlot', sectionId, entryId, lineIndex, side, slotIndex].join(DRAG_ID_SEPARATOR);
 }
 
 function getEntryHeaderFieldMeta(sectionKind, field) {
@@ -227,793 +167,6 @@ function getEntryHeaderLayoutSlotField(layout, slot) {
     }
 
     return slots[slotIndex] || null;
-}
-
-function parsePreviewDragId(id) {
-    const parts = String(id || '').split(DRAG_ID_SEPARATOR);
-    const [type, sectionId, entryId, field, itemIndex] = parts;
-
-    if (type === 'personalContact' && sectionId) {
-        return { type, field: sectionId };
-    }
-
-    if (type === 'personalHeader' && sectionId) {
-        return { type, rowId: sectionId };
-    }
-
-    if (type === 'section' && sectionId) {
-        return { type, sectionId };
-    }
-
-    if (type === 'entry' && sectionId && entryId) {
-        return { type, sectionId, entryId };
-    }
-
-    if (type === 'bullet' && sectionId && entryId && field && itemIndex !== undefined) {
-        return {
-            type,
-            sectionId,
-            entryId,
-            field,
-            itemIndex: Number(itemIndex),
-        };
-    }
-
-    if (type === 'headerSlot' && sectionId && entryId && field !== undefined && itemIndex && parts[5] !== undefined) {
-        const lineIndex = Number(field);
-        const slotIndex = Number(parts[5]);
-        const side = itemIndex === 'right' ? 'right' : 'left';
-
-        if (Number.isInteger(lineIndex) && Number.isInteger(slotIndex)) {
-            return {
-                type,
-                sectionId,
-                entryId,
-                lineIndex,
-                side,
-                slotIndex,
-            };
-        }
-    }
-
-    return { type: '' };
-}
-
-function areCompatiblePreviewDragItems(activeMeta, overMeta) {
-    if (!activeMeta?.type || activeMeta.type !== overMeta?.type) {
-        return false;
-    }
-
-    if (activeMeta.type === 'section') {
-        return true;
-    }
-
-    if (activeMeta.type === 'personalContact') {
-        return true;
-    }
-
-    if (activeMeta.type === 'personalHeader') {
-        return true;
-    }
-
-    if (activeMeta.type === 'entry') {
-        return activeMeta.sectionId === overMeta.sectionId;
-    }
-
-    if (activeMeta.type === 'bullet') {
-        return (
-            activeMeta.sectionId === overMeta.sectionId &&
-            activeMeta.entryId === overMeta.entryId &&
-            activeMeta.field === overMeta.field
-        );
-    }
-
-    if (activeMeta.type === 'headerSlot') {
-        return activeMeta.sectionId === overMeta.sectionId && activeMeta.entryId === overMeta.entryId;
-    }
-
-    return false;
-}
-
-function previewCollisionDetection(args, activeInitialRect = null) {
-    const activeMeta = parsePreviewDragId(args.active.id);
-    const droppableContainers = args.droppableContainers.filter((container) => (
-        areCompatiblePreviewDragItems(activeMeta, parsePreviewDragId(container.id))
-    ));
-
-    if (activeMeta.type === 'section' || activeMeta.type === 'entry' || activeMeta.type === 'personalHeader') {
-        const edgeCollision = getActivePreviewCollisionIfPointerOutsideListBounds(args, droppableContainers, activeInitialRect);
-
-        if (edgeCollision) {
-            return [edgeCollision];
-        }
-
-        const activeCollision = getActivePreviewCollisionIfPointerWithin(args, droppableContainers, activeInitialRect);
-
-        if (activeCollision) {
-            return [activeCollision];
-        }
-
-        const sortableDroppableContainers = droppableContainers.filter((container) => (
-            String(container.id) !== String(args.active.id)
-        ));
-        const pointerY = args.pointerCoordinates?.y;
-        const pointerX = args.pointerCoordinates?.x;
-
-        if (sortableDroppableContainers.length === 0) {
-            return [];
-        }
-
-        if (Number.isFinite(pointerY)) {
-            const collisions = sortableDroppableContainers
-                .map((droppableContainer) => {
-                    const rect = args.droppableRects.get(droppableContainer.id);
-
-                    if (!rect) {
-                        return null;
-                    }
-
-                    const verticalDistance = Math.abs(pointerY - (rect.top + (rect.height / 2)));
-                    const horizontalDistance = Number.isFinite(pointerX)
-                        ? Math.abs(pointerX - (rect.left + (rect.width / 2)))
-                        : 0;
-
-                    return {
-                        id: droppableContainer.id,
-                        data: {
-                            droppableContainer,
-                            value: verticalDistance + (horizontalDistance * 0.01),
-                        },
-                    };
-                })
-                .filter(Boolean)
-                .sort((firstCollision, secondCollision) => firstCollision.data.value - secondCollision.data.value);
-
-            if (collisions.length > 0) {
-                return collisions;
-            }
-        }
-
-        return closestCenter({ ...args, droppableContainers: sortableDroppableContainers });
-    }
-
-    const pointerCollisions = pointerWithin({ ...args, droppableContainers });
-
-    if (pointerCollisions.length > 0) {
-        return pointerCollisions;
-    }
-
-    return closestCenter({ ...args, droppableContainers });
-}
-
-function getActivePreviewCollision(args, droppableContainers) {
-    const activeContainer = droppableContainers.find((container) => (
-        String(container.id) === String(args.active.id)
-    ));
-
-    if (!activeContainer) {
-        return null;
-    }
-
-    return {
-        id: activeContainer.id,
-        data: {
-            droppableContainer: activeContainer,
-            value: 0,
-        },
-    };
-}
-
-function getPreviewDroppableRect(args, droppableContainer, activeInitialRect = null) {
-    if (String(droppableContainer.id) === String(args.active.id) && activeInitialRect) {
-        return activeInitialRect;
-    }
-
-    return args.droppableRects.get(droppableContainer.id);
-}
-
-function getActivePreviewCollisionIfPointerOutsideListBounds(args, droppableContainers, activeInitialRect = null) {
-    const pointerY = args.pointerCoordinates?.y;
-
-    if (!Number.isFinite(pointerY)) {
-        return null;
-    }
-
-    const orderedContainers = droppableContainers
-        .map((droppableContainer) => ({
-            droppableContainer,
-            rect: getPreviewDroppableRect(args, droppableContainer, activeInitialRect),
-        }))
-        .filter(({ rect }) => rect && Number.isFinite(rect.top) && Number.isFinite(rect.height))
-        .sort((first, second) => first.rect.top - second.rect.top);
-    const activeIndex = orderedContainers.findIndex(({ droppableContainer }) => (
-        String(droppableContainer.id) === String(args.active.id)
-    ));
-
-    if (activeIndex < 0) {
-        return null;
-    }
-
-    const activeRect = orderedContainers[activeIndex].rect;
-
-    if (
-        (activeIndex === 0 && pointerY < activeRect.top) ||
-        (activeIndex === orderedContainers.length - 1 && pointerY > activeRect.top + activeRect.height)
-    ) {
-        return getActivePreviewCollision(args, droppableContainers);
-    }
-
-    return null;
-}
-
-function isPointWithinRect(point, rect) {
-    const rectRight = Number.isFinite(rect?.right) ? rect.right : rect?.left + rect?.width;
-    const rectBottom = Number.isFinite(rect?.bottom) ? rect.bottom : rect?.top + rect?.height;
-
-    return (
-        point &&
-        rect &&
-        Number.isFinite(point.x) &&
-        Number.isFinite(point.y) &&
-        Number.isFinite(rect.left) &&
-        Number.isFinite(rect.top) &&
-        Number.isFinite(rectRight) &&
-        Number.isFinite(rectBottom) &&
-        point.x >= rect.left &&
-        point.x <= rectRight &&
-        point.y >= rect.top &&
-        point.y <= rectBottom
-    );
-}
-
-function getActivePreviewCollisionIfPointerWithin(args, droppableContainers, activeInitialRect = null) {
-    const activeCollision = getActivePreviewCollision(args, droppableContainers);
-    const activeContainer = activeCollision?.data?.droppableContainer;
-    const activeRect = activeContainer ? args.droppableRects.get(activeContainer.id) : null;
-
-    if (
-        !activeContainer ||
-        (
-            !isPointWithinRect(args.pointerCoordinates, activeInitialRect) &&
-            !isPointWithinRect(args.pointerCoordinates, activeRect)
-        )
-    ) {
-        return null;
-    }
-
-    return activeCollision;
-}
-
-function getPreviewSortableElement(sortableId) {
-    if (typeof document === 'undefined') {
-        return null;
-    }
-
-    return [...document.querySelectorAll('[data-preview-sortable-id]')]
-        .find((element) => element.dataset.previewSortableId === String(sortableId));
-}
-
-function normalizePreviewSortableTransform(transform, previewScale) {
-    if (!transform || !Number.isFinite(previewScale) || previewScale <= 0 || Math.abs(previewScale - 1) < 0.001) {
-        return transform;
-    }
-
-    return {
-        ...transform,
-        x: transform.x / previewScale,
-        y: transform.y / previewScale,
-    };
-}
-
-function previewSectionClassName(className, showSeparator) {
-    return `${className}${showSeparator ? '' : ' resumeSection--lastVisible'}`;
-}
-
-function renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position = 'aboveSectionName' }) {
-    if (position === 'belowSectionName') {
-        return (
-            <span
-                className="sectionSeparatorBelowHeading"
-                data-separator-scope="section"
-                data-separator-section-id={blockId}
-            >
-                <span className="sectionSeparatorPrintLine" aria-hidden="true" />
-                <button
-                    type="button"
-                    className="sectionSeparatorControl sectionSeparatorControl--belowHeading"
-                    data-separator-scope="section"
-                    data-separator-section-id={blockId}
-                    aria-label="Section separator settings"
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'section', blockId)}
-                />
-            </span>
-        );
-    }
-
-    return (
-        <button
-            type="button"
-            className="sectionSeparatorControl"
-            data-separator-scope="section"
-            data-separator-section-id={blockId}
-            aria-label="Section separator settings"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'section', blockId)}
-        />
-    );
-}
-
-function openSeparatorSettings(event, onSeparatorSettingsOpen, scope, sectionId) {
-    event.preventDefault();
-    event.stopPropagation();
-    onSeparatorSettingsOpen?.({
-        scope,
-        sectionId,
-        x: event.clientX,
-        y: event.clientY,
-        triggerElement: event.currentTarget,
-    });
-}
-
-function SortablePreviewSection({
-    blockId,
-    className,
-    previewScale,
-    showSeparator = true,
-    separatorPosition = 'aboveSectionName',
-    onSeparatorSettingsOpen,
-    children,
-}) {
-    const sortableId = sectionDragId(blockId);
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: sortableId });
-    const style = {
-        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
-        transition,
-    };
-    const handleProps = {
-        ...attributes,
-        ...listeners,
-        'data-preview-drag-handle': 'true',
-        'data-preview-drag-scope': 'section',
-    };
-
-    return (
-        <div
-            ref={setNodeRef}
-            data-preview-sortable-id={sortableId}
-            data-page-break-kind="section"
-            className={`${previewSectionClassName(className, showSeparator)}${separatorPosition === 'belowSectionName' ? ' resumeSection--separatorBelowHeading' : ''} previewSortableItem previewSortableSection ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
-            style={style}
-        >
-            {children(
-                handleProps,
-                separatorPosition === 'belowSectionName'
-                    ? renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })
-                    : null,
-            )}
-            {showSeparator && separatorPosition !== 'belowSectionName' && renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })}
-        </div>
-    );
-}
-
-function StaticPreviewSection({
-    blockId,
-    className,
-    showSeparator = true,
-    separatorPosition = 'aboveSectionName',
-    onSeparatorSettingsOpen,
-    children,
-}) {
-    return (
-        <div
-            className={`${previewSectionClassName(className, showSeparator)}${separatorPosition === 'belowSectionName' ? ' resumeSection--separatorBelowHeading' : ''}`}
-            data-page-break-kind="section"
-        >
-            {children(
-                {},
-                blockId && separatorPosition === 'belowSectionName'
-                    ? renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })
-                    : null,
-            )}
-            {blockId && showSeparator && separatorPosition !== 'belowSectionName' && renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })}
-        </div>
-    );
-}
-
-function SortablePreviewEntry({ sectionId, entryId, className, previewScale, entryEditProps = {}, preferEntryDrag = false, children }) {
-    const sortableId = entryDragId(sectionId, entryId);
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: sortableId });
-    const style = {
-        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
-        transition,
-    };
-    const handleProps = {
-        ...attributes,
-        ...listeners,
-        'data-preview-drag-handle': 'true',
-        'data-preview-drag-scope': 'entry',
-    };
-    const containerEntryDragProps = {
-        ...attributes,
-        'data-preview-drag-handle': 'true',
-        'data-preview-drag-scope': 'entry-empty-space',
-        onPointerDown: (event) => {
-            const childInteractiveTarget = event.target.closest(
-                '[data-edit-section-id], [data-preview-drag-scope="header-layout"], [data-preview-drag-scope="bullet"], [data-header-hover-slot], button, input, textarea, select, a',
-            );
-            const shouldLetChildHandleDrag = childInteractiveTarget && childInteractiveTarget !== event.currentTarget;
-
-            if (
-                shouldLetChildHandleDrag &&
-                !(preferEntryDrag && !event.target.closest('[data-preview-drag-scope="header-layout"], [data-header-hover-slot], input, textarea, select'))
-            ) {
-                return;
-            }
-
-            listeners?.onPointerDown?.(event);
-        },
-    };
-
-    return (
-        <div
-            ref={setNodeRef}
-            data-preview-sortable-id={sortableId}
-            data-page-break-kind="entry"
-            className={`${className} previewSortableItem previewSortableEntry ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
-            style={style}
-            {...entryEditProps}
-            {...containerEntryDragProps}
-        >
-            {children(handleProps)}
-        </div>
-    );
-}
-
-function StaticPreviewEntry({ className, entryEditProps = {}, children }) {
-    return (
-        <div className={className} data-page-break-kind="entry" {...entryEditProps}>
-            {children({})}
-        </div>
-    );
-}
-
-function SortablePreviewBullet({ sectionId, entryId, field, itemIndex, editProps, previewScale, children }) {
-    const sortableId = bulletDragId(sectionId, entryId, field, itemIndex);
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: sortableId });
-    const style = {
-        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
-        transition,
-    };
-    const handleProps = {
-        ...attributes,
-        ...listeners,
-        'data-preview-drag-handle': 'true',
-        'data-preview-drag-scope': 'bullet',
-    };
-
-    return (
-        <li
-            ref={setNodeRef}
-            data-preview-sortable-id={sortableId}
-            data-page-break-kind="item"
-            className={`previewSortableItem previewSortableBullet ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
-            style={style}
-            {...editProps}
-            {...handleProps}
-        >
-            {children}
-        </li>
-    );
-}
-
-function SortablePersonalContact({ field, editProps, previewScale, children }) {
-    const sortableId = personalContactDragId(field);
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: sortableId });
-    const style = {
-        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
-        transition,
-    };
-    const handleProps = {
-        ...attributes,
-        ...listeners,
-        'data-preview-drag-handle': 'true',
-        'data-preview-drag-scope': 'personal-contact',
-    };
-
-    return (
-        <span
-            ref={setNodeRef}
-            data-preview-sortable-id={sortableId}
-            className={`previewSortableItem previewSortablePersonalContact ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
-            style={style}
-            {...editProps}
-            {...handleProps}
-        >
-            {children}
-        </span>
-    );
-}
-
-function PersonalAlignmentControls({ activeAlignment, onAlignmentChange }) {
-    const labels = {
-        left: 'Align personal section left',
-        center: 'Align personal section center',
-    };
-    const iconBars = {
-        left: [
-            { x: 3, width: 14 },
-            { x: 3, width: 10 },
-            { x: 3, width: 13 },
-            { x: 3, width: 8 },
-        ],
-        center: [
-            { x: 3, width: 14 },
-            { x: 5, width: 10 },
-            { x: 3.5, width: 13 },
-            { x: 6, width: 8 },
-        ],
-    };
-
-    function stopControlEvent(event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-
-    function renderAlignmentIcon(alignment) {
-        return (
-            <svg
-                className="personalAlignmentIcon"
-                viewBox="0 0 20 18"
-                aria-hidden="true"
-                focusable="false"
-            >
-                {iconBars[alignment].map((bar, index) => (
-                    <rect
-                        key={`${alignment}-${index}`}
-                        x={bar.x}
-                        y={3 + (index * 3.4)}
-                        width={bar.width}
-                        height="1.8"
-                        rx="0.9"
-                    />
-                ))}
-            </svg>
-        );
-    }
-
-    return (
-        <div
-            className="personalAlignmentMenu"
-            data-personal-alignment-menu="true"
-            aria-label="Personal section alignment"
-            onPointerDown={stopControlEvent}
-            onMouseDown={stopControlEvent}
-            onClick={(event) => event.stopPropagation()}
-        >
-            {PERSONAL_ALIGNMENT_OPTIONS.map((alignment) => (
-                <button
-                    key={alignment}
-                    type="button"
-                    className="personalAlignmentButton"
-                    aria-label={labels[alignment]}
-                    aria-pressed={activeAlignment === alignment}
-                    data-personal-alignment-option={alignment}
-                    onClick={(event) => {
-                        stopControlEvent(event);
-                        onAlignmentChange?.(alignment);
-                    }}
-                >
-                    {renderAlignmentIcon(alignment)}
-                </button>
-            ))}
-        </div>
-    );
-}
-
-function SortablePersonalHeaderRow({
-    rowId,
-    previewScale,
-    children,
-}) {
-    const sortableId = personalHeaderDragId(rowId);
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: sortableId });
-    const style = {
-        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
-        transition,
-    };
-    const handleProps = {
-        ...attributes,
-        'data-preview-drag-handle': 'true',
-        'data-preview-drag-scope': 'personal-header',
-        onPointerDown: (event) => {
-            if (
-                event.target.closest(
-                    '[data-personal-alignment-menu], [data-preview-drag-scope="personal-contact"], .summaryResizeHandle, .summaryResizeEdge, button, input, textarea, select, a',
-                )
-            ) {
-                return;
-            }
-
-            listeners?.onPointerDown?.(event);
-        },
-        onKeyDown: listeners?.onKeyDown,
-    };
-
-    return (
-        <div
-            ref={setNodeRef}
-            data-preview-sortable-id={sortableId}
-            className={`personalHeaderRow personalHeaderRow--${rowId} previewSortableItem previewSortablePersonalHeader ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
-            style={style}
-            data-personal-header-row={rowId}
-            {...handleProps}
-        >
-            {children}
-        </div>
-    );
-}
-
-function StaticPreviewBullet({ editProps, children }) {
-    return <li data-page-break-kind="item" {...editProps}>{children}</li>;
-}
-
-function HeaderLayoutSlot({
-    id,
-    field,
-    label,
-    renderChip,
-}) {
-    const {
-        setNodeRef: setDroppableNodeRef,
-        isOver,
-    } = useDroppable({ id });
-    const {
-        attributes,
-        listeners,
-        setNodeRef: setDraggableNodeRef,
-        isDragging,
-    } = useDraggable({ id, disabled: !field });
-    const dragProps = field
-        ? {
-            ...attributes,
-            ...listeners,
-            'data-preview-drag-handle': 'true',
-            'data-preview-drag-scope': 'header-layout',
-        }
-        : {};
-
-    return (
-        <div
-            ref={setDroppableNodeRef}
-            className={`entryHeaderLayoutSlot${field ? ' entryHeaderLayoutSlot--filled' : ' entryHeaderLayoutSlot--empty'}${isDragging ? ' isHeaderLayoutSource' : ''}${isOver && !isDragging ? ' isHeaderLayoutDropTarget' : ''}`}
-            data-header-layout-slot="true"
-        >
-            {field ? (
-                <span
-                    ref={setDraggableNodeRef}
-                    className="entryHeaderLayoutChip"
-                    data-preview-sortable-id={id}
-                    {...dragProps}
-                >
-                    {renderChip(field)}
-                </span>
-            ) : (
-                <span className="entryHeaderLayoutEmpty" aria-label={label} />
-            )}
-        </div>
-    );
-}
-
-function composeEventHandlers(primaryHandler, secondaryHandler) {
-    return (event) => {
-        primaryHandler?.(event);
-
-        if (!event.defaultPrevented) {
-            secondaryHandler?.(event);
-        }
-    };
-}
-
-function HeaderLayoutField({
-    id,
-    className,
-    editProps,
-    children,
-    dragEnabled = false,
-    onFieldHover,
-    onFieldLeave,
-}) {
-    const {
-        setNodeRef: setDroppableNodeRef,
-        isOver,
-    } = useDroppable({ id, disabled: !dragEnabled });
-    const {
-        listeners,
-        setNodeRef: setDraggableNodeRef,
-        isDragging,
-    } = useDraggable({ id, disabled: !dragEnabled });
-    const setNodeRef = (node) => {
-        setDroppableNodeRef(node);
-        setDraggableNodeRef(node);
-    };
-    const dragProps = dragEnabled
-        ? {
-            'data-preview-sortable-id': id,
-            'data-preview-drag-handle': 'true',
-            'data-preview-drag-scope': 'header-layout',
-        }
-        : {};
-
-    return (
-        <span
-            ref={setNodeRef}
-            className={`${className} entryHeaderLayoutField${dragEnabled ? ' entryHeaderLayoutField--draggable' : ''}${isDragging ? ' isHeaderLayoutSource' : ''}${isOver && !isDragging ? ' isHeaderLayoutDropTarget' : ''}`}
-            {...dragProps}
-            {...editProps}
-            onPointerEnter={onFieldHover}
-            onPointerLeave={onFieldLeave}
-            onFocus={onFieldHover}
-            onBlur={onFieldLeave}
-            onPointerDown={dragEnabled
-                ? composeEventHandlers(editProps?.onPointerDown, listeners?.onPointerDown)
-                : editProps?.onPointerDown}
-            onKeyDown={editProps?.onKeyDown}
-        >
-            {children}
-        </span>
-    );
-}
-
-function HeaderLayoutHoverSlot({ id, label }) {
-    const {
-        setNodeRef,
-        isOver,
-    } = useDroppable({ id });
-
-    return (
-        <span
-            ref={setNodeRef}
-            className={`entryHeaderHoverSlot${isOver ? ' isHeaderLayoutDropTarget' : ''}`}
-            aria-label={label}
-            data-header-hover-slot="true"
-        />
-    );
 }
 
 function getPrimaryEntryField(block, entry) {
@@ -1048,99 +201,6 @@ function getPrimaryEntryField(block, entry) {
     return 'title';
 }
 
-function moveIdWithinOrder(ids, activeId, overId) {
-    const fromIndex = ids.indexOf(activeId);
-    const toIndex = ids.indexOf(overId);
-
-    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) {
-        return ids;
-    }
-
-    return arrayMove(ids, fromIndex, toIndex);
-}
-
-function getPreviewVerticalItemGap(rects, index, activeIndex) {
-    const currentRect = rects[index];
-    const previousRect = rects[index - 1];
-    const nextRect = rects[index + 1];
-
-    if (!currentRect) {
-        return 0;
-    }
-
-    if (activeIndex < index) {
-        return previousRect
-            ? currentRect.top - (previousRect.top + previousRect.height)
-            : nextRect
-                ? nextRect.top - (currentRect.top + currentRect.height)
-                : 0;
-    }
-
-    return nextRect
-        ? nextRect.top - (currentRect.top + currentRect.height)
-        : previousRect
-            ? currentRect.top - (previousRect.top + previousRect.height)
-            : 0;
-}
-
-function previewVerticalListSortingStrategy({
-    activeIndex,
-    activeNodeRect: fallbackActiveRect,
-    index,
-    rects,
-    overIndex,
-}) {
-    const activeNodeRect = rects[activeIndex] || fallbackActiveRect;
-
-    if (!activeNodeRect || overIndex < 0) {
-        return null;
-    }
-
-    if (index === activeIndex) {
-        const overIndexRect = rects[overIndex];
-
-        if (!overIndexRect) {
-            return null;
-        }
-
-        return {
-            x: 0,
-            y: activeIndex < overIndex
-                ? overIndexRect.top + overIndexRect.height - (activeNodeRect.top + activeNodeRect.height)
-                : overIndexRect.top - activeNodeRect.top,
-            scaleX: 1,
-            scaleY: 1,
-        };
-    }
-
-    const itemGap = getPreviewVerticalItemGap(rects, index, activeIndex);
-
-    if (index > activeIndex && index <= overIndex) {
-        return {
-            x: 0,
-            y: -activeNodeRect.height - itemGap,
-            scaleX: 1,
-            scaleY: 1,
-        };
-    }
-
-    if (index < activeIndex && index >= overIndex) {
-        return {
-            x: 0,
-            y: activeNodeRect.height + itemGap,
-            scaleX: 1,
-            scaleY: 1,
-        };
-    }
-
-    return {
-        x: 0,
-        y: 0,
-        scaleX: 1,
-        scaleY: 1,
-    };
-}
-
 function getPreviewBulletText(item) {
     if (item && typeof item === 'object') {
         return item.text || '';
@@ -1155,208 +215,6 @@ function getPreviewBulletSourceIndex(item, fallbackIndex) {
     }
 
     return fallbackIndex;
-}
-
-function getPreviewScaleFromElement(resumeElement) {
-    const shellElement = resumeElement.closest('.previewPageScaleShell');
-    const shellStyles = shellElement ? window.getComputedStyle(shellElement) : null;
-    const scale = parseCssPixelValue(shellStyles?.getPropertyValue('--preview-page-scale'), 1);
-
-    return Number.isFinite(scale) && scale > 0 ? scale : 1;
-}
-
-function isMobilePreviewEditingViewport() {
-    return typeof window !== 'undefined'
-        && window.matchMedia('(max-width: 980px)').matches;
-}
-
-function getMobileEditorProxyStyle(valueElement, resumeElement) {
-    if (!valueElement || !resumeElement || typeof window === 'undefined') {
-        return null;
-    }
-
-    const rect = valueElement.getBoundingClientRect();
-    const computedStyle = window.getComputedStyle(valueElement);
-    const previewScale = getPreviewScaleFromElement(resumeElement);
-    const renderedFontSize = Math.max(1, parseCssPixelValue(computedStyle.fontSize, 16));
-    const internalFontSize = Math.max(16, renderedFontSize);
-    const proxyScale = Math.max(0.01, previewScale * (renderedFontSize / internalFontSize));
-    const renderedLineHeight = parseCssPixelValue(computedStyle.lineHeight, renderedFontSize * 1.2);
-    const internalLineHeight = renderedLineHeight * (internalFontSize / renderedFontSize);
-    const renderedLetterSpacing = computedStyle.letterSpacing === 'normal'
-        ? 0
-        : parseCssPixelValue(computedStyle.letterSpacing, 0);
-
-    return {
-        top: `${rect.top}px`,
-        left: `${rect.left}px`,
-        width: `${Math.max(1, rect.width / proxyScale)}px`,
-        height: `${Math.max(internalLineHeight, rect.height / proxyScale)}px`,
-        fontFamily: computedStyle.fontFamily,
-        fontSize: `${internalFontSize}px`,
-        fontStyle: computedStyle.fontStyle,
-        fontWeight: computedStyle.fontWeight,
-        letterSpacing: `${renderedLetterSpacing * (internalFontSize / renderedFontSize)}px`,
-        lineHeight: `${internalLineHeight}px`,
-        textAlign: computedStyle.textAlign,
-        textTransform: computedStyle.textTransform,
-        transform: `scale(${proxyScale})`,
-        transformOrigin: 'top left',
-    };
-}
-
-function mobileProxyStylesMatch(currentStyle, nextStyle) {
-    if (!currentStyle || !nextStyle) {
-        return currentStyle === nextStyle;
-    }
-
-    const keys = Object.keys(nextStyle);
-    return keys.length === Object.keys(currentStyle).length
-        && keys.every((key) => currentStyle[key] === nextStyle[key]);
-}
-
-function MobilePreviewEditorProxy({
-    session,
-    inputRef,
-    onBlur,
-    onCaretEvent,
-    onChange,
-    onCommit,
-    onProxyTap,
-}) {
-    const isComposingRef = useRef(false);
-    const pointerDownRef = useRef(null);
-
-    if (!session || typeof document === 'undefined') {
-        return null;
-    }
-
-    const proxy = (
-        <textarea
-            ref={inputRef}
-            className="mobilePreviewEditorProxy"
-            data-mobile-preview-editor="true"
-            aria-label={getPreviewEditorLabel(session.target)}
-            value={session.value}
-            rows={session.isMultiline ? 3 : 1}
-            inputMode={session.inputMode}
-            enterKeyHint={session.isMultiline ? 'enter' : 'done'}
-            autoCapitalize={session.inputMode === 'text' ? 'sentences' : 'none'}
-            autoCorrect={session.inputMode === 'text' ? 'on' : 'off'}
-            spellCheck={session.inputMode === 'text'}
-            style={session.proxyStyle || undefined}
-            onBeforeInput={(event) => {
-                if (!session.isMultiline && event.nativeEvent.inputType === 'insertLineBreak') {
-                    event.preventDefault();
-                    onCommit();
-                }
-            }}
-            onBlur={onBlur}
-            onChange={onChange}
-            onCompositionStart={() => {
-                isComposingRef.current = true;
-            }}
-            onCompositionEnd={(event) => {
-                isComposingRef.current = false;
-                onCaretEvent(event);
-            }}
-            onFocus={onCaretEvent}
-            onInput={onCaretEvent}
-            onKeyDown={(event) => {
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    onCommit();
-                    return;
-                }
-
-                if (
-                    event.key === 'Enter'
-                    && !session.isMultiline
-                    && !isComposingRef.current
-                    && !event.nativeEvent.isComposing
-                ) {
-                    event.preventDefault();
-                    onCommit();
-                }
-            }}
-            onKeyUp={onCaretEvent}
-            onPointerDown={(event) => {
-                pointerDownRef.current = {
-                    pointerId: event.pointerId,
-                    x: event.clientX,
-                    y: event.clientY,
-                    timeStamp: event.timeStamp,
-                };
-            }}
-            onPointerUp={(event) => {
-                const pointerDown = pointerDownRef.current;
-                pointerDownRef.current = null;
-                const isShortTap = pointerDown?.pointerId === event.pointerId
-                    && event.timeStamp - pointerDown.timeStamp < 350
-                    && Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y) < 8;
-
-                if (isShortTap) {
-                    onProxyTap(event);
-                    return;
-                }
-
-                onCaretEvent(event);
-            }}
-            onSelect={onCaretEvent}
-        />
-    );
-
-    return createPortal(proxy, document.body);
-}
-
-function getCandidateBounds(element, resumeRect, previewScale, paddingTop) {
-    const rect = element.getBoundingClientRect();
-    const top = ((rect.top - resumeRect.top) / previewScale) - paddingTop;
-    const bottom = ((rect.bottom - resumeRect.top) / previewScale) - paddingTop;
-
-    return { top, bottom };
-}
-
-function collectPreviewBreakCandidates(resumeElement, paddingTop) {
-    const resumeRect = resumeElement.getBoundingClientRect();
-    const previewScale = getPreviewScaleFromElement(resumeElement);
-    const candidates = [];
-
-    resumeElement.querySelectorAll('[data-page-break-kind="entry"]').forEach((entryElement) => {
-        const sectionElement = entryElement.closest('[data-page-break-kind="section"]');
-        const firstSectionEntry = sectionElement?.querySelector('[data-page-break-kind="entry"]');
-        const isFirstSectionEntry = firstSectionEntry === entryElement;
-
-        candidates.push({
-            ...getCandidateBounds(entryElement, resumeRect, previewScale, paddingTop),
-            priority: 2,
-            snapDistance: isFirstSectionEntry ? FIRST_SECTION_ENTRY_SNAP_DISTANCE_PX : undefined,
-        });
-    });
-
-    resumeElement.querySelectorAll('[data-page-break-kind="item"]').forEach((itemElement) => {
-        candidates.push({
-            ...getCandidateBounds(itemElement, resumeRect, previewScale, paddingTop),
-            priority: 3,
-        });
-    });
-
-    return candidates;
-}
-
-function measurePreviewContentFlowHeight(resumeElement, paddingTop, fallbackHeight) {
-    const contentElement = resumeElement.querySelector('[data-preview-page-content="true"]');
-
-    if (!contentElement) {
-        return fallbackHeight;
-    }
-
-    const resumeRect = resumeElement.getBoundingClientRect();
-    const contentRect = contentElement.getBoundingClientRect();
-    const previewScale = getPreviewScaleFromElement(resumeElement);
-    const contentBottom = ((contentRect.bottom - resumeRect.top) / previewScale) - paddingTop;
-
-    return Math.max(0, contentBottom);
 }
 
 export default function ResumePreview({
@@ -1406,33 +264,52 @@ export default function ResumePreview({
     const headerLayoutDoubleClickRef = useRef(null);
     const headerLayoutLongPressRef = useRef(null);
     const personalChromeActiveRef = useRef(false);
-    const mobileEditorRef = useRef(null);
-    const mobileEditSessionRef = useRef(null);
-    const mobileCaretFrameRef = useRef(0);
-    const mobileBlurTimerRef = useRef(0);
-    const previewValueChangeRef = useRef(onPreviewValueChange);
-    const previewValueCommitRef = useRef(onPreviewValueCommit);
-    const previewCaretChangeRef = useRef(onPreviewCaretChange);
     const [activeDragMeta, setActiveDragMeta] = useState(null);
     const [activeDragRect, setActiveDragRect] = useState(null);
     const [activeHeaderLayout, setActiveHeaderLayout] = useState(null);
     const [hoverHeaderLayout, setHoverHeaderLayout] = useState(null);
     const [isPersonalChromeActive, setIsPersonalChromeActive] = useState(false);
     const [summaryWidthDrag, setSummaryWidthDrag] = useState(null);
-    const [mobileEditSession, setMobileEditSession] = useState(null);
     const isPreviewDragActive = Boolean(activeDragMeta?.type);
     const canShowHeaderLayoutHover = !activeDragMeta?.type || activeDragMeta.type === 'headerSlot';
-    const [pageMetrics, setPageMetrics] = useState({
-        pageWidth: 0,
-        pageHeight: 0,
-        contentHeight: 0,
-        pageCount: 1,
-        pageBreaks: [],
-        scale: 1,
-        layoutWidth: 0,
-    });
     const presentationVars = useMemo(() => getResumePresentationVars(settings, template), [settings, template]);
     const printPageRule = useMemo(() => getResumePrintPageRule(settings, template), [settings, template]);
+    const pageMetrics = useResumePreviewPageMetrics({
+        frameRef: previewFrameRef,
+        presentationVars,
+        previewModel,
+        resumeRootRef: resumeRef,
+    });
+    const {
+        closeSession: closeMobileEditSession,
+        handleBlur: handleMobileEditorBlur,
+        handleChange: handleMobileEditorChange,
+        handleProxyTap: handleMobileProxyTap,
+        inputRef: mobileEditorRef,
+        openSession: openMobileEditSession,
+        scheduleCaretSync: scheduleMobileCaretSync,
+        session: mobileEditSession,
+        sessionRef: mobileEditSessionRef,
+    } = useMobilePreviewEditor({
+        activeEditorCaret,
+        isPrintRendering,
+        onEditTarget,
+        onPreviewCaretChange,
+        onPreviewEditorHandoff,
+        onPreviewValueChange,
+        onPreviewValueCommit,
+        pageScale: pageMetrics.scale,
+        resume,
+        resumeId,
+        resumeRootRef: resumeRef,
+    });
+    useResumePrintPageRule(printPageRule);
+    useWrappedEntryHeaderSeparators({
+        activeHeaderLayout,
+        presentationVars,
+        previewModel,
+        resumeRootRef: resumeRef,
+    });
     const personalAlignment = useMemo(() => getEffectivePersonalAlignment(settings, template), [settings, template]);
     const personalHeaderOrder = useMemo(() => normalizePersonalHeaderOrder(settings?.personalHeaderOrder), [settings?.personalHeaderOrder]);
     const summaryWidthPercent = clampSummaryWidthPercent(settings?.summaryWidthPercent);
@@ -1477,360 +354,6 @@ export default function ResumePreview({
     ), [personalDetails.length, personalHeaderOrder, previewModel.personal.headline]);
 
     useEffect(() => {
-        previewValueChangeRef.current = onPreviewValueChange;
-        previewValueCommitRef.current = onPreviewValueCommit;
-        previewCaretChangeRef.current = onPreviewCaretChange;
-    }, [onPreviewCaretChange, onPreviewValueChange, onPreviewValueCommit]);
-
-    const findPreviewValueElement = useCallback((path) => {
-        if (!path || !resumeRef.current) {
-            return null;
-        }
-
-        return Array.from(resumeRef.current.querySelectorAll('[data-preview-caret-text="true"]'))
-            .find((element) => element.dataset.previewCaretPath === path) || null;
-    }, []);
-
-    const updateMobileProxyPosition = useCallback(() => {
-        const currentSession = mobileEditSessionRef.current;
-
-        if (!currentSession) {
-            return false;
-        }
-
-        const valueElement = findPreviewValueElement(currentSession.target.path);
-        const proxyStyle = getMobileEditorProxyStyle(valueElement, resumeRef.current);
-
-        if (!valueElement || !proxyStyle) {
-            return false;
-        }
-
-        if (!mobileProxyStylesMatch(currentSession.proxyStyle, proxyStyle)) {
-            const nextSession = { ...currentSession, proxyStyle };
-            mobileEditSessionRef.current = nextSession;
-            setMobileEditSession(nextSession);
-        }
-
-        return true;
-    }, [findPreviewValueElement]);
-
-    function scheduleMobileCaretSync(inputElement = mobileEditorRef.current) {
-        window.cancelAnimationFrame(mobileCaretFrameRef.current);
-        mobileCaretFrameRef.current = window.requestAnimationFrame(() => {
-            mobileCaretFrameRef.current = 0;
-            const currentSession = mobileEditSessionRef.current;
-
-            if (!currentSession || !inputElement || document.activeElement !== inputElement) {
-                return;
-            }
-
-            previewCaretChangeRef.current?.({
-                path: currentSession.target.path,
-                offset: Number.isFinite(inputElement.selectionStart)
-                    ? inputElement.selectionStart
-                    : currentSession.value.length,
-                value: currentSession.value,
-            });
-        });
-    }
-
-    function closeMobileEditSession({ commit = true } = {}) {
-        const currentSession = mobileEditSessionRef.current;
-
-        if (!currentSession) {
-            return;
-        }
-
-        window.clearTimeout(mobileBlurTimerRef.current);
-        window.cancelAnimationFrame(mobileCaretFrameRef.current);
-        mobileBlurTimerRef.current = 0;
-        mobileCaretFrameRef.current = 0;
-
-        if (commit) {
-            previewValueCommitRef.current?.(currentSession.target);
-        }
-
-        mobileEditSessionRef.current = null;
-        setMobileEditSession(null);
-        previewCaretChangeRef.current?.(null);
-
-        if (document.activeElement === mobileEditorRef.current) {
-            mobileEditorRef.current.blur();
-        }
-    }
-
-    function openMobileEditSession(target, valueElement, sourceResume = resume, sourceOffsetOverride = null) {
-        const sourceValue = readResumeEditorTargetValue(sourceResume, target);
-
-        if (sourceValue === null) {
-            return false;
-        }
-
-        const sourceOffset = Number.isFinite(sourceOffsetOverride)
-            ? Math.max(0, Math.min(sourceOffsetOverride, sourceValue.length))
-            : mapDisplayedCaretOffsetToSource({
-                displayText: target.displayText,
-                sourceValue,
-                displayOffset: target.displayOffset,
-                isPlaceholder: sourceValue.trim() === '',
-            });
-        const nextSession = {
-            target,
-            resumeId,
-            value: sourceValue,
-            isMultiline: isPreviewEditorTargetMultiline(target),
-            inputMode: getPreviewEditorInputMode(target),
-            proxyStyle: getMobileEditorProxyStyle(valueElement, resumeRef.current),
-        };
-
-        flushSync(() => {
-            mobileEditSessionRef.current = nextSession;
-            setMobileEditSession(nextSession);
-        });
-
-        const inputElement = mobileEditorRef.current;
-        inputElement?.focus({ preventScroll: true });
-
-        try {
-            inputElement?.setSelectionRange(sourceOffset, sourceOffset);
-        } catch {
-            // The textarea supports selection ranges; retain the end fallback if a browser refuses it.
-        }
-
-        scheduleMobileCaretSync(inputElement);
-        return true;
-    }
-
-    function handleMobileEditorChange(event) {
-        const currentSession = mobileEditSessionRef.current;
-
-        if (!currentSession) {
-            return;
-        }
-
-        const rawValue = event.target.value;
-        const nextValue = currentSession.isMultiline
-            ? rawValue
-            : rawValue.replace(/[\r\n]+/g, '');
-        const nextSession = { ...currentSession, value: nextValue };
-
-        mobileEditSessionRef.current = nextSession;
-        setMobileEditSession(nextSession);
-        previewValueChangeRef.current?.(currentSession.target, nextValue);
-        scheduleMobileCaretSync(event.currentTarget);
-    }
-
-    function handleMobileEditorBlur() {
-        const blurredSession = mobileEditSessionRef.current;
-
-        window.clearTimeout(mobileBlurTimerRef.current);
-        mobileBlurTimerRef.current = window.setTimeout(() => {
-            if (
-                blurredSession
-                && mobileEditSessionRef.current === blurredSession
-                && document.activeElement !== mobileEditorRef.current
-            ) {
-                closeMobileEditSession();
-            }
-        }, 0);
-    }
-
-    function handleMobileProxyTap(event) {
-        const currentSession = mobileEditSessionRef.current;
-        const inputElement = event.currentTarget;
-
-        if (!currentSession || !inputElement) {
-            return;
-        }
-
-        const previousPointerEvents = inputElement.style.pointerEvents;
-        inputElement.style.pointerEvents = 'none';
-        const underlyingElement = document.elementFromPoint(event.clientX, event.clientY);
-        const clickedValueElement = underlyingElement?.closest?.('[data-preview-caret-text="true"]');
-        const valueElement = clickedValueElement?.dataset.previewCaretPath === currentSession.target.path
-            ? clickedValueElement
-            : findPreviewValueElement(currentSession.target.path);
-        const displayText = valueElement?.dataset.previewCaretDisplay
-            ?? valueElement?.textContent
-            ?? currentSession.value;
-        const displayOffset = valueElement
-            ? getPreviewCaretOffsetFromPoint(valueElement, event.clientX, event.clientY)
-            : null;
-        inputElement.style.pointerEvents = previousPointerEvents;
-
-        const sourceOffset = mapDisplayedCaretOffsetToSource({
-            displayText,
-            sourceValue: currentSession.value,
-            displayOffset: Number.isFinite(displayOffset) ? displayOffset : currentSession.value.length,
-            isPlaceholder: currentSession.value.trim() === '',
-        });
-
-        inputElement.focus({ preventScroll: true });
-        inputElement.setSelectionRange(sourceOffset, sourceOffset);
-        scheduleMobileCaretSync(inputElement);
-    }
-
-    useEffect(() => {
-        const currentSession = mobileEditSessionRef.current;
-
-        if (!currentSession) {
-            return;
-        }
-
-        if (isPrintRendering || currentSession.resumeId !== resumeId) {
-            closeMobileEditSession();
-        }
-    }, [isPrintRendering, resumeId]);
-
-    useLayoutEffect(() => {
-        if (!mobileEditSession?.target.path || typeof window === 'undefined') {
-            return undefined;
-        }
-
-        let frameId = 0;
-        let missingTargetReads = 0;
-        const viewport = window.visualViewport;
-        const mediaQuery = window.matchMedia('(max-width: 980px)');
-
-        function readPosition() {
-            window.cancelAnimationFrame(frameId);
-            frameId = window.requestAnimationFrame(() => {
-                if (!mediaQuery.matches) {
-                    const currentSession = mobileEditSessionRef.current;
-                    const inputElement = mobileEditorRef.current;
-
-                    if (currentSession) {
-                        const sourceOffset = Number.isFinite(inputElement?.selectionStart)
-                            ? inputElement.selectionStart
-                            : currentSession.value.length;
-
-                        closeMobileEditSession({ commit: false });
-                        onPreviewEditorHandoff?.({
-                            ...currentSession.target,
-                            sourceOffset,
-                        });
-                    }
-                    return;
-                }
-
-                if (updateMobileProxyPosition()) {
-                    missingTargetReads = 0;
-                    return;
-                }
-
-                missingTargetReads += 1;
-
-                if (missingTargetReads >= 2) {
-                    closeMobileEditSession();
-                }
-            });
-        }
-
-        readPosition();
-        window.addEventListener('resize', readPosition);
-        window.addEventListener('scroll', readPosition, true);
-        viewport?.addEventListener('resize', readPosition);
-        viewport?.addEventListener('scroll', readPosition);
-        mediaQuery.addEventListener?.('change', readPosition);
-
-        const resizeObserver = typeof ResizeObserver === 'undefined'
-            ? null
-            : new ResizeObserver(readPosition);
-        if (resizeObserver && resumeRef.current) {
-            resizeObserver.observe(resumeRef.current);
-        }
-
-        return () => {
-            window.cancelAnimationFrame(frameId);
-            window.removeEventListener('resize', readPosition);
-            window.removeEventListener('scroll', readPosition, true);
-            viewport?.removeEventListener('resize', readPosition);
-            viewport?.removeEventListener('scroll', readPosition);
-            mediaQuery.removeEventListener?.('change', readPosition);
-            resizeObserver?.disconnect();
-        };
-    }, [mobileEditSession?.target.path, mobileEditSession?.value, onPreviewEditorHandoff, pageMetrics.scale, updateMobileProxyPosition]);
-
-    useEffect(() => {
-        if (typeof window === 'undefined' || !activeEditorCaret?.path) {
-            return undefined;
-        }
-
-        const mediaQuery = window.matchMedia('(max-width: 980px)');
-
-        function handoffEditorToMobile(event) {
-            if (!event.matches || mobileEditSessionRef.current || isPrintRendering) {
-                return;
-            }
-
-            const parsedTarget = parseEditorTargetPath(activeEditorCaret.path);
-            const valueElement = findPreviewValueElement(activeEditorCaret.path);
-
-            if (!parsedTarget || !valueElement) {
-                return;
-            }
-
-            const displayText = valueElement.dataset.previewCaretDisplay
-                ?? valueElement.textContent
-                ?? '';
-            const target = {
-                ...parsedTarget,
-                displayText,
-                displayOffset: Number.isFinite(activeEditorCaret.offset) ? activeEditorCaret.offset : 0,
-                stayInPreview: true,
-                preserveTransient: true,
-            };
-            const targetResume = onEditTarget?.(target);
-
-            if (targetResume) {
-                openMobileEditSession(
-                    target,
-                    valueElement,
-                    targetResume,
-                    activeEditorCaret.offset,
-                );
-            }
-        }
-
-        mediaQuery.addEventListener?.('change', handoffEditorToMobile);
-
-        return () => {
-            mediaQuery.removeEventListener?.('change', handoffEditorToMobile);
-        };
-    }, [activeEditorCaret, findPreviewValueElement, isPrintRendering, onEditTarget]);
-
-    useEffect(() => {
-        if (!mobileEditSession?.target.path || typeof document === 'undefined') {
-            return undefined;
-        }
-
-        function handleOutsidePointerDown(event) {
-            if (event.target.closest?.('[data-mobile-preview-editor="true"]')) {
-                return;
-            }
-
-            const editTarget = event.target.closest?.('[data-edit-section-id][data-edit-path]');
-
-            if (editTarget && resumeRef.current?.contains(editTarget)) {
-                return;
-            }
-
-            closeMobileEditSession();
-        }
-
-        document.addEventListener('pointerdown', handleOutsidePointerDown, true);
-
-        return () => {
-            document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
-        };
-    }, [mobileEditSession?.target.path]);
-
-    useEffect(() => () => {
-        window.clearTimeout(mobileBlurTimerRef.current);
-        window.cancelAnimationFrame(mobileCaretFrameRef.current);
-    }, []);
-
-    useEffect(() => {
         if (!activeHeaderLayout?.sectionId || typeof document === 'undefined') {
             return undefined;
         }
@@ -1861,196 +384,11 @@ export default function ResumePreview({
         };
     }, [activeHeaderLayout]);
 
-    useLayoutEffect(() => {
-        if (typeof window === 'undefined') {
-            return undefined;
-        }
-
-        let frameId = 0;
-
-        function updateWrappedHeaderSeparators() {
-            const root = resumeRef.current;
-
-            if (!root) {
-                return;
-            }
-
-            root.querySelectorAll('[data-entry-header-side="true"]').forEach((sideElement) => {
-                const items = Array.from(sideElement.querySelectorAll('[data-entry-header-item="true"]'));
-
-                items.forEach((item, index) => {
-                    const separator = item.querySelector('.entryHeaderFieldSeparator');
-
-                    if (!separator) {
-                        return;
-                    }
-
-                    const previousItem = items[index - 1];
-                    const shouldHideSeparator = previousItem
-                        ? item.getBoundingClientRect().top > previousItem.getBoundingClientRect().top + 1
-                        : false;
-
-                    separator.classList.toggle('entryHeaderFieldSeparator--wrapped', shouldHideSeparator);
-                });
-            });
-        }
-
-        function scheduleUpdate() {
-            window.cancelAnimationFrame(frameId);
-            frameId = window.requestAnimationFrame(updateWrappedHeaderSeparators);
-        }
-
-        scheduleUpdate();
-        window.addEventListener('resize', scheduleUpdate);
-
-        let resizeObserver;
-
-        if (typeof ResizeObserver !== 'undefined' && resumeRef.current) {
-            resizeObserver = new ResizeObserver(scheduleUpdate);
-            resizeObserver.observe(resumeRef.current);
-        }
-
-        return () => {
-            window.cancelAnimationFrame(frameId);
-            window.removeEventListener('resize', scheduleUpdate);
-            resizeObserver?.disconnect();
-        };
-    }, [previewModel, presentationVars, activeHeaderLayout]);
-
     function previewPulseAttributes(path) {
         return previewPulseTarget?.path === path && previewPulseTarget?.requestId
             ? { 'data-preview-pulse': previewPulseTarget.requestId % 2 === 0 ? 'even' : 'odd' }
             : {};
     }
-
-    useEffect(() => {
-        if (typeof window === 'undefined') {
-            return undefined;
-        }
-
-        let frameId = 0;
-
-        function readPageMetrics() {
-            const resumeElement = resumeRef.current;
-            const frameElement = previewFrameRef.current;
-
-            if (!resumeElement || !frameElement) {
-                setPageMetrics((current) => {
-                    const next = {
-                        pageWidth: 0,
-                        pageHeight: 0,
-                        contentHeight: 0,
-                        pageCount: 1,
-                        pageBreaks: [],
-                        scale: 1,
-                        layoutWidth: 0,
-                    };
-
-                    return metricsAreEqual(current, next) ? current : next;
-                });
-                return;
-            }
-
-            const styles = window.getComputedStyle(resumeElement);
-            const frameRect = frameElement.getBoundingClientRect();
-            const availableWidth = Math.max(240, frameElement.clientWidth || frameRect.width);
-            const pageWidth = PRINT_PAGE_WIDTH_PX;
-            const pageHeight = PRINT_PAGE_HEIGHT_PX;
-            const paddingTop = parseCssLengthToPixels(styles.paddingTop);
-            const paddingBottom = parseCssLengthToPixels(styles.paddingBottom);
-            const printableHeight = Math.max(1, pageHeight - paddingTop - paddingBottom);
-            const measuredContentFlowHeight = measurePreviewContentFlowHeight(
-                resumeElement,
-                paddingTop,
-                resumeElement.scrollHeight - paddingTop - paddingBottom,
-            );
-            const contentFlowHeight = previewModel.hasContent
-                ? Math.max(printableHeight, measuredContentFlowHeight - PAGE_FIT_TOLERANCE_PX)
-                : printableHeight;
-            const pageBreaks = previewModel.hasContent
-                ? calculatePreviewPageBreaks({
-                    contentHeight: contentFlowHeight,
-                    printableHeight,
-                    breakCandidates: collectPreviewBreakCandidates(resumeElement, paddingTop),
-                })
-                : [];
-            const markerBreaks = pageBreaks.map((pageBreak) => Math.round(paddingTop + pageBreak));
-            const pageCount = markerBreaks.length + 1;
-            const contentHeight = Math.max(pageHeight, paddingTop + contentFlowHeight + paddingBottom);
-            const availableHeight = Math.max(
-                320,
-                window.innerHeight - getPreviewStickyTop(frameElement) - 24,
-            );
-            const fitPageHeightScale = Math.min(availableHeight / pageHeight, 1);
-            const widthScale = Math.min(availableWidth / pageWidth, 1);
-            const fullPageScale = Math.min(widthScale, fitPageHeightScale, 1);
-            const scale = Math.max(0.35, fullPageScale);
-            const layoutScale = Math.max(0.35, fitPageHeightScale);
-            const nextMetrics = {
-                pageWidth: Math.round(pageWidth),
-                pageHeight: Math.round(pageHeight),
-                contentHeight: Math.round(contentHeight),
-                pageCount,
-                pageBreaks: markerBreaks,
-                scale: Number(scale.toFixed(4)),
-                layoutWidth: Math.round(pageWidth * layoutScale),
-            };
-
-            setPageMetrics((current) => (metricsAreEqual(current, nextMetrics) ? current : nextMetrics));
-        }
-
-        function scheduleRead() {
-            window.cancelAnimationFrame(frameId);
-            frameId = window.requestAnimationFrame(readPageMetrics);
-        }
-
-        scheduleRead();
-        window.addEventListener('resize', scheduleRead);
-
-        let resizeObserver;
-
-        if (typeof ResizeObserver !== 'undefined') {
-            resizeObserver = new ResizeObserver(scheduleRead);
-
-            if (resumeRef.current) {
-                resizeObserver.observe(resumeRef.current);
-            }
-
-            if (previewFrameRef.current) {
-                resizeObserver.observe(previewFrameRef.current);
-            }
-        }
-
-        return () => {
-            window.cancelAnimationFrame(frameId);
-            window.removeEventListener('resize', scheduleRead);
-            resizeObserver?.disconnect();
-        };
-    }, [previewModel, presentationVars]);
-
-    useLayoutEffect(() => {
-        if (typeof document === 'undefined') {
-            return undefined;
-        }
-
-        const styleId = 'resumeloomr-print-page-rule';
-        let styleElement = document.getElementById(styleId);
-
-        if (!styleElement) {
-            styleElement = document.createElement('style');
-            styleElement.id = styleId;
-            styleElement.media = 'print';
-            document.head.appendChild(styleElement);
-        }
-
-        styleElement.textContent = printPageRule;
-
-        return () => {
-            if (styleElement?.parentNode && styleElement.textContent === printPageRule) {
-                styleElement.parentNode.removeChild(styleElement);
-            }
-        };
-    }, [printPageRule]);
 
     useEffect(() => {
         if (!onLayoutChange) {
@@ -2509,118 +847,6 @@ export default function ResumePreview({
         );
     }
 
-    function formatPreviewMarginValue(value) {
-        const numericValue = Number(value) || 0;
-
-        if (numericValue === 0) {
-            return '0';
-        }
-
-        return String(numericValue);
-    }
-
-    function stopMarginControlEvent(event) {
-        event.stopPropagation();
-    }
-
-    function adjustPreviewMarginSetting(event, settingId, delta) {
-        event.preventDefault();
-        event.stopPropagation();
-        suppressNextPreviewClick();
-        onAdjustSetting?.(settingId, delta);
-    }
-
-    function clearPointerMarginFocus(event) {
-        const activeElement = document.activeElement;
-
-        if (!activeElement || !event.currentTarget.contains(activeElement)) {
-            return;
-        }
-
-        if (typeof activeElement.matches === 'function' && activeElement.matches(':focus-visible')) {
-            return;
-        }
-
-        activeElement.blur?.();
-    }
-
-    function renderPreviewMarginControl(position, settingId) {
-        if (typeof onAdjustSetting !== 'function') {
-            return null;
-        }
-
-        const value = Number(settings?.[settingId]) || 0;
-        const isVerticalControl = position === 'left' || position === 'right';
-        const label = settingId === 'horizontalMargins' ? 'Side margin' : 'Top and bottom margin';
-        const decreaseControl = {
-            delta: -1,
-            sign: '-',
-            label: `Decrease ${label}`,
-            disabled: value <= PREVIEW_MARGIN_SETTING_MIN,
-        };
-        const increaseControl = {
-            delta: 1,
-            sign: '+',
-            label: `Increase ${label}`,
-            disabled: value >= PREVIEW_MARGIN_SETTING_MAX,
-        };
-        const orderedControls = isVerticalControl
-            ? [increaseControl, 'value', decreaseControl]
-            : [decreaseControl, 'value', increaseControl];
-
-        return (
-            <div
-                className={`previewMarginZone previewMarginZone--${position}`}
-                role="group"
-                tabIndex={0}
-                aria-label={`${label} preview controls`}
-                onPointerDown={stopMarginControlEvent}
-                onPointerLeave={clearPointerMarginFocus}
-                onClick={stopMarginControlEvent}
-            >
-                <div
-                    className={`previewMarginStepper${isVerticalControl ? ' previewMarginStepper--vertical' : ''}`}
-                    role="group"
-                    aria-label={`${label} controls`}
-                >
-                    {orderedControls.map((control) => (
-                        control === 'value' ? (
-                            <span className="previewMarginValue" key="value">{formatPreviewMarginValue(value)}</span>
-                        ) : (
-                            <button
-                                type="button"
-                                className="previewMarginButton"
-                                key={control.sign}
-                                onClick={(event) => adjustPreviewMarginSetting(event, settingId, control.delta)}
-                                disabled={control.disabled}
-                                aria-label={control.label}
-                            >
-                                {control.sign}
-                            </button>
-                        )
-                    ))}
-                </div>
-            </div>
-        );
-    }
-
-    function renderPreviewMarginControls() {
-        if (typeof onAdjustSetting !== 'function' || showEmptyResumeChoice) {
-            return null;
-        }
-
-        return (
-            <div className="previewMarginControls" aria-hidden={false}>
-                <span className="previewMarginHighlight previewMarginHighlight--horizontal" aria-hidden="true" />
-                <span className="previewMarginHighlight previewMarginHighlight--vertical" aria-hidden="true" />
-                {renderPreviewMarginControl('top', 'verticalMargins')}
-                {renderPreviewMarginControl('right', 'horizontalMargins')}
-                {renderPreviewMarginControl('bottom', 'verticalMargins')}
-                {renderPreviewMarginControl('left', 'horizontalMargins')}
-            </div>
-        );
-    }
-
     function capturePreviewDragScroll() {
         activeDragScrollRef.current = {
             x: window.scrollX,
@@ -2889,6 +1115,43 @@ export default function ResumePreview({
         );
     }
 
+    function renderSectionFrame({
+        block,
+        className,
+        entries,
+        entryItems,
+        sortable,
+        showSeparator,
+    }) {
+        const SectionFrame = sortable ? SortablePreviewSection : StaticPreviewSection;
+
+        return (
+            <SectionFrame
+                key={block.id}
+                blockId={block.id}
+                className={className}
+                previewScale={pageMetrics.scale}
+                showSeparator={showSeparator}
+                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
+                separatorPosition={sectionSeparatorPosition}
+            >
+                {(sectionHandleProps, sectionSeparatorElement) => (
+                    <>
+                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
+                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
+                        </h2>
+                        {sectionSeparatorElement}
+                        {sortable ? (
+                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
+                                {entries}
+                            </SortableContext>
+                        ) : entries}
+                    </>
+                )}
+            </SectionFrame>
+        );
+    }
+
     function renderSimpleMetaSection({
         block,
         sectionClassName,
@@ -2901,7 +1164,6 @@ export default function ResumePreview({
         showSeparator = true,
     }) {
         const entries = block.entries;
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
 
         if (entries.length === 0) {
@@ -2950,31 +1212,14 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className={`resumeSection ${sectionClassName}`}
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entryList}
-                            </SortableContext>
-                        ) : entryList}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: `resumeSection ${sectionClassName}`,
+            entries: entryList,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function renderPersonalSection({ showSeparator = true } = {}) {
@@ -3081,7 +1326,6 @@ export default function ResumePreview({
     }
 
     function renderEducationSection(block, { sortable = true, showSeparator = true } = {}) {
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
         const entries = block.entries.map((institution) => (
@@ -3181,31 +1425,14 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className="resumeSection educationDiv"
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entries}
-                            </SortableContext>
-                        ) : entries}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: "resumeSection educationDiv",
+            entries,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function getEntryHeaderLayout(block) {
@@ -3597,7 +1824,6 @@ export default function ResumePreview({
     }
 
     function renderRolesSection(block, { sortable = true, showSeparator = true } = {}) {
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
         const entries = block.entries.map((job) => (
@@ -3625,35 +1851,17 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className="resumeSection experienceDiv"
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entries}
-                            </SortableContext>
-                        ) : entries}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: "resumeSection experienceDiv",
+            entries,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function renderSkillsSection(block, { sortable = true, showSeparator = true } = {}) {
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
         const entries = block.entries.map((entry) => (
@@ -3694,35 +1902,17 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className="resumeSection skillsDiv"
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entries}
-                            </SortableContext>
-                        ) : entries}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: "resumeSection skillsDiv",
+            entries,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function renderProjectsSection(block, { sortable = true, showSeparator = true } = {}) {
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
         const entries = block.entries.map((entry) => (
@@ -3773,35 +1963,17 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className="resumeSection projectsDiv"
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entries}
-                            </SortableContext>
-                        ) : entries}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: "resumeSection projectsDiv",
+            entries,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function renderLanguagesSection(block, { sortable = true, showSeparator = true } = {}) {
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
         const entries = block.entries.map((entry) => (
@@ -3833,35 +2005,17 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className="resumeSection languagesDiv"
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entries}
-                            </SortableContext>
-                        ) : entries}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: "resumeSection languagesDiv",
+            entries,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function renderCustomSection(block, { sortable = true, showSeparator = true } = {}) {
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
         const entries = block.entries.map((entry) => (
@@ -3894,31 +2048,14 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className="resumeSection customDiv"
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entries}
-                            </SortableContext>
-                        ) : entries}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: "resumeSection customDiv",
+            entries,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function renderSectionBlock(block, options = {}) {
@@ -4145,122 +2282,6 @@ export default function ResumePreview({
             </SortableContext>
         ),
     ].filter(Boolean);
-    function renderPageMarkers() {
-        if (!previewModel.hasContent || pageMetrics.pageBreaks.length === 0) {
-            return null;
-        }
-
-        return (
-            <div className="resumePageMarkers" aria-hidden="true">
-                {pageMetrics.pageBreaks.map((pageBreak, index) => {
-                    const pageNumber = index + 2;
-
-                    return (
-                        <div
-                            className="resumePageMarker"
-                            key={`page-marker-${pageNumber}`}
-                            style={{ top: `${pageBreak}px` }}
-                        >
-                            <span>Page {pageNumber}</span>
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    }
-
-    function renderSampleInformationToggle() {
-        if (!showSampleInformationToggle || !onToggleSampleInformation || !onDismissSampleInformation) {
-            return null;
-        }
-
-        const positionClassName = personalAlignment === 'left'
-            ? ' sampleInformationToggle--personalLeft'
-            : '';
-
-        return (
-            <div
-                className={`sampleInformationToggle${positionClassName}${showSampleInformation ? "" : " sampleInformationToggle--hiddenUntilHover"}`}
-                data-dnd-no-drag="true"
-                onPointerDown={(event) => event.stopPropagation()}
-            >
-                <label className="sampleInformationToggleRow">
-                    <input
-                        type="checkbox"
-                        checked={showSampleInformation}
-                        onChange={(event) => onToggleSampleInformation(event.target.checked)}
-                    />
-                    <span aria-hidden="true" className="sampleInformationSwitch" />
-                    <span>Show sample information</span>
-                </label>
-                <button
-                    type="button"
-                    className="sampleInformationDelete"
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        onDismissSampleInformation();
-                    }}
-                    aria-label="Permanently delete sample information for this resume"
-                >
-                    Delete sample information
-                </button>
-            </div>
-        );
-    }
-
-    function renderEmptyChoice() {
-        if (!showEmptyResumeChoice) {
-            return null;
-        }
-
-        const nudgeAttributes = emptyChoiceNudgeCount > 0
-            ? { 'data-empty-choice-nudge': emptyChoiceNudgeCount % 2 === 0 ? 'even' : 'odd' }
-            : {};
-
-        return (
-            <div className="resumeEmptyChoiceOverlay">
-                <div
-                    className="resumeEmptyActions"
-                    aria-label="Choose how to start this resume"
-                    {...nudgeAttributes}
-                >
-                    <h2 className="resumeStartHeading">How would you like to start?</h2>
-                    <div className="resumeStartOptions">
-                        <button
-                            type="button"
-                            className="emptyStartOption emptyStartOption--import"
-                            onClick={onImportResume}
-                            disabled={isImportingResume}
-                        >
-                            <span className="emptyStartIcon" aria-hidden="true">
-                                {isImportingResume ? <span className="buttonSpinner" /> : <ImportStartIcon />}
-                            </span>
-                            <span className="emptyStartCopy">
-                                <strong>{isImportingResume ? 'Processing resume…' : 'Import resume'}</strong>
-                                <small>Use AI to organize a PDF, DOCX, PNG, or JPG into editable sections.</small>
-                            </span>
-                            <StartChoiceArrow />
-                        </button>
-
-                        <button
-                            type="button"
-                            className="emptyStartOption emptyStartOption--scratch"
-                            onClick={onStartFromScratch}
-                            disabled={isImportingResume}
-                        >
-                            <span className="emptyStartIcon" aria-hidden="true"><ScratchStartIcon /></span>
-                            <span className="emptyStartCopy">
-                                <strong>Start from scratch</strong>
-                                <small>Open the editor and build your resume section by section.</small>
-                            </span>
-                            <StartChoiceArrow />
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
     function setPersonalChromeActive(nextActive) {
         if (personalChromeActiveRef.current === nextActive) {
             return;
@@ -4315,7 +2336,12 @@ export default function ResumePreview({
                                             onAlignmentChange={handlePersonalAlignmentChange}
                                         />
                                     ) : null}
-                                    {renderPreviewMarginControls()}
+                                    <PreviewMarginControls
+                                        settings={settings}
+                                        hidden={showEmptyResumeChoice}
+                                        onAdjustSetting={onAdjustSetting}
+                                        onInteraction={suppressNextPreviewClick}
+                                    />
                                     {previewModel.hasContent ? (
                                         <DndContext
                                             sensors={sensors}
@@ -4325,7 +2351,13 @@ export default function ResumePreview({
                                             onDragCancel={handlePreviewDragCancel}
                                             onDragEnd={handlePreviewDragEnd}
                                         >
-                                            {renderSampleInformationToggle()}
+                                            <SampleInformationToggle
+                                                enabled={showSampleInformationToggle}
+                                                personalAlignment={personalAlignment}
+                                                showSampleInformation={showSampleInformation}
+                                                onToggleSampleInformation={onToggleSampleInformation}
+                                                onDismissSampleInformation={onDismissSampleInformation}
+                                            />
                                             <div className="resumePageContent" data-preview-page-content="true">
                                                 {orderedSections}
                                             </div>
@@ -4333,14 +2365,31 @@ export default function ResumePreview({
                                         </DndContext>
                                     ) : (
                                         <>
-                                            {!showEmptyResumeChoice ? renderSampleInformationToggle() : null}
+                                            {!showEmptyResumeChoice ? (
+                                                <SampleInformationToggle
+                                                    enabled={showSampleInformationToggle}
+                                                    personalAlignment={personalAlignment}
+                                                    showSampleInformation={showSampleInformation}
+                                                    onToggleSampleInformation={onToggleSampleInformation}
+                                                    onDismissSampleInformation={onDismissSampleInformation}
+                                                />
+                                            ) : null}
                                             <div className="resumeEmptyState resumeEmptyState--blank" aria-hidden="true" />
                                         </>
                                     )}
                                 </div>
-                                {renderPageMarkers()}
+                                <PreviewPageMarkers
+                                    hasContent={previewModel.hasContent}
+                                    pageBreaks={pageMetrics.pageBreaks}
+                                />
                             </div>
-                            {renderEmptyChoice()}
+                            <EmptyResumeChoice
+                                visible={showEmptyResumeChoice}
+                                nudgeCount={emptyChoiceNudgeCount}
+                                isImportingResume={isImportingResume}
+                                onImportResume={onImportResume}
+                                onStartFromScratch={onStartFromScratch}
+                            />
                         </div>
                     </div>
                 </div>

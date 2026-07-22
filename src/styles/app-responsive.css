@@ -1,0 +1,456 @@
+.formContainer {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 2px 4px 0 0;
+}
+
+.formContainer::-webkit-scrollbar {
+  width: 10px;
+}
+
+.formContainer::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: var(--radius-capsule);
+  background: color-mix(in srgb, var(--color-text-muted) 44%, transparent) padding-box;
+}
+
+.previewFrame {
+  position: sticky;
+  top: var(--workspace-sticky-top);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media screen and (max-width: 1240px) {
+  .appShell {
+    width: min(100vw - 24px, 1680px);
+  }
+}
+
+@media screen and (max-width: 1660px) and (min-width: 981px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--space-4);
+  }
+
+  .brand {
+    align-self: start;
+  }
+
+  .topbarSide {
+    justify-items: end;
+  }
+
+}
+
+@media screen and (max-width: 1660px) and (min-width: 861px) {
+  .app {
+    --workspace-content-max-width: calc(
+      clamp(104px, 10.5vw, 140px) +
+      var(--rail-gap) +
+      341.5px +
+      var(--rail-gap) +
+      var(--workspace-preview-max-width)
+    );
+  }
+
+  .workspace {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
+  .workspaceColumnEditor {
+    width: fit-content;
+  }
+
+  .editorWorkspace {
+    grid-template-columns: clamp(104px, 10.5vw, 140px) minmax(0, max-content);
+    justify-content: start;
+  }
+
+  .editorStage {
+    width: fit-content;
+    max-width: 100%;
+    justify-self: start;
+  }
+
+  .workspaceColumnPreview,
+  .previewPanel,
+  .previewFrame {
+    width: 100%;
+  }
+}
+
+@media screen and (min-width: 981px) {
+  .workspace.isPreviewFitPageLayout {
+    --workspace-fit-page-editor-min: min(430px, calc(100% - 320px - var(--rail-gap)));
+    --workspace-fit-page-preview-width: min(
+      var(--workspace-fit-page-width),
+      calc(100% - var(--workspace-fit-page-editor-min) - var(--rail-gap))
+    );
+    grid-template-columns:
+      minmax(var(--workspace-fit-page-editor-min), 1fr)
+      minmax(0, var(--workspace-fit-page-preview-width));
+  }
+
+  .workspace.isPreviewFitPageLayout .workspaceColumnEditor {
+    width: auto;
+  }
+
+  .workspace.isPreviewFitPageLayout .editorWorkspace {
+    grid-template-columns: clamp(104px, 10.5vw, 140px) minmax(0, 1fr);
+  }
+
+  .workspace.isPreviewFitPageLayout .editorStage {
+    width: auto;
+    max-width: none;
+    justify-self: stretch;
+  }
+
+  .workspace.isPreviewFitPageLayout .workspaceColumnPreview {
+    justify-self: end;
+    width: 100%;
+  }
+
+  .workspace.isPreviewFitPageLayout .previewPanel,
+  .workspace.isPreviewFitPageLayout .previewFrame {
+    width: 100%;
+  }
+}
+
+@media screen and (max-width: 980px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .resumeWorkspaceBar {
+    justify-content: flex-start;
+  }
+
+  .topbarSide,
+  .topbarMeta {
+    justify-items: end;
+    justify-content: flex-end;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .workspaceColumnEditor,
+  .workspaceColumnPreview,
+  .previewPanel,
+  .previewFrame {
+    width: 100%;
+  }
+
+  .workspaceColumnPreview .previewPageViewport {
+    justify-items: center;
+  }
+
+  .editorWorkspace {
+    grid-template-columns: 1fr;
+    gap: var(--rail-gap);
+  }
+
+  .editorSidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .editorRail {
+    position: static;
+  }
+
+  .editorStage {
+    position: static;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    justify-self: stretch;
+  }
+
+  .formContainer {
+    max-height: none;
+  }
+
+  .previewFrame {
+    position: static;
+  }
+
+  .mobileWorkspaceToggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspaceColumn.isMobileHidden {
+    display: none;
+  }
+
+  .editorPanelHeader {
+    align-items: center;
+    flex-direction: row;
+    padding-inline: 2px;
+    text-align: left;
+  }
+
+  .editorPanelMeta {
+    justify-content: flex-end;
+  }
+
+  .sectionPlacementControl {
+    justify-content: flex-end;
+  }
+
+  .tabs {
+    --tabs-inset: 5px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .tabs .tabButton {
+    min-height: 30px;
+    padding: 5px 6px;
+    gap: 0;
+  }
+
+  .tabs .tabLabel {
+    font-size: 0.6875rem;
+    line-height: 1;
+  }
+
+  .tabButton.sectionAddButton {
+    min-height: 30px;
+    padding: 5px 6px;
+  }
+}
+
+@media screen and (max-width: 720px) {
+  .appShell {
+    width: min(100vw - 16px, 1680px);
+    padding-top: var(--space-5);
+    padding-bottom: var(--space-8);
+  }
+
+  .topbar,
+  .resumeSubbar,
+  .settingsRail,
+  .editorRail,
+  .editorStage,
+  .previewPanel {
+    padding: var(--space-4);
+  }
+
+  .topbar,
+  .resumeSubbar {
+    padding: 10px 12px;
+  }
+
+  .topbarMeta {
+    justify-content: flex-end;
+  }
+
+  .topbarMeta > .button {
+    flex: 0 1 auto;
+  }
+
+  .resumePillStrip {
+    gap: 6px;
+  }
+
+  .resumePill,
+  .resumeNewButton {
+    min-height: 34px;
+  }
+
+  .noticeToast {
+    top: max(60px, calc(env(safe-area-inset-top) + 48px));
+    width: calc(100vw - 24px);
+  }
+
+  .settingsLauncher {
+    left: 12px;
+    bottom: 12px;
+    width: 38px;
+    height: 38px;
+  }
+
+  .floatingSaveStatus {
+    right: 12px;
+    bottom: 12px;
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 0.75rem;
+  }
+
+  .floatingThemeToggle {
+    top: 12px;
+    right: 12px;
+    width: 38px;
+    height: 38px;
+  }
+
+  .accountSettingsPanel {
+    left: 8px;
+    right: 8px;
+    bottom: 58px;
+    width: auto;
+    max-height: calc(100dvh - 76px);
+    overflow: auto;
+    padding: 11px 12px 12px;
+  }
+
+}
+
+@media screen and (max-width: 560px) {
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .topbarSide,
+  .topbarMeta {
+    width: 100%;
+    justify-items: stretch;
+    justify-content: stretch;
+  }
+
+  .topbarMeta > .button {
+    flex: 1 1 calc(50% - 4px);
+  }
+}
+
+@media screen and (max-width: 440px) {
+  .editorPanelHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .editorPanelMeta,
+  .sectionPlacementControl {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media print {
+  html,
+  body,
+  #root,
+  .app {
+    background: #ffffff;
+    width: auto;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    overflow: visible !important;
+    -webkit-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
+  }
+
+  html,
+  body {
+    font-size: 16px !important;
+  }
+
+  .app::before {
+    display: none !important;
+  }
+
+  .workspace {
+    display: block;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible !important;
+  }
+
+  .headerStack,
+  .topbar,
+  .resumeSubbar,
+  .noticeToast,
+  .conflictBanner,
+  .authOverlay,
+  .settingsLauncher,
+  .floatingSaveStatus,
+  .floatingThemeToggle,
+  .accountSettingsOverlay,
+  .separatorSettingsPopup,
+  .sectionAddDialogLayer,
+  .resumePillOverlay,
+  .tabButtonOverlay,
+  .previewDragOverlayFrame,
+  .mobileWorkspaceToggle,
+  .workspaceColumnEditor,
+  .editorPanel {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  .workspaceColumnPreview,
+  .workspaceColumnPreview.isMobileHidden {
+    display: block !important;
+  }
+
+  .appShell {
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    overflow: visible !important;
+  }
+
+  .workspaceColumnPreview,
+  .previewPanel,
+  .previewFrame {
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    -webkit-filter: none !important;
+    filter: none !important;
+    -webkit-transform: none !important;
+    transform: none !important;
+    transition: none !important;
+    overflow: visible !important;
+  }
+}
+
+.errorState {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 40rem;
+  margin: 10vh auto 0;
+  padding: var(--space-8);
+  text-align: left;
+}
+
+.errorState h1 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.errorStateCopy {
+  margin: 0;
+  color: var(--color-text-subtle);
+  line-height: 1.6;
+}

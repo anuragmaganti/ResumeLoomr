@@ -5,6 +5,8 @@ import 'fake-indexeddb/auto';
 import {
   createSavedDraftState,
   createUnsyncedDraftCopyState,
+} from '../src/lib/draftState.js';
+import {
   deleteLocalWorkspaceDatabase,
   initializeLocalWorkspace,
   markOutboxFailed,
@@ -24,7 +26,7 @@ import {
   createWorkspaceResumeMeta,
   normalizeWorkspaceIndex,
   removeWorkspaceResumes,
-} from '../src/lib/resume.js';
+} from '../src/lib/workspace.js';
 
 class MemoryStorage {
   #values = new Map();

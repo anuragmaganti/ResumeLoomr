@@ -1,0 +1,1089 @@
+.resumeWorkspaceBar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+}
+
+.resumeRootReleaseSlot {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.resumeRootReleaseTarget {
+  display: grid;
+  place-items: center;
+  min-height: 31px;
+  margin: 7px 4px 0;
+  border: 1px dashed color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-accent-soft) 34%, var(--color-surface) 66%);
+  color: var(--color-text-subtle);
+  font-size: 0.6875rem;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.resumeRootReleaseTarget.isOver {
+  border-color: var(--color-accent);
+  border-style: solid;
+  background: color-mix(in srgb, var(--color-accent-soft) 72%, var(--color-surface) 28%);
+  color: var(--color-accent-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.resumeSubbar {
+  position: relative;
+  z-index: 35;
+  container-type: inline-size;
+  container-name: resume-rail;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+}
+
+.resumePillStrip {
+  --resume-rail-columns: 2;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(var(--resume-rail-columns), minmax(0, 1fr));
+  grid-auto-rows: 38px;
+  align-items: stretch;
+  column-gap: 7px;
+  row-gap: 7px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px;
+  border-radius: var(--radius-item);
+  overflow: visible;
+  transition:
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    gap var(--transition-fast),
+    padding var(--transition-fast);
+}
+
+.resumePillStrip.isRootDropTarget {
+  background: color-mix(in srgb, var(--color-accent) 5%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.resumePillStrip:has(.entryMenu.isOpen) {
+  z-index: 2;
+}
+
+.resumeRailCell {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 38px;
+}
+
+.resumeRailCell:has(.entryMenu.isOpen) {
+  z-index: 60;
+}
+
+.resumeFolderTone0 {
+  --folder-accent: var(--color-accent);
+}
+
+.resumeFolderTone1 {
+  --folder-accent: #2f8f62;
+}
+
+.resumeFolderTone2 {
+  --folder-accent: #7558bd;
+}
+
+.resumeFolderTone3 {
+  --folder-accent: #b88118;
+}
+
+.resumeFolderTone4 {
+  --folder-accent: #c6535a;
+}
+
+html[data-theme="dark"] .resumeFolderTone1 {
+  --folder-accent: #77c999;
+}
+
+html[data-theme="dark"] .resumeFolderTone2 {
+  --folder-accent: #b7a0ee;
+}
+
+html[data-theme="dark"] .resumeFolderTone3 {
+  --folder-accent: #dfb866;
+}
+
+html[data-theme="dark"] .resumeFolderTone4 {
+  --folder-accent: #e58a8f;
+}
+
+.resumeRailCell > div {
+  height: 100%;
+  min-width: 0;
+}
+
+.resumeRailCell .resumePill {
+  height: 100%;
+}
+
+@container resume-rail (min-width: 520px) {
+  .resumePillStrip {
+    --resume-rail-columns: 3;
+  }
+}
+
+@container resume-rail (min-width: 660px) {
+  .resumePillStrip {
+    --resume-rail-columns: 4;
+  }
+}
+
+@container resume-rail (min-width: 880px) {
+  .resumePillStrip {
+    --resume-rail-columns: 5;
+  }
+}
+
+@container resume-rail (min-width: 1030px) {
+  .resumePillStrip {
+    --resume-rail-columns: 6;
+  }
+}
+
+.resumePill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 3px 3px 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+  border-radius: var(--radius-item);
+  background: var(--color-surface-elevated);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 4%, transparent);
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.resumePill * {
+  -webkit-user-drag: none;
+}
+
+.resumePill:not(.isEditing) {
+  cursor: grab;
+}
+
+.resumePill:not(.isEditing):active {
+  cursor: grabbing;
+}
+
+.resumePill.isActive {
+  border-color: var(--color-accent-border);
+  background: color-mix(in srgb, var(--color-accent-soft) 62%, var(--color-surface) 38%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 8%, transparent),
+    0 1px 2px color-mix(in srgb, var(--color-text) 5%, transparent);
+}
+
+.resumePill.isSelected {
+  border-color: var(--color-accent);
+}
+
+.resumeFolderTile {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  color: var(--color-text);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.resumeFolderTile:active {
+  cursor: grabbing;
+}
+
+.resumeFolderTile.isOpen {
+  cursor: default;
+}
+
+.resumeFolderShape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  transition:
+    filter var(--transition-base);
+}
+
+.resumeFolderShapeBack,
+.resumeFolderShapeFace,
+.resumeFolderShapeOutline,
+.resumeFolderShapeEdge {
+  transition:
+    fill var(--transition-base),
+    stroke var(--transition-base);
+}
+
+.resumeFolderShapeBack {
+  fill: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 22%, var(--color-surface-muted) 78%);
+}
+
+.resumeFolderShapeFace {
+  fill: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 17%, var(--color-surface-muted) 83%);
+}
+
+.resumeFolderShapeOutline,
+.resumeFolderShapeEdge {
+  fill: none;
+  stroke: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 32%, var(--color-border));
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.resumeFolderTile:hover .resumeFolderShapeFace {
+  fill: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 20%, var(--color-surface-muted) 80%);
+}
+
+.resumeFolderTile:hover .resumeFolderShapeOutline,
+.resumeFolderTile:hover .resumeFolderShapeEdge {
+  stroke: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 48%, var(--color-border-strong));
+}
+
+.resumeFolderTile.isOpen .resumeFolderShape {
+  filter: drop-shadow(0 2px 3px color-mix(in srgb, var(--color-text) 8%, transparent));
+}
+
+.resumeFolderTile.isOpen .resumeFolderShapeOutline,
+.resumeFolderTile.isOpen .resumeFolderShapeEdge {
+  stroke: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 58%, var(--color-border));
+}
+
+.resumeFolderTile.isDropTarget .resumeFolderShapeBack {
+  fill: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 34%, var(--color-surface-elevated) 66%);
+}
+
+.resumeFolderTile.isDropTarget .resumeFolderShapeFace {
+  fill: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 14%, var(--color-surface-elevated) 86%);
+}
+
+.resumeFolderTile.isDropTarget .resumeFolderShapeOutline,
+.resumeFolderTile.isDropTarget .resumeFolderShapeEdge {
+  stroke: var(--folder-accent, var(--color-accent));
+}
+
+.resumeFolderTile.isSelected .resumeFolderShapeOutline {
+  stroke: var(--color-accent);
+}
+
+.resumeFolderTile.isRootInsertBefore::after,
+.resumeFolderTile.isRootInsertAfter::after {
+  position: absolute;
+  z-index: 5;
+  top: 4px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: var(--radius-capsule);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-soft) 72%, transparent);
+  content: '';
+  pointer-events: none;
+}
+
+.resumeFolderTile.isRootInsertBefore::after {
+  left: -5px;
+}
+
+.resumeFolderTile.isRootInsertAfter::after {
+  right: -5px;
+}
+
+.resumeFolderTile.containsActiveResume:not(.isDropTarget) .resumeFolderShapeBack {
+  fill: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 40%, var(--color-surface-muted) 60%);
+}
+
+.resumeFolderTile.containsActiveResume:not(.isDropTarget) .resumeFolderShapeFace {
+  fill: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 34%, var(--color-surface-muted) 66%);
+}
+
+.resumeFolderTile.containsActiveResume:not(.isSelected):not(.isDropTarget) .resumeFolderShapeOutline,
+.resumeFolderTile.containsActiveResume:not(.isSelected):not(.isDropTarget) .resumeFolderShapeEdge {
+  stroke: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 58%, var(--color-border));
+}
+
+.resumeFolderTile.isSortingPlaceholder .resumeFolderShapeBack,
+.resumeFolderTile.isSortingPlaceholder .resumeFolderShapeFace {
+  fill: color-mix(in srgb, var(--color-accent-soft) 28%, transparent 72%);
+}
+
+.resumeFolderTile.isSortingPlaceholder .resumeFolderShapeOutline,
+.resumeFolderTile.isSortingPlaceholder .resumeFolderShapeEdge {
+  stroke: var(--color-accent-strong);
+  stroke-dasharray: 4 3;
+}
+
+.resumeFolderTile.isSortingPlaceholder > :not(.resumeFolderShape) {
+  opacity: 0;
+}
+
+.resumeFolderButton,
+.resumeFolderRenameForm {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 57px 0 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.resumeFolderButton {
+  cursor: pointer;
+}
+
+.resumeFolderName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.resumeFolderCount {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding-inline: 5px;
+  border-radius: var(--radius-compact);
+  background: color-mix(in srgb, var(--color-surface-elevated) 78%, transparent);
+  color: var(--color-text-subtle);
+  font-size: 0.625rem;
+  font-weight: 800;
+}
+
+.resumeFolderActions {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  right: 3px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.resumeFolderMenuHost {
+  display: inline-flex;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(3px) scale(0.88);
+  pointer-events: none;
+  transition:
+    width 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 140ms ease,
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.resumeFolderTile:hover .resumeFolderMenuHost,
+.resumeFolderTile:focus-within .resumeFolderMenuHost,
+.resumeFolderMenuHost:has(.entryMenu.isOpen) {
+  width: 30px;
+  overflow: visible;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.resumeFolderRenameInput {
+  width: 100%;
+  min-width: 0;
+  min-height: 25px;
+  padding: 0 7px;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface-elevated);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.resumeFolderCluster {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  pointer-events: none;
+}
+
+.resumeFolderCluster.isOpen,
+.resumeFolderCluster.isClosing {
+  z-index: 2;
+}
+
+.resumeFolderCluster:has(.entryMenu.isOpen) {
+  z-index: 60;
+}
+
+.resumeFolderClusterSurface {
+  position: relative;
+  z-index: 0;
+  margin: -3px;
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 12%, var(--color-surface) 88%);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--folder-accent, var(--color-accent)) 10%, transparent);
+  pointer-events: none;
+  will-change: clip-path, opacity;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.resumeFolderCluster.isDropTarget .resumeFolderClusterSurface {
+  background: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 17%, var(--color-surface) 83%);
+  box-shadow: 0 3px 9px color-mix(in srgb, var(--folder-accent, var(--color-accent)) 20%, transparent);
+}
+
+.resumeFolderClusterGrid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--folder-cluster-columns), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--folder-cluster-rows), 38px);
+  gap: 7px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 38px;
+}
+
+.resumeFolderClusterGrid .resumeRailCell {
+  pointer-events: auto;
+}
+
+.resumeFolderClusterGrid > .resumeRailCell:has(.resumeFolderTile) {
+  z-index: 200;
+}
+
+.resumeFolderClosingLayer {
+  position: absolute;
+  inset: 4px;
+  display: grid;
+  grid-template-columns: repeat(var(--folder-cluster-columns), minmax(0, 1fr));
+  grid-auto-rows: 38px;
+  gap: 7px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.resumeFolderClosingLayer .resumeFolderClusterSurface {
+  z-index: 0;
+}
+
+.resumeFolderClosingResume {
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.resumeFolderCluster.isOpen .resumePill,
+.resumeFolderClosingLayer .resumePill {
+  border-color: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 20%, var(--color-border));
+  background: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 14%, var(--color-surface-soft) 86%);
+}
+
+.resumeFolderCluster.isOpen .resumePill:hover {
+  background: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 17%, var(--color-surface-soft) 83%);
+}
+
+.resumeFolderCluster.isOpen .resumePill.isActive,
+.resumeFolderClosingLayer .resumePill.isActive {
+  background: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 30%, var(--color-surface-soft) 70%);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 5%, transparent);
+}
+
+.resumeFolderCluster.isOpen .resumePill.isActive:not(.isSelected),
+.resumeFolderClosingLayer .resumePill.isActive:not(.isSelected) {
+  border-color: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 20%, var(--color-border));
+}
+
+.resumeFolderEmptyLabel {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px dashed color-mix(in srgb, var(--folder-accent, var(--color-accent)) 40%, var(--color-border));
+  border-radius: var(--radius-item);
+  background: color-mix(in srgb, var(--folder-accent, var(--color-accent)) 4%, var(--color-surface-soft));
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.resumeFolderTileOverlay {
+  width: 190px;
+  filter: drop-shadow(0 12px 24px rgba(15, 23, 42, 0.2));
+  pointer-events: none;
+}
+
+.resumeDragCount {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding-inline: 6px;
+  border-radius: var(--radius-small);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 800;
+}
+
+.resumeDragStack {
+  position: relative;
+  width: 100%;
+  height: 38px;
+  pointer-events: none;
+}
+
+.resumeDragStackLayer {
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 52%, var(--color-border));
+  border-radius: var(--radius-item);
+  background: color-mix(in srgb, var(--color-surface-elevated) 76%, var(--color-accent-soft) 24%);
+  box-shadow:
+    0 4px 12px color-mix(in srgb, var(--color-text) 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--color-surface) 72%, transparent);
+  transform: translate(
+    calc(var(--resume-drag-stack-layer) * 4px),
+    calc(var(--resume-drag-stack-layer) * -3px)
+  );
+}
+
+.resumeDragStack .resumePillOverlay {
+  position: relative;
+  z-index: var(--resume-drag-stack-depth);
+  height: 100%;
+}
+
+.resumePillOverlay.isDropInvalid,
+.resumeFolderTileOverlay.isDropInvalid,
+.resumeDragStack.isDropInvalid {
+  opacity: 0.68;
+  filter: saturate(0.55);
+}
+
+.resumeDropInvalidBadge {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  z-index: 10;
+  width: 19px;
+  height: 19px;
+  border: 2px solid var(--color-error);
+  border-radius: var(--radius-capsule);
+  background: color-mix(in srgb, var(--color-surface-elevated) 92%, transparent);
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--color-text) 16%, transparent);
+}
+
+.resumeDropInvalidBadge::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 2px;
+  border-radius: var(--radius-capsule);
+  background: var(--color-error);
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+html.isWorkspaceDropInvalid,
+html.isWorkspaceDropInvalid * {
+  cursor: not-allowed !important;
+}
+
+.resumeBundleSourcePlaceholder {
+  height: 100%;
+  pointer-events: none;
+}
+
+.resumePill:not(.isActive):not(.isSelected):hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-muted);
+  box-shadow: var(--shadow-xs);
+}
+
+.resumePill.isActive:hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-soft) 72%, var(--color-surface) 28%);
+}
+
+html[data-theme="dark"] .resumePill.isActive {
+  background: color-mix(in srgb, var(--color-accent-soft) 48%, var(--color-surface) 52%);
+}
+
+.resumePill.isSortingPlaceholder {
+  position: relative;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.resumePlaceholderShape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.resumePlaceholderShapeFill {
+  fill: color-mix(in srgb, var(--color-accent-soft) 28%, transparent 72%);
+}
+
+.resumePlaceholderShapeOutline {
+  fill: none;
+  stroke: var(--color-accent-strong);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.resumePill.isSortingPlaceholder > :not(.resumePlaceholderShape) {
+  opacity: 0;
+}
+
+.resumePillOverlay {
+  border-color: var(--color-accent-strong);
+  background: color-mix(in srgb, var(--color-surface-elevated) 80%, var(--color-accent-soft) 20%);
+  box-shadow:
+    0 12px 28px rgba(15, 23, 42, 0.18),
+    var(--shadow-md);
+  cursor: grabbing;
+  pointer-events: none;
+}
+
+.resumePill.isEditing {
+  padding-right: 10px;
+  cursor: auto;
+}
+
+.resumePillButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.resumePillButton::before {
+  content: "";
+  width: 10px;
+  height: 14px;
+  flex: 0 0 10px;
+  margin-right: 7px;
+  background-image: radial-gradient(circle, currentColor 1px, transparent 1.2px);
+  background-position: center;
+  background-size: 5px 5px;
+  color: var(--color-text-muted);
+  opacity: 0.24;
+  transition: opacity var(--transition-base), color var(--transition-base);
+}
+
+.resumePill:hover .resumePillButton::before,
+.resumePill.isActive .resumePillButton::before,
+.resumePill.isSelected .resumePillButton::before {
+  color: var(--color-accent-strong);
+  opacity: 0.58;
+}
+
+.resumePillLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resumePillRenameForm {
+  display: flex;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+.resumePillRenameInput {
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-elevated);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 4px var(--color-accent-soft);
+}
+
+.resumePillRenameInput:focus {
+  outline: none;
+}
+
+.resumePillMenuHost {
+  display: inline-flex;
+  flex: 0 0 0;
+  width: 0;
+  height: 30px;
+  margin-left: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(4px) scale(0.86);
+  transform-origin: right center;
+  pointer-events: none;
+  transition:
+    flex-basis 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin-left 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 150ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.resumePill.isActive .resumePillMenuHost {
+  flex-basis: 30px;
+  width: 30px;
+  margin-left: 3px;
+  overflow: visible;
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  pointer-events: auto;
+}
+
+.resumePill.isEditing .resumePillMenuHost {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.resumePillMenuHost > .entryMenu {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+}
+
+.resumePillMenuPlaceholder {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  margin: 2px;
+  padding: 0;
+}
+
+.resumePillActions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0;
+}
+
+.resumePillMenuIcon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  transition: transform var(--transition-fast);
+}
+
+.resumePillSelectionSlot {
+  display: inline-grid;
+  flex: 0 0 22px;
+  place-items: center;
+  width: 22px;
+  height: 30px;
+}
+
+.resumePillSelectionControl {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+  transform: scale(0.82);
+  pointer-events: none;
+  cursor: pointer;
+  transition:
+    opacity 140ms ease,
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.resumePill:hover .resumePillSelectionControl,
+.resumePill.isSelected .resumePillSelectionControl,
+.resumeFolderTile:hover .resumePillSelectionControl,
+.resumeFolderTile.isSelected .resumePillSelectionControl,
+.resumePillSelectionControl:focus-within {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.resumePillSelectionInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.resumePillSelectionMark {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border: 1px solid color-mix(in srgb, var(--color-text-muted) 72%, var(--color-border));
+  border-radius: var(--radius-compact);
+  background: color-mix(in srgb, var(--color-surface-elevated) 88%, transparent);
+  color: #ffffff;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 10%, transparent);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.resumePillSelectionMark svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transform: scale(0.72);
+  transition:
+    opacity 130ms ease,
+    transform 180ms cubic-bezier(0.2, 0.9, 0.25, 1.25);
+}
+
+.resumePillSelectionInput:hover + .resumePillSelectionMark {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-soft) 48%, var(--color-surface-elevated));
+}
+
+.resumePillSelectionInput:focus-visible + .resumePillSelectionMark {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.resumePillSelectionInput:checked + .resumePillSelectionMark {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--color-accent) 32%, transparent);
+}
+
+.resumePillSelectionInput:checked + .resumePillSelectionMark svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.resumeSelectionFooter {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: 0fr;
+  min-width: 0;
+  opacity: 0;
+  transform: translateY(-5px);
+  pointer-events: none;
+  transition:
+    grid-template-rows 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.resumeSelectionFooter.isVisible {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.resumeSelectionFooterClip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.resumeSelectionToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 7px 1px 0;
+  padding: 6px 7px 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 18%, var(--color-border));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-accent-soft) 36%, var(--color-surface) 64%);
+}
+
+.resumeSelectionCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.resumeSelectionCountDot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: var(--radius-capsule);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.resumeSelectionPrimary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.button.resumeSelectionClear {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-control);
+  font-size: 0.6875rem;
+  font-weight: 750;
+}
+
+.resumeNewButton {
+  width: 100%;
+  min-width: 0;
+}
+
+.resumeNewButtonIcon {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border-radius: var(--radius-compact);
+  background: color-mix(in srgb, var(--color-surface-elevated) 72%, transparent);
+  color: currentColor;
+}
+
+.resumeNewButtonIcon::before,
+.resumeNewButtonIcon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 1.4px;
+  border-radius: var(--radius-capsule);
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.resumeNewButtonIcon::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resumePillSelectionControl,
+  .resumePillSelectionMark,
+  .resumePillSelectionMark svg,
+  .resumePillMenuHost,
+  .resumeSelectionFooter {
+    transition: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .resumePillSelectionControl {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+
+  .resumeFolderMenuHost {
+    width: 30px;
+    overflow: visible;
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+}
+
+@media screen and (max-width: 620px) {
+  .resumeSelectionToolbar {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .resumeSelectionPrimary {
+    flex-wrap: wrap;
+  }
+
+  .resumeSelectionActions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}

@@ -13,15 +13,13 @@ import {
   initializeFirebaseAppCheck,
 } from '../lib/firebaseClient.js';
 import {
-  clearConnectedAccount,
   readConnectedAccount,
   writeConnectedAccount,
 } from '../lib/browserConnection.js';
 import {
   clearResumeSyncSession,
-  createResumeSyncSession,
-} from '../lib/backgroundSync.js';
-import { setSyncSessionCleanupRequested } from '../lib/localWorkspaceDb.js';
+  resetResumeSyncSessionState,
+} from '../lib/syncSession.js';
 
 function getFriendlyAuthError(error) {
   switch (error?.code) {
@@ -68,15 +66,8 @@ export function useFirebaseAuth() {
       if (nextUser) {
         const account = writeConnectedAccount(nextUser);
         setConnectedAccount(account);
-        setSyncSessionCleanupRequested(nextUser.uid, false)
-          .then(() => nextUser.getIdToken())
-          .then((idToken) => createResumeSyncSession(idToken))
-          .catch((error) => {
-            if (import.meta.env.DEV) {
-              console.warn('Could not start resume sync session', error);
-            }
-          });
       } else {
+        resetResumeSyncSessionState();
         setConnectedAccount(readConnectedAccount());
       }
 
@@ -157,7 +148,7 @@ export function useFirebaseAuth() {
         setAuthBusy(false);
       }
     },
-    async clearBrowserConnection() {
+    async disconnectAuthSession() {
       setAuthError('');
       const auth = getFirebaseAuth();
 
@@ -174,8 +165,6 @@ export function useFirebaseAuth() {
           await signOut(auth);
         }
 
-        clearConnectedAccount();
-        setConnectedAccount(null);
         return true;
       } catch (error) {
         setAuthError(getFriendlyAuthError(error));

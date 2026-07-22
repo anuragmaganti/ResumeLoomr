@@ -1,90 +1,61 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
-  DEFAULT_TEMPLATE,
-  MAX_WORKSPACE_RESUMES,
-  TEMPLATE_OPTIONS,
   addResumeSectionBlock,
-  addSectionBlockEducationCustomSection,
-  addSectionBlockEducationProgram,
-  addSectionBlockEntry,
-  addSectionBlockTextListItem,
-  commitSectionTitle,
+  moveResumeSectionBlock,
+  normalizeDraftPayload,
+  reorderResumeSectionBlocksToMatch,
+} from '../lib/resume.js';
+import {
+  projectTransientSampleEntry,
+  resolveTransientSampleEntry,
+} from '../lib/resumeSampleProjection.js';
+import { createResumeEditorActions } from '../lib/resumeEditorActions.js';
+import { getPreviewModel } from '../lib/resumePreviewModel.js';
+import {
+  TEMPLATE_OPTIONS,
+} from '../lib/resumeSettings.js';
+import { validateResume } from '../lib/resumeValidation.js';
+import {
+  MAX_WORKSPACE_RESUMES,
+  addWorkspaceResume,
   createDuplicateResumeName,
-  createEmptyResume,
   createNextResumeName,
   createWorkspaceFolderFromResumes,
-  createWorkspaceResumeId,
-  createWorkspaceResumeMeta,
-  dismissSampleInformation,
-  getPreviewModel,
-  moveResumeSectionBlock,
-  moveSectionBlockEducationCustomSection,
-  moveSectionBlockEducationProgram,
-  moveSectionBlockEntry,
-  moveSectionBlockTextListItem,
-  materializeAndReorderSectionBlockEntries,
-  normalizeDraftPayload,
   normalizeWorkspaceIndex,
-  placeWorkspaceResumeAfter,
-  projectTransientSampleEntry,
-  removeResumeSectionBlock,
-  removeSectionBlockEducationCustomSection,
-  removeSectionBlockEducationProgram,
-  removeSectionBlockEntry,
-  removeSectionBlockTextListItem,
-  reorderSectionBlockEntriesToMatch,
-  reorderSectionBlockTextListItem,
-  reorderResumeSectionBlocksToMatch,
-  resolveTransientSampleEntry,
   removeWorkspaceFolders,
   removeWorkspaceResumes,
   renameWorkspaceFolder,
   sanitizeWorkspaceResumeName,
-  setPersonalContactOrder,
-  setSampleTextListOrder,
-  setResumeSettingValue,
-  setResumeSummaryWidthPercent,
-  setSectionEntryHeaderLayout,
-  updatePersonalField,
-  updateResumeSetting as updateResumeSettingValue,
-  updateSampleDisplay,
-  updateSectionBlockEducationCustomSection,
-  updateSectionBlockEducationProgram,
-  updateSectionBlockEntry,
-  updateSectionBlockTextList,
-  updateSectionTitle,
+  updateWorkspaceResumeMeta,
   updateWorkspaceOrganization as applyWorkspaceOrganization,
-  validateResume,
-} from '../lib/resume.js';
+} from '../lib/workspace.js';
+import { createBlankDraftState } from '../lib/workspaceDraft.js';
 import {
   createSavedDraftState,
   createUnsyncedDraftCopyState,
-  initializeLocalWorkspace,
+} from '../lib/draftState.js';
+import { normalizeCloudWorkspaceSnapshot } from '../lib/cloudWorkspaceSnapshot.js';
+import {
   mergeLocalAndCloudWorkspaces,
+} from '../lib/workspaceReconciliation.js';
+import {
+  initializeLocalWorkspace,
   persistLocalDraftSnapshot,
   persistLocalResumeBatchDelete,
   persistLocalWorkspaceSnapshot,
   persistLoginMergedWorkspace,
   readLocalWorkspaceBundle,
   readLocalDraft,
-  readLegacyWorkspaceSnapshot,
 } from '../lib/localWorkspaceDb.js';
+import { readLegacyWorkspaceSnapshot } from '../lib/localWorkspaceMirror.js';
 import {
-  createResumeSyncSession,
   pullCloudWorkspaceSnapshot,
   registerResumeSyncWorker,
   requestResumeBackgroundSync,
   syncLocalOutbox,
 } from '../lib/backgroundSync.js';
-
-function createBlankDraftState() {
-  return {
-    resume: createEmptyResume(),
-    template: DEFAULT_TEMPLATE,
-    savedAt: null,
-  };
-}
+import { ensureResumeSyncSession } from '../lib/syncSession.js';
 
 function getDraftEditorSectionIds(draft) {
   const blockIds = Array.isArray(draft?.resume?.sections)
@@ -96,60 +67,6 @@ function getDraftEditorSectionIds(draft) {
 
 function isOnline() {
   return typeof navigator === 'undefined' || navigator.onLine;
-}
-
-function withWorkspaceResumeMeta(workspace, resumeId, updates) {
-  if (!resumeId || !workspace.meta[resumeId]) {
-    return normalizeWorkspaceIndex(workspace);
-  }
-
-  return normalizeWorkspaceIndex({
-    ...workspace,
-    meta: {
-      ...workspace.meta,
-      [resumeId]: {
-        ...workspace.meta[resumeId],
-        ...updates,
-      },
-    },
-  });
-}
-
-function normalizeCloudSnapshot(payload) {
-  if (!payload || typeof payload !== 'object') {
-    return null;
-  }
-
-  const workspace = normalizeWorkspaceIndex(payload.workspace);
-  const rawDrafts = payload.drafts && typeof payload.drafts === 'object' ? payload.drafts : {};
-  const tombstones = Array.isArray(payload.tombstones) ? payload.tombstones : [];
-  const draftsByResumeId = new Map();
-
-  workspace.resumeIds.forEach((resumeId) => {
-    const draft = rawDrafts[resumeId];
-
-    if (draft) {
-      const normalizedDraft = normalizeDraftPayload(draft);
-      draftsByResumeId.set(resumeId, {
-        resume: normalizedDraft.resume,
-        template: normalizedDraft.template,
-        savedAt: draft.savedAt || null,
-        cloudVersion: Math.max(0, Number(draft.cloudVersion || 0) || 0),
-      });
-    }
-  });
-
-  if (workspace.resumeIds.length === 0 && tombstones.length === 0) {
-    return null;
-  }
-
-  return {
-    workspace,
-    draftsByResumeId,
-    activeResumeId: workspace.activeResumeId || workspace.resumeIds[0],
-    tombstones,
-    workspaceCloudVersion: Math.max(0, Number(payload.workspaceVersion || 0) || 0),
-  };
 }
 
 export function useResumeBuilder({ user = null, authReady = true } = {}) {
@@ -321,8 +238,8 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       try {
         setSyncState(isOnline() ? 'syncing' : 'offline');
         const idToken = await user.getIdToken();
-        await createResumeSyncSession(idToken);
-        const cloudSnapshot = normalizeCloudSnapshot(await pullCloudWorkspaceSnapshot(idToken));
+        await ensureResumeSyncSession({ idToken, accountUid: user.uid });
+        const cloudSnapshot = normalizeCloudWorkspaceSnapshot(await pullCloudWorkspaceSnapshot(idToken));
 
         const preMergeSave = await saveEditorDraftFromRefs({
           reason: 'login-premerge',
@@ -650,7 +567,8 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     try {
       setSyncState('syncing');
       const idToken = await currentUser.getIdToken();
-      await createResumeSyncSession(idToken);
+      await ensureResumeSyncSession({ idToken, accountUid: currentUser.uid });
+
       let result = null;
       let oversizedResumeDetected = false;
 
@@ -770,7 +688,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       const expectedRevision = draftRevisionByResumeIdRef.current.get(resumeId)
         || draftSnapshot.localRevision
         || '';
-      const nextWorkspace = withWorkspaceResumeMeta(workspaceRef.current, resumeId, {
+      const nextWorkspace = updateWorkspaceResumeMeta(workspaceRef.current, resumeId, {
         updatedAt: nextDraft.savedAt,
       });
 
@@ -1031,6 +949,43 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     });
   }
 
+  async function persistCreatedResume({
+    sourceWorkspace,
+    name,
+    draft,
+    afterResumeId = '',
+    reason,
+    focusPersonal = false,
+    syncDelay = 2500,
+  }) {
+    const addition = addWorkspaceResume(sourceWorkspace, {
+      name,
+      updatedAt: draft.savedAt,
+      afterResumeId,
+    });
+
+    if (!addition.resumeId) {
+      return null;
+    }
+
+    const persisted = await persistLocalDraftSnapshot({
+      resumeId: addition.resumeId,
+      workspace: addition.workspace,
+      draft,
+      accountUid: userRef.current?.uid || '',
+      enqueueWorkspaceSync: true,
+      reason,
+    });
+
+    await commitWorkspace(persisted.workspace, { persist: false });
+    loadDraftIntoEditor(persisted.draft, {
+      focusPersonal,
+      resumeId: addition.resumeId,
+    });
+    scheduleCloudSync(reason, syncDelay);
+    return addition.resumeId;
+  }
+
   async function setActiveResume(nextResumeId) {
     const currentWorkspace = workspaceRef.current;
 
@@ -1100,34 +1055,17 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return null;
     }
     const existingNames = currentWorkspace.resumeIds.map((resumeId) => currentWorkspace.meta[resumeId]?.name || '');
-    const nextResumeId = createWorkspaceResumeId();
     const nextResumeName = createNextResumeName(existingNames);
     const nextDraft = createSavedDraftState(createBlankDraftState());
-    const workspaceWithResume = normalizeWorkspaceIndex({
-      ...currentWorkspace,
-      activeResumeId: nextResumeId,
-      resumeIds: [...currentWorkspace.resumeIds, nextResumeId],
-      meta: {
-        ...currentWorkspace.meta,
-        [nextResumeId]: createWorkspaceResumeMeta(nextResumeName, nextDraft.savedAt),
-      },
-    });
-    const nextWorkspace = applyWorkspaceOrganization(workspaceWithResume, workspaceWithResume.organization);
 
     try {
-      const persisted = await persistLocalDraftSnapshot({
-        resumeId: nextResumeId,
-        workspace: nextWorkspace,
+      return await persistCreatedResume({
+        sourceWorkspace: currentWorkspace,
+        name: nextResumeName,
         draft: nextDraft,
-        accountUid: userRef.current?.uid || '',
-        enqueueWorkspaceSync: true,
         reason: 'create-resume',
+        focusPersonal: true,
       });
-
-      await commitWorkspace(persisted.workspace, { persist: false });
-      loadDraftIntoEditor(persisted.draft, { focusPersonal: true, resumeId: nextResumeId });
-      scheduleCloudSync('create-resume');
-      return nextResumeId;
     } catch {
       setSaveState('error');
       setNotice({ tone: 'error', message: 'The new resume could not be saved in this browser.' });
@@ -1159,34 +1097,17 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     }
     const existingNames = currentWorkspace.resumeIds.map((resumeId) => currentWorkspace.meta[resumeId]?.name || '');
     const sourceName = sourceFileName.replace(/\.[^.]+$/, '');
-    const nextResumeId = createWorkspaceResumeId();
     const nextResumeName = sanitizeWorkspaceResumeName(sourceName, createNextResumeName(existingNames));
     const nextDraft = createSavedDraftState(createBlankDraftState());
-    const workspaceWithResume = normalizeWorkspaceIndex({
-      ...currentWorkspace,
-      activeResumeId: nextResumeId,
-      resumeIds: [...currentWorkspace.resumeIds, nextResumeId],
-      meta: {
-        ...currentWorkspace.meta,
-        [nextResumeId]: createWorkspaceResumeMeta(nextResumeName, nextDraft.savedAt),
-      },
-    });
-    const nextWorkspace = applyWorkspaceOrganization(workspaceWithResume, workspaceWithResume.organization);
 
     try {
-      const persisted = await persistLocalDraftSnapshot({
-        resumeId: nextResumeId,
-        workspace: nextWorkspace,
+      return await persistCreatedResume({
+        sourceWorkspace: currentWorkspace,
+        name: nextResumeName,
         draft: nextDraft,
-        accountUid: userRef.current?.uid || '',
-        enqueueWorkspaceSync: true,
         reason: 'import-placeholder',
+        focusPersonal: true,
       });
-
-      await commitWorkspace(persisted.workspace, { persist: false });
-      loadDraftIntoEditor(persisted.draft, { focusPersonal: true, resumeId: nextResumeId });
-      scheduleCloudSync('import-placeholder');
-      return nextResumeId;
     } catch {
       setSaveState('error');
       setNotice({ tone: 'error', message: 'The imported resume could not be prepared in this browser.' });
@@ -1213,7 +1134,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const existingName = currentWorkspace.meta[resumeId]?.name || 'Imported resume';
     const nextName = sanitizeWorkspaceResumeName(name, existingName);
     const nextWorkspace = normalizeWorkspaceIndex({
-      ...withWorkspaceResumeMeta(currentWorkspace, resumeId, {
+      ...updateWorkspaceResumeMeta(currentWorkspace, resumeId, {
         name: nextName,
         updatedAt: nextDraft.savedAt,
       }),
@@ -1254,35 +1175,19 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return null;
     }
     const sourceResumeId = activeResumeIdRef.current;
-    const nextResumeId = createWorkspaceResumeId();
     const existingNames = currentWorkspace.resumeIds.map((resumeId) => currentWorkspace.meta[resumeId]?.name || '');
     const sourceName = currentWorkspace.meta[sourceResumeId]?.name || '';
     const duplicateName = createDuplicateResumeName(sourceName, existingNames);
     const duplicateDraft = createUnsyncedDraftCopyState(currentDraftRef.current);
-    const nextWorkspace = placeWorkspaceResumeAfter(normalizeWorkspaceIndex({
-      ...currentWorkspace,
-      activeResumeId: nextResumeId,
-      resumeIds: [...currentWorkspace.resumeIds, nextResumeId],
-      meta: {
-        ...currentWorkspace.meta,
-        [nextResumeId]: createWorkspaceResumeMeta(duplicateName, duplicateDraft.savedAt),
-      },
-    }), nextResumeId, sourceResumeId);
 
     try {
-      const persisted = await persistLocalDraftSnapshot({
-        resumeId: nextResumeId,
-        workspace: nextWorkspace,
+      return await persistCreatedResume({
+        sourceWorkspace: currentWorkspace,
+        name: duplicateName,
         draft: duplicateDraft,
-        accountUid: userRef.current?.uid || '',
-        enqueueWorkspaceSync: true,
+        afterResumeId: sourceResumeId,
         reason: 'duplicate-resume',
       });
-
-      await commitWorkspace(persisted.workspace, { persist: false });
-      loadDraftIntoEditor(persisted.draft, { resumeId: nextResumeId });
-      scheduleCloudSync('duplicate-resume');
-      return nextResumeId;
     } catch {
       setSaveState('error');
       setNotice({ tone: 'error', message: 'This resume could not be duplicated in this browser.' });
@@ -1306,7 +1211,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     }
 
     const renamedAt = new Date().toISOString();
-    const nextWorkspace = withWorkspaceResumeMeta(currentWorkspace, targetResumeId, {
+    const nextWorkspace = updateWorkspaceResumeMeta(currentWorkspace, targetResumeId, {
       name: trimmedName,
       updatedAt: renamedAt,
     });
@@ -1527,36 +1432,27 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return false;
     }
 
-    const nextResumeId = createWorkspaceResumeId();
     const sourceName = currentWorkspace.meta[currentConflict.resumeId]?.name || 'Resume';
     const existingNames = currentWorkspace.resumeIds.map((resumeId) => currentWorkspace.meta[resumeId]?.name || '');
     const copyName = createDuplicateResumeName(sourceName, existingNames);
     const copyDraft = createUnsyncedDraftCopyState(currentDraftRef.current);
-    const nextWorkspace = placeWorkspaceResumeAfter(normalizeWorkspaceIndex({
-      ...currentWorkspace,
-      activeResumeId: nextResumeId,
-      resumeIds: [...currentWorkspace.resumeIds, nextResumeId],
-      meta: {
-        ...currentWorkspace.meta,
-        [nextResumeId]: createWorkspaceResumeMeta(copyName, copyDraft.savedAt),
-      },
-    }), nextResumeId, currentConflict.resumeId);
 
     try {
-      const persistedCopy = await persistLocalDraftSnapshot({
-        resumeId: nextResumeId,
-        workspace: nextWorkspace,
+      const nextResumeId = await persistCreatedResume({
+        sourceWorkspace: currentWorkspace,
+        name: copyName,
         draft: copyDraft,
-        accountUid: userRef.current?.uid || '',
-        enqueueWorkspaceSync: true,
+        afterResumeId: currentConflict.resumeId,
         reason: 'conflict-copy',
+        syncDelay: 500,
       });
+
+      if (!nextResumeId) {
+        return false;
+      }
 
       conflictRef.current = null;
       setConflict(null);
-      await commitWorkspace(persistedCopy.workspace, { persist: false });
-      scheduleCloudSync('conflict-copy', 500);
-      loadDraftIntoEditor(persistedCopy.draft, { resumeId: nextResumeId });
       setNotice({ tone: 'warning', message: 'Your edits were preserved as a separate resume copy.' });
       return true;
     } catch {
@@ -1565,139 +1461,37 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     }
   }
 
-  const actions = {
-    updatePersonalField(field, value) {
-      updateResume((currentResume) => updatePersonalField(currentResume, field, value));
-    },
-    updateSectionTitle(sectionId, value) {
-      updateResume((currentResume) => updateSectionTitle(currentResume, sectionId, value));
-    },
-    commitSectionTitle(sectionId) {
-      updateResume((currentResume) => commitSectionTitle(currentResume, sectionId));
-    },
-    updateResumeSetting(settingId, delta) {
-      updateResume((currentResume) => updateResumeSettingValue(currentResume, settingId, delta));
-    },
-    setSummaryWidthPercent(widthPercent) {
-      updateResume((currentResume) => setResumeSummaryWidthPercent(currentResume, widthPercent));
-    },
-    setResumeSettingValue(settingId, value) {
-      updateResume((currentResume) => setResumeSettingValue(currentResume, settingId, value));
-    },
-    setPersonalContactOrder(orderedFields) {
-      updateResume((currentResume) => setPersonalContactOrder(currentResume, orderedFields));
-    },
-    setSectionEntryHeaderLayout(sectionId, layout) {
-      updateResume((currentResume) => setSectionEntryHeaderLayout(currentResume, sectionId, layout));
-    },
-    startFromScratch() {
-      updateResume((currentResume) => updateSampleDisplay(currentResume, { hasStarted: true }));
-    },
-    setSampleInformationVisible(showInformation) {
-      endTransientSampleEntry();
-      updateResume((currentResume) => updateSampleDisplay(currentResume, {
-        hasStarted: true,
-        showInformation,
-      }));
-    },
-    dismissSampleInformation() {
-      endTransientSampleEntry();
-      updateResume((currentResume) => dismissSampleInformation(currentResume));
-    },
-    setSampleTextListOrder(orderKey, orderedSourceIndexes) {
-      updateResume((currentResume) => setSampleTextListOrder(currentResume, orderKey, orderedSourceIndexes));
-    },
-    addResumeSection(templateId) {
-      let nextSectionId = '';
+  function addResumeSection(templateId) {
+    let nextSectionId = '';
 
-      endTransientSampleEntry();
+    endTransientSampleEntry();
 
-      flushSync(() => {
-        setSaveState('saving');
-        setResume((currentResume) => {
-          const sourceResume = currentDraftRef.current?.resume || currentResume;
-          const result = addResumeSectionBlock(sourceResume, templateId);
-          nextSectionId = result.sectionId;
+    flushSync(() => {
+      setSaveState('saving');
+      setResume((currentResume) => {
+        const sourceResume = currentDraftRef.current?.resume || currentResume;
+        const result = addResumeSectionBlock(sourceResume, templateId);
+        nextSectionId = result.sectionId;
 
-          currentDraftRef.current = {
-            ...currentDraftRef.current,
-            resume: result.resume,
-          };
+        currentDraftRef.current = {
+          ...currentDraftRef.current,
+          resume: result.resume,
+        };
 
-          return result.resume;
-        });
+        return result.resume;
       });
+    });
 
-      return nextSectionId;
-    },
-    removeResumeSection(sectionId) {
-      endTransientSampleEntry();
-      updateResume((currentResume) => removeResumeSectionBlock(currentResume, sectionId));
-    },
-    updateSectionBlockEntry(sectionId, entryId, field, value) {
-      updateResume((currentResume) => updateSectionBlockEntry(currentResume, sectionId, entryId, field, value));
-    },
-    addSectionBlockEntry(sectionId) {
-      updateResume((currentResume) => addSectionBlockEntry(currentResume, sectionId));
-    },
-    moveSectionBlockEntry(sectionId, entryId, direction) {
-      updateResume((currentResume) => moveSectionBlockEntry(currentResume, sectionId, entryId, direction));
-    },
-    reorderSectionEntries(sectionId, nextEntryIds) {
-      updateResume((currentResume) => reorderSectionBlockEntriesToMatch(currentResume, sectionId, nextEntryIds));
-    },
-    materializeAndReorderSectionEntries(sectionId, nextEntryIds, sampleEntryBindings) {
-      endTransientSampleEntry();
-      updateResume((currentResume) => (
-        materializeAndReorderSectionBlockEntries(currentResume, sectionId, nextEntryIds, sampleEntryBindings)
-      ));
-    },
-    removeSectionBlockEntry(sectionId, entryId) {
-      updateResume((currentResume) => removeSectionBlockEntry(currentResume, sectionId, entryId));
-    },
-    updateSectionBlockTextList(sectionId, entryId, field, itemIndex, value) {
-      updateResume((currentResume) => updateSectionBlockTextList(currentResume, sectionId, entryId, field, itemIndex, value));
-    },
-    addSectionBlockTextListItem(sectionId, entryId, field) {
-      updateResume((currentResume) => addSectionBlockTextListItem(currentResume, sectionId, entryId, field));
-    },
-    moveSectionBlockTextListItem(sectionId, entryId, field, itemIndex, direction) {
-      updateResume((currentResume) => moveSectionBlockTextListItem(currentResume, sectionId, entryId, field, itemIndex, direction));
-    },
-    reorderSectionTextList(sectionId, entryId, field, fromIndex, toIndex) {
-      updateResume((currentResume) => reorderSectionBlockTextListItem(currentResume, sectionId, entryId, field, fromIndex, toIndex));
-    },
-    removeSectionBlockTextListItem(sectionId, entryId, field, itemIndex) {
-      updateResume((currentResume) => removeSectionBlockTextListItem(currentResume, sectionId, entryId, field, itemIndex));
-    },
-    updateSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, field, value) {
-      updateResume((currentResume) => updateSectionBlockEducationCustomSection(currentResume, sectionId, entryId, sectionIndex, field, value));
-    },
-    addSectionBlockEducationCustomSection(sectionId, entryId) {
-      updateResume((currentResume) => addSectionBlockEducationCustomSection(currentResume, sectionId, entryId));
-    },
-    moveSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, direction) {
-      updateResume((currentResume) => moveSectionBlockEducationCustomSection(currentResume, sectionId, entryId, sectionIndex, direction));
-    },
-    removeSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex) {
-      updateResume((currentResume) => removeSectionBlockEducationCustomSection(currentResume, sectionId, entryId, sectionIndex));
-    },
-    updateSectionBlockEducationProgram(sectionId, entryId, programIndex, field, value) {
-      updateResume((currentResume) => updateSectionBlockEducationProgram(currentResume, sectionId, entryId, programIndex, field, value));
-    },
-    addSectionBlockEducationProgram(sectionId, entryId) {
-      updateResume((currentResume) => addSectionBlockEducationProgram(currentResume, sectionId, entryId));
-    },
-    moveSectionBlockEducationProgram(sectionId, entryId, programIndex, direction) {
-      updateResume((currentResume) => moveSectionBlockEducationProgram(currentResume, sectionId, entryId, programIndex, direction));
-    },
-    removeSectionBlockEducationProgram(sectionId, entryId, programIndex) {
-      updateResume((currentResume) => removeSectionBlockEducationProgram(currentResume, sectionId, entryId, programIndex));
-    },
+    return nextSectionId;
+  }
+
+  const actions = createResumeEditorActions({
+    updateResume,
+    addResumeSection,
     prepareTransientSampleEntry,
     endTransientSampleEntry,
     endTransientSampleEntryUnless,
-  };
+  });
 
   return {
     resume,

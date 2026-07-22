@@ -1,5 +1,4 @@
 import {
-  createOutboxAckDescriptor,
   markOutboxFailed,
   markOutboxStale,
   markOutboxSynced,
@@ -7,10 +6,16 @@ import {
   readPendingOutbox,
   setSyncSessionCleanupRequested,
 } from './localWorkspaceDb.js';
+import { createOutboxAckDescriptor } from './outboxProtocol.js';
+import { clearResumeSyncSession } from './syncSession.js';
+import { createSerialTaskQueue, runWithOptionalWebLock } from './asyncQueue.js';
+import { fetchWithTimeout } from './httpClient.js';
 
 const RESUME_SYNC_TAG = 'resumeloomr-sync-outbox';
+const CLOUD_SYNC_LOCK_NAME = 'resumeloomr-cloud-sync';
 const MAX_SYNC_REQUEST_BYTES = 3_000_000;
 const MAX_SYNC_OPERATION_BYTES = 1_000_000;
+const runCloudSyncInProcess = createSerialTaskQueue();
 
 function getSerializedByteSize(value) {
   const serialized = JSON.stringify(value);
@@ -67,16 +72,26 @@ export async function registerResumeSyncWorker() {
   }
 
   try {
-    const registration = await navigator.serviceWorker.register('/sync-worker.js');
+    const registration = await navigator.serviceWorker.register('/sync-worker.js', {
+      updateViaCache: 'none',
+    });
 
     registration.active?.postMessage({ type: 'SYNC_RESUME_OUTBOX' });
     return registration;
   } catch (error) {
-    if (import.meta.env.DEV) {
+    if (import.meta.env?.DEV) {
       console.warn('Resume sync worker registration failed', error);
     }
     return null;
   }
+}
+
+async function getResumeSyncWorkerRegistration() {
+  const existingRegistration = typeof navigator.serviceWorker.getRegistration === 'function'
+    ? await navigator.serviceWorker.getRegistration('/')
+    : null;
+
+  return existingRegistration || registerResumeSyncWorker();
 }
 
 export async function requestResumeBackgroundSync() {
@@ -85,52 +100,29 @@ export async function requestResumeBackgroundSync() {
   }
 
   try {
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await getResumeSyncWorkerRegistration();
+
+    if (!registration) {
+      return false;
+    }
 
     if (isBackgroundSyncSupported(registration)) {
       await registration.sync.register(RESUME_SYNC_TAG);
       return true;
     }
 
-    registration.active?.postMessage({ type: 'SYNC_RESUME_OUTBOX' });
+    const worker = registration.active || registration.waiting;
+
+    if (!worker) {
+      return false;
+    }
+
+    worker.postMessage({ type: 'SYNC_RESUME_OUTBOX' });
     return true;
   } catch (error) {
-    if (import.meta.env.DEV) {
+    if (import.meta.env?.DEV) {
       console.warn('Resume background sync request failed', error);
     }
-    return false;
-  }
-}
-
-export async function createResumeSyncSession(idToken) {
-  if (!idToken) {
-    return false;
-  }
-
-  const response = await fetch('/api/sync-session', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${idToken}`,
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error('Could not start browser sync session.');
-  }
-
-  return true;
-}
-
-export async function clearResumeSyncSession() {
-  try {
-    const response = await fetch('/api/sync-session', {
-      method: 'DELETE',
-      credentials: 'include',
-    });
-
-    return response.ok;
-  } catch {
     return false;
   }
 }
@@ -158,7 +150,7 @@ export async function pullCloudWorkspaceSnapshot(idToken) {
     return null;
   }
 
-  const response = await fetch('/api/sync-workspace', {
+  const response = await fetchWithTimeout('/api/sync-workspace', {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${idToken}`,
@@ -193,7 +185,7 @@ export function getOperationAcksFromResponse(payload, operations, descriptorKey,
     .filter(Boolean);
 }
 
-export async function syncLocalOutbox({ idToken = '', useCookie = false, accountUid = '' } = {}) {
+async function syncLocalOutboxUnlocked({ idToken = '', useCookie = false, accountUid = '' } = {}) {
   const normalizedAccountUid = String(accountUid || '').trim();
   const canAttemptCloudSync = Boolean(idToken || useCookie);
   const pendingOperations = normalizedAccountUid
@@ -252,7 +244,7 @@ export async function syncLocalOutbox({ idToken = '', useCookie = false, account
   }
 
   try {
-    const response = await fetch('/api/sync-workspace', {
+    const response = await fetchWithTimeout('/api/sync-workspace', {
       method: 'POST',
       headers,
       credentials: 'include',
@@ -300,4 +292,10 @@ export async function syncLocalOutbox({ idToken = '', useCookie = false, account
     await requestResumeBackgroundSync();
     throw error;
   }
+}
+
+export function syncLocalOutbox(options = {}) {
+  return runCloudSyncInProcess(() => (
+    runWithOptionalWebLock(CLOUD_SYNC_LOCK_NAME, () => syncLocalOutboxUnlocked(options))
+  ));
 }

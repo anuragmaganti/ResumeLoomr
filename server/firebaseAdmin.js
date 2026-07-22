@@ -1,13 +1,19 @@
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { parseCookieHeader } from './httpProtocol.js';
 
 export class FirebaseAdminError extends Error {
-  constructor(message, { statusCode = 500, code = 'firebase-admin/error' } = {}) {
+  constructor(message, {
+    statusCode = 500,
+    code = 'firebase-admin/error',
+    expose = statusCode < 500,
+  } = {}) {
     super(message);
     this.name = 'FirebaseAdminError';
     this.statusCode = statusCode;
     this.code = code;
+    this.expose = expose;
   }
 }
 
@@ -74,27 +80,6 @@ export async function verifyFirebaseIdTokenHeader(authorizationHeader) {
       code: 'firebase-admin/invalid-token',
     });
   }
-}
-
-function parseCookieHeader(cookieHeader) {
-  return Object.fromEntries(
-    String(cookieHeader || '')
-      .split(';')
-      .map((cookie) => cookie.trim())
-      .filter(Boolean)
-      .map((cookie) => {
-        const separatorIndex = cookie.indexOf('=');
-
-        if (separatorIndex < 0) {
-          return [cookie, ''];
-        }
-
-        return [
-          decodeURIComponent(cookie.slice(0, separatorIndex)),
-          decodeURIComponent(cookie.slice(separatorIndex + 1)),
-        ];
-      }),
-  );
 }
 
 async function verifyFirebaseSessionCookie(cookieHeader) {

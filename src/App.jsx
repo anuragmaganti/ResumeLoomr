@@ -1,5 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import './App.css'
 import './styles/buttons.css'
 import './styles/forms.css'
@@ -13,189 +12,44 @@ import AccountSwitchPrompt from './components/accountSwitchPrompt';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/editorPanel';
 import SeparatorSettingsPopup from './components/separatorSettingsPopup';
+import NoticeToast from './components/noticeToast.jsx';
+import ResumeConflictBanner from './components/resumeConflictBanner.jsx';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
-import { importResumeFile } from './lib/importResume.js';
-import {
-  clearResumeSyncSession,
-  requestResumeBackgroundSync,
-} from './lib/backgroundSync.js';
-import {
-  readDurableLocalBrowserContext,
-  setSyncSessionCleanupRequested,
-} from './lib/localWorkspaceDb.js';
+import { useAccountSwitchGate } from './hooks/useAccountSwitchGate.js';
+import { usePreviewEditorController } from './hooks/usePreviewEditorController.js';
+import { useSeparatorSettingsController } from './hooks/useSeparatorSettingsController.js';
+import { useSignOutController } from './hooks/useSignOutController.js';
+import { useResumeImportController } from './hooks/useResumeImportController.js';
+import { useAppTheme } from './hooks/useAppTheme.js';
+import { useEditorStageMaxHeight } from './hooks/useEditorStageMaxHeight.js';
+import { useResumePrint } from './hooks/useResumePrint.js';
 import {
   createMixedSamplePreviewModel,
   createSamplePlaceholderResolver,
-  getPersistableSampleTextListMove,
 } from './lib/sampleResumes.js';
-import {
-  clearBrowserResumeConnectionData,
-  clearLocalResumeWorkspaceData,
-  readConnectedAccount,
-  readSignedOutEditingPreference,
-  writeSignedOutEditingPreference,
-} from './lib/browserConnection.js';
-import {
-  getPreviewEditorMutation,
-  readResumeEditorTargetValue,
-} from './lib/editorTargets.js';
 
-const THEME_STORAGE_KEY = 'resumeloomr:theme';
 const EMPTY_SAMPLE_ORDER_OVERRIDES = {};
-
-function NoticeToastIcon({ isSyncError }) {
-  if (isSyncError) {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-        <path d="M7.2 17.5H5.8a3.3 3.3 0 0 1-.45-6.57A6.5 6.5 0 0 1 18 9.65a4 4 0 0 1 .2 7.85h-1.4" />
-        <path d="m9 15 6 6M15 15l-6 6" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-      <path d="M12 3.5 21 20H3z" />
-      <path d="M12 9v4.5M12 17h.01" />
-    </svg>
-  );
-}
-
-function NoticeDismissIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 18 18" focusable="false">
-      <path d="m5 5 8 8M13 5l-8 8" />
-    </svg>
-  );
-}
-
-function getNoticeToastPresentation(notice, syncState) {
-  const isSyncError = syncState === 'error';
-  const isCloudUnavailable = isSyncError && notice?.message === 'Cloud sync is unavailable. Your local draft is still editable.';
-
-  return {
-    isSyncError,
-    title: isCloudUnavailable ? 'Cloud sync unavailable' : '',
-    message: isCloudUnavailable ? 'Your work is saved locally and remains editable.' : notice?.message,
-  };
-}
-
-function getPreviewEntryOrder(previewModel, sectionId) {
-  const block = previewModel?.sectionBlocks?.find((section) => section.id === sectionId);
-  const entries = Array.isArray(block?.entries) ? block.entries : [];
-
-  return entries.map((entry) => entry.id).filter(Boolean);
-}
-
-function getPreviewEntry(previewModel, sectionId, entryId) {
-  const block = previewModel?.sectionBlocks?.find((section) => section.id === sectionId);
-
-  return block?.entries?.find((entry) => entry.id === entryId) || null;
-}
-
-function getPreviewEntrySampleBindings(previewModel, sectionId) {
-  const block = previewModel?.sectionBlocks?.find((section) => section.id === sectionId);
-  const entries = Array.isArray(block?.entries) ? block.entries : [];
-
-  return Object.fromEntries(
-    entries
-      .map((entry) => [
-        entry.id,
-        Number.isInteger(entry.sampleSourceIndex) ? entry.sampleSourceIndex : null,
-      ])
-      .filter(([entryId, sourceIndex]) => entryId && Number.isInteger(sourceIndex)),
-  );
-}
-
-function getPreviewSectionOrder(previewModel) {
-  if (Array.isArray(previewModel?.sectionOrder) && previewModel.sectionOrder.length > 0) {
-    return previewModel.sectionOrder.filter(Boolean);
-  }
-
-  return Array.isArray(previewModel?.sectionBlocks)
-    ? previewModel.sectionBlocks.map((section) => section.id).filter(Boolean)
-    : [];
-}
-
-function getPreviewTextListOrder(previewModel, sectionId, entryId, field) {
-  const block = previewModel?.sectionBlocks?.find((section) => section.id === sectionId);
-  const entry = block?.entries?.find((sectionEntry) => sectionEntry.id === entryId);
-  const items = Array.isArray(entry?.[field]) ? entry[field] : [];
-
-  return items.map((item, index) => (
-    Number.isFinite(item?.sourceIndex) ? item.sourceIndex : index
-  ));
-}
-
-function moveSourceIndexWithinOrder(order, fromIndex, toIndex) {
-  const fromPosition = order.indexOf(fromIndex);
-  const toPosition = order.indexOf(toIndex);
-
-  if (fromPosition < 0 || toPosition < 0 || fromPosition === toPosition) {
-    return order;
-  }
-
-  const nextOrder = [...order];
-  const [item] = nextOrder.splice(fromPosition, 1);
-  nextOrder.splice(toPosition, 0, item);
-  return nextOrder;
-}
 
 function App() {
   const previewPanelRef = useRef(null);
-  const documentTitleRef = useRef('ResumeLoomr | Professional Resume Builder');
-  const authUserRef = useRef(null);
-  const preSignInConnectedAccountRef = useRef(readConnectedAccount());
-  const [editorStageMaxHeight, setEditorStageMaxHeight] = useState(null);
   const auth = useFirebaseAuth();
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
-  const [isSignedOutPromptOpen, setIsSignedOutPromptOpen] = useState(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importState, setImportState] = useState({ status: 'idle' });
-  const [isSignOutInProgress, setIsSignOutInProgress] = useState(false);
-  const [accountSwitchResolutionUid, setAccountSwitchResolutionUid] = useState('');
-  const [durableAccountContext, setDurableAccountContext] = useState(() => ({
-    checkedForUid: '',
-    previousAccount: preSignInConnectedAccountRef.current,
-    hasWorkspaceData: false,
-  }));
-  const [signedOutEditingPreference, setSignedOutEditingPreference] = useState(() => readSignedOutEditingPreference());
-  const previewEditRequestIdRef = useRef(0);
-  const responsiveProxyHandoffEntryRef = useRef(null);
-  const previewPulseRequestIdRef = useRef(0);
-  const [previewEditTarget, setPreviewEditTarget] = useState(null);
-  const [previewPulseTarget, setPreviewPulseTarget] = useState(null);
-  const [editorCaretTarget, setEditorCaretTarget] = useState(null);
   const [previewLayout, setPreviewLayout] = useState({ mode: 'fitPage', width: 0 });
   const [emptyChoiceNudgeCount, setEmptyChoiceNudgeCount] = useState(0);
-  const [isPrintRendering, setIsPrintRendering] = useState(false);
-  const [separatorSettingsAnchor, setSeparatorSettingsAnchor] = useState(null);
-  const separatorPointerExitTimerRef = useRef(null);
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') {
-      return 'light';
-    }
-
-    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    if (savedTheme === 'light' || savedTheme === 'dark') {
-      return savedTheme;
-    }
-
-    return 'light';
+  const { theme, toggleTheme } = useAppTheme();
+  const {
+    builderUser,
+    clearLocalData: clearAccountSwitchLocalData,
+    importLocalData: importAccountSwitchLocalData,
+    isClearing: isClearingAccountSwitchData,
+    isSwitchPending: isAccountSwitchPending,
+    previousAccount: pendingAccountSwitchAccount,
+  } = useAccountSwitchGate({
+    user: auth.user,
+    authReady: auth.authReady,
+    connectedAccount: auth.connectedAccount,
   });
-  const accountContextReady = !auth.user || durableAccountContext.checkedForUid === auth.user.uid;
-  const pendingAccountSwitchAccount = auth.user && durableAccountContext.previousAccount?.uid !== auth.user.uid
-    ? durableAccountContext.previousAccount
-    : null;
-  const isAccountSwitchPending = Boolean(
-    auth.user &&
-    accountContextReady &&
-    pendingAccountSwitchAccount?.uid &&
-    accountSwitchResolutionUid !== auth.user.uid &&
-    durableAccountContext.hasWorkspaceData
-  );
-  const builderUser = !accountContextReady || isAccountSwitchPending ? null : auth.user;
   const {
     resume,
     template,
@@ -244,6 +98,26 @@ function App() {
     user: builderUser,
     authReady: auth.authReady,
   });
+  const { handlePrint, isPrintRendering } = useResumePrint({
+    activeResumeName,
+    printResume,
+  });
+  const {
+    cancelSignOut: handleSignOutPromptCancel,
+    chooseSignOutBehavior: handleSignedOutPromptChoice,
+    disconnectBrowser: handleDisconnectBrowser,
+    editingPreference: signedOutEditingPreference,
+    isDisconnecting,
+    isPromptOpen: isSignedOutPromptOpen,
+    isSigningOut: isSignOutInProgress,
+    requestSignOut: handleSignOut,
+    updateEditingPreference: updateSignedOutEditingPreference,
+  } = useSignOutController({
+    auth,
+    flushActiveCloudDraft,
+    showNotice,
+    syncState,
+  });
   const sampleOrderOverrides = resume.sampleDisplay?.textListOrders || EMPTY_SAMPLE_ORDER_OVERRIDES;
   const sampleDisplay = resume.sampleDisplay || {};
   const shouldShowEmptyResumeChoice = !previewModel.hasContent && !sampleDisplay.hasStarted;
@@ -263,462 +137,61 @@ function App() {
   );
   const displayPreviewModel = isPrintRendering ? previewModel : (samplePreviewModel || previewModel);
   const isSamplePreview = Boolean(samplePreviewModel) && !isPrintRendering;
-  const isImportingResume = importState.status === 'processing';
-  const noticePresentation = getNoticeToastPresentation(notice, syncState);
-
-  const closeSeparatorSettings = useCallback(({ restoreFocus = true } = {}) => {
-    const triggerElement = separatorSettingsAnchor?.triggerElement;
-
-    if (separatorPointerExitTimerRef.current) {
-      window.clearTimeout(separatorPointerExitTimerRef.current);
-      separatorPointerExitTimerRef.current = null;
-    }
-
-    setSeparatorSettingsAnchor(null);
-
-    if (restoreFocus) {
-      window.requestAnimationFrame(() => {
-        triggerElement?.focus?.();
-      });
-    }
-  }, [separatorSettingsAnchor]);
-
-  const handleSeparatorSettingsOpen = useCallback((anchor) => {
-    if (separatorPointerExitTimerRef.current) {
-      window.clearTimeout(separatorPointerExitTimerRef.current);
-      separatorPointerExitTimerRef.current = null;
-    }
-
-    setSeparatorSettingsAnchor(anchor);
-  }, []);
-
-  const cancelSeparatorPointerExit = useCallback(() => {
-    if (separatorPointerExitTimerRef.current) {
-      window.clearTimeout(separatorPointerExitTimerRef.current);
-      separatorPointerExitTimerRef.current = null;
-    }
-  }, []);
-
-  const scheduleSeparatorPointerExit = useCallback(() => {
-    cancelSeparatorPointerExit();
-    separatorPointerExitTimerRef.current = window.setTimeout(() => {
-      separatorPointerExitTimerRef.current = null;
-
-      if (document.querySelector('.resumePage:hover, .separatorSettingsPopup:hover')) {
-        return;
-      }
-
-      closeSeparatorSettings({ restoreFocus: false });
-    }, 120);
-  }, [cancelSeparatorPointerExit, closeSeparatorSettings]);
-
-  const handleSeparatorSettingChange = useCallback((settingId, value) => {
-    actions.setResumeSettingValue(settingId, value);
-  }, [actions]);
-
-  useEffect(() => {
-    setSeparatorSettingsAnchor(null);
-  }, [activeResumeId]);
-
-  useEffect(() => {
-    if (!separatorSettingsAnchor) {
-      return undefined;
-    }
-
-    function handleSeparatorRegionMouseMove(event) {
-      const target = event.target;
-      const isInsideInteractiveRegion = target instanceof Element && (
-        target.closest('.resumePage') || target.closest('.separatorSettingsPopup')
-      );
-
-      if (isInsideInteractiveRegion) {
-        cancelSeparatorPointerExit();
-        return;
-      }
-
-      scheduleSeparatorPointerExit();
-    }
-
-    document.addEventListener('mousemove', handleSeparatorRegionMouseMove, { passive: true });
-    document.addEventListener('mouseleave', scheduleSeparatorPointerExit);
-
-    return () => {
-      document.removeEventListener('mousemove', handleSeparatorRegionMouseMove);
-      document.removeEventListener('mouseleave', scheduleSeparatorPointerExit);
-    };
-  }, [cancelSeparatorPointerExit, scheduleSeparatorPointerExit, separatorSettingsAnchor]);
-
-  useEffect(() => () => {
-    if (separatorPointerExitTimerRef.current) {
-      window.clearTimeout(separatorPointerExitTimerRef.current);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      documentTitleRef.current = document.title || documentTitleRef.current;
-    }
-  }, []);
-
-  useEffect(() => {
-    authUserRef.current = auth.user;
-  }, [auth.user]);
-
-  useEffect(() => {
-    if (!auth.user) {
-      preSignInConnectedAccountRef.current = auth.connectedAccount;
-      setAccountSwitchResolutionUid('');
-    }
-  }, [auth.connectedAccount, auth.user]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!auth.authReady) {
-      return undefined;
-    }
-
-    readDurableLocalBrowserContext()
-      .then((context) => {
-        if (cancelled) {
-          return;
-        }
-
-        const previousAccount = context.accountBinding || preSignInConnectedAccountRef.current || auth.connectedAccount;
-
-        if (!auth.user && previousAccount) {
-          preSignInConnectedAccountRef.current = previousAccount;
-        }
-
-        setDurableAccountContext({
-          checkedForUid: auth.user?.uid || '',
-          previousAccount,
-          hasWorkspaceData: context.hasWorkspaceData,
-        });
-      })
-      .catch(() => {
-        if (!cancelled) {
-          const previousAccount = preSignInConnectedAccountRef.current || auth.connectedAccount;
-
-          setDurableAccountContext({
-            checkedForUid: auth.user?.uid || '',
-            previousAccount,
-            hasWorkspaceData: Boolean(
-              auth.user &&
-              previousAccount?.uid &&
-              previousAccount.uid !== auth.user.uid
-            ),
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [auth.authReady, auth.connectedAccount, auth.user]);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.style.colorScheme = theme;
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-
-    const themeColor = document.querySelector('meta[name="theme-color"]');
-    if (themeColor) {
-      themeColor.setAttribute('content', theme === 'dark' ? '#0f1726' : '#3158d5');
-    }
-
-    const favicon = document.querySelector('#app-favicon');
-    if (favicon) {
-      favicon.setAttribute('href', theme === 'dark' ? '/favicon-dark.png' : '/favicon-light.png');
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    function syncEditorHeight() {
-      if (window.innerWidth <= 980) {
-        setEditorStageMaxHeight(null);
-        return;
-      }
-
-      const previewPanelHeight = previewPanelRef.current?.offsetHeight ?? 0;
-      setEditorStageMaxHeight(previewPanelHeight > 0 ? previewPanelHeight : null);
-    }
-
-    syncEditorHeight();
-
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', syncEditorHeight);
-      return () => window.removeEventListener('resize', syncEditorHeight);
-    }
-
-    const observer = new ResizeObserver(() => {
-      syncEditorHeight();
-    });
-
-    if (previewPanelRef.current) {
-      observer.observe(previewPanelRef.current);
-    }
-
-    window.addEventListener('resize', syncEditorHeight);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', syncEditorHeight);
-    };
-  }, [template, displayPreviewModel]);
-
-  useEffect(() => {
-    function preparePrintPreview() {
-      flushSync(() => setIsPrintRendering(true));
-    }
-
-    function restoreDocumentTitle() {
-      document.title = documentTitleRef.current;
-      setIsPrintRendering(false);
-    }
-
-    window.addEventListener('beforeprint', preparePrintPreview);
-    window.addEventListener('afterprint', restoreDocumentTitle);
-
-    return () => {
-      window.removeEventListener('beforeprint', preparePrintPreview);
-      window.removeEventListener('afterprint', restoreDocumentTitle);
-    };
-  }, []);
-
-  function handlePrint() {
-    document.title = activeResumeName || 'Resume';
-    flushSync(() => setIsPrintRendering(true));
-    printResume();
-  }
-
-  function handlePreviewEditTarget(target) {
-    if (!target?.sectionId || !target?.path) {
-      return null;
-    }
-
-    let targetResume = resume;
-
-    if (target.preserveTransient) {
-      responsiveProxyHandoffEntryRef.current = target.entryId
-        ? { sectionId: target.sectionId, entryId: target.entryId }
-        : null;
-    } else if (isSamplePreview && target.entryId) {
-      const previewEntry = getPreviewEntry(displayPreviewModel, target.sectionId, target.entryId);
-
-      if (!previewEntry) {
-        return null;
-      }
-
-      targetResume = actions.prepareTransientSampleEntry(
-        target.sectionId,
-        previewEntry,
-        getPreviewEntryOrder(displayPreviewModel, target.sectionId),
-      );
-    } else {
-      actions.endTransientSampleEntry();
-    }
-
-    if (!targetResume || readResumeEditorTargetValue(targetResume, target) === null) {
-      return null;
-    }
-
-    if (target.stayInPreview) {
-      setPreviewEditTarget(null);
-      setActiveTab(target.sectionId);
-      setMobileView('preview');
-      return targetResume;
-    }
-
-    previewEditRequestIdRef.current += 1;
-    setPreviewEditTarget({
-      ...target,
-      requestId: previewEditRequestIdRef.current,
-    });
-    setActiveTab(target.sectionId);
-    setMobileView('editor');
-    return targetResume;
-  }
-
-  const handlePreviewEditorHandoff = useCallback((target) => {
-    if (!target?.sectionId || !target?.path) {
-      return;
-    }
-
-    previewEditRequestIdRef.current += 1;
-    setPreviewEditTarget({
-      ...target,
-      stayInPreview: false,
-      requestId: previewEditRequestIdRef.current,
-    });
-    setActiveTab(target.sectionId);
-    setMobileView('editor');
-  }, [setActiveTab, setMobileView]);
-
-  const handlePreviewValueChange = useCallback((target, value) => {
-    const mutation = getPreviewEditorMutation(target, value);
-
-    if (!mutation) {
-      return;
-    }
-
-    switch (mutation.type) {
-      case 'personal':
-        actions.updatePersonalField(...mutation.args);
-        break;
-      case 'sectionTitle':
-        actions.updateSectionTitle(...mutation.args);
-        break;
-      case 'textList':
-        actions.updateSectionBlockTextList(...mutation.args);
-        break;
-      case 'educationProgram':
-        actions.updateSectionBlockEducationProgram(...mutation.args);
-        break;
-      case 'educationCustomSection':
-        actions.updateSectionBlockEducationCustomSection(...mutation.args);
-        break;
-      case 'entry':
-        actions.updateSectionBlockEntry(...mutation.args);
-        break;
-      default:
-        break;
-    }
-  }, [actions]);
-
-  const handlePreviewValueCommit = useCallback((target) => {
-    if (!target?.path) {
-      return;
-    }
-
-    markTouched(target.path);
-
-    if (target.field === '__title' && target.sectionId !== 'personal') {
-      actions.commitSectionTitle(target.sectionId);
-    }
-
-    if (target.entryId) {
-      actions.endTransientSampleEntry({
-        sectionId: target.sectionId,
-        entryId: target.entryId,
-      });
-    }
-  }, [actions, markTouched]);
-
-  const handlePreviewPulseTarget = useCallback((target) => {
-    if (!target?.path) {
-      return;
-    }
-
-    previewPulseRequestIdRef.current += 1;
-    setPreviewPulseTarget({
-      path: target.path,
-      requestId: previewPulseRequestIdRef.current,
-    });
-  }, []);
-
-  const updateEditorCaretTarget = useCallback((target) => {
-    if (!target?.path) {
-      startTransition(() => {
-        setEditorCaretTarget(null);
-      });
-      return;
-    }
-
-    const offset = Number.isFinite(target.offset) ? Math.max(0, target.offset) : 0;
-    const value = typeof target.value === 'string' ? target.value : undefined;
-
-    startTransition(() => {
-      setEditorCaretTarget((currentTarget) => (
-        currentTarget?.path === target.path &&
-        currentTarget?.offset === offset &&
-        currentTarget?.value === value
-          ? currentTarget
-          : { path: target.path, offset, value }
-      ));
-    });
-  }, []);
-
-  const handlePreviewReorderSectionTextList = useCallback((sectionId, entryId, field, fromIndex, toIndex) => {
-    if (!isSamplePreview) {
-      actions.reorderSectionTextList(sectionId, entryId, field, fromIndex, toIndex);
-      return;
-    }
-
-    const orderKey = `${sectionId}.${entryId}.${field}`;
-    const persistableMove = getPersistableSampleTextListMove(resume, sectionId, entryId, field, fromIndex, toIndex);
-
-    if (persistableMove) {
-      actions.reorderSectionTextList(sectionId, entryId, field, persistableMove.fromIndex, persistableMove.toIndex);
-
-      actions.setSampleTextListOrder(orderKey, null);
-
-      return;
-    }
-
-    const currentOrder = getPreviewTextListOrder(displayPreviewModel, sectionId, entryId, field);
-    const nextOrder = moveSourceIndexWithinOrder(currentOrder, fromIndex, toIndex);
-
-    if (nextOrder === currentOrder) {
-      return;
-    }
-
-    actions.setSampleTextListOrder(orderKey, nextOrder);
-  }, [actions, displayPreviewModel, isSamplePreview, resume]);
-
-  const handlePreviewReorderSectionEntries = useCallback((sectionId, nextEntryIds) => {
-    if (!isSamplePreview) {
-      actions.reorderSectionEntries(sectionId, nextEntryIds);
-      return;
-    }
-
-    const currentOrder = getPreviewEntryOrder(displayPreviewModel, sectionId);
-    const nextOrder = Array.isArray(nextEntryIds) ? nextEntryIds.filter(Boolean) : [];
-
-    if (
-      !activeResumeId ||
-      currentOrder.length !== nextOrder.length ||
-      currentOrder.every((entryId, index) => entryId === nextOrder[index])
-    ) {
-      return;
-    }
-
-    const currentIdSet = new Set(currentOrder);
-    if (!nextOrder.every((entryId) => currentIdSet.has(entryId))) {
-      return;
-    }
-
-    actions.materializeAndReorderSectionEntries(
-      sectionId,
-      nextOrder,
-      getPreviewEntrySampleBindings(displayPreviewModel, sectionId),
-    );
-  }, [actions, activeResumeId, displayPreviewModel, isSamplePreview]);
-
-  const handlePreviewReorderSections = useCallback((nextSectionIds) => {
-    if (!isSamplePreview) {
-      reorderSections(nextSectionIds);
-      return;
-    }
-
-    const currentOrder = getPreviewSectionOrder(displayPreviewModel);
-    const nextOrder = Array.isArray(nextSectionIds) ? nextSectionIds.filter(Boolean) : [];
-
-    if (
-      currentOrder.length === 0 ||
-      currentOrder.length !== nextOrder.length ||
-      currentOrder.every((sectionId, index) => sectionId === nextOrder[index])
-    ) {
-      return;
-    }
-
-    const currentIdSet = new Set(currentOrder);
-    if (!nextOrder.every((sectionId) => currentIdSet.has(sectionId))) {
-      return;
-    }
-
-    reorderSections(nextOrder);
-  }, [displayPreviewModel, isSamplePreview, reorderSections]);
+  const editorStageMaxHeight = useEditorStageMaxHeight({
+    panelRef: previewPanelRef,
+    previewModel: displayPreviewModel,
+    template,
+  });
+  const {
+    clearPreviewEditTarget,
+    editorCaretTarget,
+    handleEditorEntryExit,
+    handleEditorEntryFocus,
+    handlePreviewEditTarget,
+    handlePreviewEditorHandoff,
+    handlePreviewPulseTarget,
+    handlePreviewReorderSectionEntries,
+    handlePreviewReorderSections,
+    handlePreviewReorderSectionTextList,
+    handlePreviewValueChange,
+    handlePreviewValueCommit,
+    previewEditTarget,
+    previewPulseTarget,
+    updateEditorCaretTarget,
+  } = usePreviewEditorController({
+    actions,
+    activeResumeId,
+    displayPreviewModel,
+    isSamplePreview,
+    markTouched,
+    reorderSections,
+    resume,
+    setActiveTab,
+    setMobileView,
+  });
+  const {
+    anchor: separatorSettingsAnchor,
+    close: closeSeparatorSettings,
+    handleSettingChange: handleSeparatorSettingChange,
+    open: handleSeparatorSettingsOpen,
+  } = useSeparatorSettingsController({
+    activeResumeId,
+    onSettingChange: actions.setResumeSettingValue,
+  });
+  const {
+    closeImport: closeImportResume,
+    isImporting: isImportingResume,
+    isModalOpen: isImportModalOpen,
+    openImport: handleImportResumeClick,
+    uploadResume: handleImportResumeUpload,
+  } = useResumeImportController({
+    authUser: auth.user,
+    openAuthModal: auth.openAuthModal,
+    endTransientSampleEntry: actions.endTransientSampleEntry,
+    createImportPlaceholderResume,
+    replaceResumeDraft,
+    showNotice,
+  });
 
   const handlePreviewLayoutChange = useCallback((nextLayout) => {
     setPreviewLayout((currentLayout) => (
@@ -731,261 +204,11 @@ function App() {
     setEmptyChoiceNudgeCount((count) => count + 1);
   }, []);
 
-  const clearPreviewEditTarget = useCallback((requestId) => {
-    setPreviewEditTarget((currentTarget) => {
-      if (requestId && currentTarget?.requestId !== requestId) {
-        return currentTarget;
-      }
-
-      return null;
-    });
-    actions.endTransientSampleEntry();
-  }, [actions]);
-
-  const handleEditorEntryFocus = useCallback((entryIdentity) => {
-    actions.endTransientSampleEntryUnless(
-      entryIdentity?.sectionId || '',
-      entryIdentity?.entryId || '',
-    );
-  }, [actions]);
-
-  const handleEditorEntryExit = useCallback((entryIdentity) => {
-    if (!entryIdentity?.sectionId || !entryIdentity?.entryId) {
-      return;
-    }
-
-    const handoffEntry = responsiveProxyHandoffEntryRef.current;
-
-    if (
-      handoffEntry?.sectionId === entryIdentity.sectionId
-      && handoffEntry?.entryId === entryIdentity.entryId
-    ) {
-      responsiveProxyHandoffEntryRef.current = null;
-      return;
-    }
-
-    actions.endTransientSampleEntry(entryIdentity);
-  }, [actions]);
-
-  function handleImportResumeClick() {
-    actions.endTransientSampleEntry();
-
-    if (!auth.user) {
-      auth.openAuthModal();
-      return;
-    }
-
-    setIsImportModalOpen(true);
-  }
-
-  async function handleImportResumeUpload(file) {
-    if (!auth.user) {
-      setIsImportModalOpen(false);
-      auth.openAuthModal();
-      return;
-    }
-
-    const importUser = auth.user;
-    let placeholderResumeId = null;
-
-    setIsImportModalOpen(false);
-    setImportState({ status: 'processing', fileName: file.name });
-
-    try {
-      placeholderResumeId = await createImportPlaceholderResume({ sourceFileName: file.name });
-
-      if (!placeholderResumeId) {
-        throw new Error('Create or delete a resume before importing another file.');
-      }
-
-      setImportState({ status: 'processing', fileName: file.name, resumeId: placeholderResumeId });
-
-      const idToken = await importUser.getIdToken();
-      const importedDraft = await importResumeFile({ file, idToken });
-
-      if (authUserRef.current?.uid !== importUser.uid) {
-        showNotice({
-          tone: 'error',
-          message: 'The import finished after your account changed, so it was not applied.',
-        });
-        return;
-      }
-
-      await replaceResumeDraft(placeholderResumeId, importedDraft.draft, {
-        name: importedDraft.suggestedName || file.name,
-      });
-
-      if (importedDraft.draft?.importWarnings?.length > 0) {
-        showNotice({
-          tone: 'warning',
-          message: 'Imported resume added. Some sections may need review.',
-        });
-      }
-    } catch (error) {
-      showNotice({
-        tone: 'error',
-        message: error?.message || 'Resume import failed. The blank resume is still editable.',
-      });
-    } finally {
-      setImportState({ status: 'idle' });
-    }
-  }
-
-  useEffect(() => {
-    if (!auth.user || signedOutEditingPreference.allow) {
-      return undefined;
-    }
-
-    function handleBeforeUnload(event) {
-      if (syncState !== 'syncing' && syncState !== 'error' && syncState !== 'offline') {
-        return;
-      }
-
-      event.preventDefault();
-      event.returnValue = '';
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [auth.user, signedOutEditingPreference.allow, syncState]);
-
-  function updateSignedOutEditingPreference(nextPreference) {
-    setSignedOutEditingPreference(writeSignedOutEditingPreference(nextPreference));
-  }
-
-  async function completeSignOut({ allowSignedOutEditing }) {
-    setIsSignOutInProgress(true);
-
-    try {
-      const accountUid = auth.user?.uid || '';
-      let cloudSyncCompleted = true;
-
-      if (!allowSignedOutEditing) {
-        const flushedDraft = await flushActiveCloudDraft({ reason: 'signout' });
-
-        if (auth.user && !flushedDraft) {
-          showNotice({
-            tone: 'error',
-            message: 'Cloud sync did not finish, so this browser was not cleared. Reconnect and try again.',
-          });
-          return;
-        }
-      } else {
-        cloudSyncCompleted = await flushActiveCloudDraft({ reason: 'signout' });
-
-        if (accountUid && !cloudSyncCompleted) {
-          await setSyncSessionCleanupRequested(accountUid, true);
-          await requestResumeBackgroundSync();
-        }
-      }
-
-      if (cloudSyncCompleted) {
-        const sessionCleared = await clearResumeSyncSession();
-
-        if (!sessionCleared) {
-          showNotice({
-            tone: 'error',
-            message: 'Secure sign-out could not finish. Check your connection and try again.',
-          });
-          return;
-        }
-      }
-
-      const signedOut = await auth.signOut();
-
-      if (!signedOut) {
-        if (accountUid && !cloudSyncCompleted) {
-          await setSyncSessionCleanupRequested(accountUid, false);
-        }
-        return;
-      }
-
-      if (!allowSignedOutEditing) {
-        await clearLocalResumeWorkspaceData();
-        window.location.reload();
-      }
-    } finally {
-      setIsSignOutInProgress(false);
-      setIsSignedOutPromptOpen(false);
-    }
-  }
-
-  async function handleSignOut() {
-    if (signedOutEditingPreference.skipPrompt) {
-      await completeSignOut({ allowSignedOutEditing: signedOutEditingPreference.allow });
-      return;
-    }
-
-    setIsSignedOutPromptOpen(true);
-  }
-
-  async function handleSignedOutPromptChoice(choice) {
-    if (choice.skipPrompt) {
-      updateSignedOutEditingPreference(choice);
-    } else {
-      updateSignedOutEditingPreference({
-        ...signedOutEditingPreference,
-        allow: choice.allow,
-      });
-    }
-
-    await completeSignOut({ allowSignedOutEditing: choice.allow });
-  }
-
-  async function handleSignOutPromptCancel() {
-    if (isSignOutInProgress) {
-      return;
-    }
-
-    setIsSignedOutPromptOpen(false);
-  }
-
-  async function handleDisconnectBrowser() {
-    if (auth.user) {
-      const flushedDraft = await flushActiveCloudDraft({ reason: 'disconnect-browser' });
-
-      if (!flushedDraft) {
-        showNotice({
-          tone: 'error',
-          message: 'Cloud sync did not finish, so this browser was not cleared. Reconnect and try again.',
-        });
-        return;
-      }
-    }
-
-    const disconnected = await auth.clearBrowserConnection();
-
-    if (!disconnected) {
-      showNotice({
-        tone: 'error',
-        message: 'This browser could not be disconnected securely. Check your connection and try again.',
-      });
-      return;
-    }
-
-    await clearBrowserResumeConnectionData();
-    window.location.reload();
-  }
-
   function handleAccountSwitchImport() {
-    if (!auth.user) {
+    if (!importAccountSwitchLocalData()) {
       return;
     }
 
-    preSignInConnectedAccountRef.current = {
-      uid: auth.user.uid,
-      email: auth.user.email || '',
-      displayName: auth.user.displayName || '',
-    };
-    setDurableAccountContext((current) => ({
-      ...current,
-      checkedForUid: auth.user.uid,
-      previousAccount: preSignInConnectedAccountRef.current,
-    }));
-    setAccountSwitchResolutionUid(auth.user.uid);
     showNotice({
       tone: 'warning',
       message: 'Browser resumes will be imported into this signed-in account.',
@@ -993,23 +216,12 @@ function App() {
   }
 
   async function handleAccountSwitchClear() {
-    if (!auth.user) {
-      return;
+    if (!await clearAccountSwitchLocalData()) {
+      showNotice({
+        tone: 'error',
+        message: 'Browser resumes could not be cleared. Reload and try again.',
+      });
     }
-
-    await clearLocalResumeWorkspaceData();
-    preSignInConnectedAccountRef.current = {
-      uid: auth.user.uid,
-      email: auth.user.email || '',
-      displayName: auth.user.displayName || '',
-    };
-    setDurableAccountContext({
-      checkedForUid: auth.user.uid,
-      previousAccount: preSignInConnectedAccountRef.current,
-      hasWorkspaceData: false,
-    });
-    setAccountSwitchResolutionUid(auth.user.uid);
-    window.location.reload();
   }
 
   function handleOpenAuthFromSettings() {
@@ -1057,7 +269,7 @@ function App() {
         <ImportResumeModal
           isOpen={isImportModalOpen}
           busy={isImportingResume}
-          onClose={() => setIsImportModalOpen(false)}
+          onClose={closeImportResume}
           onUpload={handleImportResumeUpload}
         />
 
@@ -1081,7 +293,7 @@ function App() {
           isOpen={isAccountSwitchPending}
           previousAccount={pendingAccountSwitchAccount}
           nextAccount={auth.user}
-          busy={auth.authBusy}
+          busy={auth.authBusy || isClearingAccountSwitchData}
           onImportLocalData={handleAccountSwitchImport}
           onClearLocalData={handleAccountSwitchClear}
         />
@@ -1095,66 +307,28 @@ function App() {
           connectedAccount={auth.connectedAccount}
           firebaseEnabled={auth.firebaseEnabled}
           signedOutEditingPreference={signedOutEditingPreference}
-          busy={auth.authBusy}
+          busy={auth.authBusy || isDisconnecting}
           onOpen={() => setIsAccountSettingsOpen(true)}
           onClose={() => setIsAccountSettingsOpen(false)}
-          onToggleTheme={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
+          onToggleTheme={toggleTheme}
           onOpenAuth={handleOpenAuthFromSettings}
           onDisconnectBrowser={handleDisconnectBrowser}
           onSignedOutEditingPreferenceChange={updateSignedOutEditingPreference}
         />
 
-        {notice && (
-          <div
-            className={`noticeToast noticeToast--${notice.tone}`}
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <span className="noticeToastIcon">
-              <NoticeToastIcon isSyncError={noticePresentation.isSyncError} />
-            </span>
-            <span className="noticeToastCopy">
-              {noticePresentation.title ? <strong>{noticePresentation.title}</strong> : null}
-              <span>{noticePresentation.message}</span>
-            </span>
-            <span className="noticeToastActions">
-              {noticePresentation.isSyncError ? (
-                <button type="button" className="noticeToastRetry" onClick={retryCloudSync}>
-                  Retry
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="noticeToastDismiss"
-                onClick={dismissNotice}
-                aria-label="Dismiss message"
-              >
-                <NoticeDismissIcon />
-              </button>
-            </span>
-          </div>
-        )}
+        <NoticeToast
+          notice={notice}
+          syncState={syncState}
+          onRetry={retryCloudSync}
+          onDismiss={dismissNotice}
+        />
 
-        {conflict && (
-          <div className="conflictBanner" role="alert">
-            <div>
-              <strong>This resume changed in another tab or device.</strong>
-              <span>Choose which version to keep before continuing.</span>
-            </div>
-            <div className="conflictActions">
-              <button type="button" className="button buttonSecondary" onClick={resolveConflictWithCloud}>
-                Use saved version
-              </button>
-              <button type="button" className="button buttonSecondary" onClick={resolveConflictWithLocal}>
-                Keep my edits
-              </button>
-              <button type="button" className="button buttonPrimary" onClick={saveConflictAsCopy}>
-                Save as copy
-              </button>
-            </div>
-          </div>
-        )}
+        <ResumeConflictBanner
+          conflict={conflict}
+          onUseSavedVersion={resolveConflictWithCloud}
+          onKeepLocalEdits={resolveConflictWithLocal}
+          onSaveAsCopy={saveConflictAsCopy}
+        />
 
         <div className="mobileWorkspaceToggle" role="tablist" aria-label="Workspace view">
           <button

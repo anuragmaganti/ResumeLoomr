@@ -2,15 +2,15 @@ import {
   awardEntryHasContent,
   certificationEntryHasContent,
   educationEntryHasContent,
-  getPreviewModel,
   languageEntryHasContent,
-  normalizeResume,
   projectEntryHasContent,
   publicationEntryHasContent,
   roleEntryHasContent,
   skillsEntryHasContent,
-  trimText,
-} from './resume.js';
+} from './resumeEntries.js';
+import { normalizeResume } from './resume.js';
+import { getPreviewModel } from './resumePreviewModel.js';
+import { trimText } from './text.js';
 
 const SAMPLE_RESUMES = [
   {

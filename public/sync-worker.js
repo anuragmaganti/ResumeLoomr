@@ -1,3 +1,5 @@
+// This worker is intentionally self-contained so it remains a classic, root-scoped
+// service worker. tests/syncWorkerParity.test.js locks its protocol to the page path.
 const DB_NAME = 'resumeloomr-local-workspace';
 const DB_VERSION = 1;
 const WORKSPACE_STORE = 'workspace';
@@ -7,8 +9,12 @@ const TOMBSTONES_STORE = 'tombstones';
 const ACCOUNT_BINDING_STORE = 'accountBinding';
 const ACCOUNT_BINDING_ID = 'current';
 const SYNC_TAG = 'resumeloomr-sync-outbox';
+const CLOUD_SYNC_LOCK_NAME = 'resumeloomr-cloud-sync';
 const MAX_SYNC_REQUEST_BYTES = 3_000_000;
 const MAX_SYNC_OPERATION_BYTES = 1_000_000;
+const SYNC_REQUEST_TIMEOUT_MS = 30_000;
+let activeSyncAttempt = null;
+let syncRequestedDuringAttempt = false;
 
 function openWorkspaceDb() {
   return new Promise((resolve, reject) => {
@@ -26,7 +32,10 @@ function openWorkspaceDb() {
       }
 
       if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
-        db.createObjectStore(OUTBOX_STORE, { keyPath: 'id' });
+        const outboxStore = db.createObjectStore(OUTBOX_STORE, { keyPath: 'id' });
+        outboxStore.createIndex('status', 'status');
+        outboxStore.createIndex('updatedAt', 'updatedAt');
+        outboxStore.createIndex('resumeId', 'resumeId');
       }
 
       if (!db.objectStoreNames.contains(TOMBSTONES_STORE)) {
@@ -83,6 +92,20 @@ function transactionDone(transaction) {
     transaction.onerror = () => reject(transaction.error);
     transaction.onabort = () => reject(transaction.error);
   });
+}
+
+async function fetchWithTimeout(input, init = {}, timeoutMs = SYNC_REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function normalizeCloudVersion(value) {
@@ -206,7 +229,7 @@ async function clearSessionWhenReady(db, accountUid, pendingCount) {
     return;
   }
 
-  const response = await fetch('/api/sync-session', {
+  const response = await fetchWithTimeout('/api/sync-session', {
     method: 'DELETE',
     credentials: 'include',
   });
@@ -405,7 +428,7 @@ async function syncOutbox() {
       }
 
       try {
-        const response = await fetch('/api/sync-workspace', {
+        const response = await fetchWithTimeout('/api/sync-workspace', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -453,8 +476,48 @@ async function syncOutbox() {
   }
 }
 
-self.addEventListener('install', () => {
-  self.skipWaiting();
+function runWithCloudSyncLock(callback) {
+  const locks = self.navigator?.locks;
+
+  if (!locks?.request) {
+    return callback();
+  }
+
+  return locks.request(CLOUD_SYNC_LOCK_NAME, { mode: 'exclusive' }, callback);
+}
+
+function requestOutboxSync() {
+  if (activeSyncAttempt) {
+    syncRequestedDuringAttempt = true;
+    return activeSyncAttempt;
+  }
+
+  activeSyncAttempt = (async () => {
+    let lastError = null;
+
+    do {
+      syncRequestedDuringAttempt = false;
+      lastError = null;
+
+      try {
+        await runWithCloudSyncLock(syncOutbox);
+      } catch (error) {
+        lastError = error;
+      }
+    } while (syncRequestedDuringAttempt);
+
+    if (lastError) {
+      throw lastError;
+    }
+  })().finally(() => {
+    activeSyncAttempt = null;
+  });
+
+  return activeSyncAttempt;
+}
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
@@ -463,7 +526,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SYNC_RESUME_OUTBOX') {
-    const syncPromise = syncOutbox();
+    const syncPromise = requestOutboxSync();
 
     if (typeof event.waitUntil === 'function') {
       event.waitUntil(syncPromise);
@@ -475,6 +538,6 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('sync', (event) => {
   if (event.tag === SYNC_TAG) {
-    event.waitUntil(syncOutbox());
+    event.waitUntil(requestOutboxSync());
   }
 });

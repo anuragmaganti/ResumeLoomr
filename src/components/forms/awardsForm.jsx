@@ -1,44 +1,27 @@
 import AutoResizeTextarea from "../autoResizeTextarea";
-import CollapsibleEntryCard from "./collapsibleEntryCard";
-import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
-import { createEditorTargetAttributes } from "../../lib/editorTargets";
+import { createSectionEntryFormBindings } from "./sectionEntryForm";
+import SectionEntryList from "./sectionEntryList";
 
 export default function AwardsForm({ section, actions, getFieldError, markTouched, editorTarget, placeholderFor }) {
-  const entries = section.entries || [];
-  const sectionId = section.id;
-  const pathFor = (entryId, field) => `sections.${sectionId}.${entryId}.${field}`;
-  const placeholder = (entryId, field, fallback) => placeholderFor?.(pathFor(entryId, field), fallback) || fallback;
-  const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
-  const updateEntry = (entryId, field, value) => actions.updateSectionBlockEntry(sectionId, entryId, field, value);
-  const addEntry = () => actions.addSectionBlockEntry(sectionId);
-  const moveEntry = (entryId, direction) => actions.moveSectionBlockEntry(sectionId, entryId, direction);
-  const removeEntry = (entryId) => actions.removeSectionBlockEntry(sectionId, entryId);
+  const { pathFor, placeholder, editorAttrs, updateEntry } = createSectionEntryFormBindings({
+    section,
+    actions,
+    placeholderFor,
+  });
 
   return (
-    <div className="formStack">
-      {entries.map((entry, index) => (
-        <CollapsibleEntryCard
-          key={entry.id}
-          summary={buildEntrySummary(
-            [entry.title, entry.issuer, entry.years],
-            "Add award, issuer, and date"
-          )}
-          fallbackSummary="Add award, issuer, and date"
-          expandLabel={`award ${index + 1}`}
-          menuLabel={`Award ${index + 1} actions`}
-          moveUpLabel={`Move award ${index + 1} up`}
-          moveDownLabel={`Move award ${index + 1} down`}
-          removeLabel={`Remove award ${index + 1}`}
-          onMoveUp={() => moveEntry(entry.id, -1)}
-          onMoveDown={() => moveEntry(entry.id, 1)}
-          onRemove={() => removeEntry(entry.id)}
-          disableUp={index === 0}
-          disableDown={index === entries.length - 1}
-          disableRemove={entries.length === 1}
-          expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
-        >
-          <form onSubmit={(event) => event.preventDefault()}>
+    <SectionEntryList
+      section={section}
+      actions={actions}
+      editorTarget={editorTarget}
+      entryNoun="award"
+      fallbackSummary="Add award, issuer, and date"
+      getSummaryValues={(entry) => [entry.title, entry.issuer, entry.years]}
+      addLabel="Add award"
+    >
+      {(entry) => (
+        <>
             <div className="fieldGrid fieldGridTwo">
               <div className="field">
                 <label htmlFor={`award-title-${entry.id}`}>Award</label>
@@ -93,13 +76,8 @@ export default function AwardsForm({ section, actions, getFieldError, markTouche
                 placeholder={placeholder(entry.id, 'details', 'Add context about why the award matters.')}
               />
             </div>
-          </form>
-        </CollapsibleEntryCard>
-      ))}
-
-      <button className="button buttonSecondary addEntryButton" type="button" onClick={addEntry}>
-        Add award
-      </button>
-    </div>
+        </>
+      )}
+    </SectionEntryList>
   );
 }

@@ -1,22 +1,16 @@
 import AutoResizeTextarea from "../autoResizeTextarea";
-import { ensureEducationCustomSections } from "../../lib/resume";
-import CollapsibleEntryCard from "./collapsibleEntryCard";
-import { buildEntrySummary } from "./buildEntrySummary";
+import { ensureEducationCustomSections } from "../../lib/resumeEntries.js";
 import EntryActionMenu from "./entryActionMenu";
 import FormFieldError from "./formFieldError";
-import { createEditorTargetAttributes } from "../../lib/editorTargets";
+import { createSectionEntryFormBindings } from "./sectionEntryForm";
+import SectionEntryList from "./sectionEntryList";
 
 export default function EducationForm({ section, actions, getFieldError, markTouched, editorTarget, placeholderFor }) {
-    const entries = section.entries || [];
-    const sectionId = section.id;
-
-    const pathFor = (entryId, field) => `sections.${sectionId}.${entryId}.${field}`;
-    const placeholder = (entryId, field, fallback) => placeholderFor?.(pathFor(entryId, field), fallback) || fallback;
-    const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
-    const updateField = (entryId, field, value) => actions.updateSectionBlockEntry(sectionId, entryId, field, value);
-    const addEntry = () => actions.addSectionBlockEntry(sectionId);
-    const moveEntry = (entryId, direction) => actions.moveSectionBlockEntry(sectionId, entryId, direction);
-    const removeEntry = (entryId) => actions.removeSectionBlockEntry(sectionId, entryId);
+    const { sectionId, pathFor, placeholder, editorAttrs, updateEntry } = createSectionEntryFormBindings({
+        section,
+        actions,
+        placeholderFor,
+    });
     const updateCustomSection = (entryId, sectionIndex, field, value) => (
         actions.updateSectionBlockEducationCustomSection(sectionId, entryId, sectionIndex, field, value)
     );
@@ -29,34 +23,23 @@ export default function EducationForm({ section, actions, getFieldError, markTou
     );
 
     return (
-        <div className="formStack">
-            {entries.map((entry, index) => {
+        <SectionEntryList
+            section={section}
+            actions={actions}
+            editorTarget={editorTarget}
+            entryNoun="education entry"
+            actionNoun="education"
+            fallbackSummary="Add institution, degree, and dates"
+            getSummaryValues={(entry) => [entry.school, entry.degree, entry.yearsEdu]}
+            addLabel="Add education"
+        >
+            {(entry) => {
                 const customSections = ensureEducationCustomSections(entry.customSections);
                 const programs = Array.isArray(entry.programs) ? entry.programs : [];
                 const usesPrograms = programs.length > 0;
 
                 return (
-                <CollapsibleEntryCard
-                    key={entry.id}
-                    summary={buildEntrySummary(
-                        [entry.school, entry.degree, entry.yearsEdu],
-                        "Add institution, degree, and dates"
-                    )}
-                    fallbackSummary="Add institution, degree, and dates"
-                    expandLabel={`education entry ${index + 1}`}
-                    menuLabel={`Education ${index + 1} actions`}
-                    moveUpLabel={`Move education ${index + 1} up`}
-                    moveDownLabel={`Move education ${index + 1} down`}
-                    removeLabel={`Remove education ${index + 1}`}
-                    onMoveUp={() => moveEntry(entry.id, -1)}
-                    onMoveDown={() => moveEntry(entry.id, 1)}
-                    onRemove={() => removeEntry(entry.id)}
-                    disableUp={index === 0}
-                    disableDown={index === entries.length - 1}
-                    disableRemove={entries.length === 1}
-                    expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
-                >
-                    <form onSubmit={(event) => event.preventDefault()}>
+                    <>
                         <div className="field">
                             <label htmlFor={`school-${entry.id}`}>Institution</label>
                             <input
@@ -64,7 +47,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                 id={`school-${entry.id}`}
                                 {...editorAttrs(entry.id, 'school')}
                                 value={entry.school}
-                                onChange={(event) => updateField(entry.id, 'school', event.target.value)}
+                                onChange={(event) => updateEntry(entry.id, 'school', event.target.value)}
                                 onBlur={() => markTouched(pathFor(entry.id, 'school'))}
                                 placeholder={placeholder(entry.id, 'school', 'University or school name')}
                             />
@@ -79,7 +62,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                     id={`location-${entry.id}`}
                                     {...editorAttrs(entry.id, 'location')}
                                     value={entry.location}
-                                    onChange={(event) => updateField(entry.id, 'location', event.target.value)}
+                                    onChange={(event) => updateEntry(entry.id, 'location', event.target.value)}
                                     onBlur={() => markTouched(pathFor(entry.id, 'location'))}
                                     placeholder={placeholder(entry.id, 'location', 'Cambridge, MA')}
                                 />
@@ -92,7 +75,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                     id={`yearsEdu-${entry.id}`}
                                     {...editorAttrs(entry.id, 'yearsEdu')}
                                     value={entry.yearsEdu}
-                                    onChange={(event) => updateField(entry.id, 'yearsEdu', event.target.value)}
+                                    onChange={(event) => updateEntry(entry.id, 'yearsEdu', event.target.value)}
                                     onBlur={() => markTouched(pathFor(entry.id, 'yearsEdu'))}
                                     placeholder={placeholder(entry.id, 'yearsEdu', '2020 - 2024')}
                                 />
@@ -198,7 +181,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                             id={`degree-${entry.id}`}
                                             {...editorAttrs(entry.id, 'degree')}
                                             value={entry.degree}
-                                            onChange={(event) => updateField(entry.id, 'degree', event.target.value)}
+                                            onChange={(event) => updateEntry(entry.id, 'degree', event.target.value)}
                                             onBlur={() => markTouched(pathFor(entry.id, 'degree'))}
                                             placeholder={placeholder(entry.id, 'degree', 'B.S. Computer Science')}
                                         />
@@ -212,7 +195,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                             id={`gpa-${entry.id}`}
                                             {...editorAttrs(entry.id, 'gpa')}
                                             value={entry.gpa}
-                                            onChange={(event) => updateField(entry.id, 'gpa', event.target.value)}
+                                            onChange={(event) => updateEntry(entry.id, 'gpa', event.target.value)}
                                             onBlur={() => markTouched(pathFor(entry.id, 'gpa'))}
                                             placeholder={placeholder(entry.id, 'gpa', '3.9 / 4.0')}
                                         />
@@ -226,7 +209,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                         id={`honors-${entry.id}`}
                                         {...editorAttrs(entry.id, 'honors')}
                                         value={entry.honors}
-                                        onChange={(event) => updateField(entry.id, 'honors', event.target.value)}
+                                        onChange={(event) => updateEntry(entry.id, 'honors', event.target.value)}
                                         onBlur={() => markTouched(pathFor(entry.id, 'honors'))}
                                         placeholder={placeholder(entry.id, 'honors', "Magna Cum Laude, Dean's List")}
                                     />
@@ -240,7 +223,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                 id={`coursework-${entry.id}`}
                                 {...editorAttrs(entry.id, 'coursework')}
                                 value={entry.coursework}
-                                onChange={(event) => updateField(entry.id, 'coursework', event.target.value)}
+                                onChange={(event) => updateEntry(entry.id, 'coursework', event.target.value)}
                                 onBlur={() => markTouched(pathFor(entry.id, 'coursework'))}
                                 rows={2}
                                 placeholder={placeholder(entry.id, 'coursework', 'Human-Computer Interaction, Algorithms, Product Strategy')}
@@ -253,7 +236,7 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                                 id={`awards-${entry.id}`}
                                 {...editorAttrs(entry.id, 'awards')}
                                 value={entry.awards}
-                                onChange={(event) => updateField(entry.id, 'awards', event.target.value)}
+                                onChange={(event) => updateEntry(entry.id, 'awards', event.target.value)}
                                 onBlur={() => markTouched(pathFor(entry.id, 'awards'))}
                                 rows={2}
                                 placeholder={placeholder(entry.id, 'awards', 'Scholarships, distinctions, academic awards')}
@@ -317,13 +300,9 @@ export default function EducationForm({ section, actions, getFieldError, markTou
                         <button className="button buttonSecondary addInlineButton" type="button" onClick={() => addCustomSection(entry.id)}>
                             Add custom section
                         </button>
-                    </form>
-                </CollapsibleEntryCard>
-            )})}
-
-            <button className="button buttonSecondary addEntryButton" type="button" onClick={addEntry}>
-                Add education
-            </button>
-        </div>
+                    </>
+                );
+            }}
+        </SectionEntryList>
     )
 }

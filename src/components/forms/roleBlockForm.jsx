@@ -1,53 +1,40 @@
-import CollapsibleEntryCard from "./collapsibleEntryCard";
-import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 import ReorderableTextList from "./reorderableTextList";
-import { createEditorTargetAttributes } from "../../lib/editorTargets";
+import { createSectionEntryFormBindings } from "./sectionEntryForm";
+import SectionEntryList from "./sectionEntryList";
 
 export default function RoleBlockForm({ section, actions, getFieldError, markTouched, editorTarget, placeholderFor }) {
-  const entries = section.entries || [];
-  const placeholder = (path, fallback) => placeholderFor?.(path, fallback) || fallback;
+  const { sectionId, pathFor, placeholder, editorAttrs, updateEntry } = createSectionEntryFormBindings({
+    section,
+    actions,
+    placeholderFor,
+  });
 
   return (
-    <div className="formStack">
-      {entries.map((entry, index) => {
-        const pathPrefix = `sections.${section.id}.${entry.id}`;
-
-        return (
-          <CollapsibleEntryCard
-            key={entry.id}
-            summary={buildEntrySummary(
-              [entry.company, entry.role, entry.location, entry.yearsExp],
-              "Add organization, role, and dates"
-            )}
-            fallbackSummary="Add organization, role, and dates"
-            expandLabel={`${section.title} entry ${index + 1}`}
-            menuLabel={`${section.title} entry ${index + 1} actions`}
-            moveUpLabel={`Move ${section.title} entry ${index + 1} up`}
-            moveDownLabel={`Move ${section.title} entry ${index + 1} down`}
-            removeLabel={`Remove ${section.title} entry ${index + 1}`}
-            onMoveUp={() => actions.moveSectionBlockEntry(section.id, entry.id, -1)}
-            onMoveDown={() => actions.moveSectionBlockEntry(section.id, entry.id, 1)}
-            onRemove={() => actions.removeSectionBlockEntry(section.id, entry.id)}
-            disableUp={index === 0}
-            disableDown={index === entries.length - 1}
-            disableRemove={entries.length === 1}
-            expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
-          >
-            <form onSubmit={(event) => event.preventDefault()}>
+    <SectionEntryList
+      section={section}
+      actions={actions}
+      editorTarget={editorTarget}
+      entryNoun={`${section.title} entry`}
+      fallbackSummary="Add organization, role, and dates"
+      getSummaryValues={(entry) => [entry.company, entry.role, entry.location, entry.yearsExp]}
+      addLabel="Add role"
+    >
+      {(entry) => (
+        <>
               <div className="fieldGrid fieldGridTwo">
                 <div className="field">
                   <label htmlFor={`role-company-${section.id}-${entry.id}`}>Organization</label>
                   <input
                     type="text"
                     id={`role-company-${section.id}-${entry.id}`}
-                    {...createEditorTargetAttributes(`${pathPrefix}.company`, { entryId: entry.id })}
+                    {...editorAttrs(entry.id, 'company')}
                     value={entry.company}
-                    onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'company', event.target.value)}
-                    onBlur={() => markTouched(`${pathPrefix}.company`)}
-                    placeholder={placeholder(`${pathPrefix}.company`, 'Organization or company')}
+                    onChange={(event) => updateEntry(entry.id, 'company', event.target.value)}
+                    onBlur={() => markTouched(pathFor(entry.id, 'company'))}
+                    placeholder={placeholder(entry.id, 'company', 'Organization or company')}
                   />
-                  <FormFieldError message={getFieldError(`${pathPrefix}.company`)} />
+                  <FormFieldError message={getFieldError(pathFor(entry.id, 'company'))} />
                 </div>
 
                 <div className="field">
@@ -55,13 +42,13 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                   <input
                     type="text"
                     id={`role-title-${section.id}-${entry.id}`}
-                    {...createEditorTargetAttributes(`${pathPrefix}.role`, { entryId: entry.id })}
+                    {...editorAttrs(entry.id, 'role')}
                     value={entry.role}
-                    onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'role', event.target.value)}
-                    onBlur={() => markTouched(`${pathPrefix}.role`)}
-                    placeholder={placeholder(`${pathPrefix}.role`, 'Role title')}
+                    onChange={(event) => updateEntry(entry.id, 'role', event.target.value)}
+                    onBlur={() => markTouched(pathFor(entry.id, 'role'))}
+                    placeholder={placeholder(entry.id, 'role', 'Role title')}
                   />
-                  <FormFieldError message={getFieldError(`${pathPrefix}.role`)} />
+                  <FormFieldError message={getFieldError(pathFor(entry.id, 'role'))} />
                 </div>
               </div>
 
@@ -71,11 +58,11 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                   <input
                     type="text"
                     id={`role-location-${section.id}-${entry.id}`}
-                    {...createEditorTargetAttributes(`${pathPrefix}.location`, { entryId: entry.id })}
+                    {...editorAttrs(entry.id, 'location')}
                     value={entry.location}
-                    onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'location', event.target.value)}
-                    onBlur={() => markTouched(`${pathPrefix}.location`)}
-                    placeholder={placeholder(`${pathPrefix}.location`, 'City, State')}
+                    onChange={(event) => updateEntry(entry.id, 'location', event.target.value)}
+                    onBlur={() => markTouched(pathFor(entry.id, 'location'))}
+                    placeholder={placeholder(entry.id, 'location', 'City, State')}
                   />
                 </div>
 
@@ -84,13 +71,13 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                   <input
                     type="text"
                     id={`role-years-${section.id}-${entry.id}`}
-                    {...createEditorTargetAttributes(`${pathPrefix}.yearsExp`, { entryId: entry.id })}
+                    {...editorAttrs(entry.id, 'yearsExp')}
                     value={entry.yearsExp}
-                    onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'yearsExp', event.target.value)}
-                    onBlur={() => markTouched(`${pathPrefix}.yearsExp`)}
-                    placeholder={placeholder(`${pathPrefix}.yearsExp`, '2022 - Present')}
+                    onChange={(event) => updateEntry(entry.id, 'yearsExp', event.target.value)}
+                    onBlur={() => markTouched(pathFor(entry.id, 'yearsExp'))}
+                    placeholder={placeholder(entry.id, 'yearsExp', '2022 - Present')}
                   />
-                  <FormFieldError message={getFieldError(`${pathPrefix}.yearsExp`)} />
+                  <FormFieldError message={getFieldError(pathFor(entry.id, 'yearsExp'))} />
                 </div>
               </div>
 
@@ -98,25 +85,19 @@ export default function RoleBlockForm({ section, actions, getFieldError, markTou
                 label="Highlights"
                 items={entry.activities}
                 idPrefix={`role-highlights-${section.id}-${entry.id}`}
-                pathPrefix={`${pathPrefix}.activities`}
+                pathPrefix={pathFor(entry.id, 'activities')}
                 placeholder="Describe a measurable accomplishment or core responsibility."
                 placeholderFor={placeholderFor}
                 addLabel="Add highlight"
                 getFieldError={getFieldError}
                 markTouched={markTouched}
-                onChangeItem={(activityIndex, value) => actions.updateSectionBlockTextList(section.id, entry.id, 'activities', activityIndex, value)}
-                onMoveItem={(activityIndex, direction) => actions.moveSectionBlockTextListItem(section.id, entry.id, 'activities', activityIndex, direction)}
-                onRemoveItem={(activityIndex) => actions.removeSectionBlockTextListItem(section.id, entry.id, 'activities', activityIndex)}
-                onAddItem={() => actions.addSectionBlockTextListItem(section.id, entry.id, 'activities')}
+                onChangeItem={(activityIndex, value) => actions.updateSectionBlockTextList(sectionId, entry.id, 'activities', activityIndex, value)}
+                onMoveItem={(activityIndex, direction) => actions.moveSectionBlockTextListItem(sectionId, entry.id, 'activities', activityIndex, direction)}
+                onRemoveItem={(activityIndex) => actions.removeSectionBlockTextListItem(sectionId, entry.id, 'activities', activityIndex)}
+                onAddItem={() => actions.addSectionBlockTextListItem(sectionId, entry.id, 'activities')}
               />
-            </form>
-          </CollapsibleEntryCard>
-        );
-      })}
-
-      <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addSectionBlockEntry(section.id)}>
-        Add role
-      </button>
-    </div>
+        </>
+      )}
+    </SectionEntryList>
   );
 }

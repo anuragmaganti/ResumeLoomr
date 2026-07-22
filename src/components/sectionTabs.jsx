@@ -15,6 +15,7 @@ import {
     useSortable
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { trapTabKey } from "../lib/focusTrap.js";
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from "../lib/sortableSensors.js";
 
 function getSectionIds(sections) {
@@ -165,29 +166,7 @@ function SectionAddDialog({
     }
 
     function handleDialogKeyDown(event) {
-        if (event.key !== "Tab") {
-            return;
-        }
-
-        const focusableElements = Array.from(dialogRef.current?.querySelectorAll("button:not(:disabled)") || []);
-
-        if (focusableElements.length === 0) {
-            return;
-        }
-
-        const firstElement = focusableElements[0];
-        const lastElement = focusableElements[focusableElements.length - 1];
-
-        if (event.shiftKey && document.activeElement === firstElement) {
-            event.preventDefault();
-            lastElement.focus();
-            return;
-        }
-
-        if (!event.shiftKey && document.activeElement === lastElement) {
-            event.preventDefault();
-            firstElement.focus();
-        }
+        trapTabKey(event, dialogRef.current);
     }
 
     const firstTemplateId = sectionTemplateGroups.find((group) => group.templates.length > 0)?.templates[0]?.id || "";
@@ -315,7 +294,6 @@ export default function SectionTabs({
             onReorderSections(nextSectionIds);
 
             setActiveTab(activeId);
-            return;
         }
     }
 

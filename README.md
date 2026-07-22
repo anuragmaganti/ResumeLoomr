@@ -61,7 +61,7 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 - Edits, imports, deletes, switches, reorders, and template/settings changes save locally before cloud sync is attempted.
 - Local saves update the visible `Saved locally` timestamp from the actual local save time.
 - Local drafts include `localRevision` metadata to prevent stale tab saves from overwriting newer local changes.
-- `localStorage` is kept only for small compatibility markers, theme/settings, and fallback/migration helpers.
+- IndexedDB remains canonical; `localStorage` keeps a best-effort compatibility mirror plus theme, browser-preference, and folder-open keys.
 - Workspace organization is stored separately from resume bodies, so folder operations never rewrite resume content.
 - On sign-out, users can clearly choose whether to keep local resumes editable on that browser or sync first and remove its local copies; neither choice deletes cloud resumes.
 
@@ -129,7 +129,6 @@ workspace       current resume ids, active resume, names, ordering
 drafts          one normalized draft per resume
 outbox          queued cloud sync operations
 tombstones      pending cloud deletes
-syncMeta        local sync metadata
 accountBinding  browser/account connection metadata
 ```
 
@@ -145,6 +144,7 @@ The workspace record also carries normalized root items, folders, folder members
 - **Versioned sync acknowledgements:** stale cloud responses cannot clear newer local outbox work.
 - **Organization without content rewrites:** folders and rail order sync as workspace metadata rather than rewriting resume drafts.
 - **No trusted-device Firestore cache mode:** the app no longer relies on Firestore’s browser cache for correctness; IndexedDB is the durable local workspace.
+- **Enforced dependency direction:** domain and infrastructure modules stay independent of React UI, and hooks cannot import components; the architecture check rejects cycles, unreachable production modules, and boundary violations.
 
 ## Tech Stack
 
@@ -182,7 +182,7 @@ tests/               Node tests and Firestore rules tests
 
 ### Prerequisites
 
-- Node.js LTS
+- Node.js 22.12 or newer
 - npm
 - Firebase project for auth/cloud sync
 - Gemini API key for resume import
@@ -219,7 +219,6 @@ VITE_FIREBASE_API_KEY=
 VITE_FIREBASE_AUTH_DOMAIN=
 VITE_FIREBASE_PROJECT_ID=
 VITE_FIREBASE_APP_ID=
-VITE_FIREBASE_MEASUREMENT_ID=
 VITE_FIREBASE_APPCHECK_SITE_KEY=
 ```
 
@@ -239,8 +238,10 @@ FIREBASE_SERVICE_ACCOUNT_JSON=
 npm run dev      # Start the Vite dev server
 npm run build    # Build the production frontend
 npm run preview  # Preview the production build locally
+npm run check:dead-code # Reject unused files, exports, and dependencies
 npm run lint     # Run ESLint
 npm test         # Run Node tests
+npm run verify   # Run architecture, dead-code, lint, tests, audit, and build
 ```
 
 ## Testing
@@ -268,7 +269,8 @@ npm test
 Run Firestore rules tests with the emulator:
 
 ```bash
-PATH="/opt/homebrew/opt/openjdk/bin:$PATH" npx firebase-tools emulators:exec --only firestore --project resumeloomr "npm test"
+npx --yes firebase-tools@15.24.0 emulators:exec --only firestore --project resumeloomr-test \
+  "node --test --test-concurrency=1 tests/firestore.rules.test.js"
 ```
 
 ## Security And Privacy Notes
@@ -279,6 +281,7 @@ PATH="/opt/homebrew/opt/openjdk/bin:$PATH" npx firebase-tools emulators:exec --o
 - Gemini and Firebase Admin credentials are server-only.
 - Firestore rules restrict users to their own workspace and resume documents.
 - Sync API routes verify Firebase identity server-side before cloud reads/writes.
+- Firebase App Check can attest Firebase SDK traffic when enforcement is enabled; custom Vercel APIs use separately verified Firebase ID tokens or HTTP-only session cookies.
 - Uploaded resume files are processed in memory by the import route and are not intentionally stored server-side.
 - Users can remove the account connection and local resume copies from browser settings.
 - On shared computers, users should disable keeping resumes available after sign out or clear the browser connection.

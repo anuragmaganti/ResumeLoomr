@@ -16,11 +16,9 @@ import {
 import { LayoutGroup, motion as Motion, useReducedMotion } from 'motion/react';
 import {
   MAX_WORKSPACE_FOLDERS,
-  WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
   createNextWorkspaceFolderName,
-  sanitizeWorkspaceFolderName,
-  sanitizeWorkspaceResumeName,
-} from '../lib/resume.js';
+} from '../lib/workspace.js';
+import { WORKSPACE_OPEN_FOLDERS_STORAGE_KEY } from '../lib/localWorkspaceKeys.js';
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from '../lib/sortableSensors.js';
 import {
   buildResumeRailLayout,
@@ -51,6 +49,7 @@ import {
   railSortingStrategy,
   setRootInsertTargetIfChanged,
 } from './resumeWorkspaceRailSupport.js';
+import { writeLocalStorageJsonItem } from '../lib/browserStorage.js';
 import {
   applyOpenFolderPointerDestination,
   applyRootPointerDestination,
@@ -71,6 +70,8 @@ import {
   ResumeTile,
   RootReleaseDropZone,
 } from './resumeWorkspaceRailView.jsx';
+import { useWorkspaceRailRename } from './useWorkspaceRailRename.js';
+import { useWorkspaceRailLayout } from './useWorkspaceRailLayout.js';
 
 export default function ResumeWorkspaceRail({
   resumeList,
@@ -98,7 +99,6 @@ export default function ResumeWorkspaceRail({
   const folderCloseTimersRef = useRef(new Map());
   const deleteDialogTriggerRef = useRef(null);
   const selectionScopeRef = useRef(authUser?.uid || 'guest');
-  const skipRenameCommitRef = useRef(false);
   const dragOpenFolderIdsRef = useRef(new Set());
   const activeDragItemRef = useRef(null);
   const dragResumeIdsRef = useRef([]);
@@ -113,14 +113,9 @@ export default function ResumeWorkspaceRail({
   const isDropLayoutSettlingRef = useRef(false);
   const pendingDragOrganizationRef = useRef(null);
   const activeResumePlacementKeyRef = useRef('');
-  const [columns, setColumns] = useState(2);
-  const [hasMeasuredColumns, setHasMeasuredColumns] = useState(false);
-  const [motionReady, setMotionReady] = useState(false);
   const [openFolderIds, setOpenFolderIds] = useState(loadOpenFolderIds);
   const [closingFolderSnapshots, setClosingFolderSnapshots] = useState(new Map());
   const [selectionKeys, setSelectionKeys] = useState(new Set());
-  const [renamingItem, setRenamingItem] = useState(null);
-  const [renameValue, setRenameValue] = useState('');
   const [activeDragItem, setActiveDragItem] = useState(null);
   const [dragResumeIds, setDragResumeIds] = useState([]);
   const [isDragOutsideRail, setIsDragOutsideRail] = useState(false);
@@ -130,6 +125,21 @@ export default function ResumeWorkspaceRail({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const {
+    columns,
+    motionReady,
+  } = useWorkspaceRailLayout({ railRef, workspaceReady });
+  const {
+    cancelRename,
+    commitRename,
+    renameValue,
+    renamingItem,
+    setRenameValue,
+    startRename,
+  } = useWorkspaceRailRename({
+    onRenameResume,
+    onRenameResumeFolder,
+  });
   const resumeById = useMemo(() => new Map(resumeList.map((resume) => [resume.id, resume])), [resumeList]);
   const folderToneById = useMemo(() => new Map(
     organization.rootItems
@@ -208,42 +218,6 @@ export default function ResumeWorkspaceRail({
     railRef.current = node;
     setRootDropRef(node);
   }, [setRootDropRef]);
-
-  useLayoutEffect(() => {
-    const node = railRef.current;
-
-    if (!node || typeof ResizeObserver === 'undefined') {
-      setHasMeasuredColumns(true);
-      return undefined;
-    }
-
-    const updateColumns = () => {
-      const value = Number.parseInt(getComputedStyle(node).getPropertyValue('--resume-rail-columns'), 10);
-      setColumns(Number.isFinite(value) ? value : 2);
-      setHasMeasuredColumns(true);
-    };
-    const observer = new ResizeObserver(updateColumns);
-    observer.observe(node);
-    updateColumns();
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!workspaceReady || !hasMeasuredColumns) {
-      setMotionReady(false);
-      return undefined;
-    }
-
-    let secondFrameId = 0;
-    const firstFrameId = window.requestAnimationFrame(() => {
-      secondFrameId = window.requestAnimationFrame(() => setMotionReady(true));
-    });
-
-    return () => {
-      window.cancelAnimationFrame(firstFrameId);
-      window.cancelAnimationFrame(secondFrameId);
-    };
-  }, [hasMeasuredColumns, workspaceReady]);
 
   useEffect(() => {
     if (!workspaceReady) {
@@ -326,14 +300,10 @@ export default function ResumeWorkspaceRail({
       return;
     }
 
-    try {
-      window.localStorage.setItem(
-        WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
-        JSON.stringify([...openFolderIds].filter((folderId) => validFolderIds.has(folderId)).slice(-100)),
-      );
-    } catch {
-      // Folder state is a local preference; organization remains persisted in the workspace.
-    }
+    writeLocalStorageJsonItem(
+      WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
+      [...openFolderIds].filter((folderId) => validFolderIds.has(folderId)).slice(-100),
+    );
   }, [openFolderIds, validFolderIds, workspaceReady]);
 
   useEffect(() => () => {
@@ -466,38 +436,6 @@ export default function ResumeWorkspaceRail({
     }
   }
 
-  function startRename(type, item) {
-    skipRenameCommitRef.current = false;
-    setRenamingItem({ type, id: item.id });
-    setRenameValue(type === 'folder'
-      ? sanitizeWorkspaceFolderName(item.name)
-      : sanitizeWorkspaceResumeName(item.name));
-  }
-
-  function cancelRename() {
-    skipRenameCommitRef.current = true;
-    setRenamingItem(null);
-    setRenameValue('');
-  }
-
-  function commitRename() {
-    if (skipRenameCommitRef.current) {
-      skipRenameCommitRef.current = false;
-      return;
-    }
-
-    if (!renamingItem) {
-      return;
-    }
-
-    if (renamingItem.type === 'folder') {
-      onRenameResumeFolder(renamingItem.id, renameValue);
-    } else {
-      onRenameResume(renamingItem.id, renameValue);
-    }
-    cancelRename();
-  }
-
   async function createFolderFromSelection() {
     if (selectedResumeIds.size === 0 || isCreatingFolder) {
       return;
@@ -509,9 +447,7 @@ export default function ResumeWorkspaceRail({
       const folderId = await onCreateResumeFolder([...selectedResumeIds]);
       if (folderId) {
         setOpenFolderIds((current) => new Set(current).add(folderId));
-        skipRenameCommitRef.current = false;
-        setRenamingItem({ type: 'folder', id: folderId });
-        setRenameValue(folderName);
+        startRename('folder', { id: folderId, name: folderName });
         clearSelection();
       }
     } finally {
