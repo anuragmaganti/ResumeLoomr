@@ -7,6 +7,7 @@ import {
   setSyncSessionCleanupRequested,
 } from './localWorkspaceDb.js';
 import { createOutboxAckDescriptor } from './outboxProtocol.js';
+import { clearResumeSyncSession } from './syncSession.js';
 
 const RESUME_SYNC_TAG = 'resumeloomr-sync-outbox';
 const MAX_SYNC_REQUEST_BYTES = 3_000_000;
@@ -98,39 +99,6 @@ export async function requestResumeBackgroundSync() {
     if (import.meta.env.DEV) {
       console.warn('Resume background sync request failed', error);
     }
-    return false;
-  }
-}
-
-export async function createResumeSyncSession(idToken) {
-  if (!idToken) {
-    return false;
-  }
-
-  const response = await fetch('/api/sync-session', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${idToken}`,
-    },
-    credentials: 'include',
-  });
-
-  if (!response.ok) {
-    throw new Error('Could not start browser sync session.');
-  }
-
-  return true;
-}
-
-export async function clearResumeSyncSession() {
-  try {
-    const response = await fetch('/api/sync-session', {
-      method: 'DELETE',
-      credentials: 'include',
-    });
-
-    return response.ok;
-  } catch {
     return false;
   }
 }

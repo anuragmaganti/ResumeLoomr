@@ -19,9 +19,9 @@ import { usePreviewEditorController } from './hooks/usePreviewEditorController.j
 import { useSeparatorSettingsController } from './hooks/useSeparatorSettingsController.js';
 import { importResumeFile } from './lib/importResume.js';
 import {
-  clearResumeSyncSession,
   requestResumeBackgroundSync,
 } from './lib/backgroundSync.js';
+import { clearResumeSyncSession } from './lib/syncSession.js';
 import {
   readDurableLocalBrowserContext,
   setSyncSessionCleanupRequested,

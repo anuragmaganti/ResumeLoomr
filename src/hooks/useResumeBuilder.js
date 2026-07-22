@@ -82,12 +82,12 @@ import {
 } from '../lib/localWorkspaceDb.js';
 import { readLegacyWorkspaceSnapshot } from '../lib/localWorkspaceMirror.js';
 import {
-  createResumeSyncSession,
   pullCloudWorkspaceSnapshot,
   registerResumeSyncWorker,
   requestResumeBackgroundSync,
   syncLocalOutbox,
 } from '../lib/backgroundSync.js';
+import { ensureResumeSyncSession } from '../lib/syncSession.js';
 
 function getDraftEditorSectionIds(draft) {
   const blockIds = Array.isArray(draft?.resume?.sections)
@@ -270,7 +270,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       try {
         setSyncState(isOnline() ? 'syncing' : 'offline');
         const idToken = await user.getIdToken();
-        await createResumeSyncSession(idToken);
+        await ensureResumeSyncSession({ idToken, accountUid: user.uid });
         const cloudSnapshot = normalizeCloudWorkspaceSnapshot(await pullCloudWorkspaceSnapshot(idToken));
 
         const preMergeSave = await saveEditorDraftFromRefs({
@@ -599,7 +599,8 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     try {
       setSyncState('syncing');
       const idToken = await currentUser.getIdToken();
-      await createResumeSyncSession(idToken);
+      await ensureResumeSyncSession({ idToken, accountUid: currentUser.uid });
+
       let result = null;
       let oversizedResumeDetected = false;
 
