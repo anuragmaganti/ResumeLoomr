@@ -14,7 +14,7 @@ const STANDALONE_SOURCE_FILES = [
   'vite.config.js',
   'public/sync-worker.js',
 ];
-const SOURCE_EXTENSIONS = new Set(['.js', '.jsx', '.mjs']);
+const SOURCE_EXTENSIONS = new Set(['.js', '.jsx', '.mjs', '.css']);
 const RESOLVABLE_EXTENSIONS = ['.js', '.jsx', '.mjs', '.json', '.css'];
 const ENTRYPOINTS = [
   'src/main.jsx',
@@ -24,6 +24,7 @@ const ENTRYPOINTS = [
   'public/sync-worker.js',
 ];
 const SERVER_ENTRYPOINTS = ENTRYPOINTS.filter((path) => path.startsWith('api/'));
+const PRODUCTION_MODULE_PREFIXES = ['src/', 'api/', 'server/', 'public/'];
 
 function toRepositoryPath(path) {
   return relative(ROOT, path).replaceAll('\\', '/');
@@ -50,8 +51,9 @@ function extractImportSpecifiers(source) {
   const staticImportPattern = /\b(?:import|export)\s+(?:(?:[\w*$\s{},]+)\s+from\s+)?(['"])([^'"]+)\1/g;
   const dynamicImportPattern = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
   const requirePattern = /\brequire\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
+  const cssImportPattern = /@import\s+(?:url\(\s*)?(['"])([^'"]+)\1\s*\)?/g;
 
-  for (const pattern of [staticImportPattern, dynamicImportPattern, requirePattern]) {
+  for (const pattern of [staticImportPattern, dynamicImportPattern, requirePattern, cssImportPattern]) {
     for (const match of source.matchAll(pattern)) {
       specifiers.add(match[2]);
     }
@@ -184,6 +186,18 @@ const clientReachable = collectReachable(graph, 'src/main.jsx');
 for (const module of clientReachable) {
   if (module.startsWith('api/') || module.startsWith('server/')) {
     errors.push(`client entrypoint reaches server-only module: ${module}`);
+  }
+}
+
+const productionReachable = new Set(
+  ENTRYPOINTS.flatMap((entrypoint) => [...collectReachable(graph, entrypoint)]),
+);
+for (const module of graph.keys()) {
+  if (
+    PRODUCTION_MODULE_PREFIXES.some((prefix) => module.startsWith(prefix))
+    && !productionReachable.has(module)
+  ) {
+    errors.push(`unreachable production module: ${module}`);
   }
 }
 
