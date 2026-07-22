@@ -214,9 +214,10 @@ test('empty sample content is replaced with the real preview model before print'
 test('below-heading section separators render on the final visible section', () => {
   const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
   const previewComponent = fs.readFileSync('src/components/resumePreview.jsx', 'utf8');
+  const previewSortables = fs.readFileSync('src/components/resumePreviewSortables.jsx', 'utf8');
 
   assert.match(previewComponent, /const showSeparator = sectionSeparatorPosition === 'belowSectionName'\s*\?\s*true\s*:\s*index < visibleSectionBlocks\.length - 1/);
-  assert.match(previewComponent, /separatorPosition === 'belowSectionName'\s*\?\s*renderSectionSeparatorControl/);
+  assert.match(previewSortables, /separatorPosition === 'belowSectionName'\s*\?\s*renderSectionSeparatorControl/);
   assert.match(previewCss, /\.resumeSection:not\(\.resumeSection--separatorBelowHeading\):last-child > \.sectionSeparatorControl/);
   assert.match(previewCss, /\.resumeSection:not\(\.resumeSection--separatorBelowHeading\)\.resumeSection--lastVisible > \.sectionSeparatorControl/);
 });

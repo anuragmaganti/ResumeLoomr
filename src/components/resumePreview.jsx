@@ -5,8 +5,6 @@ import {
     DragOverlay,
     MeasuringFrequency,
     MeasuringStrategy,
-    useDraggable,
-    useDroppable,
     useSensor,
     useSensors,
 } from '@dnd-kit/core';
@@ -14,9 +12,7 @@ import {
     horizontalListSortingStrategy,
     SortableContext,
     sortableKeyboardCoordinates,
-    useSortable,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import {
     ENTRY_HEADER_LAYOUT_FIELDS,
     getDefaultEntryHeaderLayout,
@@ -24,7 +20,6 @@ import {
     normalizeEntryHeaderLayout,
 } from '../lib/resumeEntryLayout.js';
 import {
-    PERSONAL_ALIGNMENT_OPTIONS,
     PERSONAL_CONTACT_FIELDS,
     getEffectivePersonalAlignment,
     getResumePresentationVars,
@@ -46,6 +41,7 @@ import {
 } from '../lib/editorTargets.js';
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from '../lib/sortableSensors.js';
 import MobilePreviewEditorProxy from './mobilePreviewEditorProxy.jsx';
+import PersonalAlignmentControls from './personalAlignmentControls.jsx';
 import {
     isMobilePreviewEditingViewport,
     parseCssPixelValue,
@@ -57,7 +53,6 @@ import {
     getPreviewSortableElement,
     headerSlotDragId,
     moveIdWithinOrder,
-    normalizePreviewSortableTransform,
     parsePreviewDragId,
     personalContactDragId,
     personalHeaderDragId,
@@ -65,6 +60,25 @@ import {
     previewVerticalListSortingStrategy,
     sectionDragId,
 } from './resumePreviewDrag.js';
+import {
+    HeaderLayoutField,
+    HeaderLayoutHoverSlot,
+    HeaderLayoutSlot,
+} from './resumePreviewHeaderLayout.jsx';
+import {
+    SortablePersonalContact,
+    SortablePersonalHeaderRow,
+    SortablePreviewBullet,
+    SortablePreviewEntry,
+    SortablePreviewSection,
+    StaticPreviewBullet,
+    StaticPreviewEntry,
+    StaticPreviewSection,
+} from './resumePreviewSortables.jsx';
+import {
+    openSeparatorSettings,
+    previewSectionClassName,
+} from './resumePreviewSectionChrome.js';
 import { useMobilePreviewEditor } from './useMobilePreviewEditor.js';
 import {
     useResumePreviewPageMetrics,
@@ -175,517 +189,6 @@ function getEntryHeaderLayoutSlotField(layout, slot) {
     }
 
     return slots[slotIndex] || null;
-}
-
-function previewSectionClassName(className, showSeparator) {
-    return `${className}${showSeparator ? '' : ' resumeSection--lastVisible'}`;
-}
-
-function renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position = 'aboveSectionName' }) {
-    if (position === 'belowSectionName') {
-        return (
-            <span
-                className="sectionSeparatorBelowHeading"
-                data-separator-scope="section"
-                data-separator-section-id={blockId}
-            >
-                <span className="sectionSeparatorPrintLine" aria-hidden="true" />
-                <button
-                    type="button"
-                    className="sectionSeparatorControl sectionSeparatorControl--belowHeading"
-                    data-separator-scope="section"
-                    data-separator-section-id={blockId}
-                    aria-label="Section separator settings"
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'section', blockId)}
-                />
-            </span>
-        );
-    }
-
-    return (
-        <button
-            type="button"
-            className="sectionSeparatorControl"
-            data-separator-scope="section"
-            data-separator-section-id={blockId}
-            aria-label="Section separator settings"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'section', blockId)}
-        />
-    );
-}
-
-function openSeparatorSettings(event, onSeparatorSettingsOpen, scope, sectionId) {
-    event.preventDefault();
-    event.stopPropagation();
-    onSeparatorSettingsOpen?.({
-        scope,
-        sectionId,
-        x: event.clientX,
-        y: event.clientY,
-        triggerElement: event.currentTarget,
-    });
-}
-
-function SortablePreviewSection({
-    blockId,
-    className,
-    previewScale,
-    showSeparator = true,
-    separatorPosition = 'aboveSectionName',
-    onSeparatorSettingsOpen,
-    children,
-}) {
-    const sortableId = sectionDragId(blockId);
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: sortableId });
-    const style = {
-        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
-        transition,
-    };
-    const handleProps = {
-        ...attributes,
-        ...listeners,
-        'data-preview-drag-handle': 'true',
-        'data-preview-drag-scope': 'section',
-    };
-
-    return (
-        <div
-            ref={setNodeRef}
-            data-preview-sortable-id={sortableId}
-            data-page-break-kind="section"
-            className={`${previewSectionClassName(className, showSeparator)}${separatorPosition === 'belowSectionName' ? ' resumeSection--separatorBelowHeading' : ''} previewSortableItem previewSortableSection ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
-            style={style}
-        >
-            {children(
-                handleProps,
-                separatorPosition === 'belowSectionName'
-                    ? renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })
-                    : null,
-            )}
-            {showSeparator && separatorPosition !== 'belowSectionName' && renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })}
-        </div>
-    );
-}
-
-function StaticPreviewSection({
-    blockId,
-    className,
-    showSeparator = true,
-    separatorPosition = 'aboveSectionName',
-    onSeparatorSettingsOpen,
-    children,
-}) {
-    return (
-        <div
-            className={`${previewSectionClassName(className, showSeparator)}${separatorPosition === 'belowSectionName' ? ' resumeSection--separatorBelowHeading' : ''}`}
-            data-page-break-kind="section"
-        >
-            {children(
-                {},
-                blockId && separatorPosition === 'belowSectionName'
-                    ? renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })
-                    : null,
-            )}
-            {blockId && showSeparator && separatorPosition !== 'belowSectionName' && renderSectionSeparatorControl({ blockId, onSeparatorSettingsOpen, position: separatorPosition })}
-        </div>
-    );
-}
-
-function SortablePreviewEntry({ sectionId, entryId, className, previewScale, entryEditProps = {}, preferEntryDrag = false, children }) {
-    const sortableId = entryDragId(sectionId, entryId);
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: sortableId });
-    const style = {
-        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
-        transition,
-    };
-    const handleProps = {
-        ...attributes,
-        ...listeners,
-        'data-preview-drag-handle': 'true',
-        'data-preview-drag-scope': 'entry',
-    };
-    const containerEntryDragProps = {
-        ...attributes,
-        'data-preview-drag-handle': 'true',
-        'data-preview-drag-scope': 'entry-empty-space',
-        onPointerDown: (event) => {
-            const childInteractiveTarget = event.target.closest(
-                '[data-edit-section-id], [data-preview-drag-scope="header-layout"], [data-preview-drag-scope="bullet"], [data-header-hover-slot], button, input, textarea, select, a',
-            );
-            const shouldLetChildHandleDrag = childInteractiveTarget && childInteractiveTarget !== event.currentTarget;
-
-            if (
-                shouldLetChildHandleDrag &&
-                !(preferEntryDrag && !event.target.closest('[data-preview-drag-scope="header-layout"], [data-header-hover-slot], input, textarea, select'))
-            ) {
-                return;
-            }
-
-            listeners?.onPointerDown?.(event);
-        },
-    };
-
-    return (
-        <div
-            ref={setNodeRef}
-            data-preview-sortable-id={sortableId}
-            data-page-break-kind="entry"
-            className={`${className} previewSortableItem previewSortableEntry ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
-            style={style}
-            {...entryEditProps}
-            {...containerEntryDragProps}
-        >
-            {children(handleProps)}
-        </div>
-    );
-}
-
-function StaticPreviewEntry({ className, entryEditProps = {}, children }) {
-    return (
-        <div className={className} data-page-break-kind="entry" {...entryEditProps}>
-            {children({})}
-        </div>
-    );
-}
-
-function SortablePreviewBullet({ sectionId, entryId, field, itemIndex, editProps, previewScale, children }) {
-    const sortableId = bulletDragId(sectionId, entryId, field, itemIndex);
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: sortableId });
-    const style = {
-        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
-        transition,
-    };
-    const handleProps = {
-        ...attributes,
-        ...listeners,
-        'data-preview-drag-handle': 'true',
-        'data-preview-drag-scope': 'bullet',
-    };
-
-    return (
-        <li
-            ref={setNodeRef}
-            data-preview-sortable-id={sortableId}
-            data-page-break-kind="item"
-            className={`previewSortableItem previewSortableBullet ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
-            style={style}
-            {...editProps}
-            {...handleProps}
-        >
-            {children}
-        </li>
-    );
-}
-
-function SortablePersonalContact({ field, editProps, previewScale, children }) {
-    const sortableId = personalContactDragId(field);
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: sortableId });
-    const style = {
-        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
-        transition,
-    };
-    const handleProps = {
-        ...attributes,
-        ...listeners,
-        'data-preview-drag-handle': 'true',
-        'data-preview-drag-scope': 'personal-contact',
-    };
-
-    return (
-        <span
-            ref={setNodeRef}
-            data-preview-sortable-id={sortableId}
-            className={`previewSortableItem previewSortablePersonalContact ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
-            style={style}
-            {...editProps}
-            {...handleProps}
-        >
-            {children}
-        </span>
-    );
-}
-
-function PersonalAlignmentControls({ activeAlignment, onAlignmentChange }) {
-    const labels = {
-        left: 'Align personal section left',
-        center: 'Align personal section center',
-    };
-    const iconBars = {
-        left: [
-            { x: 3, width: 14 },
-            { x: 3, width: 10 },
-            { x: 3, width: 13 },
-            { x: 3, width: 8 },
-        ],
-        center: [
-            { x: 3, width: 14 },
-            { x: 5, width: 10 },
-            { x: 3.5, width: 13 },
-            { x: 6, width: 8 },
-        ],
-    };
-
-    function stopControlEvent(event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-
-    function renderAlignmentIcon(alignment) {
-        return (
-            <svg
-                className="personalAlignmentIcon"
-                viewBox="0 0 20 18"
-                aria-hidden="true"
-                focusable="false"
-            >
-                {iconBars[alignment].map((bar, index) => (
-                    <rect
-                        key={`${alignment}-${index}`}
-                        x={bar.x}
-                        y={3 + (index * 3.4)}
-                        width={bar.width}
-                        height="1.8"
-                        rx="0.9"
-                    />
-                ))}
-            </svg>
-        );
-    }
-
-    return (
-        <div
-            className="personalAlignmentMenu"
-            data-personal-alignment-menu="true"
-            aria-label="Personal section alignment"
-            onPointerDown={stopControlEvent}
-            onMouseDown={stopControlEvent}
-            onClick={(event) => event.stopPropagation()}
-        >
-            {PERSONAL_ALIGNMENT_OPTIONS.map((alignment) => (
-                <button
-                    key={alignment}
-                    type="button"
-                    className="personalAlignmentButton"
-                    aria-label={labels[alignment]}
-                    aria-pressed={activeAlignment === alignment}
-                    data-personal-alignment-option={alignment}
-                    onClick={(event) => {
-                        stopControlEvent(event);
-                        onAlignmentChange?.(alignment);
-                    }}
-                >
-                    {renderAlignmentIcon(alignment)}
-                </button>
-            ))}
-        </div>
-    );
-}
-
-function SortablePersonalHeaderRow({
-    rowId,
-    previewScale,
-    children,
-}) {
-    const sortableId = personalHeaderDragId(rowId);
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: sortableId });
-    const style = {
-        transform: CSS.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
-        transition,
-    };
-    const handleProps = {
-        ...attributes,
-        'data-preview-drag-handle': 'true',
-        'data-preview-drag-scope': 'personal-header',
-        onPointerDown: (event) => {
-            if (
-                event.target.closest(
-                    '[data-personal-alignment-menu], [data-preview-drag-scope="personal-contact"], .summaryResizeHandle, .summaryResizeEdge, button, input, textarea, select, a',
-                )
-            ) {
-                return;
-            }
-
-            listeners?.onPointerDown?.(event);
-        },
-        onKeyDown: listeners?.onKeyDown,
-    };
-
-    return (
-        <div
-            ref={setNodeRef}
-            data-preview-sortable-id={sortableId}
-            className={`personalHeaderRow personalHeaderRow--${rowId} previewSortableItem previewSortablePersonalHeader ${isDragging ? 'isPreviewSortingPlaceholder' : ''}`}
-            style={style}
-            data-personal-header-row={rowId}
-            {...handleProps}
-        >
-            {children}
-        </div>
-    );
-}
-
-function StaticPreviewBullet({ editProps, children }) {
-    return <li data-page-break-kind="item" {...editProps}>{children}</li>;
-}
-
-function HeaderLayoutSlot({
-    id,
-    field,
-    label,
-    renderChip,
-}) {
-    const {
-        setNodeRef: setDroppableNodeRef,
-        isOver,
-    } = useDroppable({ id });
-    const {
-        attributes,
-        listeners,
-        setNodeRef: setDraggableNodeRef,
-        isDragging,
-    } = useDraggable({ id, disabled: !field });
-    const dragProps = field
-        ? {
-            ...attributes,
-            ...listeners,
-            'data-preview-drag-handle': 'true',
-            'data-preview-drag-scope': 'header-layout',
-        }
-        : {};
-
-    return (
-        <div
-            ref={setDroppableNodeRef}
-            className={`entryHeaderLayoutSlot${field ? ' entryHeaderLayoutSlot--filled' : ' entryHeaderLayoutSlot--empty'}${isDragging ? ' isHeaderLayoutSource' : ''}${isOver && !isDragging ? ' isHeaderLayoutDropTarget' : ''}`}
-            data-header-layout-slot="true"
-        >
-            {field ? (
-                <span
-                    ref={setDraggableNodeRef}
-                    className="entryHeaderLayoutChip"
-                    data-preview-sortable-id={id}
-                    {...dragProps}
-                >
-                    {renderChip(field)}
-                </span>
-            ) : (
-                <span className="entryHeaderLayoutEmpty" aria-label={label} />
-            )}
-        </div>
-    );
-}
-
-function composeEventHandlers(primaryHandler, secondaryHandler) {
-    return (event) => {
-        primaryHandler?.(event);
-
-        if (!event.defaultPrevented) {
-            secondaryHandler?.(event);
-        }
-    };
-}
-
-function HeaderLayoutField({
-    id,
-    className,
-    editProps,
-    children,
-    dragEnabled = false,
-    onFieldHover,
-    onFieldLeave,
-}) {
-    const {
-        setNodeRef: setDroppableNodeRef,
-        isOver,
-    } = useDroppable({ id, disabled: !dragEnabled });
-    const {
-        listeners,
-        setNodeRef: setDraggableNodeRef,
-        isDragging,
-    } = useDraggable({ id, disabled: !dragEnabled });
-    const setNodeRef = (node) => {
-        setDroppableNodeRef(node);
-        setDraggableNodeRef(node);
-    };
-    const dragProps = dragEnabled
-        ? {
-            'data-preview-sortable-id': id,
-            'data-preview-drag-handle': 'true',
-            'data-preview-drag-scope': 'header-layout',
-        }
-        : {};
-
-    return (
-        <span
-            ref={setNodeRef}
-            className={`${className} entryHeaderLayoutField${dragEnabled ? ' entryHeaderLayoutField--draggable' : ''}${isDragging ? ' isHeaderLayoutSource' : ''}${isOver && !isDragging ? ' isHeaderLayoutDropTarget' : ''}`}
-            {...dragProps}
-            {...editProps}
-            onPointerEnter={onFieldHover}
-            onPointerLeave={onFieldLeave}
-            onFocus={onFieldHover}
-            onBlur={onFieldLeave}
-            onPointerDown={dragEnabled
-                ? composeEventHandlers(editProps?.onPointerDown, listeners?.onPointerDown)
-                : editProps?.onPointerDown}
-            onKeyDown={editProps?.onKeyDown}
-        >
-            {children}
-        </span>
-    );
-}
-
-function HeaderLayoutHoverSlot({ id, label }) {
-    const {
-        setNodeRef,
-        isOver,
-    } = useDroppable({ id });
-
-    return (
-        <span
-            ref={setNodeRef}
-            className={`entryHeaderHoverSlot${isOver ? ' isHeaderLayoutDropTarget' : ''}`}
-            aria-label={label}
-            data-header-hover-slot="true"
-        />
-    );
 }
 
 function getPrimaryEntryField(block, entry) {
