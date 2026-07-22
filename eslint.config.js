@@ -15,7 +15,6 @@ export default defineConfig([
     ],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
       parserOptions: {
         ecmaVersion: 'latest',
         ecmaFeatures: { jsx: true },
@@ -27,7 +26,25 @@ export default defineConfig([
     },
   },
   {
-    files: ['api/**/*.js', 'server/**/*.js', 'tests/**/*.js', 'scripts/**/*.mjs'],
+    files: ['src/**/*.{js,jsx}'],
+    languageOptions: {
+      globals: globals.browser,
+    },
+  },
+  {
+    files: ['public/sync-worker.js'],
+    languageOptions: {
+      globals: globals.serviceworker,
+    },
+  },
+  {
+    files: [
+      'api/**/*.js',
+      'server/**/*.js',
+      'tests/**/*.js',
+      'scripts/**/*.mjs',
+      '*.config.js',
+    ],
     languageOptions: {
       globals: globals.node,
     },
