@@ -19,7 +19,7 @@ export function isKnownSourceSectionHeader(line) {
   return /^(?:summary|profile|objective|education|relevant coursework|coursework|internship experience|professional experience|work experience|additional work experience|employment experience|experience|leadership(?: experience|\s*(?:&|and|\+)\s*service)?|volunteer experience|volunteering|research(?: experience)?|teaching(?: experience)?|advising(?: experience)?|industry(?: experience)?|military(?: experience| service)?|clinical(?: experience)?|campus involvement|public service|community service|projects?|skills|certifications?|languages|additional information|activities?\s*(?:&|and|\+)\s*awards?|honors?\s*(?:&|and|\+)?\s*awards?|awards(?:\s*(?:&|and|\+)\s*interests?)?|interests?|publications?|invited talks?|conferences?|patents?|references?)$/i.test(trimText(line));
 }
 
-export function getRoleSectionType(line) {
+function getRoleSectionType(line) {
   const text = trimText(line);
 
   if (/^leadership experience$/i.test(text)) {
