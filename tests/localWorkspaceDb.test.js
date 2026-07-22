@@ -4,6 +4,7 @@ import 'fake-indexeddb/auto';
 
 import {
   createSavedDraftState,
+  createUnsyncedDraftCopyState,
   deleteLocalWorkspaceDatabase,
   initializeLocalWorkspace,
   markOutboxFailed,
@@ -129,6 +130,42 @@ test('content-only draft saves persist workspace metadata locally without queuei
     structuralOperations.map((operation) => operation.type).sort(),
     ['upsertDraft', 'workspace'],
   );
+});
+
+test('a draft copied to a new resume id starts with fresh local and cloud identity', async () => {
+  const initial = await initializeLocalWorkspace();
+  const copyResumeId = 'copied-resume';
+  const sourceDraft = {
+    ...createSavedDraftState(initial.draft),
+    localRevision: 'source-revision',
+    cloudVersion: 7,
+  };
+  const copiedDraft = createUnsyncedDraftCopyState(sourceDraft);
+  const workspaceWithCopy = addResumeToWorkspace(
+    initial.workspace,
+    copyResumeId,
+    copiedDraft.savedAt,
+  );
+
+  assert.equal(copiedDraft.localRevision, '');
+  assert.equal(copiedDraft.cloudVersion, 0);
+  assert.deepEqual(copiedDraft.resume, sourceDraft.resume);
+  assert.equal(copiedDraft.template, sourceDraft.template);
+
+  const persistedCopy = await persistLocalDraftSnapshot({
+    resumeId: copyResumeId,
+    workspace: workspaceWithCopy,
+    draft: copiedDraft,
+    accountUid: 'account-a',
+    enqueueWorkspaceSync: true,
+  });
+  const pendingOperations = await readPendingOutbox({ accountUid: 'account-a' });
+  const copyOperation = pendingOperations.find((operation) => (
+    operation.type === 'upsertDraft' && operation.resumeId === copyResumeId
+  ));
+
+  assert.notEqual(persistedCopy.draft.localRevision, sourceDraft.localRevision);
+  assert.equal(copyOperation?.baseCloudVersion, 0);
 });
 
 test('an old in-flight acknowledgement cannot clear a newer draft operation', async () => {

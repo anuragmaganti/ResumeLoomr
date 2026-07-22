@@ -1840,3 +1840,10 @@ export function createSavedDraftState({ resume, template, localRevision = '', cl
     cloudVersion: normalizeCloudVersion(cloudVersion),
   };
 }
+
+export function createUnsyncedDraftCopyState(draft) {
+  return createSavedDraftState({
+    resume: draft?.resume,
+    template: draft?.template,
+  });
+}

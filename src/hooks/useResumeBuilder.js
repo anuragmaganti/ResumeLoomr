@@ -57,6 +57,7 @@ import {
 } from '../lib/resume.js';
 import {
   createSavedDraftState,
+  createUnsyncedDraftCopyState,
   initializeLocalWorkspace,
   mergeLocalAndCloudWorkspaces,
   persistLocalDraftSnapshot,
@@ -1177,7 +1178,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const existingNames = currentWorkspace.resumeIds.map((resumeId) => currentWorkspace.meta[resumeId]?.name || '');
     const sourceName = currentWorkspace.meta[sourceResumeId]?.name || '';
     const duplicateName = createDuplicateResumeName(sourceName, existingNames);
-    const duplicateDraft = createSavedDraftState(currentDraftRef.current);
+    const duplicateDraft = createUnsyncedDraftCopyState(currentDraftRef.current);
     const nextWorkspace = placeWorkspaceResumeAfter(normalizeWorkspaceIndex({
       ...currentWorkspace,
       activeResumeId: nextResumeId,
@@ -1450,7 +1451,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const sourceName = currentWorkspace.meta[currentConflict.resumeId]?.name || 'Resume';
     const existingNames = currentWorkspace.resumeIds.map((resumeId) => currentWorkspace.meta[resumeId]?.name || '');
     const copyName = createDuplicateResumeName(sourceName, existingNames);
-    const copyDraft = createSavedDraftState(currentDraftRef.current);
+    const copyDraft = createUnsyncedDraftCopyState(currentDraftRef.current);
     const nextWorkspace = placeWorkspaceResumeAfter(normalizeWorkspaceIndex({
       ...currentWorkspace,
       activeResumeId: nextResumeId,
