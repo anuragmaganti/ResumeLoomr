@@ -182,7 +182,7 @@ tests/               Node tests and Firestore rules tests
 
 ### Prerequisites
 
-- Node.js 22.12 or newer
+- Node.js 22.13 or newer
 - npm
 - Firebase project for auth/cloud sync
 - Gemini API key for resume import

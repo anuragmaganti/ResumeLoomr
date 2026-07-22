@@ -34,20 +34,20 @@ export function deriveAccountSwitchGate({ user, durableContext, resolvedAccountU
 }
 
 export function useAccountSwitchGate({ user, authReady, connectedAccount }) {
-  const preSignInConnectedAccountRef = useRef(readConnectedAccount());
+  const [initialConnectedAccount] = useState(readConnectedAccount);
+  const preSignInConnectedAccountRef = useRef(initialConnectedAccount);
   const clearingRef = useRef(false);
   const [isClearing, setIsClearing] = useState(false);
-  const [resolvedAccountUid, setResolvedAccountUid] = useState('');
+  const [resolvedUser, setResolvedUser] = useState(null);
   const [durableContext, setDurableContext] = useState(() => ({
     checkedForUid: '',
-    previousAccount: preSignInConnectedAccountRef.current,
+    previousAccount: initialConnectedAccount,
     hasWorkspaceData: false,
   }));
 
   useEffect(() => {
     if (!user) {
       preSignInConnectedAccountRef.current = connectedAccount;
-      setResolvedAccountUid('');
     }
   }, [connectedAccount, user]);
 
@@ -101,7 +101,11 @@ export function useAccountSwitchGate({ user, authReady, connectedAccount }) {
     };
   }, [authReady, connectedAccount, user]);
 
-  const gate = deriveAccountSwitchGate({ user, durableContext, resolvedAccountUid });
+  const gate = deriveAccountSwitchGate({
+    user,
+    durableContext,
+    resolvedAccountUid: resolvedUser === user ? user?.uid || '' : '',
+  });
 
   function importLocalData() {
     if (!user) {
@@ -115,7 +119,7 @@ export function useAccountSwitchGate({ user, authReady, connectedAccount }) {
       checkedForUid: user.uid,
       previousAccount: nextAccount,
     }));
-    setResolvedAccountUid(user.uid);
+    setResolvedUser(user);
     return true;
   }
 
@@ -136,7 +140,7 @@ export function useAccountSwitchGate({ user, authReady, connectedAccount }) {
         previousAccount: nextAccount,
         hasWorkspaceData: false,
       });
-      setResolvedAccountUid(user.uid);
+      setResolvedUser(user);
       window.location.reload();
       return true;
     } catch {

@@ -77,7 +77,7 @@ export async function readJsonRequestBody(req, { maxBytes = DEFAULT_MAX_JSON_BOD
     }
 
     if (req.body !== null && typeof req.body === 'object') {
-      let serializedBody = '';
+      let serializedBody;
 
       try {
         serializedBody = JSON.stringify(req.body);

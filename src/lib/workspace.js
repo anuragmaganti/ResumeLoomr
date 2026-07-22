@@ -79,7 +79,7 @@ function createUniqueWorkspaceFolderName(folders, value, { excludeFolderId = '',
   }
 
   let index = 2;
-  let candidate = '';
+  let candidate;
 
   do {
     const suffix = ` ${index}`;

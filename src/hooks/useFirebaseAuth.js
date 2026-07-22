@@ -42,25 +42,20 @@ function getFriendlyAuthError(error) {
 
 export function useFirebaseAuth() {
   const firebaseEnabled = hasFirebaseConfig();
+  const [auth] = useState(() => (firebaseEnabled ? getFirebaseAuth() : null));
   const [user, setUser] = useState(null);
-  const [authReady, setAuthReady] = useState(!firebaseEnabled);
+  const [authReady, setAuthReady] = useState(!auth);
   const [authError, setAuthError] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [connectedAccount, setConnectedAccount] = useState(() => readConnectedAccount());
 
   useEffect(() => {
-    if (!firebaseEnabled) {
+    if (!auth) {
       return undefined;
     }
 
     initializeFirebaseAppCheck();
-    const auth = getFirebaseAuth();
-
-    if (!auth) {
-      setAuthReady(true);
-      return undefined;
-    }
 
     return onAuthStateChanged(auth, (nextUser) => {
       if (nextUser) {
@@ -74,7 +69,7 @@ export function useFirebaseAuth() {
       setUser(nextUser);
       setAuthReady(true);
     });
-  }, [firebaseEnabled]);
+  }, [auth]);
 
   async function runAuthAction(action) {
     setAuthError('');
@@ -83,8 +78,6 @@ export function useFirebaseAuth() {
       setAuthError('Firebase is not configured for this deployment yet.');
       return;
     }
-
-    const auth = getFirebaseAuth();
 
     if (!auth) {
       setAuthError('Firebase is not available in this browser session.');
@@ -130,7 +123,6 @@ export function useFirebaseAuth() {
     },
     async signOut() {
       setAuthError('');
-      const auth = getFirebaseAuth();
 
       if (!auth) {
         return;
@@ -150,7 +142,6 @@ export function useFirebaseAuth() {
     },
     async disconnectAuthSession() {
       setAuthError('');
-      const auth = getFirebaseAuth();
 
       setAuthBusy(true);
 

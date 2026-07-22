@@ -10,7 +10,6 @@ export function useWorkspaceRailLayout({ railRef, workspaceReady }) {
 
     if (!node || typeof ResizeObserver === 'undefined') {
       // Mark the fallback layout ready when container observation is unavailable.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHasMeasuredColumns(true);
       return undefined;
     }
@@ -32,9 +31,6 @@ export function useWorkspaceRailLayout({ railRef, workspaceReady }) {
 
   useEffect(() => {
     if (!workspaceReady || !hasMeasuredColumns) {
-      // Hydration must suppress layout animation until measured content is stable.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMotionReady(false);
       return undefined;
     }
 
@@ -51,6 +47,6 @@ export function useWorkspaceRailLayout({ railRef, workspaceReady }) {
 
   return {
     columns,
-    motionReady,
+    motionReady: workspaceReady && hasMeasuredColumns && motionReady,
   };
 }

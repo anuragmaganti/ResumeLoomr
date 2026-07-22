@@ -230,7 +230,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     bootstrapRunIdRef.current = runId;
 
     if (!user) {
-      setSyncState('idle');
       return;
     }
 
@@ -1341,7 +1340,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       editorDraftResumeIdRef.current = '';
     }
 
-    let persistedWorkspace = null;
+    let persistedWorkspace;
 
     try {
       persistedWorkspace = await persistLocalResumeBatchDelete({
@@ -1522,7 +1521,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     retryCloudSync,
     flushActiveCloudDraft,
     saveState,
-    syncState,
+    syncState: user ? syncState : 'idle',
     localReady,
     templateOptions: TEMPLATE_OPTIONS,
     resumeList,
