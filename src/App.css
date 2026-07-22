@@ -3875,6 +3875,10 @@ html[data-theme="dark"] .sectionAddDialog {
     width: 100%;
   }
 
+  .workspaceColumnPreview .previewPageViewport {
+    justify-items: center;
+  }
+
   .editorWorkspace {
     grid-template-columns: 1fr;
     gap: var(--rail-gap);
