@@ -169,6 +169,7 @@ test('preview print CSS uses physical page geometry instead of mobile viewport g
   const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
   const appCss = fs.readFileSync('src/App.css', 'utf8');
   const previewComponent = fs.readFileSync('src/components/resumePreview.jsx', 'utf8');
+  const previewLayoutHook = fs.readFileSync('src/components/useResumePreviewLayout.js', 'utf8');
   const builderHook = fs.readFileSync('src/hooks/useResumeBuilder.js', 'utf8');
   const printStart = previewCss.indexOf('@media print');
   const pageRuleStart = previewCss.indexOf('@page', printStart);
@@ -196,8 +197,9 @@ test('preview print CSS uses physical page geometry instead of mobile viewport g
   assert.match(builderHook, /window\.addEventListener\('beforeprint', handleBeforePrint\)/);
   assert.match(builderHook, /function preparePrintView\(\)\s*\{[\s\S]*?setMobileView\('preview'\)/);
   assert.match(previewComponent, /className="previewPageViewport" style=\{presentationVars\}/);
-  assert.match(previewComponent, /useLayoutEffect\(\(\) => \{\s*if \(typeof document === 'undefined'\)/);
-  assert.match(previewComponent, /document\.head\.appendChild\(styleElement\)/);
+  assert.match(previewComponent, /useResumePrintPageRule\(printPageRule\)/);
+  assert.match(previewLayoutHook, /useLayoutEffect\(\(\) => \{\s*if \(typeof document === 'undefined'\)/);
+  assert.match(previewLayoutHook, /document\.head\.appendChild\(styleElement\)/);
   assert.doesNotMatch(previewComponent, /<style media="print">/);
 });
 
@@ -290,13 +292,15 @@ test('preview page break helper keeps raw marker when no clean candidate is vali
 test('preview page markers measure rendered content instead of fixed page scroll height', () => {
   const previewComponent = fs.readFileSync('src/components/resumePreview.jsx', 'utf8');
   const previewGeometry = fs.readFileSync('src/components/resumePreviewGeometry.js', 'utf8');
+  const previewLayoutHook = fs.readFileSync('src/components/useResumePreviewLayout.js', 'utf8');
   const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
 
   assert.match(previewGeometry, /export function measurePreviewContentFlowHeight/);
-  assert.match(previewComponent, /measurePreviewContentFlowHeight\(/);
+  assert.match(previewComponent, /useResumePreviewPageMetrics\(/);
+  assert.match(previewLayoutHook, /measurePreviewContentFlowHeight\(/);
   assert.match(previewComponent, /data-preview-page-content="true"/);
   assert.doesNotMatch(
-    `${previewComponent}\n${previewGeometry}`,
+    `${previewComponent}\n${previewGeometry}\n${previewLayoutHook}`,
     /Math\.max\(printableHeight,\s*resumeElement\.scrollHeight - paddingTop - paddingBottom\)/,
   );
   assert.match(previewCss, /\.resumePageContent\s*\{/);

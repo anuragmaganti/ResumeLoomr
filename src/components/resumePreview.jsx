@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
     DndContext,
@@ -34,8 +34,6 @@ import {
 } from '../lib/resumeSettings.js';
 import {
     PRINT_PAGE_HEIGHT_PX,
-    PRINT_PAGE_WIDTH_PX,
-    calculatePreviewPageBreaks,
 } from '../lib/previewPagination.js';
 import {
     createPreviewEditAttributes,
@@ -49,12 +47,7 @@ import {
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from '../lib/sortableSensors.js';
 import MobilePreviewEditorProxy from './mobilePreviewEditorProxy.jsx';
 import {
-    collectPreviewBreakCandidates,
-    getPreviewStickyTop,
     isMobilePreviewEditingViewport,
-    measurePreviewContentFlowHeight,
-    metricsAreEqual,
-    parseCssLengthToPixels,
     parseCssPixelValue,
 } from './resumePreviewGeometry.js';
 import {
@@ -73,6 +66,11 @@ import {
     sectionDragId,
 } from './resumePreviewDrag.js';
 import { useMobilePreviewEditor } from './useMobilePreviewEditor.js';
+import {
+    useResumePreviewPageMetrics,
+    useResumePrintPageRule,
+    useWrappedEntryHeaderSeparators,
+} from './useResumePreviewLayout.js';
 
 function templateClassName(template) {
     return `resumePage--${template}`;
@@ -86,7 +84,6 @@ const personalLinkFieldMap = {
 };
 
 const DEFAULT_PREVIEW_PAGE_MIN_HEIGHT = PRINT_PAGE_HEIGHT_PX;
-const PAGE_FIT_TOLERANCE_PX = 3;
 const SUMMARY_WIDTH_MIN_PERCENT = 75;
 const SUMMARY_WIDTH_MAX_PERCENT = 100;
 const PREVIEW_MARGIN_SETTING_MIN = -5;
@@ -794,14 +791,13 @@ export default function ResumePreview({
     const [summaryWidthDrag, setSummaryWidthDrag] = useState(null);
     const isPreviewDragActive = Boolean(activeDragMeta?.type);
     const canShowHeaderLayoutHover = !activeDragMeta?.type || activeDragMeta.type === 'headerSlot';
-    const [pageMetrics, setPageMetrics] = useState({
-        pageWidth: 0,
-        pageHeight: 0,
-        contentHeight: 0,
-        pageCount: 1,
-        pageBreaks: [],
-        scale: 1,
-        layoutWidth: 0,
+    const presentationVars = useMemo(() => getResumePresentationVars(settings, template), [settings, template]);
+    const printPageRule = useMemo(() => getResumePrintPageRule(settings, template), [settings, template]);
+    const pageMetrics = useResumePreviewPageMetrics({
+        frameRef: previewFrameRef,
+        presentationVars,
+        previewModel,
+        resumeRootRef: resumeRef,
     });
     const {
         closeSession: closeMobileEditSession,
@@ -826,8 +822,13 @@ export default function ResumePreview({
         resumeId,
         resumeRootRef: resumeRef,
     });
-    const presentationVars = useMemo(() => getResumePresentationVars(settings, template), [settings, template]);
-    const printPageRule = useMemo(() => getResumePrintPageRule(settings, template), [settings, template]);
+    useResumePrintPageRule(printPageRule);
+    useWrappedEntryHeaderSeparators({
+        activeHeaderLayout,
+        presentationVars,
+        previewModel,
+        resumeRootRef: resumeRef,
+    });
     const personalAlignment = useMemo(() => getEffectivePersonalAlignment(settings, template), [settings, template]);
     const personalHeaderOrder = useMemo(() => normalizePersonalHeaderOrder(settings?.personalHeaderOrder), [settings?.personalHeaderOrder]);
     const summaryWidthPercent = clampSummaryWidthPercent(settings?.summaryWidthPercent);
@@ -902,196 +903,11 @@ export default function ResumePreview({
         };
     }, [activeHeaderLayout]);
 
-    useLayoutEffect(() => {
-        if (typeof window === 'undefined') {
-            return undefined;
-        }
-
-        let frameId = 0;
-
-        function updateWrappedHeaderSeparators() {
-            const root = resumeRef.current;
-
-            if (!root) {
-                return;
-            }
-
-            root.querySelectorAll('[data-entry-header-side="true"]').forEach((sideElement) => {
-                const items = Array.from(sideElement.querySelectorAll('[data-entry-header-item="true"]'));
-
-                items.forEach((item, index) => {
-                    const separator = item.querySelector('.entryHeaderFieldSeparator');
-
-                    if (!separator) {
-                        return;
-                    }
-
-                    const previousItem = items[index - 1];
-                    const shouldHideSeparator = previousItem
-                        ? item.getBoundingClientRect().top > previousItem.getBoundingClientRect().top + 1
-                        : false;
-
-                    separator.classList.toggle('entryHeaderFieldSeparator--wrapped', shouldHideSeparator);
-                });
-            });
-        }
-
-        function scheduleUpdate() {
-            window.cancelAnimationFrame(frameId);
-            frameId = window.requestAnimationFrame(updateWrappedHeaderSeparators);
-        }
-
-        scheduleUpdate();
-        window.addEventListener('resize', scheduleUpdate);
-
-        let resizeObserver;
-
-        if (typeof ResizeObserver !== 'undefined' && resumeRef.current) {
-            resizeObserver = new ResizeObserver(scheduleUpdate);
-            resizeObserver.observe(resumeRef.current);
-        }
-
-        return () => {
-            window.cancelAnimationFrame(frameId);
-            window.removeEventListener('resize', scheduleUpdate);
-            resizeObserver?.disconnect();
-        };
-    }, [previewModel, presentationVars, activeHeaderLayout]);
-
     function previewPulseAttributes(path) {
         return previewPulseTarget?.path === path && previewPulseTarget?.requestId
             ? { 'data-preview-pulse': previewPulseTarget.requestId % 2 === 0 ? 'even' : 'odd' }
             : {};
     }
-
-    useEffect(() => {
-        if (typeof window === 'undefined') {
-            return undefined;
-        }
-
-        let frameId = 0;
-
-        function readPageMetrics() {
-            const resumeElement = resumeRef.current;
-            const frameElement = previewFrameRef.current;
-
-            if (!resumeElement || !frameElement) {
-                setPageMetrics((current) => {
-                    const next = {
-                        pageWidth: 0,
-                        pageHeight: 0,
-                        contentHeight: 0,
-                        pageCount: 1,
-                        pageBreaks: [],
-                        scale: 1,
-                        layoutWidth: 0,
-                    };
-
-                    return metricsAreEqual(current, next) ? current : next;
-                });
-                return;
-            }
-
-            const styles = window.getComputedStyle(resumeElement);
-            const frameRect = frameElement.getBoundingClientRect();
-            const availableWidth = Math.max(240, frameElement.clientWidth || frameRect.width);
-            const pageWidth = PRINT_PAGE_WIDTH_PX;
-            const pageHeight = PRINT_PAGE_HEIGHT_PX;
-            const paddingTop = parseCssLengthToPixels(styles.paddingTop);
-            const paddingBottom = parseCssLengthToPixels(styles.paddingBottom);
-            const printableHeight = Math.max(1, pageHeight - paddingTop - paddingBottom);
-            const measuredContentFlowHeight = measurePreviewContentFlowHeight(
-                resumeElement,
-                paddingTop,
-                resumeElement.scrollHeight - paddingTop - paddingBottom,
-            );
-            const contentFlowHeight = previewModel.hasContent
-                ? Math.max(printableHeight, measuredContentFlowHeight - PAGE_FIT_TOLERANCE_PX)
-                : printableHeight;
-            const pageBreaks = previewModel.hasContent
-                ? calculatePreviewPageBreaks({
-                    contentHeight: contentFlowHeight,
-                    printableHeight,
-                    breakCandidates: collectPreviewBreakCandidates(resumeElement, paddingTop),
-                })
-                : [];
-            const markerBreaks = pageBreaks.map((pageBreak) => Math.round(paddingTop + pageBreak));
-            const pageCount = markerBreaks.length + 1;
-            const contentHeight = Math.max(pageHeight, paddingTop + contentFlowHeight + paddingBottom);
-            const availableHeight = Math.max(
-                320,
-                window.innerHeight - getPreviewStickyTop(frameElement) - 24,
-            );
-            const fitPageHeightScale = Math.min(availableHeight / pageHeight, 1);
-            const widthScale = Math.min(availableWidth / pageWidth, 1);
-            const fullPageScale = Math.min(widthScale, fitPageHeightScale, 1);
-            const scale = Math.max(0.35, fullPageScale);
-            const layoutScale = Math.max(0.35, fitPageHeightScale);
-            const nextMetrics = {
-                pageWidth: Math.round(pageWidth),
-                pageHeight: Math.round(pageHeight),
-                contentHeight: Math.round(contentHeight),
-                pageCount,
-                pageBreaks: markerBreaks,
-                scale: Number(scale.toFixed(4)),
-                layoutWidth: Math.round(pageWidth * layoutScale),
-            };
-
-            setPageMetrics((current) => (metricsAreEqual(current, nextMetrics) ? current : nextMetrics));
-        }
-
-        function scheduleRead() {
-            window.cancelAnimationFrame(frameId);
-            frameId = window.requestAnimationFrame(readPageMetrics);
-        }
-
-        scheduleRead();
-        window.addEventListener('resize', scheduleRead);
-
-        let resizeObserver;
-
-        if (typeof ResizeObserver !== 'undefined') {
-            resizeObserver = new ResizeObserver(scheduleRead);
-
-            if (resumeRef.current) {
-                resizeObserver.observe(resumeRef.current);
-            }
-
-            if (previewFrameRef.current) {
-                resizeObserver.observe(previewFrameRef.current);
-            }
-        }
-
-        return () => {
-            window.cancelAnimationFrame(frameId);
-            window.removeEventListener('resize', scheduleRead);
-            resizeObserver?.disconnect();
-        };
-    }, [previewModel, presentationVars]);
-
-    useLayoutEffect(() => {
-        if (typeof document === 'undefined') {
-            return undefined;
-        }
-
-        const styleId = 'resumeloomr-print-page-rule';
-        let styleElement = document.getElementById(styleId);
-
-        if (!styleElement) {
-            styleElement = document.createElement('style');
-            styleElement.id = styleId;
-            styleElement.media = 'print';
-            document.head.appendChild(styleElement);
-        }
-
-        styleElement.textContent = printPageRule;
-
-        return () => {
-            if (styleElement?.parentNode && styleElement.textContent === printPageRule) {
-                styleElement.parentNode.removeChild(styleElement);
-            }
-        };
-    }, [printPageRule]);
 
     useEffect(() => {
         if (!onLayoutChange) {
