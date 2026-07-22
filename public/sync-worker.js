@@ -1,3 +1,5 @@
+// This worker is intentionally self-contained so it remains a classic, root-scoped
+// service worker. tests/syncWorkerParity.test.js locks its protocol to the page path.
 const DB_NAME = 'resumeloomr-local-workspace';
 const DB_VERSION = 1;
 const WORKSPACE_STORE = 'workspace';
@@ -26,7 +28,10 @@ function openWorkspaceDb() {
       }
 
       if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
-        db.createObjectStore(OUTBOX_STORE, { keyPath: 'id' });
+        const outboxStore = db.createObjectStore(OUTBOX_STORE, { keyPath: 'id' });
+        outboxStore.createIndex('status', 'status');
+        outboxStore.createIndex('updatedAt', 'updatedAt');
+        outboxStore.createIndex('resumeId', 'resumeId');
       }
 
       if (!db.objectStoreNames.contains(TOMBSTONES_STORE)) {
