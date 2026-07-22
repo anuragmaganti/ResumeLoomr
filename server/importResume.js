@@ -1,38 +1,48 @@
-import { GoogleGenAI } from '@google/genai';
 import { createRequire } from 'node:module';
 import mammoth from 'mammoth';
 import { z } from 'zod';
 
-import {
-  FirebaseAdminError,
-  verifyFirebaseIdTokenHeader,
-} from './firebaseAdmin.js';
 import { normalizeDraftPayload } from '../src/lib/resume.js';
 import { getPreviewModel } from '../src/lib/resumePreviewModel.js';
 import { trimText } from '../src/lib/text.js';
 import { sanitizeWorkspaceResumeName } from '../src/lib/workspace.js';
+import { ImportResumeError } from './resumeImport/error.js';
+import {
+  DEFAULT_GEMINI_IMPORT_MODEL,
+  createGeminiClient,
+  createGeminiImportGenerationConfig,
+  generateStructuredGeminiResponse,
+  parseGeminiJson,
+} from './resumeImport/geminiProvider.js';
+import {
+  DOCX_MIME_TYPE,
+  PDF_MIME_TYPE,
+  isImageMimeType,
+} from './resumeImport/filePayload.js';
 
-export const IMPORT_FILE_MAX_BYTES = 3 * 1024 * 1024;
-export const DEFAULT_GEMINI_IMPORT_MODEL = 'gemini-3.1-flash-lite';
-export const DEFAULT_GEMINI_THINKING_LEVEL = 'medium';
-const DEFAULT_GEMINI_MAX_OUTPUT_TOKENS = 20000;
+export { verifyFirebaseIdToken } from './resumeImport/auth.js';
+export { ImportResumeError } from './resumeImport/error.js';
+export {
+  DEFAULT_GEMINI_IMPORT_MODEL,
+  DEFAULT_GEMINI_THINKING_LEVEL,
+  createGeminiImportGenerationConfig,
+} from './resumeImport/geminiProvider.js';
+export {
+  IMPORT_FILE_MAX_BYTES,
+  normalizeImportFilePayload,
+} from './resumeImport/filePayload.js';
+export {
+  createImportResponseBody,
+  parseImportRequestBody,
+} from './resumeImport/http.js';
+
 const PDF_TEXT_EXTRACTION_TIMEOUT_MS = 2000;
-const GEMINI_GENERATE_RETRY_DELAYS_MS = [750, 1500];
 
-const PDF_MIME_TYPE = 'application/pdf';
-const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-const PNG_MIME_TYPE = 'image/png';
-const JPEG_MIME_TYPE = 'image/jpeg';
-const OCTET_STREAM_MIME_TYPE = 'application/octet-stream';
-const SUPPORTED_FILE_TYPES_LABEL = 'PDF, DOCX, PNG, JPG, or JPEG';
 const TRUSTED_PDF_TEXT_MIN_CHARACTERS = 450;
 const TRUSTED_PDF_TEXT_MIN_WORDS = 75;
 const TRUSTED_PDF_TEXT_MIN_PRINTABLE_RATIO = 0.85;
 const TRUSTED_PDF_TEXT_MIN_RESUME_SIGNALS = 2;
 const IMPORT_SECTION_KINDS = ['education', 'roles', 'skills', 'projects', 'certifications', 'languages', 'awards', 'publications', 'custom'];
-const GEMINI_THINKING_LEVELS = new Set(['minimal', 'low', 'medium', 'high']);
-const GEMINI_MIN_OUTPUT_TOKENS = 1024;
-const GEMINI_MAX_OUTPUT_TOKENS = 65536;
 const serverRequire = createRequire(import.meta.url);
 const PHONE_TEXT_PATTERN = /(?:\+?1[\s.-]?)?(?:\(?[\dxX]{3}\)?[\s.-]?)[\dxX]{3}[\s.-]?[\dxX]{4}/;
 const RESUME_SIGNAL_PATTERNS = [
@@ -154,141 +164,6 @@ const sourceMappingWireSchema = z.object({
     title: z.string().min(1),
   }).strict()).min(1),
 }).strict();
-
-const importRequestSchema = z.object({
-  fileName: z.string().min(1),
-  mimeType: z.string().optional().default(''),
-  fileDataBase64: z.string().min(1),
-});
-
-function isImageMimeType(mimeType) {
-  return mimeType === PNG_MIME_TYPE || mimeType === JPEG_MIME_TYPE;
-}
-
-export class ImportResumeError extends Error {
-  constructor(message, { statusCode = 400, code = 'import/failed', diagnostics = null } = {}) {
-    super(message);
-    this.name = 'ImportResumeError';
-    this.statusCode = statusCode;
-    this.code = code;
-    this.diagnostics = diagnostics;
-  }
-}
-
-function getExtension(fileName) {
-  const match = trimText(fileName).toLowerCase().match(/\.([a-z0-9]+)$/);
-  return match?.[1] || '';
-}
-
-function normalizeMimeType(fileName, mimeType) {
-  const extension = getExtension(fileName);
-  const normalizedMimeType = trimText(mimeType).toLowerCase();
-
-  if (extension === 'pdf' && (!normalizedMimeType || normalizedMimeType === PDF_MIME_TYPE || normalizedMimeType === OCTET_STREAM_MIME_TYPE)) {
-    return PDF_MIME_TYPE;
-  }
-
-  if (extension === 'docx' && (!normalizedMimeType || normalizedMimeType === DOCX_MIME_TYPE || normalizedMimeType === OCTET_STREAM_MIME_TYPE)) {
-    return DOCX_MIME_TYPE;
-  }
-
-  if (extension === 'png' && (!normalizedMimeType || normalizedMimeType === PNG_MIME_TYPE || normalizedMimeType === OCTET_STREAM_MIME_TYPE)) {
-    return PNG_MIME_TYPE;
-  }
-
-  if ((extension === 'jpg' || extension === 'jpeg') && (!normalizedMimeType || normalizedMimeType === JPEG_MIME_TYPE || normalizedMimeType === OCTET_STREAM_MIME_TYPE)) {
-    return JPEG_MIME_TYPE;
-  }
-
-  if (extension) {
-    return '';
-  }
-
-  if (normalizedMimeType === PDF_MIME_TYPE) {
-    return PDF_MIME_TYPE;
-  }
-
-  if (normalizedMimeType === DOCX_MIME_TYPE) {
-    return DOCX_MIME_TYPE;
-  }
-
-  if (isImageMimeType(normalizedMimeType)) {
-    return normalizedMimeType;
-  }
-
-  return '';
-}
-
-function normalizeBase64(value) {
-  const rawValue = trimText(value);
-  const base64Value = rawValue.includes(',') ? rawValue.split(',').pop() : rawValue;
-  const compactValue = base64Value.replace(/\s/g, '');
-
-  if (!/^[a-zA-Z0-9+/]*={0,2}$/.test(compactValue)) {
-    throw new ImportResumeError('The uploaded file could not be read.', {
-      statusCode: 400,
-      code: 'import/invalid-file-data',
-    });
-  }
-
-  return compactValue;
-}
-
-export function normalizeImportFilePayload(payload) {
-  const parsedPayload = importRequestSchema.safeParse(payload);
-
-  if (!parsedPayload.success) {
-    throw new ImportResumeError(`Upload a ${SUPPORTED_FILE_TYPES_LABEL} resume file.`, {
-      statusCode: 400,
-      code: 'import/invalid-request',
-    });
-  }
-
-  const mimeType = normalizeMimeType(parsedPayload.data.fileName, parsedPayload.data.mimeType);
-
-  if (!mimeType) {
-    throw new ImportResumeError(`Upload a ${SUPPORTED_FILE_TYPES_LABEL} resume file.`, {
-      statusCode: 415,
-      code: 'import/unsupported-file-type',
-    });
-  }
-
-  const base64 = normalizeBase64(parsedPayload.data.fileDataBase64);
-  const buffer = Buffer.from(base64, 'base64');
-
-  if (buffer.length === 0) {
-    throw new ImportResumeError('The uploaded file is empty.', {
-      statusCode: 400,
-      code: 'import/empty-file',
-    });
-  }
-
-  if (buffer.length > IMPORT_FILE_MAX_BYTES) {
-    throw new ImportResumeError('Upload a resume smaller than 3 MB.', {
-      statusCode: 413,
-      code: 'import/file-too-large',
-    });
-  }
-
-  return {
-    fileName: parsedPayload.data.fileName,
-    mimeType,
-    base64: buffer.toString('base64'),
-    buffer,
-    size: buffer.length,
-  };
-}
-
-export async function verifyFirebaseIdToken(authorizationHeader) {
-  try {
-    return await verifyFirebaseIdTokenHeader(authorizationHeader);
-  } catch (error) {
-    throw new ImportResumeError(error?.message || 'Your sign-in expired. Sign in again to import a resume.', {
-      statusCode: error instanceof FirebaseAdminError ? error.statusCode : 401,
-      code: error instanceof FirebaseAdminError ? error.code : 'import/invalid-token',
-    });
-  }
-}
 
 async function extractDocxText(file) {
   const result = await mammoth.extractRawText({ buffer: file.buffer });
@@ -1565,43 +1440,6 @@ function createSourceMappingGeminiContents(sourceDocument, fileName) {
       ].join('\n\n'),
     },
   ];
-}
-
-async function generateStructuredGeminiResponse({
-  ai,
-  model,
-  contents,
-  generationConfig,
-  diagnostics = null,
-  parseResponse,
-}) {
-  let lastError;
-
-  for (let attempt = 0; attempt <= GEMINI_GENERATE_RETRY_DELAYS_MS.length; attempt += 1) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents,
-        config: generationConfig,
-      });
-
-      return parseResponse(String(response.text || ''));
-    } catch (error) {
-      lastError = error;
-
-      if (error instanceof ImportResumeError) {
-        throw error;
-      }
-
-      if (!isRetryableGeminiError(error) || attempt === GEMINI_GENERATE_RETRY_DELAYS_MS.length) {
-        break;
-      }
-
-      await wait(GEMINI_GENERATE_RETRY_DELAYS_MS[attempt]);
-    }
-  }
-
-  throw createGeminiUnavailableError(lastError, diagnostics);
 }
 
 async function generateSourceDocumentFromGemini({ ai, model, file, generationConfig, diagnostics, createContents = createSourceDocumentGeminiContents }) {
@@ -3394,181 +3232,6 @@ function finalizeSourceImportDraft({
   };
 }
 
-function parseGeminiJson(text) {
-  const rawText = trimText(text);
-  const fencedMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const jsonText = fencedMatch ? fencedMatch[1] : rawText;
-
-  try {
-    return JSON.parse(jsonText);
-  } catch {
-    throw new ImportResumeError('The AI response could not be parsed. Try another resume file.', {
-      statusCode: 502,
-      code: 'import/invalid-ai-response',
-    });
-  }
-}
-
-function parseJsonErrorMessage(message) {
-  try {
-    const parsed = JSON.parse(message);
-    return parsed?.error && typeof parsed.error === 'object' ? parsed.error : null;
-  } catch {
-    return null;
-  }
-}
-
-function getNumericStatusCode(...values) {
-  const numericValue = values.find((value) => {
-    if (value === null || value === undefined || value === '') {
-      return false;
-    }
-
-    return Number.isFinite(Number(value));
-  });
-
-  return Number(numericValue || 0);
-}
-
-function getQuotaViolations(parsedError) {
-  return (Array.isArray(parsedError?.details) ? parsedError.details : [])
-    .flatMap((detail) => (Array.isArray(detail?.violations) ? detail.violations : []))
-    .map((violation) => ({
-      quotaMetric: trimText(violation?.quotaMetric),
-      quotaId: trimText(violation?.quotaId),
-    }))
-    .filter((violation) => violation.quotaMetric || violation.quotaId);
-}
-
-function getGeminiErrorDetails(error) {
-  const parsedError = parseJsonErrorMessage(error?.message || '');
-  const statusCode = getNumericStatusCode(error?.statusCode, error?.code, parsedError?.code, error?.status);
-  const status = trimText(parsedError?.status || (Number.isFinite(Number(error?.status)) ? '' : error?.status));
-  const message = trimText(parsedError?.message || error?.message);
-  const quotaViolations = getQuotaViolations(parsedError);
-  const quotaText = [message, ...quotaViolations.flatMap((violation) => [violation.quotaMetric, violation.quotaId])]
-    .filter(Boolean)
-    .join(' ');
-  const isDailyQuota = /(?:per\s*day|perday|requestsperday|daily|rpd)/i.test(quotaText);
-
-  return {
-    statusCode,
-    status,
-    message,
-    quotaViolations,
-    isDailyQuota,
-  };
-}
-
-function isRetryableGeminiError(error) {
-  const { statusCode, status } = getGeminiErrorDetails(error);
-
-  if (statusCode === 429 || status === 'RESOURCE_EXHAUSTED') {
-    return false;
-  }
-
-  return (
-    [500, 502, 503, 504].includes(statusCode) ||
-    ['UNAVAILABLE', 'DEADLINE_EXCEEDED', 'INTERNAL'].includes(status)
-  );
-}
-
-function createGeminiUnavailableError(error, diagnostics = null) {
-  const {
-    statusCode,
-    status,
-    message,
-    quotaViolations,
-    isDailyQuota,
-  } = getGeminiErrorDetails(error);
-  const providerDiagnostics = {
-    ...diagnostics,
-    providerStatusCode: statusCode || undefined,
-    providerStatus: status || undefined,
-    providerMessage: message ? message.slice(0, 500) : undefined,
-    providerQuotaViolations: quotaViolations.length > 0 ? quotaViolations : undefined,
-    providerIsDailyQuota: isDailyQuota || undefined,
-  };
-
-  if (statusCode === 429 || status === 'RESOURCE_EXHAUSTED') {
-    return new ImportResumeError(
-      isDailyQuota
-        ? 'Daily AI import quota reached. Try again after Gemini resets your daily limit.'
-        : 'AI import rate limit reached. Try again in a minute.',
-      {
-        statusCode: 429,
-        code: isDailyQuota ? 'import/ai-daily-quota' : 'import/ai-rate-limited',
-        diagnostics: providerDiagnostics,
-      },
-    );
-  }
-
-  if (statusCode === 503 || status === 'UNAVAILABLE') {
-    return new ImportResumeError('The AI import provider is temporarily unavailable. Try again in a minute.', {
-      statusCode: 503,
-      code: 'import/ai-unavailable',
-      diagnostics: providerDiagnostics,
-    });
-  }
-
-  return new ImportResumeError(message || 'The AI import service could not process this resume. Try again with another file.', {
-    statusCode: statusCode >= 400 && statusCode < 500 ? 502 : 503,
-    code: 'import/ai-provider-failed',
-    diagnostics: providerDiagnostics,
-  });
-}
-
-function wait(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-function isGemini3Model(model) {
-  return /(?:^|\/)gemini-3(?:[.-]|$)/i.test(trimText(model));
-}
-
-function getGeminiThinkingLevel(env = process.env) {
-  const thinkingLevel = trimText(env.GEMINI_THINKING_LEVEL).toLowerCase();
-
-  return GEMINI_THINKING_LEVELS.has(thinkingLevel) ? thinkingLevel : DEFAULT_GEMINI_THINKING_LEVEL;
-}
-
-function getGeminiMaxOutputTokens(env = process.env) {
-  const parsedValue = Number.parseInt(trimText(env.GEMINI_MAX_OUTPUT_TOKENS), 10);
-
-  if (!Number.isFinite(parsedValue)) {
-    return DEFAULT_GEMINI_MAX_OUTPUT_TOKENS;
-  }
-
-  return Math.min(GEMINI_MAX_OUTPUT_TOKENS, Math.max(GEMINI_MIN_OUTPUT_TOKENS, parsedValue));
-}
-
-export function createGeminiImportGenerationConfig(model, env = process.env, options = {}) {
-  const maxOutputTokens = getGeminiMaxOutputTokens(env);
-  const baseConfig = {
-    responseMimeType: 'application/json',
-    maxOutputTokens,
-  };
-  const responseConfig = options.responseJsonSchema
-    ? { ...baseConfig, responseJsonSchema: options.responseJsonSchema }
-    : baseConfig;
-
-  if (!isGemini3Model(model)) {
-    return {
-      ...responseConfig,
-      temperature: 0.1,
-    };
-  }
-
-  return {
-    ...responseConfig,
-    thinkingConfig: {
-      thinkingLevel: options.thinkingLevel || getGeminiThinkingLevel(env),
-    },
-  };
-}
-
 function normalizeComparisonKey(value) {
   return trimText(value)
     .toLowerCase()
@@ -3611,7 +3274,7 @@ export async function parseResumeWithGemini(file) {
     });
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = createGeminiClient(apiKey);
   const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_IMPORT_MODEL;
   const visualSourceDocumentGenerationConfig = createGeminiImportGenerationConfig(model, process.env, {
     responseJsonSchema: sourceDocumentResponseJsonSchema,
@@ -3785,34 +3448,5 @@ export async function parseResumeWithGemini(file) {
       ...parsedImport.draft,
       importWarnings: Array.from(new Set(importWarnings)),
     },
-  };
-}
-
-export async function parseImportRequestBody(req) {
-  try {
-    if (req.body) {
-      return typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    }
-
-    const chunks = [];
-
-    for await (const chunk of req) {
-      chunks.push(Buffer.from(chunk));
-    }
-
-    const rawBody = Buffer.concat(chunks).toString('utf8');
-    return rawBody ? JSON.parse(rawBody) : {};
-  } catch {
-    throw new ImportResumeError('The upload request could not be read.', {
-      statusCode: 400,
-      code: 'import/invalid-json',
-    });
-  }
-}
-
-export function createImportResponseBody(parsedImport) {
-  return {
-    suggestedName: parsedImport.suggestedName,
-    draft: parsedImport.draft,
   };
 }
