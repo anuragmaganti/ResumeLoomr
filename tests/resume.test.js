@@ -12,9 +12,7 @@ import {
   createEmptyResume,
   didTransientSampleEntryChange,
   dismissSampleInformation,
-  getDefaultEntryHeaderLayout,
   materializeAndReorderSectionBlockEntries,
-  moveSectionHeaderField,
   moveSectionBlockEntry,
   moveResumeSectionBlock,
   normalizeDraftPayload,
@@ -26,7 +24,6 @@ import {
   resolveTransientSampleEntry,
   setSampleTextListOrder,
   setSectionEntryHeaderLayout,
-  normalizeEntryHeaderLayout,
   updatePersonalField,
   updateSampleDisplay,
   updateSectionBlockEducationCustomSection,
@@ -35,6 +32,11 @@ import {
   updateSectionBlockTextList,
   updateSectionTitle,
 } from '../src/lib/resume.js';
+import {
+  getDefaultEntryHeaderLayout,
+  moveSectionHeaderField,
+  normalizeEntryHeaderLayout,
+} from '../src/lib/resumeEntryLayout.js';
 import { getPreviewModel } from '../src/lib/resumePreviewModel.js';
 import {
   DEFAULT_TEMPLATE,

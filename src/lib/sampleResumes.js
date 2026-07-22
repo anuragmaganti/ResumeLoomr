@@ -3,12 +3,12 @@ import {
   certificationEntryHasContent,
   educationEntryHasContent,
   languageEntryHasContent,
-  normalizeResume,
   projectEntryHasContent,
   publicationEntryHasContent,
   roleEntryHasContent,
   skillsEntryHasContent,
-} from './resume.js';
+} from './resumeEntries.js';
+import { normalizeResume } from './resume.js';
 import { getPreviewModel } from './resumePreviewModel.js';
 import { trimText } from './text.js';
 

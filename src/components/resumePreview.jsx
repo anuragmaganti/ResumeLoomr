@@ -25,7 +25,7 @@ import {
     getDefaultEntryHeaderLayout,
     moveSectionHeaderField,
     normalizeEntryHeaderLayout,
-} from '../lib/resume.js';
+} from '../lib/resumeEntryLayout.js';
 import {
     PERSONAL_ALIGNMENT_OPTIONS,
     PERSONAL_CONTACT_FIELDS,

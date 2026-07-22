@@ -1,5 +1,5 @@
 import AutoResizeTextarea from "../autoResizeTextarea";
-import { ensureEducationCustomSections } from "../../lib/resume";
+import { ensureEducationCustomSections } from "../../lib/resumeEntries.js";
 import CollapsibleEntryCard from "./collapsibleEntryCard";
 import { buildEntrySummary } from "./buildEntrySummary";
 import EntryActionMenu from "./entryActionMenu";

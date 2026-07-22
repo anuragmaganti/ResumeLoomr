@@ -4,12 +4,12 @@ import {
   customEntryHasContent,
   educationEntryHasContent,
   languageEntryHasContent,
-  normalizeResume,
   projectEntryHasContent,
   publicationEntryHasContent,
   roleEntryHasContent,
   skillsEntryHasContent,
-} from './resume.js';
+} from './resumeEntries.js';
+import { normalizeResume } from './resume.js';
 import { normalizeStringList } from './resumeValues.js';
 import { trimText } from './text.js';
 
