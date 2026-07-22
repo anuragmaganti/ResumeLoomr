@@ -43,6 +43,32 @@ export function writeStorageItem(storage, key, value) {
   }
 }
 
+export function readJsonStorageItem(storage, key) {
+  const rawValue = readStorageItem(storage, key);
+
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawValue);
+  } catch {
+    return null;
+  }
+}
+
+export function writeJsonStorageItem(storage, key, value) {
+  try {
+    const serializedValue = JSON.stringify(value);
+
+    return serializedValue === undefined
+      ? false
+      : writeStorageItem(storage, key, serializedValue);
+  } catch {
+    return false;
+  }
+}
+
 export function removeStorageItem(storage, key) {
   if (!storage) {
     return false;
@@ -84,4 +110,12 @@ export function readLocalStorageItem(key, storage = null) {
 
 export function writeLocalStorageItem(key, value, storage = null) {
   return writeStorageItem(getBrowserLocalStorage(storage), key, value);
+}
+
+export function readLocalStorageJsonItem(key, storage = null) {
+  return readJsonStorageItem(getBrowserLocalStorage(storage), key);
+}
+
+export function writeLocalStorageJsonItem(key, value, storage = null) {
+  return writeJsonStorageItem(getBrowserLocalStorage(storage), key, value);
 }

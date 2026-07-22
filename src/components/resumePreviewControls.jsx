@@ -1,3 +1,5 @@
+import { IMPORT_FILE_TYPES_LABEL } from '../lib/importFileTypes.js';
+
 const PREVIEW_MARGIN_SETTING_MIN = -5;
 const PREVIEW_MARGIN_SETTING_MAX = 5;
 
@@ -234,7 +236,7 @@ export function EmptyResumeChoice({
                         </span>
                         <span className="emptyStartCopy">
                             <strong>{isImportingResume ? 'Processing resume…' : 'Import resume'}</strong>
-                            <small>Use AI to organize a PDF, DOCX, PNG, or JPG into editable sections.</small>
+                            <small>Use AI to organize a {IMPORT_FILE_TYPES_LABEL} into editable sections.</small>
                         </span>
                         <StartChoiceArrow />
                     </button>

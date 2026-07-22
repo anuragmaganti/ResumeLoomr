@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { validateImportResumeFile } from '../src/lib/importResume.js';
+import {
+  IMPORT_FILE_ACCEPT,
+  normalizeResumeImportMimeType,
+} from '../src/lib/importFileTypes.js';
 import { getPreviewModel } from '../src/lib/resumePreviewModel.js';
 import {
   DEFAULT_GEMINI_IMPORT_MODEL,
@@ -57,6 +61,15 @@ test('import file validation accepts PDF DOCX PNG JPG and JPEG files', () => {
   assert.equal(validateImportResumeFile({ name: 'resume.jpg', type: 'image/jpeg', size: 12 }), '');
   assert.equal(validateImportResumeFile({ name: 'resume.jpeg', type: 'image/jpeg', size: 12 }), '');
   assert.match(validateImportResumeFile({ name: 'resume.gif', type: 'image/gif', size: 12 }), /PDF, DOCX, PNG, JPG, or JPEG/);
+});
+
+test('shared import type contract preserves browser and server normalization rules', () => {
+  assert.match(IMPORT_FILE_ACCEPT, /\.pdf/);
+  assert.match(IMPORT_FILE_ACCEPT, /image\/jpeg/);
+  assert.equal(normalizeResumeImportMimeType('resume.JPG', 'APPLICATION/OCTET-STREAM'), 'image/jpeg');
+  assert.equal(normalizeResumeImportMimeType('', 'image/png'), 'image/png');
+  assert.equal(normalizeResumeImportMimeType('', 'image/png', { allowMimeOnly: false }), '');
+  assert.equal(normalizeResumeImportMimeType('resume.png', 'application/pdf'), '');
 });
 
 test('server import file normalization accepts image resumes and rejects mismatched MIME types', () => {

@@ -1,4 +1,9 @@
 import { useState } from 'react';
+import {
+  IMPORT_FILE_ACCEPT,
+  IMPORT_FILE_MAX_MEGABYTES,
+  IMPORT_FILE_TYPES_LABEL,
+} from '../lib/importFileTypes.js';
 import { validateImportResumeFile } from '../lib/importResume.js';
 
 export default function ImportResumeModal({
@@ -59,14 +64,14 @@ export default function ImportResumeModal({
         </div>
 
         <p className="authIntro">
-          Upload a PDF, DOCX, PNG, JPG, or JPEG under 3 MB. ResumeLoomr will create a new resume and place the extracted details into the editor.
+          Upload a {IMPORT_FILE_TYPES_LABEL} under {IMPORT_FILE_MAX_MEGABYTES} MB. ResumeLoomr will create a new resume and place the extracted details into the editor.
         </p>
 
         <form className="importResumeForm" onSubmit={handleSubmit}>
           <label className={`importResumeDropzone${selectedFile ? ' hasFile' : ''}`} aria-label="Choose resume file to import">
             <input
               type="file"
-              accept=".pdf,.docx,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg"
+              accept={IMPORT_FILE_ACCEPT}
               onChange={handleFileChange}
               disabled={busy}
             />

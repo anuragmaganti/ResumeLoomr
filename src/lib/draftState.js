@@ -4,6 +4,7 @@ import {
   dismissSampleInformation,
   normalizeDraftPayload,
 } from './resume.js';
+import { stableJson } from './stableJson.js';
 import { trimText } from './text.js';
 
 export function normalizeCloudVersion(value) {
@@ -44,26 +45,6 @@ export function serializeDraftState(draft) {
     localRevision: draft?.localRevision || '',
     cloudVersion: normalizeCloudVersion(draft?.cloudVersion),
   };
-}
-
-function stableValue(value) {
-  if (Array.isArray(value)) {
-    return value.map(stableValue);
-  }
-
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.keys(value)
-        .sort()
-        .map((key) => [key, stableValue(value[key])]),
-    );
-  }
-
-  return value;
-}
-
-export function stableJson(value) {
-  return JSON.stringify(stableValue(value));
 }
 
 function withoutIdentityFields(value) {

@@ -2,7 +2,7 @@ import {
   WORKSPACE_FOLDER_TONE_COUNT,
 } from '../lib/workspace.js';
 import { WORKSPACE_OPEN_FOLDERS_STORAGE_KEY } from '../lib/localWorkspaceKeys.js';
-import { readLocalStorageItem } from '../lib/browserStorage.js';
+import { readLocalStorageJsonItem } from '../lib/browserStorage.js';
 
 export const FOLDER_AUTO_OPEN_DELAY_MS = 320;
 export const FOLDER_AUTO_CLOSE_DELAY_MS = 140;
@@ -85,10 +85,6 @@ export function loadOpenFolderIds() {
     return new Set();
   }
 
-  try {
-    const value = JSON.parse(readLocalStorageItem(WORKSPACE_OPEN_FOLDERS_STORAGE_KEY) || '[]');
-    return new Set(Array.isArray(value) ? value.filter((id) => typeof id === 'string').slice(-100) : []);
-  } catch {
-    return new Set();
-  }
+  const value = readLocalStorageJsonItem(WORKSPACE_OPEN_FOLDERS_STORAGE_KEY);
+  return new Set(Array.isArray(value) ? value.filter((id) => typeof id === 'string').slice(-100) : []);
 }

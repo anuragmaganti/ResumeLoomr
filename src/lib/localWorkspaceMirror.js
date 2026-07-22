@@ -11,8 +11,9 @@ import { normalizeWorkspaceIndex } from './workspace.js';
 import { createBlankDraftState, createFreshWorkspaceDraft } from './workspaceDraft.js';
 import {
   getBrowserLocalStorage,
-  readStorageItem,
+  readJsonStorageItem,
   removeStorageItem,
+  writeJsonStorageItem,
   writeStorageItem,
 } from './browserStorage.js';
 
@@ -20,31 +21,15 @@ export function getLocalWorkspaceStorage() {
   return getBrowserLocalStorage();
 }
 
-function safeJsonParse(rawValue) {
-  if (!rawValue) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(rawValue);
-  } catch {
-    return null;
-  }
-}
-
-function readLocalWorkspaceStorageValue(key) {
-  return readStorageItem(getLocalWorkspaceStorage(), key);
-}
-
 export function markLocalWorkspacePresent() {
   return writeStorageItem(getLocalWorkspaceStorage(), LOCAL_WORKSPACE_PRESENT_KEY, 'true');
 }
 
 export function writeLocalStorageWorkspace(workspace) {
-  const written = writeStorageItem(
+  const written = writeJsonStorageItem(
     getLocalWorkspaceStorage(),
     WORKSPACE_INDEX_STORAGE_KEY,
-    JSON.stringify(normalizeWorkspaceIndex(workspace)),
+    normalizeWorkspaceIndex(workspace),
   );
 
   if (written) {
@@ -59,10 +44,10 @@ export function writeLocalStorageDraft(resumeId, draft) {
     return false;
   }
 
-  const written = writeStorageItem(
+  const written = writeJsonStorageItem(
     getLocalWorkspaceStorage(),
     createResumeStorageKey(resumeId),
-    JSON.stringify(serializeDraftState(draft)),
+    serializeDraftState(draft),
   );
 
   if (written) {
@@ -85,14 +70,14 @@ export function readLegacyDraftFromLocalStorage(resumeId) {
     return null;
   }
 
-  const draft = safeJsonParse(readLocalWorkspaceStorageValue(createResumeStorageKey(resumeId)));
+  const draft = readJsonStorageItem(getLocalWorkspaceStorage(), createResumeStorageKey(resumeId));
 
   return draft ? normalizeDraftState(draft) : null;
 }
 
 function readLegacyWorkspaceFromLocalStorage() {
   const fresh = createFreshWorkspaceDraft();
-  const rawWorkspace = safeJsonParse(readLocalWorkspaceStorageValue(WORKSPACE_INDEX_STORAGE_KEY));
+  const rawWorkspace = readJsonStorageItem(getLocalWorkspaceStorage(), WORKSPACE_INDEX_STORAGE_KEY);
 
   if (!rawWorkspace) {
     return fresh;

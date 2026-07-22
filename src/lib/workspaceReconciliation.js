@@ -18,8 +18,8 @@ import {
   normalizeDraftMap,
   normalizeDraftState,
   preservePermanentSampleDismissal,
-  stableJson,
 } from './draftState.js';
+import { stableJson } from './stableJson.js';
 
 function getTimestamp(value) {
   const timestamp = Date.parse(value || '');

@@ -35,6 +35,7 @@ import {
   moveOrganizationResumeBundle,
   moveOrganizationRootItem,
   moveOrganizationRootItemToIndex,
+  workspaceOrganizationsEqual,
 } from '../src/lib/workspaceOrganization.js';
 import {
   applyOpenFolderPointerDestination,
@@ -148,6 +149,33 @@ test('workspace organization normalizes flat workspaces and enforces one placeme
     { type: 'resume', id: 'r3' },
   ]);
   assert.deepEqual(getOrganizationVisualResumeIds(organization), ['r2', 'r1', 'r3']);
+});
+
+test('workspace organization equality ignores timestamps and object insertion order', () => {
+  const first = {
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    rootItems: [{ type: 'folder', id: 'folder-a' }, { type: 'folder', id: 'folder-b' }],
+    folders: {
+      'folder-a': { id: 'folder-a', name: 'A', resumeIds: ['r1'] },
+      'folder-b': { id: 'folder-b', name: 'B', resumeIds: ['r2'] },
+    },
+    removedFolderIds: [],
+  };
+  const second = {
+    removedFolderIds: [],
+    folders: {
+      'folder-b': { resumeIds: ['r2'], name: 'B', id: 'folder-b' },
+      'folder-a': { resumeIds: ['r1'], name: 'A', id: 'folder-a' },
+    },
+    rootItems: [{ id: 'folder-a', type: 'folder' }, { id: 'folder-b', type: 'folder' }],
+    updatedAt: '2026-07-22T00:00:00.000Z',
+  };
+
+  assert.equal(workspaceOrganizationsEqual(first, second), true);
+  assert.equal(workspaceOrganizationsEqual(first, {
+    ...second,
+    rootItems: [...second.rootItems].reverse(),
+  }), false);
 });
 
 test('folder creation preserves visual order and uses the earliest selected root anchor', () => {

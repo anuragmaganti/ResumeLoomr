@@ -14,9 +14,9 @@ import {
   getBrowserLocalStorage,
   getBrowserSessionStorage,
   listStorageKeys,
-  readStorageItem,
+  readJsonStorageItem,
   removeStorageItem,
-  writeStorageItem,
+  writeJsonStorageItem,
 } from './browserStorage.js';
 
 const CONNECTED_ACCOUNT_STORAGE_KEY = 'resumeloomr:connected-account:v1';
@@ -79,18 +79,6 @@ function getSessionStorage(storage) {
   return getBrowserSessionStorage(storage);
 }
 
-function safeParse(rawValue) {
-  if (!rawValue) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(rawValue);
-  } catch {
-    return null;
-  }
-}
-
 export function readConnectedAccount(storage) {
   const targetStorage = getStorage(storage);
 
@@ -98,7 +86,7 @@ export function readConnectedAccount(storage) {
     return null;
   }
 
-  const account = safeParse(readStorageItem(targetStorage, CONNECTED_ACCOUNT_STORAGE_KEY));
+  const account = readJsonStorageItem(targetStorage, CONNECTED_ACCOUNT_STORAGE_KEY);
 
   if (!account?.uid) {
     return null;
@@ -126,7 +114,7 @@ export function writeConnectedAccount(user, storage) {
     lastConnectedAt: new Date().toISOString(),
   };
 
-  return writeStorageItem(targetStorage, CONNECTED_ACCOUNT_STORAGE_KEY, JSON.stringify(account))
+  return writeJsonStorageItem(targetStorage, CONNECTED_ACCOUNT_STORAGE_KEY, account)
     ? account
     : null;
 }
@@ -148,7 +136,7 @@ export function readSignedOutEditingPreference(storage) {
     return DEFAULT_SIGNED_OUT_EDITING_PREFERENCE;
   }
 
-  const preference = safeParse(readStorageItem(targetStorage, SIGNED_OUT_EDITING_PREFERENCE_KEY));
+  const preference = readJsonStorageItem(targetStorage, SIGNED_OUT_EDITING_PREFERENCE_KEY);
 
   return {
     allow: typeof preference?.allow === 'boolean'
@@ -172,7 +160,7 @@ export function writeSignedOutEditingPreference(preference, storage) {
   };
 
   if (targetStorage) {
-    writeStorageItem(targetStorage, SIGNED_OUT_EDITING_PREFERENCE_KEY, JSON.stringify(nextPreference));
+    writeJsonStorageItem(targetStorage, SIGNED_OUT_EDITING_PREFERENCE_KEY, nextPreference);
   }
 
   return nextPreference;

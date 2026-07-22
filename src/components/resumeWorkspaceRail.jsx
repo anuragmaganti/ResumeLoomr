@@ -49,7 +49,7 @@ import {
   railSortingStrategy,
   setRootInsertTargetIfChanged,
 } from './resumeWorkspaceRailSupport.js';
-import { writeLocalStorageItem } from '../lib/browserStorage.js';
+import { writeLocalStorageJsonItem } from '../lib/browserStorage.js';
 import {
   applyOpenFolderPointerDestination,
   applyRootPointerDestination,
@@ -300,9 +300,9 @@ export default function ResumeWorkspaceRail({
       return;
     }
 
-    writeLocalStorageItem(
+    writeLocalStorageJsonItem(
       WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
-      JSON.stringify([...openFolderIds].filter((folderId) => validFolderIds.has(folderId)).slice(-100)),
+      [...openFolderIds].filter((folderId) => validFolderIds.has(folderId)).slice(-100),
     );
   }, [openFolderIds, validFolderIds, workspaceReady]);
 

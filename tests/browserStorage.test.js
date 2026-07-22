@@ -3,8 +3,10 @@ import test from 'node:test';
 
 import {
   listStorageKeys,
+  readJsonStorageItem,
   readStorageItem,
   removeStorageItem,
+  writeJsonStorageItem,
   writeStorageItem,
 } from '../src/lib/browserStorage.js';
 import {
@@ -82,6 +84,23 @@ test('storage key enumeration returns a stable snapshot', () => {
     keys: ['one', 'two'],
     succeeded: true,
   });
+});
+
+test('JSON storage helpers contain malformed and unserializable values', () => {
+  const values = new Map();
+  const storage = {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, String(value)); },
+  };
+  const circular = {};
+  circular.self = circular;
+
+  assert.equal(writeJsonStorageItem(storage, 'valid', { enabled: true }), true);
+  assert.deepEqual(readJsonStorageItem(storage, 'valid'), { enabled: true });
+  values.set('invalid', '{');
+  assert.equal(readJsonStorageItem(storage, 'invalid'), null);
+  assert.equal(writeJsonStorageItem(storage, 'circular', circular), false);
+  assert.equal(values.has('circular'), false);
 });
 
 test('browser cleanup preserves the account marker when workspace cleanup fails', async () => {

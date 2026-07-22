@@ -1,54 +1,29 @@
-const IMPORT_RESUME_MAX_BYTES = 3 * 1024 * 1024;
-
-const PDF_MIME_TYPE = 'application/pdf';
-const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-const PNG_MIME_TYPE = 'image/png';
-const JPEG_MIME_TYPE = 'image/jpeg';
-const OCTET_STREAM_MIME_TYPE = 'application/octet-stream';
-const SUPPORTED_FILE_TYPES_LABEL = 'PDF, DOCX, PNG, JPG, or JPEG';
-const SUPPORTED_EXTENSION_MIME_TYPES = {
-  pdf: new Set([PDF_MIME_TYPE, OCTET_STREAM_MIME_TYPE]),
-  docx: new Set([DOCX_MIME_TYPE, OCTET_STREAM_MIME_TYPE]),
-  png: new Set([PNG_MIME_TYPE, OCTET_STREAM_MIME_TYPE]),
-  jpg: new Set([JPEG_MIME_TYPE, OCTET_STREAM_MIME_TYPE]),
-  jpeg: new Set([JPEG_MIME_TYPE, OCTET_STREAM_MIME_TYPE]),
-};
-
-function getExtension(fileName) {
-  const match = String(fileName || '').toLowerCase().match(/\.([a-z0-9]+)$/);
-  return match?.[1] || '';
-}
+import {
+  IMPORT_FILE_MAX_BYTES,
+  IMPORT_FILE_MAX_MEGABYTES,
+  IMPORT_FILE_TYPES_LABEL,
+  normalizeResumeImportMimeType,
+} from './importFileTypes.js';
 
 function isSupportedResumeFile(file) {
-  const extension = getExtension(file?.name);
-  const supportedMimeTypes = SUPPORTED_EXTENSION_MIME_TYPES[extension];
-
-  if (!supportedMimeTypes) {
-    return false;
-  }
-
-  if (!file?.type) {
-    return true;
-  }
-
-  return supportedMimeTypes.has(file.type);
+  return Boolean(normalizeResumeImportMimeType(file?.name, file?.type, { allowMimeOnly: false }));
 }
 
 export function validateImportResumeFile(file) {
   if (!file) {
-    return `Choose a ${SUPPORTED_FILE_TYPES_LABEL} resume first.`;
+    return `Choose a ${IMPORT_FILE_TYPES_LABEL} resume first.`;
   }
 
   if (!isSupportedResumeFile(file)) {
-    return `Upload a ${SUPPORTED_FILE_TYPES_LABEL} resume file.`;
+    return `Upload a ${IMPORT_FILE_TYPES_LABEL} resume file.`;
   }
 
   if (file.size <= 0) {
     return 'The selected file is empty.';
   }
 
-  if (file.size > IMPORT_RESUME_MAX_BYTES) {
-    return 'Upload a resume smaller than 3 MB.';
+  if (file.size > IMPORT_FILE_MAX_BYTES) {
+    return `Upload a resume smaller than ${IMPORT_FILE_MAX_MEGABYTES} MB.`;
   }
 
   return '';
