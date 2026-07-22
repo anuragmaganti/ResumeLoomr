@@ -43,6 +43,12 @@ import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from '../lib/sort
 import MobilePreviewEditorProxy from './mobilePreviewEditorProxy.jsx';
 import PersonalAlignmentControls from './personalAlignmentControls.jsx';
 import {
+    EmptyResumeChoice,
+    PreviewMarginControls,
+    PreviewPageMarkers,
+    SampleInformationToggle,
+} from './resumePreviewControls.jsx';
+import {
     isMobilePreviewEditingViewport,
     parseCssPixelValue,
 } from './resumePreviewGeometry.js';
@@ -100,38 +106,10 @@ const personalLinkFieldMap = {
 const DEFAULT_PREVIEW_PAGE_MIN_HEIGHT = PRINT_PAGE_HEIGHT_PX;
 const SUMMARY_WIDTH_MIN_PERCENT = 75;
 const SUMMARY_WIDTH_MAX_PERCENT = 100;
-const PREVIEW_MARGIN_SETTING_MIN = -5;
-const PREVIEW_MARGIN_SETTING_MAX = 5;
 const HEADER_LAYOUT_DOUBLE_CLICK_MS = 420;
 const HEADER_LAYOUT_DOUBLE_CLICK_TOLERANCE_PX = 8;
 const HEADER_LAYOUT_LONG_PRESS_MS = 520;
 const HEADER_LAYOUT_LONG_PRESS_MOVE_TOLERANCE_PX = 8;
-
-function ImportStartIcon() {
-    return (
-        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-            <path d="M7 3.5h7l4 4V20.5H7z" />
-            <path d="M14 3.5v4h4M12.5 16V10.5m-2.5 2 2.5-2 2.5 2" />
-        </svg>
-    );
-}
-
-function ScratchStartIcon() {
-    return (
-        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-            <path d="m5 16.5-.8 3.3 3.3-.8L18 8.5 14.5 5z" />
-            <path d="m12.8 6.7 3.5 3.5M8.5 19.5h10.8" />
-        </svg>
-    );
-}
-
-function StartChoiceArrow() {
-    return (
-        <svg className="emptyStartArrow" aria-hidden="true" viewBox="0 0 18 18" focusable="false">
-            <path d="m7 4 5 5-5 5" />
-        </svg>
-    );
-}
 
 const ENTRY_HEADER_FIELD_META = {
     education: {
@@ -866,118 +844,6 @@ export default function ResumePreview({
                 onPointerUp={finishSummaryResize}
                 onPointerCancel={finishSummaryResize}
             />
-        );
-    }
-
-    function formatPreviewMarginValue(value) {
-        const numericValue = Number(value) || 0;
-
-        if (numericValue === 0) {
-            return '0';
-        }
-
-        return String(numericValue);
-    }
-
-    function stopMarginControlEvent(event) {
-        event.stopPropagation();
-    }
-
-    function adjustPreviewMarginSetting(event, settingId, delta) {
-        event.preventDefault();
-        event.stopPropagation();
-        suppressNextPreviewClick();
-        onAdjustSetting?.(settingId, delta);
-    }
-
-    function clearPointerMarginFocus(event) {
-        const activeElement = document.activeElement;
-
-        if (!activeElement || !event.currentTarget.contains(activeElement)) {
-            return;
-        }
-
-        if (typeof activeElement.matches === 'function' && activeElement.matches(':focus-visible')) {
-            return;
-        }
-
-        activeElement.blur?.();
-    }
-
-    function renderPreviewMarginControl(position, settingId) {
-        if (typeof onAdjustSetting !== 'function') {
-            return null;
-        }
-
-        const value = Number(settings?.[settingId]) || 0;
-        const isVerticalControl = position === 'left' || position === 'right';
-        const label = settingId === 'horizontalMargins' ? 'Side margin' : 'Top and bottom margin';
-        const decreaseControl = {
-            delta: -1,
-            sign: '-',
-            label: `Decrease ${label}`,
-            disabled: value <= PREVIEW_MARGIN_SETTING_MIN,
-        };
-        const increaseControl = {
-            delta: 1,
-            sign: '+',
-            label: `Increase ${label}`,
-            disabled: value >= PREVIEW_MARGIN_SETTING_MAX,
-        };
-        const orderedControls = isVerticalControl
-            ? [increaseControl, 'value', decreaseControl]
-            : [decreaseControl, 'value', increaseControl];
-
-        return (
-            <div
-                className={`previewMarginZone previewMarginZone--${position}`}
-                role="group"
-                tabIndex={0}
-                aria-label={`${label} preview controls`}
-                onPointerDown={stopMarginControlEvent}
-                onPointerLeave={clearPointerMarginFocus}
-                onClick={stopMarginControlEvent}
-            >
-                <div
-                    className={`previewMarginStepper${isVerticalControl ? ' previewMarginStepper--vertical' : ''}`}
-                    role="group"
-                    aria-label={`${label} controls`}
-                >
-                    {orderedControls.map((control) => (
-                        control === 'value' ? (
-                            <span className="previewMarginValue" key="value">{formatPreviewMarginValue(value)}</span>
-                        ) : (
-                            <button
-                                type="button"
-                                className="previewMarginButton"
-                                key={control.sign}
-                                onClick={(event) => adjustPreviewMarginSetting(event, settingId, control.delta)}
-                                disabled={control.disabled}
-                                aria-label={control.label}
-                            >
-                                {control.sign}
-                            </button>
-                        )
-                    ))}
-                </div>
-            </div>
-        );
-    }
-
-    function renderPreviewMarginControls() {
-        if (typeof onAdjustSetting !== 'function' || showEmptyResumeChoice) {
-            return null;
-        }
-
-        return (
-            <div className="previewMarginControls" aria-hidden={false}>
-                <span className="previewMarginHighlight previewMarginHighlight--horizontal" aria-hidden="true" />
-                <span className="previewMarginHighlight previewMarginHighlight--vertical" aria-hidden="true" />
-                {renderPreviewMarginControl('top', 'verticalMargins')}
-                {renderPreviewMarginControl('right', 'horizontalMargins')}
-                {renderPreviewMarginControl('bottom', 'verticalMargins')}
-                {renderPreviewMarginControl('left', 'horizontalMargins')}
-            </div>
         );
     }
 
@@ -2505,122 +2371,6 @@ export default function ResumePreview({
             </SortableContext>
         ),
     ].filter(Boolean);
-    function renderPageMarkers() {
-        if (!previewModel.hasContent || pageMetrics.pageBreaks.length === 0) {
-            return null;
-        }
-
-        return (
-            <div className="resumePageMarkers" aria-hidden="true">
-                {pageMetrics.pageBreaks.map((pageBreak, index) => {
-                    const pageNumber = index + 2;
-
-                    return (
-                        <div
-                            className="resumePageMarker"
-                            key={`page-marker-${pageNumber}`}
-                            style={{ top: `${pageBreak}px` }}
-                        >
-                            <span>Page {pageNumber}</span>
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    }
-
-    function renderSampleInformationToggle() {
-        if (!showSampleInformationToggle || !onToggleSampleInformation || !onDismissSampleInformation) {
-            return null;
-        }
-
-        const positionClassName = personalAlignment === 'left'
-            ? ' sampleInformationToggle--personalLeft'
-            : '';
-
-        return (
-            <div
-                className={`sampleInformationToggle${positionClassName}${showSampleInformation ? "" : " sampleInformationToggle--hiddenUntilHover"}`}
-                data-dnd-no-drag="true"
-                onPointerDown={(event) => event.stopPropagation()}
-            >
-                <label className="sampleInformationToggleRow">
-                    <input
-                        type="checkbox"
-                        checked={showSampleInformation}
-                        onChange={(event) => onToggleSampleInformation(event.target.checked)}
-                    />
-                    <span aria-hidden="true" className="sampleInformationSwitch" />
-                    <span>Show sample information</span>
-                </label>
-                <button
-                    type="button"
-                    className="sampleInformationDelete"
-                    onClick={(event) => {
-                        event.stopPropagation();
-                        onDismissSampleInformation();
-                    }}
-                    aria-label="Permanently delete sample information for this resume"
-                >
-                    Delete sample information
-                </button>
-            </div>
-        );
-    }
-
-    function renderEmptyChoice() {
-        if (!showEmptyResumeChoice) {
-            return null;
-        }
-
-        const nudgeAttributes = emptyChoiceNudgeCount > 0
-            ? { 'data-empty-choice-nudge': emptyChoiceNudgeCount % 2 === 0 ? 'even' : 'odd' }
-            : {};
-
-        return (
-            <div className="resumeEmptyChoiceOverlay">
-                <div
-                    className="resumeEmptyActions"
-                    aria-label="Choose how to start this resume"
-                    {...nudgeAttributes}
-                >
-                    <h2 className="resumeStartHeading">How would you like to start?</h2>
-                    <div className="resumeStartOptions">
-                        <button
-                            type="button"
-                            className="emptyStartOption emptyStartOption--import"
-                            onClick={onImportResume}
-                            disabled={isImportingResume}
-                        >
-                            <span className="emptyStartIcon" aria-hidden="true">
-                                {isImportingResume ? <span className="buttonSpinner" /> : <ImportStartIcon />}
-                            </span>
-                            <span className="emptyStartCopy">
-                                <strong>{isImportingResume ? 'Processing resume…' : 'Import resume'}</strong>
-                                <small>Use AI to organize a PDF, DOCX, PNG, or JPG into editable sections.</small>
-                            </span>
-                            <StartChoiceArrow />
-                        </button>
-
-                        <button
-                            type="button"
-                            className="emptyStartOption emptyStartOption--scratch"
-                            onClick={onStartFromScratch}
-                            disabled={isImportingResume}
-                        >
-                            <span className="emptyStartIcon" aria-hidden="true"><ScratchStartIcon /></span>
-                            <span className="emptyStartCopy">
-                                <strong>Start from scratch</strong>
-                                <small>Open the editor and build your resume section by section.</small>
-                            </span>
-                            <StartChoiceArrow />
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
     function setPersonalChromeActive(nextActive) {
         if (personalChromeActiveRef.current === nextActive) {
             return;
@@ -2675,7 +2425,12 @@ export default function ResumePreview({
                                             onAlignmentChange={handlePersonalAlignmentChange}
                                         />
                                     ) : null}
-                                    {renderPreviewMarginControls()}
+                                    <PreviewMarginControls
+                                        settings={settings}
+                                        hidden={showEmptyResumeChoice}
+                                        onAdjustSetting={onAdjustSetting}
+                                        onInteraction={suppressNextPreviewClick}
+                                    />
                                     {previewModel.hasContent ? (
                                         <DndContext
                                             sensors={sensors}
@@ -2685,7 +2440,13 @@ export default function ResumePreview({
                                             onDragCancel={handlePreviewDragCancel}
                                             onDragEnd={handlePreviewDragEnd}
                                         >
-                                            {renderSampleInformationToggle()}
+                                            <SampleInformationToggle
+                                                enabled={showSampleInformationToggle}
+                                                personalAlignment={personalAlignment}
+                                                showSampleInformation={showSampleInformation}
+                                                onToggleSampleInformation={onToggleSampleInformation}
+                                                onDismissSampleInformation={onDismissSampleInformation}
+                                            />
                                             <div className="resumePageContent" data-preview-page-content="true">
                                                 {orderedSections}
                                             </div>
@@ -2693,14 +2454,31 @@ export default function ResumePreview({
                                         </DndContext>
                                     ) : (
                                         <>
-                                            {!showEmptyResumeChoice ? renderSampleInformationToggle() : null}
+                                            {!showEmptyResumeChoice ? (
+                                                <SampleInformationToggle
+                                                    enabled={showSampleInformationToggle}
+                                                    personalAlignment={personalAlignment}
+                                                    showSampleInformation={showSampleInformation}
+                                                    onToggleSampleInformation={onToggleSampleInformation}
+                                                    onDismissSampleInformation={onDismissSampleInformation}
+                                                />
+                                            ) : null}
                                             <div className="resumeEmptyState resumeEmptyState--blank" aria-hidden="true" />
                                         </>
                                     )}
                                 </div>
-                                {renderPageMarkers()}
+                                <PreviewPageMarkers
+                                    hasContent={previewModel.hasContent}
+                                    pageBreaks={pageMetrics.pageBreaks}
+                                />
                             </div>
-                            {renderEmptyChoice()}
+                            <EmptyResumeChoice
+                                visible={showEmptyResumeChoice}
+                                nudgeCount={emptyChoiceNudgeCount}
+                                isImportingResume={isImportingResume}
+                                onImportResume={onImportResume}
+                                onStartFromScratch={onStartFromScratch}
+                            />
                         </div>
                     </div>
                 </div>
