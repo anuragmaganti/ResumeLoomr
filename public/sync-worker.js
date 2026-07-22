@@ -493,7 +493,7 @@ function requestOutboxSync() {
   }
 
   activeSyncAttempt = (async () => {
-    let lastError = null;
+    let lastError;
 
     do {
       syncRequestedDuringAttempt = false;

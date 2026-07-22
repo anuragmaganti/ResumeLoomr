@@ -109,10 +109,10 @@ export async function parseResumeWithGemini(file) {
   });
   const isPdf = file.mimeType === PDF_MIME_TYPE;
   const isImage = isImageMimeType(file.mimeType);
-  let sourceText = '';
-  let sourceMode = '';
+  let sourceText;
+  let sourceMode;
   let extractionDiagnostics = null;
-  let sourceDocument = null;
+  let sourceDocument;
   let sourceMapping = null;
   let mappingDiagnostics = null;
   const importWarnings = [];

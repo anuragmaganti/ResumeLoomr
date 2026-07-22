@@ -112,8 +112,8 @@ export default function ResumeWorkspaceRail({
   const dragLayoutAnimationsRef = useRef(new Map());
   const isDropLayoutSettlingRef = useRef(false);
   const pendingDragOrganizationRef = useRef(null);
-  const activeResumePlacementKeyRef = useRef('');
   const [openFolderIds, setOpenFolderIds] = useState(loadOpenFolderIds);
+  const [suppressedActiveFolderKey, setSuppressedActiveFolderKey] = useState('');
   const [closingFolderSnapshots, setClosingFolderSnapshots] = useState(new Map());
   const [selectionKeys, setSelectionKeys] = useState(new Set());
   const [activeDragItem, setActiveDragItem] = useState(null);
@@ -147,10 +147,6 @@ export default function ResumeWorkspaceRail({
       .map((item) => [item.id, organization.folders[item.id]?.toneIndex || 0]),
   ), [organization.folders, organization.rootItems]);
   const validFolderIds = useMemo(() => new Set(Object.keys(organization.folders)), [organization.folders]);
-  const validSelectionKeys = useMemo(() => new Set([
-    ...resumeList.map((resume) => createWorkspaceItemId('resume', resume.id)),
-    ...Object.keys(organization.folders).map((folderId) => createWorkspaceItemId('folder', folderId)),
-  ]), [organization.folders, resumeList]);
   const selectedResumeIds = useMemo(() => new Set(
     [...selectionKeys]
       .map(parseWorkspaceItemId)
@@ -166,17 +162,39 @@ export default function ResumeWorkspaceRail({
   const selectionCount = selectedResumeIds.size + selectedFolderIds.size;
   const isAtFolderLimit = validFolderIds.size >= MAX_WORKSPACE_FOLDERS;
   const visibleOrganization = dragOrganization || organization;
-  const displayedOpenFolderIds = useMemo(() => {
+  const activeResumePlacement = useMemo(
+    () => getOrganizationResumePlacement(organization, activeResumeId),
+    [activeResumeId, organization],
+  );
+  const activeFolderId = activeResumePlacement?.containerId !== 'root'
+    ? activeResumePlacement?.containerId || ''
+    : '';
+  const activeFolderKey = activeFolderId
+    ? `${authUser?.uid || 'guest'}:${activeResumeId}:${activeFolderId}`
+    : '';
+  const effectiveOpenFolderIds = useMemo(() => {
     const next = new Set(
       [...openFolderIds].filter((folderId) => validFolderIds.has(folderId)),
     );
+
+    if (activeFolderId && suppressedActiveFolderKey !== activeFolderKey) {
+      next.add(activeFolderId);
+    }
+
+    return next;
+  }, [activeFolderId, activeFolderKey, openFolderIds, suppressedActiveFolderKey, validFolderIds]);
+  const displayedOpenFolderIds = useMemo(() => {
+    const next = new Set(effectiveOpenFolderIds);
 
     if (activeDragItem?.type === 'folder') {
       next.delete(activeDragItem.id);
     }
 
     return next;
-  }, [activeDragItem, openFolderIds, validFolderIds]);
+  }, [activeDragItem, effectiveOpenFolderIds]);
+  const validClosingFolderSnapshots = useMemo(() => new Map(
+    [...closingFolderSnapshots].filter(([folderId]) => validFolderIds.has(folderId)),
+  ), [closingFolderSnapshots, validFolderIds]);
   const layoutOrganization = useMemo(() => ({
     ...visibleOrganization,
     rootItems: [...visibleOrganization.rootItems, { type: 'new', id: 'new' }],
@@ -224,11 +242,6 @@ export default function ResumeWorkspaceRail({
       return;
     }
 
-    setSelectionKeys((current) => new Set([...current].filter((key) => validSelectionKeys.has(key))));
-    setOpenFolderIds((current) => new Set([...current].filter((folderId) => validFolderIds.has(folderId))));
-    setClosingFolderSnapshots((current) => new Map(
-      [...current].filter(([folderId]) => validFolderIds.has(folderId)),
-    ));
     autoOpenedFolderIdsRef.current = new Set(
       [...autoOpenedFolderIdsRef.current].filter((folderId) => validFolderIds.has(folderId)),
     );
@@ -238,7 +251,7 @@ export default function ResumeWorkspaceRail({
         autoFolderCloseTimersRef.current.delete(folderId);
       }
     });
-  }, [validFolderIds, validSelectionKeys, workspaceReady]);
+  }, [validFolderIds, workspaceReady]);
 
   useEffect(() => {
     const nextScope = authUser?.uid || 'guest';
@@ -274,37 +287,11 @@ export default function ResumeWorkspaceRail({
       return;
     }
 
-    const placement = getOrganizationResumePlacement(organization, activeResumeId);
-    const placementKey = `${activeResumeId}:${placement?.containerId || ''}`;
-
-    if (activeResumePlacementKeyRef.current === placementKey) {
-      return;
-    }
-
-    activeResumePlacementKeyRef.current = placementKey;
-
-    if (placement?.containerId && placement.containerId !== 'root') {
-      window.clearTimeout(folderCloseTimersRef.current.get(placement.containerId));
-      folderCloseTimersRef.current.delete(placement.containerId);
-      setClosingFolderSnapshots((current) => {
-        const next = new Map(current);
-        next.delete(placement.containerId);
-        return next;
-      });
-      setOpenFolderIds((current) => new Set(current).add(placement.containerId));
-    }
-  }, [activeResumeId, organization, workspaceReady]);
-
-  useEffect(() => {
-    if (!workspaceReady) {
-      return;
-    }
-
     writeLocalStorageJsonItem(
       WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
-      [...openFolderIds].filter((folderId) => validFolderIds.has(folderId)).slice(-100),
+      [...effectiveOpenFolderIds].slice(-100),
     );
-  }, [openFolderIds, validFolderIds, workspaceReady]);
+  }, [effectiveOpenFolderIds, workspaceReady]);
 
   useEffect(() => () => {
     window.clearTimeout(folderHoverTimerRef.current);
@@ -376,6 +363,9 @@ export default function ResumeWorkspaceRail({
   function openFolder(folderId) {
     window.clearTimeout(folderCloseTimersRef.current.get(folderId));
     folderCloseTimersRef.current.delete(folderId);
+    if (folderId === activeFolderId) {
+      setSuppressedActiveFolderKey('');
+    }
     setClosingFolderSnapshots((current) => {
       const next = new Map(current);
       next.delete(folderId);
@@ -386,6 +376,10 @@ export default function ResumeWorkspaceRail({
 
   function closeFolder(folderId, { clearHiddenSelection = true } = {}) {
     const folderPlacement = railLayout.placements.find((placement) => placement.folderId === folderId);
+
+    if (folderId === activeFolderId) {
+      setSuppressedActiveFolderKey(activeFolderKey);
+    }
 
     if (folderPlacement?.isOpen && organization.folders[folderId]) {
       setClosingFolderSnapshots((current) => new Map(current).set(folderId, {
@@ -429,7 +423,7 @@ export default function ResumeWorkspaceRail({
   }
 
   function toggleFolder(folderId) {
-    if (openFolderIds.has(folderId)) {
+    if (effectiveOpenFolderIds.has(folderId)) {
       closeFolder(folderId);
     } else {
       openFolder(folderId);
@@ -735,7 +729,7 @@ export default function ResumeWorkspaceRail({
     setIsDragOutsideRail(false);
     setDropTargetFolderId('');
     setRootInsertTargetIfChanged(setRootInsertTarget);
-    dragOpenFolderIdsRef.current = new Set(openFolderIds);
+    dragOpenFolderIdsRef.current = new Set(effectiveOpenFolderIds);
   }
 
   function getAfterPosition(event) {
@@ -753,7 +747,7 @@ export default function ResumeWorkspaceRail({
     const preserveSourceSlots = dragResumeIdsRef.current.length > 1;
     const rootLayoutOpenFolderIds = activeDragItemRef.current
       ? dragOpenFolderIdsRef.current
-      : openFolderIds;
+      : effectiveOpenFolderIds;
     return resolveRootPointerDestination({
       pointer,
       baseOrganization: dragBaseOrganizationRef.current,
@@ -773,7 +767,7 @@ export default function ResumeWorkspaceRail({
       baseOrganization: dragBaseOrganizationRef.current,
       currentOrganization: dragVisualOrganizationRef.current || organization,
       draggedResumeIds: dragResumeIdsRef.current,
-      openFolderIds,
+      openFolderIds: effectiveOpenFolderIds,
       columns,
       metrics: getFinalRailGridMetrics(),
       preserveSourceSlots,
@@ -878,7 +872,7 @@ export default function ResumeWorkspaceRail({
   function scheduleFolderOpen(folderId) {
     if (
       !folderId
-      || openFolderIds.has(folderId)
+      || effectiveOpenFolderIds.has(folderId)
       || autoOpenedFolderIdsRef.current.has(folderId)
     ) {
       window.clearTimeout(folderHoverTimerRef.current);
@@ -1353,7 +1347,7 @@ export default function ResumeWorkspaceRail({
                           key={`folder:${folder.id}`}
                           folder={folder}
                           placement={placement}
-                          isClosing={closingFolderSnapshots.has(folder.id)}
+                          isClosing={validClosingFolderSnapshots.has(folder.id)}
                           toneIndex={folderToneById.get(folder.id)}
                           sortableResumeIds={organization.folders[folder.id]?.resumeIds || folder.resumeIds}
                           resumeById={resumeById}
@@ -1409,7 +1403,7 @@ export default function ResumeWorkspaceRail({
                       />
                     );
                 })}
-                {[...closingFolderSnapshots.values()].map((snapshot) => (
+                {[...validClosingFolderSnapshots.values()].map((snapshot) => (
                   <ClosingFolderLayer
                     key={`closing-folder:${snapshot.folderId}`}
                     folderId={snapshot.folderId}

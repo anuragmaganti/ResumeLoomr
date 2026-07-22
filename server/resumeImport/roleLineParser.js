@@ -174,7 +174,7 @@ export function parseRoleEntryLine(line) {
   const { beforeDate, dateText } = extractRoleDateText(line);
   const titleBeforeDate = beforeDate.replace(/[,\s]+$/g, '');
   const pipeParts = titleBeforeDate.split('|').map(trimText).filter(Boolean);
-  let titleText = titleBeforeDate;
+  let titleText;
   let location = '';
   let pipeRole = '';
 

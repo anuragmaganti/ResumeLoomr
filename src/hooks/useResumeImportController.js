@@ -43,13 +43,12 @@ export function useResumeImportController({
     }
 
     const importUser = authUser;
-    let placeholderResumeId = null;
 
     setIsModalOpen(false);
     setImportState({ status: 'processing', fileName: file.name });
 
     try {
-      placeholderResumeId = await createImportPlaceholderResume({ sourceFileName: file.name });
+      const placeholderResumeId = await createImportPlaceholderResume({ sourceFileName: file.name });
 
       if (!placeholderResumeId) {
         throw new Error('Create or delete a resume before importing another file.');

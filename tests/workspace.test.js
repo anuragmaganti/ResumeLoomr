@@ -1117,7 +1117,7 @@ test('resume rail uses stable container-driven columns instead of viewport-sized
   assert.match(railView, /dragDisabled=\{isRenaming \|\| isOpen \|\| isTransitioning\}/);
   assert.match(railView, /const animationOrder = placement\.children\.length - index - 1/);
   assert.match(railView, /delay: shouldReduceMotion \? 0 : index \* itemStagger/);
-  assert.match(railComponent, /closingFolderSnapshots\.values\(\)[\s\S]*?<ClosingFolderLayer/);
+  assert.match(railComponent, /validClosingFolderSnapshots\.values\(\)[\s\S]*?<ClosingFolderLayer/);
   assert.match(railComponent, /onDragMove=\{handleDragMove\}/);
   assert.doesNotMatch(railComponent, /onDragOver=/);
   assert.match(railDrag, /getFolderResumeInsertionIndex\(pointer, rect, placement, targetCount\)/);
@@ -1125,7 +1125,7 @@ test('resume rail uses stable container-driven columns instead of viewport-sized
   assert.doesNotMatch(railComponent, /dragOverTargetRef|stableItemCollisionRef/);
   assert.match(railComponent, /<SortableContext items=\{rootSortableIds\} strategy=\{railSortingStrategy\}>/);
   assert.match(railComponent, /dragCollisionRectsRef/);
-  assert.match(railComponent, /activeResumePlacementKeyRef\.current === placementKey/);
+  assert.match(railComponent, /suppressedActiveFolderKey !== activeFolderKey/);
   assert.doesNotMatch(railComponent, /rectSortingStrategy/);
   assert.match(railComponent, /from '\.\/resumeWorkspaceRailDrag\.js'/);
   assert.match(railComponent, /from '\.\/resumeWorkspaceRailView\.jsx'/);
