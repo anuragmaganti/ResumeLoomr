@@ -58,6 +58,36 @@ export {
   shouldUseVisualPdfFallbackForSourceText,
 } from './resumeImport/sourceDocument.js';
 
+function createSourceDocumentDiagnostics(file, model, sourceMode) {
+  return {
+    phase: 'source-document',
+    model,
+    sourceMode,
+    fileName: trimText(file.fileName).slice(0, 120),
+    mimeType: file.mimeType,
+    fileSizeBytes: file.size || file.buffer?.length || 0,
+  };
+}
+
+function generateVisualSourceDocument({
+  ai,
+  model,
+  file,
+  generationConfig,
+  sourceMode,
+  createContents,
+  diagnosticsFile = file,
+}) {
+  return generateSourceDocumentFromGemini({
+    ai,
+    model,
+    file,
+    generationConfig,
+    ...(createContents ? { createContents } : {}),
+    diagnostics: createSourceDocumentDiagnostics(diagnosticsFile, model, sourceMode),
+  });
+}
+
 export async function parseResumeWithGemini(file) {
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -106,7 +136,7 @@ export async function parseResumeWithGemini(file) {
 
       if (shouldUseVisualPdfFallbackForSourceText(sourceText, sourceDocument)) {
         sourceMode = 'pdf-text-layout';
-        sourceDocument = await generateSourceDocumentFromGemini({
+        sourceDocument = await generateVisualSourceDocument({
           ai,
           model,
           file: {
@@ -114,54 +144,34 @@ export async function parseResumeWithGemini(file) {
             text: sourceText,
           },
           generationConfig: visualSourceDocumentGenerationConfig,
+          sourceMode,
           createContents: createTextSourceDocumentGeminiContents,
-          diagnostics: {
-            phase: 'source-document',
-            model,
-            sourceMode,
-            fileName: trimText(file.fileName).slice(0, 120),
-            mimeType: file.mimeType,
-            fileSizeBytes: file.size || file.buffer?.length || 0,
-          },
+          diagnosticsFile: file,
         });
         sourceText = sourceDocumentToText(sourceDocument);
       }
     } else {
       importWarnings.push('Some sections may need review because this PDF could not be verified from selectable text.');
       sourceMode = 'pdf-document';
-      sourceDocument = await generateSourceDocumentFromGemini({
+      sourceDocument = await generateVisualSourceDocument({
         ai,
         model,
         file,
         generationConfig: visualSourceDocumentGenerationConfig,
-        diagnostics: {
-          phase: 'source-document',
-          model,
-          sourceMode,
-          fileName: trimText(file.fileName).slice(0, 120),
-          mimeType: file.mimeType,
-          fileSizeBytes: file.size || file.buffer?.length || 0,
-        },
+        sourceMode,
       });
       sourceText = sourceDocumentToText(sourceDocument);
     }
   } else if (isImage) {
     importWarnings.push('Some sections may need review because this image resume could not be verified from selectable text.');
     sourceMode = 'image-document';
-    sourceDocument = await generateSourceDocumentFromGemini({
+    sourceDocument = await generateVisualSourceDocument({
       ai,
       model,
       file,
       generationConfig: visualSourceDocumentGenerationConfig,
+      sourceMode,
       createContents: createImageSourceDocumentGeminiContents,
-      diagnostics: {
-        phase: 'source-document',
-        model,
-        sourceMode,
-        fileName: trimText(file.fileName).slice(0, 120),
-        mimeType: file.mimeType,
-        fileSizeBytes: file.size || file.buffer?.length || 0,
-      },
     });
     sourceText = sourceDocumentToText(sourceDocument);
   } else {

@@ -4,17 +4,18 @@
   "version": "0.0.0",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "check:architecture": "node scripts/verifyArchitecture.mjs",
+    "check:dead-code": "knip --no-progress",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "node --test --test-concurrency=1",
-    "verify": "npm run check:architecture && npm run lint && npm test && npm run audit:production && npm run build"
+    "verify": "npm run check:architecture && npm run check:dead-code && npm run lint && npm test && npm run audit:production && npm run build"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -43,6 +44,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "fake-indexeddb": "^6.2.5",
     "globals": "^16.5.0",
+    "knip": "6.29.0",
     "vite": "^7.2.4"
   },
   "overrides": {

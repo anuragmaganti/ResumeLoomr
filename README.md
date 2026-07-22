@@ -238,9 +238,10 @@ FIREBASE_SERVICE_ACCOUNT_JSON=
 npm run dev      # Start the Vite dev server
 npm run build    # Build the production frontend
 npm run preview  # Preview the production build locally
+npm run check:dead-code # Reject unused files, exports, and dependencies
 npm run lint     # Run ESLint
 npm test         # Run Node tests
-npm run verify   # Run architecture, lint, tests, audit, and build
+npm run verify   # Run architecture, dead-code, lint, tests, audit, and build
 ```
 
 ## Testing

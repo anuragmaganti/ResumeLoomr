@@ -2,8 +2,8 @@ export const IMPORT_FILE_MAX_BYTES = 3 * 1024 * 1024;
 export const IMPORT_FILE_MAX_MEGABYTES = 3;
 export const PDF_MIME_TYPE = 'application/pdf';
 export const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-export const PNG_MIME_TYPE = 'image/png';
-export const JPEG_MIME_TYPE = 'image/jpeg';
+const PNG_MIME_TYPE = 'image/png';
+const JPEG_MIME_TYPE = 'image/jpeg';
 export const IMPORT_FILE_TYPES_LABEL = 'PDF, DOCX, PNG, JPG, or JPEG';
 export const IMPORT_FILE_ACCEPT = [
   '.pdf',
