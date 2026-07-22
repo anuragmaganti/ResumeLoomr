@@ -60,8 +60,12 @@ import {
 import {
   createSavedDraftState,
   createUnsyncedDraftCopyState,
-  initializeLocalWorkspace,
+} from '../lib/draftState.js';
+import {
   mergeLocalAndCloudWorkspaces,
+} from '../lib/workspaceReconciliation.js';
+import {
+  initializeLocalWorkspace,
   persistLocalDraftSnapshot,
   persistLocalResumeBatchDelete,
   persistLocalWorkspaceSnapshot,

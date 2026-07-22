@@ -5,6 +5,8 @@ import 'fake-indexeddb/auto';
 import {
   createSavedDraftState,
   createUnsyncedDraftCopyState,
+} from '../src/lib/draftState.js';
+import {
   deleteLocalWorkspaceDatabase,
   initializeLocalWorkspace,
   markOutboxFailed,

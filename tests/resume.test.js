@@ -101,11 +101,15 @@ import {
   hasLocalResumeWorkspaceData,
 } from '../src/lib/browserConnection.js';
 import {
-  createOutboxAckDescriptor,
   createDraftContentHash,
   createSavedDraftState,
-  filterOutboxOperationsForAccount,
+} from '../src/lib/draftState.js';
+import {
   mergeLocalAndCloudWorkspaces,
+} from '../src/lib/workspaceReconciliation.js';
+import {
+  createOutboxAckDescriptor,
+  filterOutboxOperationsForAccount,
   outboxOperationBelongsToAccount,
   outboxOperationMatchesAck,
   persistLocalResumeBatchDelete,
