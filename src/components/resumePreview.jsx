@@ -2384,7 +2384,10 @@ export default function ResumePreview({
                 : null}
             zIndex={1000}
         >
-            <div className={`previewDragOverlayFrame ${templateClassName(template)}`} style={dragOverlayStyle}>
+            <div
+                className={`previewDragOverlayFrame ${templateClassName(template)}${activeDragMeta?.type === 'sectionHeading' ? ' previewDragOverlayFrame--sectionHeading' : ''}`}
+                style={dragOverlayStyle}
+            >
                 <div className="previewDragOverlayScaleLayer" style={dragOverlayContentStyle}>
                     {renderPreviewDragOverlay()}
                 </div>

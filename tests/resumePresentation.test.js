@@ -249,6 +249,16 @@ test('below-heading section separators render on the final visible section', () 
   assert.match(previewCss, /\.resumeSection:not\(\.resumeSection--separatorBelowHeading\)\.resumeSection--lastVisible > \.sectionSeparatorControl/);
 });
 
+test('section heading alignment drag keeps title hover and overlay geometry isolated', () => {
+  const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
+
+  assert.match(previewCss, /\.previewSortableSection:has\(> \.previewSectionHeadingLine \.previewSectionReorderSurface:hover\)/);
+  assert.doesNotMatch(previewCss, /\.previewSortableSection:has\(> \.previewSectionHeadingLine \.previewSectionHeadingSource:hover\)/);
+  assert.match(previewCss, /\.previewDragOverlayFrame--sectionHeading\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;/);
+  assert.match(previewCss, /\.previewDragOverlay--sectionHeading\s*\{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*100%;[\s\S]*?padding:\s*0;/);
+  assert.match(previewCss, /\.previewDragOverlay--sectionHeading h2\s*\{[\s\S]*?height:\s*100%;[\s\S]*?line-height:\s*1\.1;/);
+});
+
 test('preview page break helper uses printable height for raw markers', () => {
   assert.deepEqual(calculatePreviewPageBreaks({
     contentHeight: 2200,
