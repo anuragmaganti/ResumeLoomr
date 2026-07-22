@@ -1115,6 +1115,43 @@ export default function ResumePreview({
         );
     }
 
+    function renderSectionFrame({
+        block,
+        className,
+        entries,
+        entryItems,
+        sortable,
+        showSeparator,
+    }) {
+        const SectionFrame = sortable ? SortablePreviewSection : StaticPreviewSection;
+
+        return (
+            <SectionFrame
+                key={block.id}
+                blockId={block.id}
+                className={className}
+                previewScale={pageMetrics.scale}
+                showSeparator={showSeparator}
+                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
+                separatorPosition={sectionSeparatorPosition}
+            >
+                {(sectionHandleProps, sectionSeparatorElement) => (
+                    <>
+                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
+                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
+                        </h2>
+                        {sectionSeparatorElement}
+                        {sortable ? (
+                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
+                                {entries}
+                            </SortableContext>
+                        ) : entries}
+                    </>
+                )}
+            </SectionFrame>
+        );
+    }
+
     function renderSimpleMetaSection({
         block,
         sectionClassName,
@@ -1127,7 +1164,6 @@ export default function ResumePreview({
         showSeparator = true,
     }) {
         const entries = block.entries;
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
 
         if (entries.length === 0) {
@@ -1176,31 +1212,14 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className={`resumeSection ${sectionClassName}`}
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entryList}
-                            </SortableContext>
-                        ) : entryList}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: `resumeSection ${sectionClassName}`,
+            entries: entryList,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function renderPersonalSection({ showSeparator = true } = {}) {
@@ -1307,7 +1326,6 @@ export default function ResumePreview({
     }
 
     function renderEducationSection(block, { sortable = true, showSeparator = true } = {}) {
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
         const entries = block.entries.map((institution) => (
@@ -1407,31 +1425,14 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className="resumeSection educationDiv"
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entries}
-                            </SortableContext>
-                        ) : entries}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: "resumeSection educationDiv",
+            entries,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function getEntryHeaderLayout(block) {
@@ -1823,7 +1824,6 @@ export default function ResumePreview({
     }
 
     function renderRolesSection(block, { sortable = true, showSeparator = true } = {}) {
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
         const entries = block.entries.map((job) => (
@@ -1851,35 +1851,17 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className="resumeSection experienceDiv"
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entries}
-                            </SortableContext>
-                        ) : entries}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: "resumeSection experienceDiv",
+            entries,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function renderSkillsSection(block, { sortable = true, showSeparator = true } = {}) {
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
         const entries = block.entries.map((entry) => (
@@ -1920,35 +1902,17 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className="resumeSection skillsDiv"
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entries}
-                            </SortableContext>
-                        ) : entries}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: "resumeSection skillsDiv",
+            entries,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function renderProjectsSection(block, { sortable = true, showSeparator = true } = {}) {
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
         const entries = block.entries.map((entry) => (
@@ -1999,35 +1963,17 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className="resumeSection projectsDiv"
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entries}
-                            </SortableContext>
-                        ) : entries}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: "resumeSection projectsDiv",
+            entries,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function renderLanguagesSection(block, { sortable = true, showSeparator = true } = {}) {
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
         const entries = block.entries.map((entry) => (
@@ -2059,35 +2005,17 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className="resumeSection languagesDiv"
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entries}
-                            </SortableContext>
-                        ) : entries}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: "resumeSection languagesDiv",
+            entries,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function renderCustomSection(block, { sortable = true, showSeparator = true } = {}) {
-        const SectionShell = sortable ? SortablePreviewSection : StaticPreviewSection;
         const EntryShell = sortable ? SortablePreviewEntry : StaticPreviewEntry;
         const entryItems = block.entries.map((entry) => entryDragId(block.id, entry.id));
         const entries = block.entries.map((entry) => (
@@ -2120,31 +2048,14 @@ export default function ResumePreview({
             </EntryShell>
         ));
 
-        return (
-            <SectionShell
-                key={block.id}
-                blockId={block.id}
-                className="resumeSection customDiv"
-                previewScale={pageMetrics.scale}
-                showSeparator={showSeparator}
-                onSeparatorSettingsOpen={onSeparatorSettingsOpen}
-                separatorPosition={sectionSeparatorPosition}
-            >
-                {(sectionHandleProps, sectionSeparatorElement) => (
-                    <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
-                            {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
-                        {sectionSeparatorElement}
-                        {sortable ? (
-                            <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
-                                {entries}
-                            </SortableContext>
-                        ) : entries}
-                    </>
-                )}
-            </SectionShell>
-        );
+        return renderSectionFrame({
+            block,
+            className: "resumeSection customDiv",
+            entries,
+            entryItems,
+            sortable,
+            showSeparator,
+        });
     }
 
     function renderSectionBlock(block, options = {}) {

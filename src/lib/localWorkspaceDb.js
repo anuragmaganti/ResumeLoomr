@@ -805,7 +805,7 @@ export async function markOutboxSynced(operations) {
   await tx.done;
 }
 
-export async function markOutboxFailed(operations, errorMessage = '') {
+async function updateMatchingOutboxRecords(operations, updateRecord) {
   const db = await getLocalWorkspaceDb();
   const acks = normalizeOutboxAckList(operations);
 
@@ -822,42 +822,27 @@ export async function markOutboxFailed(operations, errorMessage = '') {
       continue;
     }
 
-    await tx.store.put({
-      ...record,
-      attempts: Number(record.attempts || 0) + 1,
-      lastError: errorMessage,
-      updatedAt: new Date().toISOString(),
-      status: 'pending',
-    });
+    await tx.store.put(updateRecord(record));
   }
 
   await tx.done;
 }
 
+export async function markOutboxFailed(operations, errorMessage = '') {
+  await updateMatchingOutboxRecords(operations, (record) => ({
+    ...record,
+    attempts: Number(record.attempts || 0) + 1,
+    lastError: errorMessage,
+    updatedAt: new Date().toISOString(),
+    status: 'pending',
+  }));
+}
+
 export async function markOutboxStale(operations, errorMessage = 'Skipped stale cloud write.') {
-  const db = await getLocalWorkspaceDb();
-  const acks = normalizeOutboxAckList(operations);
-
-  if (!db || acks.length === 0) {
-    return;
-  }
-
-  const tx = db.transaction(OUTBOX_STORE, 'readwrite');
-
-  for (const ack of acks) {
-    const record = await tx.store.get(ack.id);
-
-    if (!outboxOperationMatchesAck(record, ack)) {
-      continue;
-    }
-
-    await tx.store.put({
-      ...record,
-      lastError: errorMessage,
-      updatedAt: new Date().toISOString(),
-      status: 'stale',
-    });
-  }
-
-  await tx.done;
+  await updateMatchingOutboxRecords(operations, (record) => ({
+    ...record,
+    lastError: errorMessage,
+    updatedAt: new Date().toISOString(),
+    status: 'stale',
+  }));
 }

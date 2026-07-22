@@ -12,6 +12,7 @@ import {
   createWorkspaceItemId,
   isResumeBundleSourcePlaceholder,
 } from '../lib/workspaceOrganization.js';
+import { trapTabKey } from '../lib/focusTrap.js';
 import EntryActionMenu from './forms/entryActionMenu';
 import {
   FOLDER_MOTION_TRANSITION,
@@ -219,21 +220,7 @@ export function BatchDeleteDialog({ resumeCount, folderCount, isDeleting, isSign
         return;
       }
 
-      if (event.key !== 'Tab') {
-        return;
-      }
-
-      const focusable = [...dialogRef.current?.querySelectorAll('button:not(:disabled)') || []];
-      const first = focusable[0];
-      const last = focusable.at(-1);
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
+      trapTabKey(event, dialogRef.current);
     }
 
     document.addEventListener('keydown', handleKeyDown);

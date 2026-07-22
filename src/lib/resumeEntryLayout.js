@@ -55,7 +55,7 @@ function getEntryHeaderLayoutFields(sectionKind) {
   return ENTRY_HEADER_LAYOUT_FIELDS[normalizeLayoutKind(sectionKind)] || [];
 }
 
-function getEntryHeaderLayoutSlot(layout, slot) {
+function resolveEntryHeaderLayoutSlot(layout, slot) {
   const lineIndex = Number(slot?.lineIndex);
   const slotIndex = Number(slot?.slotIndex);
   const side = slot?.side === 'right' ? 'right' : 'left';
@@ -70,32 +70,29 @@ function getEntryHeaderLayoutSlot(layout, slot) {
     || slotIndex < 0
     || slotIndex >= slots.length
   ) {
-    return undefined;
+    return null;
   }
 
-  return slots[slotIndex];
+  return { lineIndex, side, slotIndex };
+}
+
+function getEntryHeaderLayoutSlot(layout, slot) {
+  const resolvedSlot = resolveEntryHeaderLayoutSlot(layout, slot);
+
+  return resolvedSlot
+    ? layout.lines[resolvedSlot.lineIndex][resolvedSlot.side][resolvedSlot.slotIndex]
+    : undefined;
 }
 
 function setEntryHeaderLayoutSlot(layout, slot, value) {
-  const lineIndex = Number(slot?.lineIndex);
-  const slotIndex = Number(slot?.slotIndex);
-  const side = slot?.side === 'right' ? 'right' : 'left';
-  const slots = layout?.lines?.[lineIndex]?.[side];
+  const resolvedSlot = resolveEntryHeaderLayoutSlot(layout, slot);
 
-  if (
-    !Number.isInteger(lineIndex)
-    || !Number.isInteger(slotIndex)
-    || lineIndex < 0
-    || lineIndex > 1
-    || !Array.isArray(slots)
-    || slotIndex < 0
-    || slotIndex >= slots.length
-  ) {
+  if (!resolvedSlot) {
     return layout;
   }
 
   const nextLayout = cloneEntryHeaderLayout(layout);
-  nextLayout.lines[lineIndex][side][slotIndex] = value || null;
+  nextLayout.lines[resolvedSlot.lineIndex][resolvedSlot.side][resolvedSlot.slotIndex] = value || null;
   return nextLayout;
 }
 

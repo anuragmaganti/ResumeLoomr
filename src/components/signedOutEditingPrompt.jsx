@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { trapTabKey } from '../lib/focusTrap.js';
 
 function KeepOnBrowserIcon() {
   return (
@@ -94,28 +95,7 @@ export default function SignedOutEditingPrompt({
       return;
     }
 
-    if (event.key !== 'Tab') {
-      return;
-    }
-
-    const focusableElements = dialogRef.current?.querySelectorAll(
-      'button:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
-    );
-
-    if (!focusableElements?.length) {
-      return;
-    }
-
-    const firstElement = focusableElements[0];
-    const lastElement = focusableElements[focusableElements.length - 1];
-
-    if (event.shiftKey && document.activeElement === firstElement) {
-      event.preventDefault();
-      lastElement.focus();
-    } else if (!event.shiftKey && document.activeElement === lastElement) {
-      event.preventDefault();
-      firstElement.focus();
-    }
+    trapTabKey(event, dialogRef.current);
   }
 
   return (

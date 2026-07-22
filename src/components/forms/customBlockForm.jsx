@@ -1,40 +1,28 @@
 import AutoResizeTextarea from "../autoResizeTextarea";
-import CollapsibleEntryCard from "./collapsibleEntryCard";
-import { buildEntrySummary } from "./buildEntrySummary";
 import FormFieldError from "./formFieldError";
 import ReorderableTextList from "./reorderableTextList";
-import { createEditorTargetAttributes } from "../../lib/editorTargets";
+import { createSectionEntryFormBindings } from "./sectionEntryForm";
+import SectionEntryList from "./sectionEntryList";
 
 export default function CustomBlockForm({ section, actions, getFieldError, markTouched, editorTarget, placeholderFor }) {
-  const entries = section.entries || [];
-  const pathFor = (entryId, field) => `sections.${section.id}.${entryId}.${field}`;
-  const placeholder = (entryId, field, fallback) => placeholderFor?.(pathFor(entryId, field), fallback) || fallback;
-  const editorAttrs = (entryId, field) => createEditorTargetAttributes(pathFor(entryId, field), { entryId });
+  const { sectionId, pathFor, placeholder, editorAttrs, updateEntry } = createSectionEntryFormBindings({
+    section,
+    actions,
+    placeholderFor,
+  });
 
   return (
-    <div className="formStack">
-      {entries.map((entry, index) => (
-        <CollapsibleEntryCard
-          key={entry.id}
-          summary={buildEntrySummary(
-            [entry.title, entry.subtitle, entry.location, entry.years, entry.details],
-            "Add title and details"
-          )}
-          fallbackSummary="Add title and details"
-          expandLabel={`${section.title} entry ${index + 1}`}
-          menuLabel={`${section.title} entry ${index + 1} actions`}
-          moveUpLabel={`Move ${section.title} entry ${index + 1} up`}
-          moveDownLabel={`Move ${section.title} entry ${index + 1} down`}
-          removeLabel={`Remove ${section.title} entry ${index + 1}`}
-          onMoveUp={() => actions.moveSectionBlockEntry(section.id, entry.id, -1)}
-          onMoveDown={() => actions.moveSectionBlockEntry(section.id, entry.id, 1)}
-          onRemove={() => actions.removeSectionBlockEntry(section.id, entry.id)}
-          disableUp={index === 0}
-          disableDown={index === entries.length - 1}
-          disableRemove={entries.length === 1}
-          expandSignal={editorTarget?.entryId === entry.id ? editorTarget.requestId : 0}
-        >
-          <form onSubmit={(event) => event.preventDefault()}>
+    <SectionEntryList
+      section={section}
+      actions={actions}
+      editorTarget={editorTarget}
+      entryNoun={`${section.title} entry`}
+      fallbackSummary="Add title and details"
+      getSummaryValues={(entry) => [entry.title, entry.subtitle, entry.location, entry.years, entry.details]}
+      addLabel="Add entry"
+    >
+      {(entry) => (
+        <>
             <div className="field">
               <label htmlFor={`custom-title-${section.id}-${entry.id}`}>Title</label>
               <input
@@ -42,7 +30,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                 id={`custom-title-${section.id}-${entry.id}`}
                 {...editorAttrs(entry.id, 'title')}
                 value={entry.title}
-                onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'title', event.target.value)}
+                onChange={(event) => updateEntry(entry.id, 'title', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'title'))}
                 placeholder={placeholder(entry.id, 'title', 'Entry title')}
               />
@@ -56,7 +44,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                 id={`custom-subtitle-${section.id}-${entry.id}`}
                 {...editorAttrs(entry.id, 'subtitle')}
                 value={entry.subtitle}
-                onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'subtitle', event.target.value)}
+                onChange={(event) => updateEntry(entry.id, 'subtitle', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'subtitle'))}
                 placeholder={placeholder(entry.id, 'subtitle', 'Optional context')}
               />
@@ -70,7 +58,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                   id={`custom-location-${section.id}-${entry.id}`}
                   {...editorAttrs(entry.id, 'location')}
                   value={entry.location}
-                  onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'location', event.target.value)}
+                  onChange={(event) => updateEntry(entry.id, 'location', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'location'))}
                   placeholder={placeholder(entry.id, 'location', 'City, State')}
                 />
@@ -83,7 +71,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                   id={`custom-years-${section.id}-${entry.id}`}
                   {...editorAttrs(entry.id, 'years')}
                   value={entry.years}
-                  onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'years', event.target.value)}
+                  onChange={(event) => updateEntry(entry.id, 'years', event.target.value)}
                   onBlur={() => markTouched(pathFor(entry.id, 'years'))}
                   placeholder={placeholder(entry.id, 'years', '2024')}
                 />
@@ -96,7 +84,7 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
                 id={`custom-details-${section.id}-${entry.id}`}
                 {...editorAttrs(entry.id, 'details')}
                 value={entry.details}
-                onChange={(event) => actions.updateSectionBlockEntry(section.id, entry.id, 'details', event.target.value)}
+                onChange={(event) => updateEntry(entry.id, 'details', event.target.value)}
                 onBlur={() => markTouched(pathFor(entry.id, 'details'))}
                 rows={2}
                 placeholder={placeholder(entry.id, 'details', 'Add details for this entry.')}
@@ -113,18 +101,13 @@ export default function CustomBlockForm({ section, actions, getFieldError, markT
               addLabel="Add highlight"
               getFieldError={getFieldError}
               markTouched={markTouched}
-              onChangeItem={(itemIndex, value) => actions.updateSectionBlockTextList(section.id, entry.id, 'highlights', itemIndex, value)}
-              onMoveItem={(itemIndex, direction) => actions.moveSectionBlockTextListItem(section.id, entry.id, 'highlights', itemIndex, direction)}
-              onRemoveItem={(itemIndex) => actions.removeSectionBlockTextListItem(section.id, entry.id, 'highlights', itemIndex)}
-              onAddItem={() => actions.addSectionBlockTextListItem(section.id, entry.id, 'highlights')}
+              onChangeItem={(itemIndex, value) => actions.updateSectionBlockTextList(sectionId, entry.id, 'highlights', itemIndex, value)}
+              onMoveItem={(itemIndex, direction) => actions.moveSectionBlockTextListItem(sectionId, entry.id, 'highlights', itemIndex, direction)}
+              onRemoveItem={(itemIndex) => actions.removeSectionBlockTextListItem(sectionId, entry.id, 'highlights', itemIndex)}
+              onAddItem={() => actions.addSectionBlockTextListItem(sectionId, entry.id, 'highlights')}
             />
-          </form>
-        </CollapsibleEntryCard>
-      ))}
-
-      <button className="button buttonSecondary addEntryButton" type="button" onClick={() => actions.addSectionBlockEntry(section.id)}>
-        Add entry
-      </button>
-    </div>
+        </>
+      )}
+    </SectionEntryList>
   );
 }
