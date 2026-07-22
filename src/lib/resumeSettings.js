@@ -21,6 +21,7 @@ export const PERSONAL_CONTACT_FIELDS = [
 ];
 export const PERSONAL_ALIGNMENT_OPTIONS = ['left', 'center'];
 export const PERSONAL_HEADER_ROWS = ['headline', 'contact'];
+const SECTION_HEADING_ALIGNMENT_OPTIONS = ['left', 'center'];
 
 const RESUME_SETTINGS_DEFAULTS = {
   textSize: 0,
@@ -40,6 +41,7 @@ const RESUME_SETTINGS_DEFAULTS = {
   personalSeparatorGap: 0,
   sectionSeparatorGap: -1,
   sectionSeparatorPosition: 'aboveSectionName',
+  sectionHeadingAlignment: 'left',
   personalContactOrder: PERSONAL_CONTACT_FIELDS,
   personalAlignment: 'template',
   personalHeaderOrder: PERSONAL_HEADER_ROWS,
@@ -57,6 +59,8 @@ const SEPARATOR_GAP_MIN = -5;
 const SEPARATOR_GAP_MAX = 5;
 const SECTION_SEPARATOR_POSITION_DEFAULT = 'aboveSectionName';
 const SECTION_SEPARATOR_POSITIONS = new Set(['aboveSectionName', 'belowSectionName']);
+const SECTION_HEADING_ALIGNMENT_DEFAULT = 'left';
+const SECTION_HEADING_ALIGNMENTS = new Set(SECTION_HEADING_ALIGNMENT_OPTIONS);
 const PERSONAL_ALIGNMENT_DEFAULT = 'template';
 const PERSONAL_ALIGNMENTS = new Set([PERSONAL_ALIGNMENT_DEFAULT, ...PERSONAL_ALIGNMENT_OPTIONS]);
 const TEXT_SIZE_STEP = 0.03;
@@ -81,6 +85,10 @@ const BOOLEAN_SETTING_IDS = new Set(['showSummaryTitle']);
 
 function normalizeSectionSeparatorPosition(value) {
   return SECTION_SEPARATOR_POSITIONS.has(value) ? value : SECTION_SEPARATOR_POSITION_DEFAULT;
+}
+
+function normalizeSectionHeadingAlignment(value) {
+  return SECTION_HEADING_ALIGNMENTS.has(value) ? value : SECTION_HEADING_ALIGNMENT_DEFAULT;
 }
 
 export function normalizePersonalContactOrder(order) {
@@ -227,6 +235,13 @@ export function normalizeResumeSettings(settings) {
         ];
       }
 
+      if (key === 'sectionHeadingAlignment') {
+        return [
+          key,
+          normalizeSectionHeadingAlignment(settings?.[key] ?? RESUME_SETTINGS_DEFAULTS[key]),
+        ];
+      }
+
       if (BOOLEAN_SETTING_IDS.has(key)) {
         return [key, settings?.[key] === true];
       }
@@ -254,6 +269,7 @@ export function adjustResumeSettings(settings, settingId, delta) {
     SETTING_RANGES[settingId] ||
     BOOLEAN_SETTING_IDS.has(settingId) ||
     settingId === 'sectionSeparatorPosition' ||
+    settingId === 'sectionHeadingAlignment' ||
     settingId === 'personalContactOrder' ||
     settingId === 'personalAlignment' ||
     settingId === 'personalHeaderOrder'
@@ -299,6 +315,13 @@ export function setResumeSettingsValue(settings, settingId, value) {
     return {
       ...normalizedSettings,
       sectionSeparatorPosition: normalizeSectionSeparatorPosition(value),
+    };
+  }
+
+  if (settingId === 'sectionHeadingAlignment') {
+    return {
+      ...normalizedSettings,
+      sectionHeadingAlignment: normalizeSectionHeadingAlignment(value),
     };
   }
 

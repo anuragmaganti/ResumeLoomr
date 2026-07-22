@@ -403,6 +403,7 @@ function App() {
               onReorderPersonalContact={actions.setPersonalContactOrder}
               onPersonalAlignmentChange={(alignment) => actions.setResumeSettingValue('personalAlignment', alignment)}
               onPersonalHeaderOrderChange={(order) => actions.setResumeSettingValue('personalHeaderOrder', order)}
+              onSectionHeadingAlignmentChange={(alignment) => actions.setResumeSettingValue('sectionHeadingAlignment', alignment)}
               onSetSectionEntryHeaderLayout={actions.setSectionEntryHeaderLayout}
               onAdjustSetting={actions.updateResumeSetting}
               onSummaryWidthChange={actions.setSummaryWidthPercent}

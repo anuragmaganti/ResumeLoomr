@@ -59,12 +59,14 @@ import {
     entryDragId,
     getPreviewSortableElement,
     headerSlotDragId,
+    isPreviewPointWithinRect,
     moveIdWithinOrder,
     parsePreviewDragId,
     personalContactDragId,
     personalHeaderDragId,
     previewCollisionDetection,
     previewVerticalListSortingStrategy,
+    sectionHeadingDragId,
     sectionDragId,
 } from './resumePreviewDrag.js';
 import {
@@ -82,6 +84,7 @@ import {
     StaticPreviewEntry,
     StaticPreviewSection,
 } from './resumePreviewSortables.jsx';
+import ResumePreviewSectionHeading from './resumePreviewSectionHeading.jsx';
 import {
     openSeparatorSettings,
     previewSectionClassName,
@@ -240,6 +243,7 @@ export default function ResumePreview({
     onReorderPersonalContact,
     onPersonalAlignmentChange,
     onPersonalHeaderOrderChange,
+    onSectionHeadingAlignmentChange,
     onSetSectionEntryHeaderLayout,
     onAdjustSetting,
     onSummaryWidthChange,
@@ -263,6 +267,7 @@ export default function ResumePreview({
     const suppressPreviewClickRef = useRef(false);
     const activeDragScrollRef = useRef({ x: 0, y: 0, captured: false });
     const activeDragInitialRectRef = useRef(null);
+    const activeDragPointerRef = useRef(null);
     const summaryWidthDragRef = useRef(null);
     const headerLayoutDoubleClickRef = useRef(null);
     const headerLayoutLongPressRef = useRef(null);
@@ -327,6 +332,7 @@ export default function ResumePreview({
     const sectionSeparatorPosition = settings?.sectionSeparatorPosition === 'belowSectionName'
         ? 'belowSectionName'
         : 'aboveSectionName';
+    const sectionHeadingAlignment = settings?.sectionHeadingAlignment === 'center' ? 'center' : 'left';
     const sensors = useSensors(
         useSensor(ResumeLoomrPointerSensor, { activationConstraint: { distance: 6 } }),
         useSensor(ResumeLoomrKeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -908,6 +914,10 @@ export default function ResumePreview({
         }
 
         setActiveDragMeta(parsePreviewDragId(event.active.id));
+        activeDragPointerRef.current = Number.isFinite(event.activatorEvent?.clientX)
+            && Number.isFinite(event.activatorEvent?.clientY)
+            ? { x: event.activatorEvent.clientX, y: event.activatorEvent.clientY }
+            : null;
         setHoverHeaderLayout(null);
         const activeElement = getPreviewSortableElement(event.active.id);
         const rect = activeElement?.getBoundingClientRect() || event.active.rect.current.initial;
@@ -929,12 +939,23 @@ export default function ResumePreview({
         setActiveDragRect(null);
         setHoverHeaderLayout(null);
         activeDragInitialRectRef.current = null;
+        activeDragPointerRef.current = null;
         activeDragScrollRef.current = { x: 0, y: 0, captured: false };
     }
 
     function handlePreviewDragEnd(event) {
         const activeMeta = parsePreviewDragId(event.active.id);
-        const overMeta = event.over ? parsePreviewDragId(event.over.id) : null;
+        let overMeta = event.over ? parsePreviewDragId(event.over.id) : null;
+
+        if (activeMeta.type === 'sectionHeading') {
+            const targetAlignment = activeMeta.alignment === 'center' ? 'left' : 'center';
+            const targetId = sectionHeadingDragId(activeMeta.sectionId, targetAlignment);
+            const targetRect = getPreviewSortableElement(targetId)?.getBoundingClientRect();
+            const pointer = activeDragPointerRef.current;
+            const pointerIsInsideTarget = isPreviewPointWithinRect(pointer, targetRect);
+
+            overMeta = pointerIsInsideTarget ? parsePreviewDragId(targetId) : null;
+        }
         const keepHeaderLayoutModeOpen = (
             activeMeta.type === 'headerSlot' &&
             activeHeaderLayout?.sectionId === activeMeta.sectionId &&
@@ -945,6 +966,7 @@ export default function ResumePreview({
         setActiveDragRect(null);
         setHoverHeaderLayout(null);
         activeDragInitialRectRef.current = null;
+        activeDragPointerRef.current = null;
         activeDragScrollRef.current = { x: 0, y: 0, captured: false };
 
         if (!overMeta || !areCompatiblePreviewDragItems(activeMeta, overMeta)) {
@@ -1005,6 +1027,14 @@ export default function ResumePreview({
                         entryId: activeMeta.entryId,
                     });
                 }
+            }
+
+            return;
+        }
+
+        if (activeMeta.type === 'sectionHeading') {
+            if (overMeta.alignment !== sectionHeadingAlignment) {
+                onSectionHeadingAlignmentChange?.(overMeta.alignment);
             }
 
             return;
@@ -1146,9 +1176,17 @@ export default function ResumePreview({
             >
                 {(sectionHandleProps, sectionSeparatorElement) => (
                     <>
-                        <h2 data-page-break-kind="heading" {...sectionTitleTarget(block.id)} {...sectionHandleProps}>
+                        <ResumePreviewSectionHeading
+                            alignment={sectionHeadingAlignment}
+                            alignmentDragEnabled={sortable && typeof onSectionHeadingAlignmentChange === 'function'}
+                            editProps={sectionTitleTarget(block.id)}
+                            isAlignmentDragging={activeDragMeta?.type === 'sectionHeading' && activeDragMeta.sectionId === block.id}
+                            sectionHandleProps={sectionHandleProps}
+                            sectionId={block.id}
+                            title={block.title}
+                        >
                             {renderTextWithCaret(block.title, sectionTitleEditorPath(block.id))}
-                        </h2>
+                        </ResumePreviewSectionHeading>
                         {sectionSeparatorElement}
                         {sortable ? (
                             <SortableContext items={entryItems} strategy={previewVerticalListSortingStrategy}>
@@ -1383,13 +1421,20 @@ export default function ResumePreview({
                 >
                     {(_sectionHandleProps, sectionSeparatorElement) => (
                         <>
-                            <h2 data-page-break-kind="heading" {...personalTarget('summaryTitle')}>
+                            <ResumePreviewSectionHeading
+                                alignment={sectionHeadingAlignment}
+                                alignmentDragEnabled={!activeHeaderLayout?.sectionId && typeof onSectionHeadingAlignmentChange === 'function'}
+                                editProps={personalTarget('summaryTitle')}
+                                isAlignmentDragging={activeDragMeta?.type === 'sectionHeading' && activeDragMeta.sectionId === 'personal-summary'}
+                                sectionId="personal-summary"
+                                title={previewModel.personal.summaryTitle || 'Untitled section'}
+                            >
                                 {renderTextWithCaret(
                                     previewModel.personal.summaryTitle,
                                     summaryTitlePath,
                                     { fallback: 'Untitled section' },
                                 )}
-                            </h2>
+                            </ResumePreviewSectionHeading>
                             {sectionSeparatorElement}
                             {renderSummaryBody()}
                         </>
@@ -2202,6 +2247,18 @@ export default function ResumePreview({
             ) : null;
         }
 
+        if (activeDragMeta.type === 'sectionHeading') {
+            const title = activeDragMeta.sectionId === 'personal-summary'
+                ? previewModel.personal.summaryTitle || 'Untitled section'
+                : findBlock(activeDragMeta.sectionId)?.title;
+
+            return title ? (
+                <div className="previewDragOverlay previewDragOverlay--sectionHeading">
+                    <h2>{title}</h2>
+                </div>
+            ) : null;
+        }
+
         if (activeDragMeta.type === 'entry') {
             const block = findBlock(activeDragMeta.sectionId);
             const entry = findEntry(block, activeDragMeta.entryId);
@@ -2322,7 +2379,7 @@ export default function ResumePreview({
     const previewDragOverlay = (
         <DragOverlay
             adjustScale={false}
-            dropAnimation={activeDragMeta?.type === 'bullet' || activeDragMeta?.type === 'personalHeader'
+            dropAnimation={['bullet', 'personalHeader', 'sectionHeading'].includes(activeDragMeta?.type)
                 ? { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }
                 : null}
             zIndex={1000}
@@ -2366,6 +2423,8 @@ export default function ResumePreview({
     }
 
     function handleResumePagePointerMove(event) {
+        activeDragPointerRef.current = { x: event.clientX, y: event.clientY };
+
         if (!previewModel.hasContent || !previewModel.showPersonal) {
             setPersonalChromeActive(false);
             return;
@@ -2387,6 +2446,10 @@ export default function ResumePreview({
         setPersonalChromeActive(isInsidePageX && isInsidePersonalBandY);
     }
 
+    function captureResumePagePointer(event) {
+        activeDragPointerRef.current = { x: event.clientX, y: event.clientY };
+    }
+
     return (
         <>
             <section ref={panelRef} className="previewPanel">
@@ -2399,6 +2462,7 @@ export default function ResumePreview({
                                     className={`resumePage ${templateClassName(template)}${isSamplePreview ? ' resumePage--sample' : ''}${isHeaderLayoutModeActive ? ' resumePage--headerLayoutMode' : ''}${isPreviewDragActive ? ' resumePage--dragging' : ''}${isPersonalChromeActive ? ' resumePage--personalChromeActive' : ''}`}
                                     style={presentationVars}
                                     onClick={handlePreviewClick}
+                                    onPointerMoveCapture={captureResumePagePointer}
                                     onPointerMove={handleResumePagePointerMove}
                                     onPointerLeave={() => setPersonalChromeActive(false)}
                                     onPointerDownCapture={handlePreviewDragHandleCapture}
@@ -2420,7 +2484,11 @@ export default function ResumePreview({
                                         <DndContext
                                             sensors={sensors}
                                             measuring={previewDragMeasuring}
-                                            collisionDetection={(args) => previewCollisionDetection(args, activeDragInitialRectRef.current)}
+                                            collisionDetection={(args) => previewCollisionDetection(
+                                                args,
+                                                activeDragInitialRectRef.current,
+                                                activeDragPointerRef.current,
+                                            )}
                                             onDragStart={handlePreviewDragStart}
                                             onDragCancel={handlePreviewDragCancel}
                                             onDragEnd={handlePreviewDragEnd}

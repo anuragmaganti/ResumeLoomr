@@ -149,6 +149,7 @@ test('summary heading metadata round trips as draft content without queueing a w
       settings: {
         ...initial.draft.resume.settings,
         showSummaryTitle: true,
+        sectionHeadingAlignment: 'center',
       },
     },
   });
@@ -166,6 +167,7 @@ test('summary heading metadata round trips as draft content without queueing a w
 
   assert.equal(storedDraft.resume.personal.summaryTitle, 'Profile');
   assert.equal(storedDraft.resume.settings.showSummaryTitle, true);
+  assert.equal(storedDraft.resume.settings.sectionHeadingAlignment, 'center');
   assert.deepEqual(operations.map((operation) => operation.type), ['upsertDraft']);
 });
 

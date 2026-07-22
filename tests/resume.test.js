@@ -111,6 +111,7 @@ test('createEmptyResume returns the block-first resume shape', () => {
     personalSeparatorGap: 0,
     sectionSeparatorGap: -1,
     sectionSeparatorPosition: 'aboveSectionName',
+    sectionHeadingAlignment: 'left',
     personalContactOrder: PERSONAL_CONTACT_FIELDS,
     personalAlignment: 'template',
     personalHeaderOrder: PERSONAL_HEADER_ROWS,

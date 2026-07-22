@@ -151,6 +151,7 @@ test('login merge restores summary heading metadata from cloud drafts', () => {
   cloudDraft.resume.personal.aboutMe = 'Cloud-backed professional summary.';
   cloudDraft.resume.personal.summaryTitle = 'Objective';
   cloudDraft.resume.settings.showSummaryTitle = true;
+  cloudDraft.resume.settings.sectionHeadingAlignment = 'center';
 
   const result = mergeLocalAndCloudWorkspaces({
     localWorkspace: createWorkspace(['local-blank']),
@@ -162,6 +163,7 @@ test('login merge restores summary heading metadata from cloud drafts', () => {
 
   assert.equal(restoredDraft.resume.personal.summaryTitle, 'Objective');
   assert.equal(restoredDraft.resume.settings.showSummaryTitle, true);
+  assert.equal(restoredDraft.resume.settings.sectionHeadingAlignment, 'center');
 });
 
 test('login merge treats sample-only local state as blank when restoring cloud resumes', () => {

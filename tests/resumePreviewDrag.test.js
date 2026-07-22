@@ -5,11 +5,13 @@ import {
   areCompatiblePreviewDragItems,
   bulletDragId,
   entryDragId,
+  isPreviewPointWithinRect,
   moveIdWithinOrder,
   normalizePreviewSortableTransform,
   parsePreviewDragId,
   personalContactDragId,
   previewVerticalListSortingStrategy,
+  sectionHeadingDragId,
   sectionDragId,
 } from '../src/components/resumePreviewDrag.js';
 
@@ -17,6 +19,11 @@ test('preview drag ids retain their typed scope', () => {
   assert.deepEqual(parsePreviewDragId(sectionDragId('experience')), {
     type: 'section',
     sectionId: 'experience',
+  });
+  assert.deepEqual(parsePreviewDragId(sectionHeadingDragId('experience', 'center')), {
+    type: 'sectionHeading',
+    sectionId: 'experience',
+    alignment: 'center',
   });
   assert.deepEqual(parsePreviewDragId(entryDragId('experience', 'role-2')), {
     type: 'entry',
@@ -53,6 +60,14 @@ test('preview drag compatibility prevents cross-entry and cross-section moves', 
     parsePreviewDragId(sectionDragId('experience')),
     parsePreviewDragId(sectionDragId('education')),
   ), true);
+  assert.equal(areCompatiblePreviewDragItems(
+    parsePreviewDragId(sectionHeadingDragId('experience', 'left')),
+    parsePreviewDragId(sectionHeadingDragId('experience', 'center')),
+  ), true);
+  assert.equal(areCompatiblePreviewDragItems(
+    parsePreviewDragId(sectionHeadingDragId('experience', 'left')),
+    parsePreviewDragId(sectionHeadingDragId('education', 'center')),
+  ), false);
 });
 
 test('preview drag transforms compensate for page scaling without changing item scale', () => {
@@ -63,6 +78,15 @@ test('preview drag transforms compensate for page scaling without changing item 
     scaleY: 1,
   });
   assert.deepEqual(normalizePreviewSortableTransform({ x: 20, y: -12 }, 1), { x: 20, y: -12 });
+});
+
+test('preview heading drop hit testing uses live client geometry', () => {
+  const rect = { left: 100, top: 50, right: 180, bottom: 70 };
+
+  assert.equal(isPreviewPointWithinRect({ x: 140, y: 60 }, rect), true);
+  assert.equal(isPreviewPointWithinRect({ x: 180, y: 70 }, rect), true);
+  assert.equal(isPreviewPointWithinRect({ x: 181, y: 60 }, rect), false);
+  assert.equal(isPreviewPointWithinRect(null, rect), false);
 });
 
 test('preview list reordering and variable-height displacement preserve insertion behavior', () => {

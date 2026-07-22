@@ -10,6 +10,10 @@ export function sectionDragId(sectionId) {
     return ['section', sectionId].join(DRAG_ID_SEPARATOR);
 }
 
+export function sectionHeadingDragId(sectionId, alignment) {
+    return ['sectionHeading', sectionId, alignment].join(DRAG_ID_SEPARATOR);
+}
+
 export function personalContactDragId(field) {
     return ['personalContact', field].join(DRAG_ID_SEPARATOR);
 }
@@ -44,6 +48,10 @@ export function parsePreviewDragId(id) {
 
     if (type === 'section' && sectionId) {
         return { type, sectionId };
+    }
+
+    if (type === 'sectionHeading' && sectionId && ['left', 'center'].includes(entryId)) {
+        return { type, sectionId, alignment: entryId };
     }
 
     if (type === 'entry' && sectionId && entryId) {
@@ -89,6 +97,10 @@ export function areCompatiblePreviewDragItems(activeMeta, overMeta) {
         return true;
     }
 
+    if (activeMeta.type === 'sectionHeading') {
+        return activeMeta.sectionId === overMeta.sectionId;
+    }
+
     if (activeMeta.type === 'personalContact') {
         return true;
     }
@@ -116,11 +128,15 @@ export function areCompatiblePreviewDragItems(activeMeta, overMeta) {
     return false;
 }
 
-export function previewCollisionDetection(args, activeInitialRect = null) {
+export function previewCollisionDetection(args, activeInitialRect = null, activePointer = null) {
     const activeMeta = parsePreviewDragId(args.active.id);
     const droppableContainers = args.droppableContainers.filter((container) => (
         areCompatiblePreviewDragItems(activeMeta, parsePreviewDragId(container.id))
     ));
+
+    if (activeMeta.type === 'sectionHeading') {
+        return getSectionHeadingPointerCollision(args, droppableContainers, activePointer);
+    }
 
     if (activeMeta.type === 'section' || activeMeta.type === 'entry' || activeMeta.type === 'personalHeader') {
         const edgeCollision = getActivePreviewCollisionIfPointerOutsideListBounds(args, droppableContainers, activeInitialRect);
@@ -187,6 +203,25 @@ export function previewCollisionDetection(args, activeInitialRect = null) {
     return closestCenter({ ...args, droppableContainers });
 }
 
+function getSectionHeadingPointerCollision(args, droppableContainers, activePointer) {
+    const target = activePointer ? droppableContainers.find((container) => {
+        const element = getPreviewSortableElement(container.id);
+        const rect = element?.getBoundingClientRect() || args.droppableRects.get(container.id);
+
+        return isPreviewPointWithinRect(activePointer, rect);
+    }) : null;
+
+    return target
+        ? [{
+            id: target.id,
+            data: {
+                droppableContainer: target,
+                value: 0,
+            },
+        }]
+        : [];
+}
+
 function getActivePreviewCollision(args, droppableContainers) {
     const activeContainer = droppableContainers.find((container) => (
         String(container.id) === String(args.active.id)
@@ -247,11 +282,11 @@ function getActivePreviewCollisionIfPointerOutsideListBounds(args, droppableCont
     return null;
 }
 
-function isPointWithinRect(point, rect) {
+export function isPreviewPointWithinRect(point, rect) {
     const rectRight = Number.isFinite(rect?.right) ? rect.right : rect?.left + rect?.width;
     const rectBottom = Number.isFinite(rect?.bottom) ? rect.bottom : rect?.top + rect?.height;
 
-    return (
+    return Boolean(
         point &&
         rect &&
         Number.isFinite(point.x) &&
@@ -275,8 +310,8 @@ function getActivePreviewCollisionIfPointerWithin(args, droppableContainers, act
     if (
         !activeContainer ||
         (
-            !isPointWithinRect(args.pointerCoordinates, activeInitialRect) &&
-            !isPointWithinRect(args.pointerCoordinates, activeRect)
+            !isPreviewPointWithinRect(args.pointerCoordinates, activeInitialRect) &&
+            !isPreviewPointWithinRect(args.pointerCoordinates, activeRect)
         )
     ) {
         return null;

@@ -49,6 +49,7 @@ test('resume settings produce bounded preview and print variables', () => {
   assert.equal(settings.personalSeparatorTone, 50);
   assert.equal(settings.sectionSeparatorWeight, 2);
   assert.equal(settings.sectionSeparatorPosition, 'aboveSectionName');
+  assert.equal(settings.sectionHeadingAlignment, 'left');
   assert.equal(settings.personalAlignment, 'template');
   assert.deepEqual(settings.personalHeaderOrder, ['headline', 'contact']);
   assert.equal(getEffectivePersonalAlignment(settings, 'compact'), 'center');
@@ -107,6 +108,12 @@ test('resume settings produce bounded preview and print variables', () => {
 
   const invalidSeparatorPosition = setResumeSettingValue(createEmptyResume(), 'sectionSeparatorPosition', 'sideways');
   assert.equal(invalidSeparatorPosition.settings.sectionSeparatorPosition, 'aboveSectionName');
+
+  const centeredSectionHeadings = setResumeSettingValue(createEmptyResume(), 'sectionHeadingAlignment', 'center');
+  assert.equal(centeredSectionHeadings.settings.sectionHeadingAlignment, 'center');
+
+  const invalidSectionHeadingAlignment = setResumeSettingValue(createEmptyResume(), 'sectionHeadingAlignment', 'right');
+  assert.equal(invalidSectionHeadingAlignment.settings.sectionHeadingAlignment, 'left');
 
   const leftAlignedPersonal = setResumeSettingValue(createEmptyResume(), 'personalAlignment', 'left');
   assert.equal(leftAlignedPersonal.settings.personalAlignment, 'left');
