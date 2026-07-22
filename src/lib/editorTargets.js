@@ -163,6 +163,7 @@ const EDITOR_FIELD_LABELS = {
   school: 'Institution',
   subtitle: 'Subtitle',
   summary: 'Summary',
+  summaryTitle: 'Summary section name',
   title: 'Title',
   years: 'Dates',
   yearsEdu: 'Dates',

@@ -228,6 +228,7 @@ export function getPreviewModel(candidateResume) {
     githubUrl: trimText(resume.personal.githubUrl),
     customField: trimText(resume.personal.customField),
     aboutMe: trimText(resume.personal.aboutMe),
+    summaryTitle: trimText(resume.personal.summaryTitle),
   };
   const links = [
     personal.linkedinUrl ? { id: 'linkedin', text: formatUrlForDisplay(personal.linkedinUrl) } : null,

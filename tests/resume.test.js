@@ -103,6 +103,7 @@ test('createEmptyResume returns the block-first resume shape', () => {
     headingSize: 0,
     nameSize: 0,
     summaryWidthPercent: 100,
+    showSummaryTitle: false,
     personalSeparatorTone: 50,
     sectionSeparatorTone: 50,
     personalSeparatorWeight: 2,
@@ -158,6 +159,7 @@ test('normalizeDraftPayload creates block-only drafts and fills missing defaults
   assert.equal(normalized.version, 3);
   assert.equal(normalized.template, DEFAULT_TEMPLATE);
   assert.equal(normalized.resume.personal.name, 'Ada Lovelace');
+  assert.equal(normalized.resume.personal.summaryTitle, 'Summary');
   assert.equal(normalized.resume.settings.textSize, 5);
   assert.deepEqual(normalized.resume.sections.map((section) => section.id), ['custom-work', 'custom-notes']);
   assert.equal(normalized.resume.sections[0].entries[0].company, 'Analytical Engines');

@@ -458,6 +458,7 @@ export default function EditorPanel({
                         {activeTab === "personal" && (
                             <PersonalForm
                                 personal={resume.personal}
+                                settings={resume.settings}
                                 actions={actions}
                                 getFieldError={getFieldError}
                                 markTouched={markTouched}

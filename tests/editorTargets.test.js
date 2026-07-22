@@ -70,6 +70,14 @@ test('preview editor mutations cover every existing resume update path', () => {
   });
 
   assert.deepEqual(getPreviewEditorMutation({
+    sectionId: 'personal',
+    field: 'summaryTitle',
+  }, 'Profile'), {
+    type: 'personal',
+    args: ['summaryTitle', 'Profile'],
+  });
+
+  assert.deepEqual(getPreviewEditorMutation({
     sectionId: 'experience',
     field: '__title',
   }, 'Work'), {
@@ -119,7 +127,7 @@ test('preview editor mutations cover every existing resume update path', () => {
 
 test('preview editor values resolve personal, section, entry, list, and nested fields', () => {
   const resume = {
-    personal: { name: 'Ada Lovelace' },
+    personal: { name: 'Ada Lovelace', summaryTitle: 'Profile' },
     sections: [{
       id: 'education',
       title: 'Education',
@@ -136,6 +144,10 @@ test('preview editor values resolve personal, section, entry, list, and nested f
     sectionId: 'personal',
     field: 'name',
   }), 'Ada Lovelace');
+  assert.equal(readResumeEditorTargetValue(resume, {
+    sectionId: 'personal',
+    field: 'summaryTitle',
+  }), 'Profile');
   assert.equal(readResumeEditorTargetValue(resume, {
     sectionId: 'education',
     field: '__title',

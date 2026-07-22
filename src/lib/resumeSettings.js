@@ -32,6 +32,7 @@ const RESUME_SETTINGS_DEFAULTS = {
   headingSize: 0,
   nameSize: 0,
   summaryWidthPercent: 100,
+  showSummaryTitle: false,
   personalSeparatorTone: 50,
   sectionSeparatorTone: 50,
   personalSeparatorWeight: 2,
@@ -76,6 +77,7 @@ const SETTING_RANGES = {
   personalSeparatorGap: [SEPARATOR_GAP_MIN, SEPARATOR_GAP_MAX],
   sectionSeparatorGap: [SEPARATOR_GAP_MIN, SEPARATOR_GAP_MAX],
 };
+const BOOLEAN_SETTING_IDS = new Set(['showSummaryTitle']);
 
 function normalizeSectionSeparatorPosition(value) {
   return SECTION_SEPARATOR_POSITIONS.has(value) ? value : SECTION_SEPARATOR_POSITION_DEFAULT;
@@ -225,6 +227,10 @@ export function normalizeResumeSettings(settings) {
         ];
       }
 
+      if (BOOLEAN_SETTING_IDS.has(key)) {
+        return [key, settings?.[key] === true];
+      }
+
       const [min, max] = SETTING_RANGES[key] || [RESUME_SETTINGS_MIN, RESUME_SETTINGS_MAX];
 
       return [
@@ -246,6 +252,7 @@ export function adjustResumeSettings(settings, settingId, delta) {
   if (
     !hasResumeSettingId(settingId) ||
     SETTING_RANGES[settingId] ||
+    BOOLEAN_SETTING_IDS.has(settingId) ||
     settingId === 'sectionSeparatorPosition' ||
     settingId === 'personalContactOrder' ||
     settingId === 'personalAlignment' ||
@@ -292,6 +299,13 @@ export function setResumeSettingsValue(settings, settingId, value) {
     return {
       ...normalizedSettings,
       sectionSeparatorPosition: normalizeSectionSeparatorPosition(value),
+    };
+  }
+
+  if (BOOLEAN_SETTING_IDS.has(settingId)) {
+    return {
+      ...normalizedSettings,
+      [settingId]: value === true,
     };
   }
 

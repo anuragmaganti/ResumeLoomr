@@ -406,6 +406,7 @@ function App() {
               onSetSectionEntryHeaderLayout={actions.setSectionEntryHeaderLayout}
               onAdjustSetting={actions.updateResumeSetting}
               onSummaryWidthChange={actions.setSummaryWidthPercent}
+              onSummaryTitleVisibilityChange={actions.setSummaryTitleVisibility}
               onSeparatorSettingsOpen={handleSeparatorSettingsOpen}
               activeEditorCaret={editorCaretTarget}
               isPrintRendering={isPrintRendering}

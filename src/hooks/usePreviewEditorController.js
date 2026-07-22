@@ -190,6 +190,10 @@ export function usePreviewEditorController({
       actions.commitSectionTitle(target.sectionId);
     }
 
+    if (target.sectionId === 'personal' && target.field === 'summaryTitle') {
+      actions.commitSummaryTitle();
+    }
+
     if (target.entryId) {
       actions.endTransientSampleEntry({
         sectionId: target.sectionId,

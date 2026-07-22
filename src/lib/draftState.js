@@ -112,8 +112,20 @@ export function preservePermanentSampleDismissal(preferredDraft, ...otherDrafts)
 function draftHasVisibleText(draft) {
   const normalizedDraft = normalizeDraftPayload(draft);
   const personal = normalizedDraft.resume.personal || {};
+  const personalContentFields = [
+    'name',
+    'headline',
+    'location',
+    'phone',
+    'email',
+    'linkedinUrl',
+    'portfolioUrl',
+    'githubUrl',
+    'customField',
+    'aboutMe',
+  ];
 
-  if (Object.values(personal).some((value) => trimText(value) !== '')) {
+  if (personalContentFields.some((field) => trimText(personal[field]) !== '')) {
     return true;
   }
 

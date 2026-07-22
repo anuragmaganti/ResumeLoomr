@@ -3,6 +3,7 @@ import {
   addSectionBlockEducationProgram,
   addSectionBlockEntry,
   addSectionBlockTextListItem,
+  commitSummaryTitle,
   commitSectionTitle,
   dismissSampleInformation,
   moveSectionBlockEducationCustomSection,
@@ -19,6 +20,7 @@ import {
   setPersonalContactOrder,
   setResumeSettingValue,
   setResumeSummaryWidthPercent,
+  setSummaryTitleVisibility,
   setSampleTextListOrder,
   setSectionEntryHeaderLayout,
   updatePersonalField,
@@ -49,6 +51,9 @@ export function createResumeEditorActions({
     commitSectionTitle(sectionId) {
       updateResume((resume) => commitSectionTitle(resume, sectionId));
     },
+    commitSummaryTitle() {
+      updateResume((resume) => commitSummaryTitle(resume));
+    },
     updateResumeSetting(settingId, delta) {
       updateResume((resume) => updateResumeSetting(resume, settingId, delta));
     },
@@ -57,6 +62,9 @@ export function createResumeEditorActions({
     },
     setResumeSettingValue(settingId, value) {
       updateResume((resume) => setResumeSettingValue(resume, settingId, value));
+    },
+    setSummaryTitleVisibility(isVisible) {
+      updateResume((resume) => setSummaryTitleVisibility(resume, isVisible));
     },
     setPersonalContactOrder(orderedFields) {
       updateResume((resume) => setPersonalContactOrder(resume, orderedFields));

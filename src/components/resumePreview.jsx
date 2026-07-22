@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
     DndContext,
@@ -42,6 +42,7 @@ import {
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from '../lib/sortableSensors.js';
 import MobilePreviewEditorProxy from './mobilePreviewEditorProxy.jsx';
 import PersonalAlignmentControls from './personalAlignmentControls.jsx';
+import PreviewAttachedControl from './previewAttachedControl.jsx';
 import {
     EmptyResumeChoice,
     PreviewMarginControls,
@@ -91,6 +92,7 @@ import {
     useResumePrintPageRule,
     useWrappedEntryHeaderSeparators,
 } from './useResumePreviewLayout.js';
+import ThemedSwitch from './themedSwitch.jsx';
 
 function templateClassName(template) {
     return `resumePage--${template}`;
@@ -241,6 +243,7 @@ export default function ResumePreview({
     onSetSectionEntryHeaderLayout,
     onAdjustSetting,
     onSummaryWidthChange,
+    onSummaryTitleVisibilityChange,
     onSeparatorSettingsOpen,
     activeEditorCaret,
     isPrintRendering = false,
@@ -315,6 +318,12 @@ export default function ResumePreview({
     const summaryWidthPercent = clampSummaryWidthPercent(settings?.summaryWidthPercent);
     const renderedSummaryWidthPercent = summaryWidthDrag?.percent || summaryWidthPercent;
     const canResizeSummary = template !== 'executive' && typeof onSummaryWidthChange === 'function';
+    const showSummaryTitle = settings?.showSummaryTitle === true;
+    const hasVisibleSummaryTitle = showSummaryTitle && Boolean(previewModel.personal.aboutMe);
+    const summaryBodyPath = personalEditorPath('aboutMe');
+    const summaryTitlePath = personalEditorPath('summaryTitle');
+    const isSummaryControlActive = [summaryBodyPath, summaryTitlePath].includes(activeEditorCaret?.path)
+        || [summaryBodyPath, summaryTitlePath].includes(mobileEditSession?.target?.path);
     const sectionSeparatorPosition = settings?.sectionSeparatorPosition === 'belowSectionName'
         ? 'belowSectionName'
         : 'aboveSectionName';
@@ -1222,6 +1231,60 @@ export default function ResumePreview({
         });
     }
 
+    function renderSummaryBody() {
+        if (!previewModel.personal.aboutMe) {
+            return null;
+        }
+
+        return (
+            <div
+                className={`aboutMe${summaryWidthDrag ? ' isSummaryWidthDragging' : ''}`}
+                style={canResizeSummary ? { '--resume-summary-active-width': `${renderedSummaryWidthPercent}%` } : undefined}
+                {...personalTarget('aboutMe')}
+            >
+                {renderTextWithCaret(previewModel.personal.aboutMe, summaryBodyPath)}
+                {canResizeSummary && (
+                    <>
+                        {renderSummaryResizeEdge('left')}
+                        {renderSummaryResizeEdge('right')}
+                        {renderSummaryResizeHandle('topLeft', 'left')}
+                        {renderSummaryResizeHandle('topRight', 'right')}
+                        {renderSummaryResizeHandle('bottomLeft', 'left')}
+                        {renderSummaryResizeHandle('bottomRight', 'right')}
+                    </>
+                )}
+                {typeof onSummaryTitleVisibilityChange === 'function' ? (
+                    <PreviewAttachedControl
+                        active={isSummaryControlActive}
+                        className="summaryTitlePreviewControl"
+                        onInteraction={suppressNextPreviewClick}
+                    >
+                        <ThemedSwitch
+                            checked={showSummaryTitle}
+                            className="themedSwitch--preview"
+                            label="Section name"
+                            onChange={onSummaryTitleVisibilityChange}
+                        />
+                    </PreviewAttachedControl>
+                ) : null}
+            </div>
+        );
+    }
+
+    function renderPersonalSeparator() {
+        return (
+            <button
+                type="button"
+                className="sectionSeparatorControl"
+                data-separator-scope="personal"
+                data-separator-section-id="personal"
+                aria-label="Personal separator settings"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'personal', 'personal')}
+            />
+        );
+    }
+
     function renderPersonalSection({ showSeparator = true } = {}) {
         if (!previewModel.showPersonal) {
             return null;
@@ -1276,8 +1339,8 @@ export default function ResumePreview({
             );
         }
 
-        return (
-            <div className={previewSectionClassName('resumeSection personalSection', showSeparator)} key="personal">
+        const personalHeader = (
+            <>
                 <h1 {...personalTarget('name')}>
                     {renderTextWithCaret(previewModel.personal.name, personalEditorPath('name'), { fallback: "Your Name" })}
                 </h1>
@@ -1290,38 +1353,49 @@ export default function ResumePreview({
                         {visiblePersonalHeaderRows.map(renderPersonalHeaderRow)}
                     </SortableContext>
                 )}
+            </>
+        );
 
-                {previewModel.personal.aboutMe && (
-                    <div
-                        className={`aboutMe${summaryWidthDrag ? ' isSummaryWidthDragging' : ''}`}
-                        style={canResizeSummary ? { '--resume-summary-active-width': `${renderedSummaryWidthPercent}%` } : undefined}
-                        {...personalTarget('aboutMe')}
-                    >
-                        {renderTextWithCaret(previewModel.personal.aboutMe, personalEditorPath('aboutMe'))}
-                        {canResizeSummary && (
-                            <>
-                                {renderSummaryResizeEdge('left')}
-                                {renderSummaryResizeEdge('right')}
-                                {renderSummaryResizeHandle('topLeft', 'left')}
-                                {renderSummaryResizeHandle('topRight', 'right')}
-                                {renderSummaryResizeHandle('bottomLeft', 'left')}
-                                {renderSummaryResizeHandle('bottomRight', 'right')}
-                            </>
-                        )}
-                    </div>
-                )}
-                {showSeparator && (
-                    <button
-                        type="button"
-                        className="sectionSeparatorControl"
-                        data-separator-scope="personal"
-                        data-separator-section-id="personal"
-                        aria-label="Personal separator settings"
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onClick={(event) => openSeparatorSettings(event, onSeparatorSettingsOpen, 'personal', 'personal')}
-                    />
-                )}
-            </div>
+        if (!hasVisibleSummaryTitle) {
+            return (
+                <div className={previewSectionClassName('resumeSection personalSection', showSeparator)} key="personal">
+                    {personalHeader}
+                    {renderSummaryBody()}
+                    {showSeparator ? renderPersonalSeparator() : null}
+                </div>
+            );
+        }
+
+        const showSummarySeparator = sectionSeparatorPosition === 'belowSectionName' || showSeparator;
+
+        return (
+            <Fragment key="personal-summary-group">
+                <div className={previewSectionClassName('resumeSection personalSection', true)} key="personal">
+                    {personalHeader}
+                    {renderPersonalSeparator()}
+                </div>
+                <StaticPreviewSection
+                    blockId="personal-summary"
+                    className="resumeSection summarySection"
+                    showSeparator={showSummarySeparator}
+                    separatorPosition={sectionSeparatorPosition}
+                    onSeparatorSettingsOpen={onSeparatorSettingsOpen}
+                >
+                    {(_sectionHandleProps, sectionSeparatorElement) => (
+                        <>
+                            <h2 data-page-break-kind="heading" {...personalTarget('summaryTitle')}>
+                                {renderTextWithCaret(
+                                    previewModel.personal.summaryTitle,
+                                    summaryTitlePath,
+                                    { fallback: 'Untitled section' },
+                                )}
+                            </h2>
+                            {sectionSeparatorElement}
+                            {renderSummaryBody()}
+                        </>
+                    )}
+                </StaticPreviewSection>
+            </Fragment>
         );
     }
 

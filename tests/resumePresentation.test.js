@@ -4,10 +4,12 @@ import fs from 'node:fs';
 
 import {
   createEmptyResume,
+  commitSummaryTitle,
   setPersonalContactOrder,
   setPersonalHeaderOrder,
   setResumeSettingValue,
   setResumeSummaryWidthPercent,
+  setSummaryTitleVisibility,
   updatePersonalField,
   updateResumeSetting,
 } from '../src/lib/resume.js';
@@ -42,6 +44,8 @@ test('resume settings produce bounded preview and print variables', () => {
     'customField',
   ]);
   assert.equal(settings.summaryWidthPercent, 100);
+  assert.equal(settings.showSummaryTitle, false);
+  assert.equal(normalizeResumeSettings({ showSummaryTitle: 'true' }).showSummaryTitle, false);
   assert.equal(settings.personalSeparatorTone, 50);
   assert.equal(settings.sectionSeparatorWeight, 2);
   assert.equal(settings.sectionSeparatorPosition, 'aboveSectionName');
@@ -75,6 +79,19 @@ test('resume settings produce bounded preview and print variables', () => {
 
   const wideSummary = setResumeSummaryWidthPercent(createEmptyResume(), 110);
   assert.equal(wideSummary.settings.summaryWidthPercent, 100);
+
+  const visibleSummaryTitle = setSummaryTitleVisibility(createEmptyResume(), true);
+  assert.equal(visibleSummaryTitle.settings.showSummaryTitle, true);
+  assert.equal(visibleSummaryTitle.personal.summaryTitle, 'Summary');
+
+  const renamedSummaryTitle = updatePersonalField(visibleSummaryTitle, 'summaryTitle', 'Profile');
+  const hiddenSummaryTitle = setSummaryTitleVisibility(renamedSummaryTitle, false);
+  assert.equal(hiddenSummaryTitle.settings.showSummaryTitle, false);
+  assert.equal(hiddenSummaryTitle.personal.summaryTitle, 'Profile');
+
+  const blankSummaryTitle = updatePersonalField(visibleSummaryTitle, 'summaryTitle', '');
+  assert.equal(setSummaryTitleVisibility(blankSummaryTitle, false).personal.summaryTitle, '');
+  assert.equal(commitSummaryTitle(blankSummaryTitle).personal.summaryTitle, 'Untitled section');
 
   const hiddenPersonalSeparator = setResumeSettingValue(createEmptyResume(), 'personalSeparatorTone', -20);
   assert.equal(hiddenPersonalSeparator.settings.personalSeparatorTone, 0);
@@ -186,6 +203,7 @@ test('preview print CSS uses physical page geometry instead of mobile viewport g
   assert.match(printCss, /\.resumePage\s*\{[\s\S]*?width:\s*var\(--resume-print-content-width\)/);
   assert.match(printCss, /\.resumePage\s*\{[\s\S]*?-webkit-filter:\s*none !important/);
   assert.match(printCss, /\.resumePage\s*\{[\s\S]*?-webkit-transform:\s*none !important/);
+  assert.match(printCss, /\.previewAttachedControl/);
   assert.match(previewCss, /@page\s*\{\s*size:\s*letter;\s*margin:\s*0\.5in;/);
   assert.match(appPrintCss, /\.app::before\s*\{[\s\S]*?display:\s*none !important/);
   assert.match(appPrintCss, /\.sectionAddDialogLayer,\s*\.resumePillOverlay,\s*\.tabButtonOverlay,\s*\.previewDragOverlayFrame,\s*\.mobileWorkspaceToggle/);

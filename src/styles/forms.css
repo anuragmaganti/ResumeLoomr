@@ -220,6 +220,104 @@ form {
   gap: 4px;
 }
 
+.summaryTitleEditorControl {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  margin-top: 1px;
+}
+
+.summaryTitleEditorField {
+  animation: summaryTitleEditorReveal var(--transition-fast) both;
+}
+
+.themedSwitch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
+}
+
+.field .themedSwitch input,
+.themedSwitch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.themedSwitchTrack {
+  position: relative;
+  width: 31px;
+  height: 18px;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 78%, transparent);
+  border-radius: var(--radius-capsule);
+  background: var(--color-surface);
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.themedSwitchTrack::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-surface-elevated);
+  box-shadow: 0 1px 3px color-mix(in srgb, #0f172a 24%, transparent);
+  content: "";
+  transition: transform var(--transition-fast);
+}
+
+.themedSwitch input:checked + .themedSwitchTrack {
+  border-color: color-mix(in srgb, var(--color-accent) 84%, transparent);
+  background: var(--color-accent);
+}
+
+.themedSwitch input:checked + .themedSwitchTrack::after {
+  transform: translateX(13px);
+}
+
+.themedSwitch input:focus-visible + .themedSwitchTrack {
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.themedSwitch:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+@keyframes summaryTitleEditorReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .editorSectionTitleField {
   margin-bottom: 9px;
 }

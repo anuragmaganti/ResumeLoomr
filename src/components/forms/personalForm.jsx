@@ -1,8 +1,10 @@
 import AutoResizeTextarea from "../autoResizeTextarea";
+import ThemedSwitch from "../themedSwitch";
 import FormFieldError from "./formFieldError";
 import { createEditorTargetAttributes, personalEditorPath } from "../../lib/editorTargets";
+import { UNTITLED_SECTION_TITLE } from "../../lib/resume";
 
-export default function PersonalForm({ personal, actions, getFieldError, markTouched, placeholderFor }) {
+export default function PersonalForm({ personal, settings, actions, getFieldError, markTouched, placeholderFor }) {
     const placeholder = (field, fallback) => placeholderFor?.(personalEditorPath(field), fallback) || fallback;
 
     return (
@@ -162,7 +164,30 @@ export default function PersonalForm({ personal, actions, getFieldError, markTou
                         rows={2}
                         placeholder={placeholder('aboutMe', 'Write a short summary that highlights your experience, strengths, and goals.')}
                     />
+                    <div className="summaryTitleEditorControl">
+                        <ThemedSwitch
+                            checked={settings.showSummaryTitle}
+                            label="Show section name"
+                            onChange={actions.setSummaryTitleVisibility}
+                        />
+                    </div>
                 </div>
+
+                {settings.showSummaryTitle ? (
+                    <div className="field summaryTitleEditorField">
+                        <label htmlFor="summaryTitle">Section name</label>
+                        <input
+                            type="text"
+                            id="summaryTitle"
+                            name="summaryTitle"
+                            {...createEditorTargetAttributes(personalEditorPath('summaryTitle'))}
+                            value={personal.summaryTitle}
+                            onChange={(event) => actions.updatePersonalField('summaryTitle', event.target.value)}
+                            onBlur={actions.commitSummaryTitle}
+                            placeholder={placeholder('summaryTitle', UNTITLED_SECTION_TITLE)}
+                        />
+                    </div>
+                ) : null}
             </form>
         </fieldset>
     )

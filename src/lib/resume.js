@@ -36,6 +36,7 @@ import { trimText } from './text.js';
 
 export const MAX_RESUME_SECTIONS = 100;
 export const UNTITLED_SECTION_TITLE = 'Untitled section';
+const DEFAULT_SUMMARY_TITLE = 'Summary';
 const SECTION_BLOCK_KINDS = [
   'education',
   'roles',
@@ -216,6 +217,9 @@ function createPersonal(candidate = {}) {
     githubUrl: asText(candidate.githubUrl),
     customField: asText(candidate.customField),
     aboutMe: asText(candidate.aboutMe || candidate.summary),
+    summaryTitle: Object.hasOwn(candidate, 'summaryTitle')
+      ? asText(candidate.summaryTitle)
+      : DEFAULT_SUMMARY_TITLE,
   };
 }
 
@@ -378,6 +382,15 @@ export function setResumeSettingValue(resume, settingId, value) {
   };
 }
 
+export function setSummaryTitleVisibility(resume, isVisible) {
+  const normalizedResume = normalizeResume(resume);
+
+  return {
+    ...normalizedResume,
+    settings: setResumeSettingsValue(normalizedResume.settings, 'showSummaryTitle', isVisible === true),
+  };
+}
+
 export function setPersonalContactOrder(resume, orderedFields) {
   const normalizedResume = normalizeResume(resume);
   const requestedFields = Array.isArray(orderedFields)
@@ -506,6 +519,18 @@ export function commitSectionTitle(resume, sectionId) {
     ...section,
     title: trimText(section.title) || UNTITLED_SECTION_TITLE,
   }));
+}
+
+export function commitSummaryTitle(resume) {
+  const normalizedResume = normalizeResume(resume);
+
+  return {
+    ...normalizedResume,
+    personal: {
+      ...normalizedResume.personal,
+      summaryTitle: trimText(normalizedResume.personal.summaryTitle) || UNTITLED_SECTION_TITLE,
+    },
+  };
 }
 
 export function removeResumeSectionBlock(resume, sectionId) {

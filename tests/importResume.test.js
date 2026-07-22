@@ -231,6 +231,38 @@ test('source document compiler preserves section order and block kinds', () => {
   ]);
 });
 
+test('source document compiler preserves explicit summary headings and enables them', () => {
+  ['Summary', 'Profile', 'Objective'].forEach((title) => {
+    const result = compileSourceDocumentToImportedDraft({
+      personalLines: ['Jane Doe', 'jane@example.com'],
+      sections: [
+        {
+          id: `source-${title.toLowerCase()}-1`,
+          title,
+          lines: ['Product engineer with experience building reliable web applications.'],
+        },
+      ],
+    }, null, { sourceFileName: 'jane.pdf' });
+
+    assert.equal(result.draft.resume.personal.aboutMe, 'Product engineer with experience building reliable web applications.');
+    assert.equal(result.draft.resume.personal.summaryTitle, title);
+    assert.equal(result.draft.resume.settings.showSummaryTitle, true);
+  });
+});
+
+test('source document compiler leaves unheaded personal summaries untitled', () => {
+  const result = compileSourceDocumentToImportedDraft({
+    personalLines: [
+      'Jane Doe',
+      'jane@example.com',
+      'Product engineer with experience building reliable web applications.',
+    ],
+    sections: [],
+  }, null, { sourceFileName: 'jane.pdf' });
+
+  assert.equal(result.draft.resume.settings.showSummaryTitle, false);
+});
+
 test('source document compiler prefers parsed personal name over mapped file name', () => {
   const source = {
     personalLines: ['Real Person', 'real@example.com'],

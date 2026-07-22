@@ -134,6 +134,41 @@ test('content-only draft saves persist workspace metadata locally without queuei
   );
 });
 
+test('summary heading metadata round trips as draft content without queueing a workspace write', async () => {
+  const initial = await initializeLocalWorkspace();
+  const resumeId = initial.activeResumeId;
+  const nextDraft = createSavedDraftState({
+    ...initial.draft,
+    resume: {
+      ...initial.draft.resume,
+      personal: {
+        ...initial.draft.resume.personal,
+        aboutMe: 'Product engineer focused on reliable interfaces.',
+        summaryTitle: 'Profile',
+      },
+      settings: {
+        ...initial.draft.resume.settings,
+        showSummaryTitle: true,
+      },
+    },
+  });
+
+  await persistLocalDraftSnapshot({
+    resumeId,
+    workspace: initial.workspace,
+    draft: nextDraft,
+    accountUid: 'account-a',
+    expectedRevision: initial.draft.localRevision || '',
+  });
+
+  const storedDraft = await readLocalDraft(resumeId);
+  const operations = await readPendingOutbox({ accountUid: 'account-a' });
+
+  assert.equal(storedDraft.resume.personal.summaryTitle, 'Profile');
+  assert.equal(storedDraft.resume.settings.showSummaryTitle, true);
+  assert.deepEqual(operations.map((operation) => operation.type), ['upsertDraft']);
+});
+
 test('a draft copied to a new resume id starts with fresh local and cloud identity', async () => {
   const initial = await initializeLocalWorkspace();
   const copyResumeId = 'copied-resume';

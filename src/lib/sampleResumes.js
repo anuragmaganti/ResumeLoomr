@@ -996,6 +996,7 @@ export function createSamplePreviewModel(resume, resumeId, realPreviewModel = ge
     githubUrl: trimText(sample.personal.githubUrl),
     customField: trimText(sample.personal.customField),
     aboutMe: trimText(sample.personal.aboutMe),
+    summaryTitle: trimText(normalizedResume.personal.summaryTitle),
   };
   const links = [
     personal.linkedinUrl ? { id: 'linkedin', text: formatUrlForSampleDisplay(personal.linkedinUrl) } : null,
@@ -1306,6 +1307,7 @@ export function createMixedSamplePreviewModel(resume, resumeId, realPreviewModel
     githubUrl: mergePreviewText(realPreviewModel?.personal?.githubUrl, samplePreviewModel.personal.githubUrl),
     customField: mergePreviewText(realPreviewModel?.personal?.customField, samplePreviewModel.personal.customField),
     aboutMe: mergePreviewText(realPreviewModel?.personal?.aboutMe, samplePreviewModel.personal.aboutMe),
+    summaryTitle: mergePreviewText(realPreviewModel?.personal?.summaryTitle, samplePreviewModel.personal.summaryTitle),
   };
   const sectionBlocks = normalizedResume.sections
     .map((section) => {

@@ -81,6 +81,7 @@ export function compileSourceDocumentToImportedDraft(sourceDocument, sourceMappi
   const mappingById = getSourceMappingById(sourceMapping);
   const detectedPersonal = detectPersonalFromSourceLines(normalizedDocument.personalLines);
   let personal = mergeMappedPersonal(detectedPersonal, sourceMapping?.personal);
+  let settings;
   const sections = [];
   const pendingEducationDetails = [];
   let lastEducationBlock = null;
@@ -93,6 +94,11 @@ export function compileSourceDocumentToImportedDraft(sourceDocument, sourceMappi
       personal = {
         ...personal,
         aboutMe: mergeUniqueText([personal.aboutMe, section.lines.join(' ')], ' '),
+        summaryTitle: personal.summaryTitle || section.title,
+      };
+      settings = {
+        ...settings,
+        showSummaryTitle: true,
       };
       return;
     }
@@ -127,6 +133,7 @@ export function compileSourceDocumentToImportedDraft(sourceDocument, sourceMappi
   return finalizeSourceImportDraft({
     suggestedName: personal.name || sourceMapping?.suggestedName,
     personal,
+    settings,
     sections,
     sourceFileName,
   });
@@ -134,6 +141,7 @@ export function compileSourceDocumentToImportedDraft(sourceDocument, sourceMappi
 
 function finalizeSourceImportDraft({
   personal,
+  settings,
   sections,
   suggestedName = '',
   sourceFileName = '',
@@ -142,7 +150,7 @@ function finalizeSourceImportDraft({
     resume: {
       personal,
       sections,
-      settings: undefined,
+      settings,
     },
   });
   const personalName = normalizedDraft.resume.personal.name;

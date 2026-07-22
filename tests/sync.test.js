@@ -6,6 +6,7 @@ import {
   createEmptyResume,
   dismissSampleInformation,
   setResumeSettingValue,
+  setSummaryTitleVisibility,
   updateSampleDisplay,
 } from '../src/lib/resume.js';
 import { DEFAULT_TEMPLATE } from '../src/lib/resumeSettings.js';
@@ -16,6 +17,7 @@ import {
 import {
   createDraftContentHash,
   createSavedDraftState,
+  draftHasMeaningfulChanges,
 } from '../src/lib/draftState.js';
 import { normalizeCloudWorkspaceSnapshot } from '../src/lib/cloudWorkspaceSnapshot.js';
 import { mergeLocalAndCloudWorkspaces } from '../src/lib/workspaceReconciliation.js';
@@ -74,6 +76,18 @@ test('draft content hashes ignore saved time but track content', () => {
   assert.notEqual(createDraftContentHash(firstDraft), createDraftContentHash(thirdDraft));
 });
 
+test('summary title metadata is blank by default and meaningful after the user enables it', () => {
+  const emptyResume = createEmptyResume();
+  const enabledResume = setSummaryTitleVisibility(emptyResume, true);
+
+  assert.equal(draftHasMeaningfulChanges({ resume: emptyResume }), false);
+  assert.equal(draftHasMeaningfulChanges({ resume: enabledResume }), true);
+  assert.notEqual(
+    createDraftContentHash({ resume: emptyResume }),
+    createDraftContentHash({ resume: enabledResume }),
+  );
+});
+
 test('saved draft state stamps a fresh save time', async () => {
   const oldDraft = createDraft('Fresh Save', '2000-01-01T03:10:00.000Z');
   const beforeSave = Date.now();
@@ -130,6 +144,24 @@ test('login merge restores cloud resumes into blank local workspaces', () => {
   assert.deepEqual(result.workspace.resumeIds, ['cloud-1', 'cloud-2']);
   assert.equal(result.activeResumeId, 'cloud-2');
   assert.equal(result.draftsByResumeId.get('cloud-1').resume.personal.name, 'Cloud One');
+});
+
+test('login merge restores summary heading metadata from cloud drafts', () => {
+  const cloudDraft = createDraft('Cloud Resume');
+  cloudDraft.resume.personal.aboutMe = 'Cloud-backed professional summary.';
+  cloudDraft.resume.personal.summaryTitle = 'Objective';
+  cloudDraft.resume.settings.showSummaryTitle = true;
+
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace: createWorkspace(['local-blank']),
+    localDraftsByResumeId: new Map([['local-blank', createDraft('')]]),
+    cloudWorkspace: createWorkspace(['cloud-1']),
+    cloudDraftsByResumeId: new Map([['cloud-1', cloudDraft]]),
+  });
+  const restoredDraft = result.draftsByResumeId.get('cloud-1');
+
+  assert.equal(restoredDraft.resume.personal.summaryTitle, 'Objective');
+  assert.equal(restoredDraft.resume.settings.showSummaryTitle, true);
 });
 
 test('login merge treats sample-only local state as blank when restoring cloud resumes', () => {

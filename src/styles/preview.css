@@ -1005,6 +1005,87 @@ html[data-theme="dark"] .personalSection {
   text-align-last: left;
 }
 
+.summarySection .aboutMe {
+  margin-top: var(--resume-detail-gap);
+}
+
+.previewAttachedControl.summaryTitlePreviewControl {
+  right: 14px;
+}
+
+.previewAttachedControl {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 16;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, var(--resume-page-divider));
+  border-radius: var(--radius-capsule);
+  background: color-mix(in srgb, var(--resume-page-bg) 90%, transparent);
+  box-shadow: 0 8px 20px color-mix(in srgb, #0f172a 10%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.previewAttachedControl::before {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  width: 100%;
+  height: 11px;
+  content: "";
+}
+
+.aboutMe:hover > .previewAttachedControl,
+.aboutMe:focus-within > .previewAttachedControl,
+.previewAttachedControl:hover,
+.previewAttachedControl:focus-within,
+.previewAttachedControl.isActive {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.resumePage--dragging .previewAttachedControl,
+.aboutMe.isSummaryWidthDragging > .previewAttachedControl {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.themedSwitch--preview {
+  gap: 6px;
+  color: var(--resume-page-muted);
+  font-size: calc(var(--resume-meta-size) * 0.92);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.themedSwitch--preview .themedSwitchTrack {
+  width: 27px;
+  height: 16px;
+  border-color: color-mix(in srgb, var(--resume-page-muted) 32%, transparent);
+  background: color-mix(in srgb, var(--resume-page-muted) 18%, transparent);
+}
+
+.themedSwitch--preview .themedSwitchTrack::after {
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  background: var(--resume-page-bg);
+}
+
+.themedSwitch--preview input:checked + .themedSwitchTrack::after {
+  transform: translateX(11px);
+}
+
 .personalAlignmentMenu {
   position: absolute;
   top: 12px;
@@ -1997,6 +2078,7 @@ html[data-theme="dark"] .personalSection {
   .previewMarginControls,
   .mobilePreviewEditorProxy,
   .sampleInformationToggle,
+  .previewAttachedControl,
   .sectionSeparatorControl,
   .resumeEmptyChoiceOverlay,
   .resumeEmptyState {
