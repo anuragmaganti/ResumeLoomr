@@ -1264,6 +1264,7 @@ export async function persistLocalDraftSnapshot({
   draft,
   accountUid = '',
   enqueueSync = true,
+  enqueueWorkspaceSync = false,
   persistWorkspace = true,
   reason = 'autosave',
   expectedRevision = '',
@@ -1338,7 +1339,7 @@ export async function persistLocalDraftSnapshot({
     }
     await writeDraftRecord(tx, resumeId, draftWithRevision, { localRevision: nextRevision });
 
-    if (enqueueSync && persistWorkspace) {
+    if (enqueueSync && enqueueWorkspaceSync && persistWorkspace) {
       await queueWorkspaceSyncInTx(tx, persistedWorkspace, { accountUid, reason });
     }
 

@@ -88,6 +88,49 @@ test('divergent tab workspace writes preserve both additions', async () => {
   assert.equal(bundle.workspace.resumeIds.includes('tab-b-resume'), true);
 });
 
+test('content-only draft saves persist workspace metadata locally without queueing a cloud workspace write', async () => {
+  const initial = await initializeLocalWorkspace();
+  const resumeId = initial.activeResumeId;
+  const updatedAt = '2026-07-22T14:00:00.000Z';
+  const workspace = normalizeWorkspaceIndex({
+    ...initial.workspace,
+    meta: {
+      ...initial.workspace.meta,
+      [resumeId]: {
+        ...initial.workspace.meta[resumeId],
+        updatedAt,
+      },
+    },
+  });
+  const contentSave = await persistLocalDraftSnapshot({
+    resumeId,
+    workspace,
+    draft: createSavedDraftState(initial.draft),
+    accountUid: 'account-a',
+  });
+  const contentOperations = await readPendingOutbox({ accountUid: 'account-a' });
+  const localBundle = await readLocalWorkspaceBundle();
+
+  assert.deepEqual(contentOperations.map((operation) => operation.type), ['upsertDraft']);
+  assert.equal(localBundle.workspace.meta[resumeId].updatedAt, updatedAt);
+
+  await persistLocalDraftSnapshot({
+    resumeId,
+    workspace: contentSave.workspace,
+    draft: createSavedDraftState(contentSave.draft),
+    accountUid: 'account-a',
+    enqueueWorkspaceSync: true,
+    expectedRevision: contentSave.draft.localRevision,
+  });
+
+  const structuralOperations = await readPendingOutbox({ accountUid: 'account-a' });
+
+  assert.deepEqual(
+    structuralOperations.map((operation) => operation.type).sort(),
+    ['upsertDraft', 'workspace'],
+  );
+});
+
 test('an old in-flight acknowledgement cannot clear a newer draft operation', async () => {
   const initial = await initializeLocalWorkspace();
   const resumeId = initial.activeResumeId;

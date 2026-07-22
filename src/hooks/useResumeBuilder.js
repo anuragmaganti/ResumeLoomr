@@ -723,7 +723,13 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     }
   }
 
-  function saveEditorDraftFromRefs({ reason = 'manual', scheduleSync = true, persistWorkspace = true, allowStaleOverwrite = false } = {}) {
+  function saveEditorDraftFromRefs({
+    reason = 'manual',
+    scheduleSync = true,
+    persistWorkspace = true,
+    enqueueWorkspaceSync = false,
+    allowStaleOverwrite = false,
+  } = {}) {
     const resumeId = editorDraftResumeIdRef.current;
     const draftSnapshot = currentDraftRef.current;
     const accountUid = userRef.current?.uid || '';
@@ -774,6 +780,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
           draft: nextDraft,
           accountUid,
           enqueueSync: true,
+          enqueueWorkspaceSync,
           persistWorkspace,
           reason,
           expectedRevision,
@@ -1032,6 +1039,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         workspace: nextWorkspace,
         draft: nextDraft,
         accountUid: userRef.current?.uid || '',
+        enqueueWorkspaceSync: true,
         reason: 'create-resume',
       });
 
@@ -1090,6 +1098,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         workspace: nextWorkspace,
         draft: nextDraft,
         accountUid: userRef.current?.uid || '',
+        enqueueWorkspaceSync: true,
         reason: 'import-placeholder',
       });
 
@@ -1135,6 +1144,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       workspace: nextWorkspace,
       draft: nextDraft,
       accountUid: userRef.current?.uid || '',
+      enqueueWorkspaceSync: true,
       reason: 'import-replace',
     });
     await commitWorkspace(persistedDraft.workspace, { persist: false });
@@ -1184,6 +1194,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         workspace: nextWorkspace,
         draft: duplicateDraft,
         accountUid: userRef.current?.uid || '',
+        enqueueWorkspaceSync: true,
         reason: 'duplicate-resume',
       });
 
@@ -1456,6 +1467,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         workspace: nextWorkspace,
         draft: copyDraft,
         accountUid: userRef.current?.uid || '',
+        enqueueWorkspaceSync: true,
         reason: 'conflict-copy',
       });
 
