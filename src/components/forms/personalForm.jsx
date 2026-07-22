@@ -152,8 +152,27 @@ export default function PersonalForm({ personal, settings, actions, getFieldErro
                     </div>
                 </div>
 
-                <div className="field">
-                    <label htmlFor="aboutMe">Professional summary</label>
+                <div className="field summaryEditorField">
+                    <div className="summaryTitleEditorRow">
+                        <input
+                            type="text"
+                            id="summaryTitle"
+                            name="summaryTitle"
+                            aria-label="Professional summary section name"
+                            {...createEditorTargetAttributes(personalEditorPath('summaryTitle'))}
+                            value={personal.summaryTitle}
+                            onChange={(event) => actions.updatePersonalField('summaryTitle', event.target.value)}
+                            onBlur={actions.commitSummaryTitle}
+                            placeholder={placeholder('summaryTitle', UNTITLED_SECTION_TITLE)}
+                        />
+                        <ThemedSwitch
+                            checked={settings.showSummaryTitle}
+                            className="summaryTitleVisibilitySwitch"
+                            label="Show section name"
+                            onChange={actions.setSummaryTitleVisibility}
+                        />
+                    </div>
+                    <label className="visuallyHidden" htmlFor="aboutMe">Professional summary content</label>
                     <AutoResizeTextarea
                         id="aboutMe"
                         name="aboutMe"
@@ -164,30 +183,7 @@ export default function PersonalForm({ personal, settings, actions, getFieldErro
                         rows={2}
                         placeholder={placeholder('aboutMe', 'Write a short summary that highlights your experience, strengths, and goals.')}
                     />
-                    <div className="summaryTitleEditorControl">
-                        <ThemedSwitch
-                            checked={settings.showSummaryTitle}
-                            label="Show section name"
-                            onChange={actions.setSummaryTitleVisibility}
-                        />
-                    </div>
                 </div>
-
-                {settings.showSummaryTitle ? (
-                    <div className="field summaryTitleEditorField">
-                        <label htmlFor="summaryTitle">Section name</label>
-                        <input
-                            type="text"
-                            id="summaryTitle"
-                            name="summaryTitle"
-                            {...createEditorTargetAttributes(personalEditorPath('summaryTitle'))}
-                            value={personal.summaryTitle}
-                            onChange={(event) => actions.updatePersonalField('summaryTitle', event.target.value)}
-                            onBlur={actions.commitSummaryTitle}
-                            placeholder={placeholder('summaryTitle', UNTITLED_SECTION_TITLE)}
-                        />
-                    </div>
-                ) : null}
             </form>
         </fieldset>
     )
