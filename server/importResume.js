@@ -24,15 +24,34 @@ import {
   isImageMimeType,
 } from './resumeImport/filePayload.js';
 import {
-  BULLET_MARKER_PATTERN,
-  DATE_RANGE_SOURCE,
-  DATE_TEXT_PATTERN,
-  DATE_TEXT_PATTERN_GLOBAL,
-  DATE_TOKEN_SOURCE,
-  PHONE_TEXT_PATTERN,
-  RESUME_SIGNAL_PATTERNS,
-  YEAR_TOKEN_SOURCE,
-} from './resumeImport/patterns.js';
+  detectPersonalFromSourceLines,
+  isLikelyHeadlineLine,
+  mergeMappedPersonal,
+} from './resumeImport/personal.js';
+import {
+  cleanSourceBullet,
+  extractEndingDateText,
+  extractRoleDateText,
+  extractTrailingDateText,
+  hasDateSignal,
+  isDateOnlyLine,
+  isLikelyLocationText,
+  isLikelyPersonalContactLine,
+  isLikelySourceBullet,
+  isLikelyUrlText,
+  isResumeContactLine,
+} from './resumeImport/sourceSignals.js';
+import {
+  getSourceSectionHeaderInfo,
+  isContactLinkGroupingLabel,
+  isKnownSourceSectionHeader,
+  shouldTreatAsContactGroupingLabel,
+  slugifyImportId,
+} from './resumeImport/sectionHeadings.js';
+import {
+  mergeUniqueText,
+  normalizeComparisonKey,
+} from './resumeImport/text.js';
 
 export { verifyFirebaseIdToken } from './resumeImport/auth.js';
 export { ImportResumeError } from './resumeImport/error.js';
@@ -154,126 +173,6 @@ const sourceMappingWireSchema = z.object({
     title: z.string().min(1),
   }).strict()).min(1),
 }).strict();
-
-function isLikelySourceBullet(line) {
-  return new RegExp(`^${BULLET_MARKER_PATTERN.source}\\s+\\S`, 'u').test(trimText(line));
-}
-
-function isLikelyUrlText(value) {
-  return /(?<!@)\b(?:https?:\/\/|www\.|linkedin\.com|github\.com|[a-z0-9](?:[a-z0-9-]*\.)+[a-z]{2,}(?:\/\S*)?)\S*/i.test(trimText(value));
-}
-
-function isLikelyPersonalContactLine(line) {
-  const text = trimText(line);
-
-  return (
-    isResumeContactLine(text) ||
-    isLikelyUrlText(text) ||
-    /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(text)
-  );
-}
-
-function isContactLinkGroupingLabel(line) {
-  return /^(?:links?|contact|contacts?|online|web|profiles?)$/i.test(trimText(line));
-}
-
-function shouldTreatAsContactGroupingLabel(line, nextLine = '') {
-  const text = trimText(line);
-
-  if (/^(?:links?|online|web)$/i.test(text)) {
-    return true;
-  }
-
-  return isContactLinkGroupingLabel(text) && isLikelyPersonalContactLine(nextLine);
-}
-
-function isKnownSourceSectionHeader(line) {
-  return /^(?:summary|profile|objective|education|relevant coursework|coursework|internship experience|professional experience|work experience|additional work experience|employment experience|experience|leadership(?: experience|\s*(?:&|and|\+)\s*service)?|volunteer experience|volunteering|research(?: experience)?|teaching(?: experience)?|advising(?: experience)?|industry(?: experience)?|military(?: experience| service)?|clinical(?: experience)?|campus involvement|public service|community service|projects?|skills|certifications?|languages|additional information|activities?\s*(?:&|and|\+)\s*awards?|honors?\s*(?:&|and|\+)?\s*awards?|awards(?:\s*(?:&|and|\+)\s*interests?)?|interests?|publications?|invited talks?|conferences?|patents?|references?)$/i.test(trimText(line));
-}
-
-function getRoleSectionType(line) {
-  const text = trimText(line);
-
-  if (/^leadership experience$/i.test(text)) {
-    return 'leadership';
-  }
-
-  if (/^(?:internship experience|professional experience|work experience|additional work experience|employment experience|experience|volunteer experience|volunteering|research(?: experience)?|teaching(?: experience)?|advising(?: experience)?|industry(?: experience)?|military(?: experience| service)?|clinical(?: experience)?|campus involvement|public service|community service)$/i.test(text)) {
-    return 'experience';
-  }
-
-  return '';
-}
-
-function slugifyImportId(value, fallback = 'section') {
-  const slug = trimText(value)
-    .toLowerCase()
-    .replace(/&/g, 'and')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-  return slug || fallback;
-}
-
-function getSourceSectionHeaderInfo(line) {
-  const title = trimText(line);
-
-  if (!isKnownSourceSectionHeader(title)) {
-    return null;
-  }
-
-  if (/^education$/i.test(title)) {
-    return { title, kind: 'education', roleType: '' };
-  }
-
-  if (/^(?:summary|profile|objective)$/i.test(title)) {
-    return { title, kind: 'custom', roleType: '' };
-  }
-
-  if (/^(?:relevant\s+)?coursework$/i.test(title)) {
-    return { title, kind: 'education-detail', roleType: '' };
-  }
-
-  if (/^honors?\s*(?:&|and)?\s*awards?$|^awards$/i.test(title)) {
-    return { title, kind: 'awards', roleType: '' };
-  }
-
-  if (/^projects?$/i.test(title)) {
-    return { title, kind: 'projects', roleType: '' };
-  }
-
-  if (/^(?:skills|additional information)$/i.test(title)) {
-    return { title, kind: 'skills', roleType: '' };
-  }
-
-  if (/^certifications?$/i.test(title)) {
-    return { title, kind: 'certifications', roleType: '' };
-  }
-
-  if (/^languages$/i.test(title)) {
-    return { title, kind: 'languages', roleType: '' };
-  }
-
-  if (/^publications?$/i.test(title)) {
-    return { title, kind: 'publications', roleType: '' };
-  }
-
-  if (/^(?:invited talks?|conferences?|patents?)$/i.test(title)) {
-    return { title, kind: 'publications', roleType: '' };
-  }
-
-  if (/^references?$/i.test(title)) {
-    return { title, kind: 'custom', roleType: '' };
-  }
-
-  const roleType = getRoleSectionType(title);
-
-  if (roleType) {
-    return { title, kind: 'roles', roleType };
-  }
-
-  return { title, kind: 'custom', roleType: '' };
-}
 
 function isLikelyRoleEntryLine(line) {
   const text = trimText(line);
@@ -606,14 +505,6 @@ export function validateImportedDraftCoverage(draft, sourceCoverage) {
     ok: issues.length === 0,
     issues: Array.from(new Set(issues)),
   };
-}
-
-function isResumeContactLine(line) {
-  return RESUME_SIGNAL_PATTERNS.slice(0, 3).some((pattern) => pattern.test(line)) || /[●•]\s*/.test(line);
-}
-
-function hasDateSignal(line) {
-  return DATE_TEXT_PATTERN.test(line);
 }
 
 function getLetterCaseRatio(line) {
@@ -1377,221 +1268,8 @@ function getSourceMappingById(sourceMapping) {
   return mappings;
 }
 
-function mergeMappedPersonal(detectedPersonal, mappedPersonal = {}) {
-  const source = mappedPersonal && typeof mappedPersonal === 'object' ? mappedPersonal : {};
-  const merged = Object.fromEntries(
-    Object.entries(detectedPersonal).map(([field, value]) => [
-      field,
-      trimText(source[field]) || value,
-    ])
-  );
-
-  if (normalizeComparisonKey(merged.headline) === normalizeComparisonKey(merged.name)) {
-    merged.headline = '';
-  }
-
-  merged.location = normalizePersonalLocationText(merged.location) || normalizePersonalLocationText(detectedPersonal.location);
-
-  return merged;
-}
-
-function extractResumeUrls(value) {
-  return Array.from(trimText(value).matchAll(/(?<!@)\b(?:https?:\/\/|www\.|linkedin\.com|github\.com|[a-z0-9](?:[a-z0-9-]*\.)+[a-z]{2,}(?:\/\S*)?)\S*/gi))
-    .map((match) => trimText(match[0]).replace(/[),.;]+$/g, ''))
-    .filter((url) => url && !/@/.test(url));
-}
-
-function extractResumeEmail(value) {
-  const text = trimText(value);
-  const commonDomainMatch = text.match(/[A-Z][A-Z0-9._%+-]*@(?:gmail|yahoo|outlook|hotmail|icloud|me|protonmail|aol)\.com/i);
-
-  if (commonDomainMatch) {
-    return commonDomainMatch[0];
-  }
-
-  return text.match(/[A-Z][A-Z0-9._%+-]*@[A-Z0-9.-]+?\.(?:com|edu|org|net|io|dev|co|us|gov|me)/i)?.[0] || '';
-}
-
-function removeContactTokens(value, { email = '', phone = '', urls = [] } = {}) {
-  let text = trimText(value);
-
-  [email, phone, ...urls].filter(Boolean).forEach((token) => {
-    text = text.split(token).join(' ');
-  });
-
-  return trimText(text)
-    .replace(/\b(?:email|e-mail|phone|tel|telephone|mobile)\s*:\s*/ig, ' ')
-    .replace(/[●•|]/g, ' ')
-    .replace(/\s{2,}/g, ' ');
-}
-
-function normalizePersonalLocationText(value) {
-  const text = trimText(value);
-
-  if (/^(?:remote|virtual|hybrid)$/i.test(text)) {
-    return text;
-  }
-
-  if (isLikelyLocationText(text)) {
-    return text.replace(/\s+\d{5}(?:-\d{4})?$/, '');
-  }
-
-  const cityStateMatches = Array.from(text.matchAll(/\b([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)*,\s*[A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?\b/g))
-    .map((match) => trimText(match[1]))
-    .filter(isLikelyLocationText);
-
-  return cityStateMatches[cityStateMatches.length - 1] || '';
-}
-
-function isLikelyHeadlineLine(line) {
-  const text = trimText(line);
-  const words = text.split(/\s+/g).filter(Boolean);
-
-  return (
-    text.length > 0 &&
-    text.length <= 90 &&
-    words.length <= 10 &&
-    !isResumeContactLine(text) &&
-    !isKnownSourceSectionHeader(text) &&
-    !/\baddress\b/i.test(text) &&
-    !/\b(?:street|st\.?|road|rd\.?|avenue|ave\.?|drive|dr\.?|boulevard|blvd\.?|lane|ln\.?|memorial)\b/i.test(text) &&
-    !/\b[A-Z]{2}\s+\d{5}\b/.test(text) &&
-    !/[.!?]$/.test(text)
-  );
-}
-
-function detectPersonalFromSourceLines(lines) {
-  const personalLines = Array.isArray(lines) ? lines.map(trimText).filter(Boolean) : [];
-  const combinedText = personalLines.join('\n');
-  const email = extractResumeEmail(combinedText);
-  const phone = combinedText.match(PHONE_TEXT_PATTERN)?.[0] || '';
-  const urls = extractResumeUrls(email ? combinedText.split(email).join(' ') : combinedText);
-  const linkedinUrl = urls.find((url) => /linkedin\.com/i.test(url)) || '';
-  const githubUrl = urls.find((url) => /github\.com/i.test(url)) || '';
-  const portfolioUrl = urls.find((url) => !/linkedin\.com|github\.com/i.test(url)) || '';
-  const name = personalLines.find((line) => (
-    line !== email &&
-    line !== phone &&
-    !isResumeContactLine(line) &&
-    !RESUME_SIGNAL_PATTERNS[2].test(line)
-  )) || '';
-  const remainingPersonalLines = personalLines
-    .filter((line) => line !== name)
-    .map((line) => removeContactTokens(line, { email, phone, urls }));
-  const headline = remainingPersonalLines.find(isLikelyHeadlineLine) || '';
-  const location = remainingPersonalLines
-    .flatMap((line) => line.split(/[●•|]/g))
-    .map(trimText)
-    .map((part) => (
-      part &&
-      part !== email &&
-      part !== phone &&
-      part !== headline &&
-      !/linkedin\.com|github\.com|https?:\/\/|www\./i.test(part)
-        ? normalizePersonalLocationText(part)
-        : ''
-    ))
-    .find(Boolean) || '';
-  const aboutMe = personalLines
-    .filter((line) => line !== name)
-    .filter((line) => !isResumeContactLine(line))
-    .filter((line) => line !== headline)
-    .find((line) => line.length > 90 || /[.!?]$/.test(line)) || '';
-
-  return {
-    name,
-    headline,
-    location,
-    phone,
-    email,
-    linkedinUrl,
-    portfolioUrl,
-    githubUrl,
-    customField: '',
-    aboutMe,
-  };
-}
-
-function cleanSourceBullet(line) {
-  return trimText(line).replace(new RegExp(`^${BULLET_MARKER_PATTERN.source}\\s*`, 'u'), '').trim();
-}
-
-function extractTrailingDateText(line) {
-  const text = trimText(line);
-  DATE_TEXT_PATTERN_GLOBAL.lastIndex = 0;
-  const matches = Array.from(text.matchAll(DATE_TEXT_PATTERN_GLOBAL));
-  const match = matches[matches.length - 1];
-
-  if (!match) {
-    return { beforeDate: text, dateText: '' };
-  }
-
-  const dateText = trimText(match[0]);
-  const beforeDate = trimText(`${text.slice(0, match.index)} ${text.slice((match.index || 0) + match[0].length)}`);
-
-  return { beforeDate, dateText };
-}
-
-function extractEndingDateText(line) {
-  const text = trimText(line);
-  const endingDatePattern = new RegExp(`(?:${DATE_RANGE_SOURCE}|${DATE_TOKEN_SOURCE})\\s*$`, 'i');
-  const match = text.match(endingDatePattern);
-
-  if (!match || match.index == null) {
-    return { beforeDate: text, dateText: '' };
-  }
-
-  return {
-    beforeDate: trimText(text.slice(0, match.index)),
-    dateText: trimText(match[0]),
-  };
-}
-
-function extractRoleDateText(line) {
-  const text = trimText(line);
-  const parentheticalDatePattern = new RegExp(`^(.*?)\\s*\\(([^)]*${YEAR_TOKEN_SOURCE}[^)]*)\\)\\s*$`, 'i');
-  const parentheticalMatch = text.match(parentheticalDatePattern);
-  const parentheticalDateCount = Array.from(text.matchAll(new RegExp(`\\([^)]*${YEAR_TOKEN_SOURCE}[^)]*\\)`, 'gi'))).length;
-
-  if (parentheticalMatch && trimText(parentheticalMatch[1]) && parentheticalDateCount <= 1) {
-    return {
-      beforeDate: trimText(parentheticalMatch[1]),
-      dateText: trimText(parentheticalMatch[2]),
-    };
-  }
-
-  return extractEndingDateText(text);
-}
-
-function isDateOnlyLine(line) {
-  return new RegExp(`^\\s*(?:${DATE_RANGE_SOURCE}|${DATE_TOKEN_SOURCE})\\s*$`, 'i').test(trimText(line));
-}
-
 function hasRoleTitleSignal(line) {
   return /\b(?:intern|assistant|associate|manager|engineer|analyst|director|counselor|consultant|consulting|developer|coordinator|specialist|sales|student|resident|head|officer|president|co[-\s]?president|vice\s+president|treasurer|secretary|lead|participant|mentor|member|volunteer|technician|designer|architect|administrator|supervisor|scrub|full[-\s]?stack|founder|co[-\s]?founder|ceo|cto|cfo|coo|chief|owner|partner|principal|board\s+member|stakeholder|advisor|adviser|executive|chair|co[-\s]?chair|committee|captain|editor|clerk|bagger|cashier|fellow|researcher|operator|strategist)\b/i.test(trimText(line));
-}
-
-function isLikelyLocationText(value) {
-  const text = trimText(value);
-
-  if (text.includes('/')) {
-    const parts = text.split('/').map(trimText).filter(Boolean);
-    return parts.length > 1 && parts.every((part) => isLikelyLocationText(part));
-  }
-
-  if (/\s+and\s+/i.test(text)) {
-    const parts = text.split(/\s+and\s+/i).map(trimText).filter(Boolean);
-    return parts.length > 1 && parts.every((part) => isLikelyLocationText(part));
-  }
-
-  if (/\b(?:lab|laborator(?:y|ies)|center|centre|institute|university|college|school|department|program|group|team|organization|association|society|committee|council|systems?|technologies)\b/i.test(text.split(',').slice(1).join(','))) {
-    return false;
-  }
-
-  return (
-    /^(?:remote|virtual|hybrid)$/i.test(text) ||
-    /^[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)*,\s*(?:[A-Z]{2}|[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)*)$/.test(text)
-  );
 }
 
 function hasOrganizationSignal(value) {
@@ -3133,38 +2811,6 @@ function finalizeSourceImportDraft({
       savedAt: null,
     },
   };
-}
-
-function normalizeComparisonKey(value) {
-  return trimText(value)
-    .toLowerCase()
-    .replace(/\bhonors?\s+program\b/g, '')
-    .replace(/&/g, 'and')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-function mergeUniqueText(values, separator = '; ') {
-  const seen = new Set();
-
-  return values
-    .flatMap((value) => trimText(value).split(/\n|;/g))
-    .map(trimText)
-    .filter((value) => {
-      if (!value) {
-        return false;
-      }
-
-      const key = normalizeComparisonKey(value);
-
-      if (seen.has(key)) {
-        return false;
-      }
-
-      seen.add(key);
-      return true;
-    })
-    .join(separator);
 }
 
 export async function parseResumeWithGemini(file) {
