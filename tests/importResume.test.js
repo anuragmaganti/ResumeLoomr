@@ -17,6 +17,18 @@ import {
   shouldUseVisualPdfFallbackForSourceText,
   validateImportedDraftCoverage,
 } from '../server/importResume.js';
+import { parseImportRequestBody } from '../server/resumeImport/http.js';
+
+test('import request parsing maps malformed and oversized JSON to import errors', async () => {
+  await assert.rejects(
+    parseImportRequestBody({ body: '{invalid' }),
+    (error) => error?.statusCode === 400 && error?.code === 'import/invalid-json',
+  );
+  await assert.rejects(
+    parseImportRequestBody({ body: 'x'.repeat(IMPORT_FILE_MAX_BYTES * 2) }),
+    (error) => error?.statusCode === 413 && error?.code === 'import/file-too-large',
+  );
+});
 
 test('import file normalization rejects unsupported or oversized uploads', () => {
   assert.throws(
