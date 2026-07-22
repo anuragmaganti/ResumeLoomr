@@ -404,4 +404,3 @@ export function compileEducationEntries(section, attachedCourseworkSections = []
       entry.customSections.some((customSection) => trimText(customSection.content) !== '')
     ));
 }
-

@@ -96,5 +96,3 @@ export default function MobilePreviewEditorProxy({
 
     return createPortal(proxy, document.body);
 }
-
-

@@ -398,4 +398,3 @@ export function previewVerticalListSortingStrategy({
         scaleY: 1,
     };
 }
-

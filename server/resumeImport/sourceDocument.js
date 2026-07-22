@@ -616,4 +616,3 @@ export function sourceDocumentToText(sourceDocument) {
     ]),
   ].join('\n');
 }
-

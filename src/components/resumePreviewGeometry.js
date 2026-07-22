@@ -150,5 +150,3 @@ export function measurePreviewContentFlowHeight(resumeElement, paddingTop, fallb
 
     return Math.max(0, contentBottom);
 }
-
-

@@ -60,5 +60,3 @@ export function reorderItemSubsetById(items, orderedItemIds) {
     return nextItem;
   });
 }
-
-

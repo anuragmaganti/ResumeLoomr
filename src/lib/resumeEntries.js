@@ -266,4 +266,3 @@ export function sectionEntryHasContent(sectionKind, entry) {
 
   return customEntryHasContent(entry);
 }
-

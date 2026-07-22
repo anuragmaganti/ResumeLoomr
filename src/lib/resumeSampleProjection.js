@@ -333,5 +333,3 @@ export function didTransientSampleEntryChange(resume, transient) {
   return JSON.stringify(compactTransientEntryValue(currentEntry) || null)
     !== JSON.stringify(compactTransientEntryValue(transient.projectedEntry) || null);
 }
-
-

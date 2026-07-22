@@ -701,4 +701,3 @@ html[data-theme="dark"] .separatorSettingsPopup {
   background: color-mix(in srgb, var(--color-accent-soft) 82%, transparent);
   color: var(--color-accent-strong);
 }
-
