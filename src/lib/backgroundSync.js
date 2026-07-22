@@ -3,10 +3,55 @@ import {
   markOutboxFailed,
   markOutboxStale,
   markOutboxSynced,
+  readLocalAccountBinding,
   readPendingOutbox,
+  setSyncSessionCleanupRequested,
 } from './localWorkspaceDb.js';
 
 const RESUME_SYNC_TAG = 'resumeloomr-sync-outbox';
+const MAX_SYNC_REQUEST_BYTES = 3_000_000;
+const MAX_SYNC_OPERATION_BYTES = 1_000_000;
+
+function getSerializedByteSize(value) {
+  const serialized = JSON.stringify(value);
+
+  return new TextEncoder().encode(serialized).byteLength;
+}
+
+export function partitionClientSyncOperations(operations) {
+  const oversizedOperations = [];
+  const eligibleOperations = [];
+
+  (Array.isArray(operations) ? operations : []).forEach((operation) => {
+    if (getSerializedByteSize(operation) > MAX_SYNC_OPERATION_BYTES) {
+      oversizedOperations.push(createOutboxAckDescriptor({
+        ...operation,
+        reason: 'payload-too-large',
+      }));
+    } else {
+      eligibleOperations.push(operation);
+    }
+  });
+
+  const selectedOperations = [];
+  let selectedBytes = 256;
+
+  for (const operation of eligibleOperations) {
+    const operationBytes = getSerializedByteSize(operation) + 1;
+
+    if (selectedOperations.length > 0 && selectedBytes + operationBytes > MAX_SYNC_REQUEST_BYTES) {
+      break;
+    }
+
+    selectedOperations.push(operation);
+    selectedBytes += operationBytes;
+  }
+
+  return {
+    operations: selectedOperations,
+    oversizedOperations: oversizedOperations.filter(Boolean),
+  };
+}
 
 function isServiceWorkerSupported() {
   return typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
@@ -22,7 +67,10 @@ export async function registerResumeSyncWorker() {
   }
 
   try {
-    return await navigator.serviceWorker.register('/sync-worker.js');
+    const registration = await navigator.serviceWorker.register('/sync-worker.js');
+
+    registration.active?.postMessage({ type: 'SYNC_RESUME_OUTBOX' });
+    return registration;
   } catch (error) {
     if (import.meta.env.DEV) {
       console.warn('Resume sync worker registration failed', error);
@@ -75,10 +123,34 @@ export async function createResumeSyncSession(idToken) {
 }
 
 export async function clearResumeSyncSession() {
-  await fetch('/api/sync-session', {
-    method: 'DELETE',
-    credentials: 'include',
-  }).catch(() => null);
+  try {
+    const response = await fetch('/api/sync-session', {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function clearCompletedBackgroundSession(accountUid, pendingCount) {
+  if (pendingCount !== 0) {
+    return;
+  }
+
+  const binding = await readLocalAccountBinding();
+
+  if (binding?.uid !== accountUid || binding?.clearSessionWhenSynced !== true) {
+    return;
+  }
+
+  const cleared = await clearResumeSyncSession();
+
+  if (cleared) {
+    await setSyncSessionCleanupRequested(accountUid, false);
+  }
 }
 
 export async function pullCloudWorkspaceSnapshot(idToken) {
@@ -124,11 +196,14 @@ export function getOperationAcksFromResponse(payload, operations, descriptorKey,
 export async function syncLocalOutbox({ idToken = '', useCookie = false, accountUid = '' } = {}) {
   const normalizedAccountUid = String(accountUid || '').trim();
   const canAttemptCloudSync = Boolean(idToken || useCookie);
-  const operations = normalizedAccountUid
+  const pendingOperations = normalizedAccountUid
     ? await readPendingOutbox({ accountUid: normalizedAccountUid })
     : await readPendingOutbox();
 
-  if (operations.length === 0) {
+  if (pendingOperations.length === 0) {
+    if (normalizedAccountUid) {
+      await clearCompletedBackgroundSession(normalizedAccountUid, 0);
+    }
     return {
       status: 'idle',
       syncedCount: 0,
@@ -141,7 +216,30 @@ export async function syncLocalOutbox({ idToken = '', useCookie = false, account
     return {
       status: 'queued',
       syncedCount: 0,
-      pendingCount: operations.length,
+      pendingCount: pendingOperations.length,
+    };
+  }
+
+  const clientPartition = partitionClientSyncOperations(pendingOperations);
+  const operations = clientPartition.operations;
+
+  await markOutboxStale(
+    clientPartition.oversizedOperations,
+    'This resume is too large to sync, but it remains saved in this browser.',
+  );
+
+  if (operations.length === 0) {
+    const remainingOperations = await readPendingOutbox({ accountUid: normalizedAccountUid });
+
+    await clearCompletedBackgroundSession(normalizedAccountUid, remainingOperations.length);
+    return {
+      status: 'stale',
+      syncedCount: 0,
+      staleCount: 0,
+      rejectedCount: clientPartition.oversizedOperations.length,
+      oversizedCount: clientPartition.oversizedOperations.length,
+      requiresReconcile: false,
+      pendingCount: remainingOperations.length,
     };
   }
 
@@ -173,19 +271,28 @@ export async function syncLocalOutbox({ idToken = '', useCookie = false, account
     const syncedOperations = getOperationAcksFromResponse(payload, operations, 'syncedOperations', 'syncedOperationIds');
     const staleOperations = getOperationAcksFromResponse(payload, operations, 'staleOperations', 'staleOperationIds');
     const rejectedOperations = getOperationAcksFromResponse(payload, operations, 'rejectedOperations', 'rejectedOperationIds');
+    const serverOversizedOperations = rejectedOperations.filter((operation) => operation.reason === 'payload-too-large');
+    const accountRejectedOperations = rejectedOperations.filter((operation) => operation.reason !== 'payload-too-large');
 
     await markOutboxSynced(syncedOperations);
     await markOutboxStale(staleOperations);
-    await markOutboxStale(rejectedOperations, 'Skipped cloud sync because these changes belong to another account.');
+    await markOutboxStale(serverOversizedOperations, 'This resume is too large to sync, but it remains saved in this browser.');
+    await markOutboxStale(accountRejectedOperations, 'Skipped cloud sync because these changes belong to another account.');
 
-    const skippedCount = staleOperations.length + rejectedOperations.length;
+    const oversizedCount = clientPartition.oversizedOperations.length + serverOversizedOperations.length;
+    const skippedCount = staleOperations.length + rejectedOperations.length + clientPartition.oversizedOperations.length;
     const remainingOperations = await readPendingOutbox({ accountUid: normalizedAccountUid });
+    await clearCompletedBackgroundSession(normalizedAccountUid, remainingOperations.length);
 
     return {
       status: skippedCount > 0 ? 'stale' : 'synced',
       syncedCount: syncedOperations.length,
       staleCount: staleOperations.length,
-      rejectedCount: rejectedOperations.length,
+      rejectedCount: rejectedOperations.length + clientPartition.oversizedOperations.length,
+      oversizedCount,
+      requiresReconcile: staleOperations.some((operation) => (
+        operation.reason === 'version-conflict' || operation.reason === 'deleted-remotely'
+      )),
       pendingCount: remainingOperations.length,
     };
   } catch (error) {

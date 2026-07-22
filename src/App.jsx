@@ -16,7 +16,14 @@ import SeparatorSettingsPopup from './components/separatorSettingsPopup';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
 import { importResumeFile } from './lib/importResume.js';
-import { clearResumeSyncSession } from './lib/backgroundSync.js';
+import {
+  clearResumeSyncSession,
+  requestResumeBackgroundSync,
+} from './lib/backgroundSync.js';
+import {
+  readDurableLocalBrowserContext,
+  setSyncSessionCleanupRequested,
+} from './lib/localWorkspaceDb.js';
 import {
   createMixedSamplePreviewModel,
   createSamplePlaceholderResolver,
@@ -25,7 +32,6 @@ import {
 import {
   clearBrowserResumeConnectionData,
   clearLocalResumeWorkspaceData,
-  hasLocalResumeWorkspaceData,
   readConnectedAccount,
   readSignedOutEditingPreference,
   writeSignedOutEditingPreference,
@@ -139,6 +145,11 @@ function App() {
   const [importState, setImportState] = useState({ status: 'idle' });
   const [isSignOutInProgress, setIsSignOutInProgress] = useState(false);
   const [accountSwitchResolutionUid, setAccountSwitchResolutionUid] = useState('');
+  const [durableAccountContext, setDurableAccountContext] = useState(() => ({
+    checkedForUid: '',
+    previousAccount: preSignInConnectedAccountRef.current,
+    hasWorkspaceData: false,
+  }));
   const [signedOutEditingPreference, setSignedOutEditingPreference] = useState(() => readSignedOutEditingPreference());
   const previewEditRequestIdRef = useRef(0);
   const previewPulseRequestIdRef = useRef(0);
@@ -162,16 +173,18 @@ function App() {
 
     return 'light';
   });
-  const pendingAccountSwitchAccount = auth.user && preSignInConnectedAccountRef.current?.uid !== auth.user.uid
-    ? preSignInConnectedAccountRef.current
+  const accountContextReady = !auth.user || durableAccountContext.checkedForUid === auth.user.uid;
+  const pendingAccountSwitchAccount = auth.user && durableAccountContext.previousAccount?.uid !== auth.user.uid
+    ? durableAccountContext.previousAccount
     : null;
   const isAccountSwitchPending = Boolean(
     auth.user &&
+    accountContextReady &&
     pendingAccountSwitchAccount?.uid &&
     accountSwitchResolutionUid !== auth.user.uid &&
-    hasLocalResumeWorkspaceData()
+    durableAccountContext.hasWorkspaceData
   );
-  const builderUser = isAccountSwitchPending ? null : auth.user;
+  const builderUser = !accountContextReady || isAccountSwitchPending ? null : auth.user;
   const {
     resume,
     template,
@@ -346,6 +359,52 @@ function App() {
       setAccountSwitchResolutionUid('');
     }
   }, [auth.connectedAccount, auth.user]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!auth.authReady) {
+      return undefined;
+    }
+
+    readDurableLocalBrowserContext()
+      .then((context) => {
+        if (cancelled) {
+          return;
+        }
+
+        const previousAccount = context.accountBinding || preSignInConnectedAccountRef.current || auth.connectedAccount;
+
+        if (!auth.user && previousAccount) {
+          preSignInConnectedAccountRef.current = previousAccount;
+        }
+
+        setDurableAccountContext({
+          checkedForUid: auth.user?.uid || '',
+          previousAccount,
+          hasWorkspaceData: context.hasWorkspaceData,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          const previousAccount = preSignInConnectedAccountRef.current || auth.connectedAccount;
+
+          setDurableAccountContext({
+            checkedForUid: auth.user?.uid || '',
+            previousAccount,
+            hasWorkspaceData: Boolean(
+              auth.user &&
+              previousAccount?.uid &&
+              previousAccount.uid !== auth.user.uid
+            ),
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [auth.authReady, auth.connectedAccount, auth.user]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -595,7 +654,7 @@ function App() {
     setImportState({ status: 'processing', fileName: file.name });
 
     try {
-      placeholderResumeId = createImportPlaceholderResume({ sourceFileName: file.name });
+      placeholderResumeId = await createImportPlaceholderResume({ sourceFileName: file.name });
 
       if (!placeholderResumeId) {
         throw new Error('Create or delete a resume before importing another file.');
@@ -663,6 +722,9 @@ function App() {
     setIsSignOutInProgress(true);
 
     try {
+      const accountUid = auth.user?.uid || '';
+      let cloudSyncCompleted = true;
+
       if (!allowSignedOutEditing) {
         const flushedDraft = await flushActiveCloudDraft({ reason: 'signout' });
 
@@ -674,17 +736,36 @@ function App() {
           return;
         }
       } else {
-        await flushActiveCloudDraft({ reason: 'signout' });
+        cloudSyncCompleted = await flushActiveCloudDraft({ reason: 'signout' });
+
+        if (accountUid && !cloudSyncCompleted) {
+          await setSyncSessionCleanupRequested(accountUid, true);
+          await requestResumeBackgroundSync();
+        }
+      }
+
+      if (cloudSyncCompleted) {
+        const sessionCleared = await clearResumeSyncSession();
+
+        if (!sessionCleared) {
+          showNotice({
+            tone: 'error',
+            message: 'Secure sign-out could not finish. Check your connection and try again.',
+          });
+          return;
+        }
       }
 
       const signedOut = await auth.signOut();
 
       if (!signedOut) {
+        if (accountUid && !cloudSyncCompleted) {
+          await setSyncSessionCleanupRequested(accountUid, false);
+        }
         return;
       }
 
       if (!allowSignedOutEditing) {
-        await clearResumeSyncSession();
         await clearLocalResumeWorkspaceData();
         window.location.reload();
       }
@@ -737,7 +818,16 @@ function App() {
       }
     }
 
-    await auth.clearBrowserConnection();
+    const disconnected = await auth.clearBrowserConnection();
+
+    if (!disconnected) {
+      showNotice({
+        tone: 'error',
+        message: 'This browser could not be disconnected securely. Check your connection and try again.',
+      });
+      return;
+    }
+
     await clearBrowserResumeConnectionData();
     window.location.reload();
   }
@@ -752,6 +842,11 @@ function App() {
       email: auth.user.email || '',
       displayName: auth.user.displayName || '',
     };
+    setDurableAccountContext((current) => ({
+      ...current,
+      checkedForUid: auth.user.uid,
+      previousAccount: preSignInConnectedAccountRef.current,
+    }));
     setAccountSwitchResolutionUid(auth.user.uid);
     showNotice({
       tone: 'warning',
@@ -770,6 +865,11 @@ function App() {
       email: auth.user.email || '',
       displayName: auth.user.displayName || '',
     };
+    setDurableAccountContext({
+      checkedForUid: auth.user.uid,
+      previousAccount: preSignInConnectedAccountRef.current,
+      hasWorkspaceData: false,
+    });
     setAccountSwitchResolutionUid(auth.user.uid);
     window.location.reload();
   }

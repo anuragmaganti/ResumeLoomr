@@ -21,6 +21,7 @@ import {
   clearResumeSyncSession,
   createResumeSyncSession,
 } from '../lib/backgroundSync.js';
+import { setSyncSessionCleanupRequested } from '../lib/localWorkspaceDb.js';
 
 function getFriendlyAuthError(error) {
   switch (error?.code) {
@@ -67,7 +68,8 @@ export function useFirebaseAuth() {
       if (nextUser) {
         const account = writeConnectedAccount(nextUser);
         setConnectedAccount(account);
-        nextUser.getIdToken()
+        setSyncSessionCleanupRequested(nextUser.uid, false)
+          .then(() => nextUser.getIdToken())
           .then((idToken) => createResumeSyncSession(idToken))
           .catch((error) => {
             if (import.meta.env.DEV) {
@@ -162,15 +164,22 @@ export function useFirebaseAuth() {
       setAuthBusy(true);
 
       try {
+        const sessionCleared = await clearResumeSyncSession();
+
+        if (!sessionCleared) {
+          throw new Error('Secure browser disconnect could not finish. Check your connection and try again.');
+        }
+
         if (auth?.currentUser) {
           await signOut(auth);
         }
 
-        await clearResumeSyncSession();
         clearConnectedAccount();
         setConnectedAccount(null);
+        return true;
       } catch (error) {
         setAuthError(getFriendlyAuthError(error));
+        return false;
       } finally {
         setAuthBusy(false);
       }

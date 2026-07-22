@@ -14,6 +14,7 @@ import {
   normalizeDraftPayload,
   normalizeWorkspaceIndex,
   placeWorkspaceResumeAfter,
+  removeWorkspaceResumes,
   trimText,
 } from './resume.js';
 
@@ -34,7 +35,6 @@ const LOCAL_SYNC_SEQUENCE_KEY = 'resumeloomr:sync-sequence:v1';
 
 let dbPromise = null;
 let localMutationQueue = Promise.resolve();
-let localMutationDepth = 0;
 let fallbackSyncSequence = 0;
 let fallbackSyncClientId = '';
 
@@ -83,6 +83,12 @@ function createLocalRevision() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function normalizeCloudVersion(value) {
+  const version = Number(value);
+
+  return Number.isSafeInteger(version) && version >= 0 ? version : 0;
+}
+
 function getDraftRecordRevision(record) {
   if (record?.localRevision) {
     return record.localRevision;
@@ -110,11 +116,23 @@ function normalizeOutboxAckDescriptor(operation) {
     return null;
   }
 
-  return {
+  const rawCloudVersion = Number(operation.cloudVersion);
+
+  const descriptor = {
     id,
     operationVersion: Number(operation.operationVersion || 0) || 0,
     localRevision: trimText(operation.localRevision),
   };
+
+  if (Number.isSafeInteger(rawCloudVersion) && rawCloudVersion >= 0) {
+    descriptor.cloudVersion = rawCloudVersion;
+  }
+
+  if (trimText(operation.reason)) {
+    descriptor.reason = trimText(operation.reason);
+  }
+
+  return descriptor;
 }
 
 export function createOutboxAckDescriptor(operation) {
@@ -169,19 +187,7 @@ async function withLocalWorkspaceLock(callback) {
 }
 
 function runLocalMutation(callback) {
-  if (localMutationDepth > 0) {
-    return callback();
-  }
-
-  const run = async () => {
-    localMutationDepth += 1;
-
-    try {
-      return await withLocalWorkspaceLock(callback);
-    } finally {
-      localMutationDepth -= 1;
-    }
-  };
+  const run = () => withLocalWorkspaceLock(callback);
   const resultPromise = localMutationQueue.then(run, run);
 
   localMutationQueue = resultPromise.catch(() => null);
@@ -223,6 +229,7 @@ function serializeDraftState(draft) {
     template: draft?.template,
     resume: draft?.resume,
     localRevision: draft?.localRevision || '',
+    cloudVersion: normalizeCloudVersion(draft?.cloudVersion),
   };
 }
 
@@ -234,6 +241,7 @@ function normalizeDraftState(draft) {
     template: normalizedDraft.template,
     savedAt: draft?.savedAt || null,
     localRevision: draft?.localRevision || '',
+    cloudVersion: normalizeCloudVersion(draft?.cloudVersion),
   };
 }
 
@@ -409,6 +417,12 @@ function getDraftTimestamp(draft, meta = {}) {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
+function getTimestamp(value) {
+  const timestamp = Date.parse(value || '');
+
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 function workspaceHasVisibleDrafts(workspace, draftsByResumeId, tombstonedResumeIds = new Set()) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
 
@@ -456,6 +470,56 @@ function normalizeTombstoneList(tombstones, pendingOutbox = []) {
       ...record,
       resumeId: trimText(record.resumeId),
     }));
+}
+
+function tombstoneAppliesToAccount(tombstone, accountUid = '') {
+  const tombstoneAccountUid = trimText(tombstone?.accountUid);
+  const normalizedAccountUid = trimText(accountUid);
+
+  return !tombstoneAccountUid || !normalizedAccountUid || tombstoneAccountUid === normalizedAccountUid;
+}
+
+function filterTombstonesForAccount(tombstones, accountUid = '') {
+  return (Array.isArray(tombstones) ? tombstones : [])
+    .filter((tombstone) => tombstoneAppliesToAccount(tombstone, accountUid));
+}
+
+function mergeConcurrentLocalWorkspaces(currentWorkspace, incomingWorkspace, tombstones = []) {
+  const current = normalizeWorkspaceIndex(currentWorkspace);
+  const incoming = normalizeWorkspaceIndex(incomingWorkspace);
+  const deletedIds = new Set(normalizeTombstoneList(tombstones).map((record) => record.resumeId));
+  const resumeIds = [...new Set([...incoming.resumeIds, ...current.resumeIds])]
+    .filter((resumeId) => !deletedIds.has(resumeId))
+    .slice(0, MAX_WORKSPACE_RESUMES);
+  const meta = Object.fromEntries(resumeIds.map((resumeId, index) => {
+    const incomingMeta = incoming.meta[resumeId];
+    const currentMeta = current.meta[resumeId];
+    const incomingTimestamp = getTimestamp(incomingMeta?.updatedAt);
+    const currentTimestamp = getTimestamp(currentMeta?.updatedAt);
+    const preferredMeta = incomingTimestamp >= currentTimestamp ? incomingMeta : currentMeta;
+
+    return [
+      resumeId,
+      createWorkspaceResumeMeta(preferredMeta?.name || `Resume ${index + 1}`, preferredMeta?.updatedAt || ''),
+    ];
+  }));
+
+  return normalizeWorkspaceIndex({
+    activeResumeId: resumeIds.includes(incoming.activeResumeId)
+      ? incoming.activeResumeId
+      : (resumeIds.includes(current.activeResumeId) ? current.activeResumeId : resumeIds[0] || ''),
+    resumeIds,
+    meta,
+    organization: mergeWorkspaceOrganizations(
+      incoming.organization,
+      current.organization,
+      resumeIds,
+      {
+        primaryResumeIds: incoming.resumeIds,
+        secondaryResumeIds: current.resumeIds,
+      },
+    ),
+  });
 }
 
 function workspacesMatch(firstWorkspace, secondWorkspace) {
@@ -580,12 +644,26 @@ async function readWorkspaceRecord(db) {
   return db.get(WORKSPACE_STORE, LOCAL_WORKSPACE_ID);
 }
 
-async function writeWorkspaceRecord(tx, workspace) {
-  await tx.objectStore(WORKSPACE_STORE).put({
+async function writeWorkspaceRecord(tx, workspace, { localRevision = '', cloudVersion = null } = {}) {
+  const store = tx.objectStore(WORKSPACE_STORE);
+  const existingRecord = await store.get(LOCAL_WORKSPACE_ID);
+  const nextLocalRevision = localRevision || createLocalRevision();
+  const nextCloudVersion = cloudVersion === null
+    ? normalizeCloudVersion(existingRecord?.cloudVersion)
+    : normalizeCloudVersion(cloudVersion);
+
+  await store.put({
     id: LOCAL_WORKSPACE_ID,
     workspace: normalizeWorkspaceIndex(workspace),
+    localRevision: nextLocalRevision,
+    cloudVersion: nextCloudVersion,
     updatedAt: new Date().toISOString(),
   });
+
+  return {
+    localRevision: nextLocalRevision,
+    cloudVersion: nextCloudVersion,
+  };
 }
 
 async function writeDraftRecord(tx, resumeId, draft, { localRevision = '' } = {}) {
@@ -595,18 +673,24 @@ async function writeDraftRecord(tx, resumeId, draft, { localRevision = '' } = {}
     resumeId,
     draft: normalizeDraftWithRevision(draft, revision),
     localRevision: revision,
+    cloudVersion: normalizeCloudVersion(draft?.cloudVersion),
     updatedAt: draft?.savedAt || new Date().toISOString(),
   });
 
   return revision;
 }
 
-function createOutboxRecord({ type, resumeId = '', workspace = null, draft = null, tombstone = null, accountUid = '', reason = '' }) {
+function createOutboxRecordId(type, resumeId = '', accountUid = '') {
+  const accountScope = encodeURIComponent(trimText(accountUid) || 'guest');
+  const operationKey = type === 'workspace' ? 'workspace' : `${type}:${resumeId}`;
+
+  return `${accountScope}:${operationKey}`;
+}
+
+function createOutboxRecord({ type, resumeId = '', workspace = null, draft = null, tombstone = null, accountUid = '', reason = '', baseCloudVersion = 0 }) {
   const now = new Date().toISOString();
   const syncIdentity = getSyncOperationIdentity();
-  const id = type === 'workspace'
-    ? 'workspace'
-    : `${type}:${resumeId}`;
+  const id = createOutboxRecordId(type, resumeId, accountUid);
 
   return {
     id,
@@ -615,6 +699,7 @@ function createOutboxRecord({ type, resumeId = '', workspace = null, draft = nul
     workspace: workspace ? normalizeWorkspaceIndex(workspace) : null,
     draft: draft ? normalizeDraftState(draft) : null,
     localRevision: draft ? (getDraftStateRevision(draft) || createLocalRevision()) : createLocalRevision(),
+    baseCloudVersion: normalizeCloudVersion(baseCloudVersion),
     clientId: syncIdentity.clientId,
     operationVersion: syncIdentity.operationVersion,
     tombstone,
@@ -642,21 +727,36 @@ async function putOutboxRecord(tx, record) {
   });
 }
 
+async function deleteMatchingLegacyOutboxRecord(tx, legacyId, accountUid = '') {
+  const outboxStore = tx.objectStore(OUTBOX_STORE);
+  const legacyRecord = await outboxStore.get(legacyId);
+
+  if (legacyRecord && trimText(legacyRecord.accountUid) === trimText(accountUid)) {
+    await outboxStore.delete(legacyId);
+  }
+}
+
 async function queueWorkspaceSyncInTx(tx, workspace, options = {}) {
+  const workspaceRecord = await tx.objectStore(WORKSPACE_STORE).get(LOCAL_WORKSPACE_ID);
+
+  await deleteMatchingLegacyOutboxRecord(tx, 'workspace', options.accountUid);
   await putOutboxRecord(tx, createOutboxRecord({
     type: 'workspace',
     workspace,
+    baseCloudVersion: options.baseCloudVersion ?? workspaceRecord?.cloudVersion,
     accountUid: options.accountUid,
     reason: options.reason || 'workspace',
   }));
 }
 
 async function queueDraftSyncInTx(tx, resumeId, workspace, draft, options = {}) {
+  await deleteMatchingLegacyOutboxRecord(tx, `upsertDraft:${resumeId}`, options.accountUid);
   await putOutboxRecord(tx, createOutboxRecord({
     type: 'upsertDraft',
     resumeId,
     workspace,
     draft,
+    baseCloudVersion: options.baseCloudVersion ?? draft?.cloudVersion,
     accountUid: options.accountUid,
     reason: options.reason || 'draft',
   }));
@@ -672,7 +772,9 @@ async function queueDeleteSyncInTx(tx, resumeId, workspace, options = {}) {
   };
 
   await tx.objectStore(TOMBSTONES_STORE).put(tombstone);
-  await tx.objectStore(OUTBOX_STORE).delete(`upsertDraft:${resumeId}`);
+  await tx.objectStore(OUTBOX_STORE).delete(createOutboxRecordId('upsertDraft', resumeId, options.accountUid));
+  await deleteMatchingLegacyOutboxRecord(tx, `upsertDraft:${resumeId}`, options.accountUid);
+  await deleteMatchingLegacyOutboxRecord(tx, `deleteDraft:${resumeId}`, options.accountUid);
   await putOutboxRecord(tx, createOutboxRecord({
     type: 'deleteDraft',
     resumeId,
@@ -703,6 +805,8 @@ export async function initializeLocalWorkspace() {
         workspace,
         activeResumeId,
         draft,
+        workspaceLocalRevision: existingWorkspaceRecord.localRevision || '',
+        workspaceCloudVersion: normalizeCloudVersion(existingWorkspaceRecord.cloudVersion),
       };
     }
 
@@ -726,7 +830,13 @@ export async function initializeLocalWorkspace() {
     writeLocalStorageWorkspace(legacySnapshot.workspace);
     writeLocalStorageDraft(legacySnapshot.activeResumeId, legacySnapshot.draft);
 
-    return legacySnapshot;
+    const workspaceRecord = await readWorkspaceRecord(db);
+
+    return {
+      ...legacySnapshot,
+      workspaceLocalRevision: workspaceRecord?.localRevision || '',
+      workspaceCloudVersion: normalizeCloudVersion(workspaceRecord?.cloudVersion),
+    };
   });
 }
 
@@ -751,6 +861,8 @@ async function readLocalWorkspaceSnapshot() {
     workspace,
     activeResumeId,
     draft: await readLocalDraft(activeResumeId),
+    workspaceLocalRevision: workspaceRecord?.localRevision || '',
+    workspaceCloudVersion: normalizeCloudVersion(workspaceRecord?.cloudVersion),
   };
 }
 
@@ -764,7 +876,10 @@ export async function readLocalDraft(resumeId) {
   const record = await db.get(DRAFTS_STORE, resumeId);
 
   if (record?.draft) {
-    return normalizeDraftWithRevision(record.draft, getDraftRecordRevision(record));
+    return normalizeDraftWithRevision({
+      ...record.draft,
+      cloudVersion: record.draft.cloudVersion ?? record.cloudVersion,
+    }, getDraftRecordRevision(record));
   }
 
   const legacyDraft = readLegacyDraftFromLocalStorage(resumeId);
@@ -795,16 +910,28 @@ async function readLocalTombstones() {
   return db.getAll(TOMBSTONES_STORE);
 }
 
+async function readLocalOutboxRecords() {
+  const db = await getLocalWorkspaceDb();
+
+  if (!db) {
+    return [];
+  }
+
+  return db.getAll(OUTBOX_STORE);
+}
+
 export async function readLocalWorkspaceBundle() {
   const snapshot = await readLocalWorkspaceSnapshot();
   const [
     draftsByResumeId,
     tombstones,
     pendingOutbox,
+    outboxRecords,
   ] = await Promise.all([
     readAllLocalDrafts(snapshot.workspace),
     readLocalTombstones(),
     readPendingOutbox({ limit: 1000 }),
+    readLocalOutboxRecords(),
   ]);
 
   return {
@@ -812,6 +939,7 @@ export async function readLocalWorkspaceBundle() {
     draftsByResumeId,
     tombstones,
     pendingOutbox,
+    outboxRecords,
   };
 }
 
@@ -821,14 +949,33 @@ export function mergeLocalAndCloudWorkspaces({
   cloudWorkspace = null,
   cloudDraftsByResumeId = null,
   tombstones = [],
+  cloudTombstones = [],
   pendingOutbox = [],
+  outboxRecords = pendingOutbox,
+  workspaceCloudVersion = 0,
   maxResumes = MAX_WORKSPACE_RESUMES,
 } = {}) {
   const normalizedLocalWorkspace = normalizeWorkspaceIndex(localWorkspace);
   const normalizedCloudWorkspace = normalizeWorkspaceIndex(cloudWorkspace);
   const localDrafts = normalizeDraftMap(localDraftsByResumeId);
   const cloudDrafts = normalizeDraftMap(cloudDraftsByResumeId);
-  const tombstoneRecords = normalizeTombstoneList(tombstones, pendingOutbox);
+  const localTombstoneRecords = normalizeTombstoneList(tombstones, outboxRecords);
+  const cloudTombstoneRecords = normalizeTombstoneList(cloudTombstones);
+  const tombstoneRecords = normalizeTombstoneList([
+    ...localTombstoneRecords,
+    ...cloudTombstoneRecords,
+  ]);
+  const localTombstonedResumeIds = new Set(localTombstoneRecords.map((record) => record.resumeId));
+  const remotelyTombstonedResumeIds = new Set(cloudTombstoneRecords.map((record) => record.resumeId));
+  const unsyncedLocalUpsertResumeIds = new Set(
+    (Array.isArray(outboxRecords) ? outboxRecords : [])
+      .filter((record) => (
+        record?.type === 'upsertDraft'
+        && trimText(record.resumeId)
+        && record.status !== 'synced'
+      ))
+      .map((record) => trimText(record.resumeId)),
+  );
   const tombstonedResumeIds = new Set(tombstoneRecords.map((record) => record.resumeId));
   const localHasContent = workspaceHasVisibleDrafts(normalizedLocalWorkspace, localDrafts, tombstonedResumeIds);
   const cloudHasContent = workspaceHasVisibleDrafts(normalizedCloudWorkspace, cloudDrafts, tombstonedResumeIds);
@@ -841,12 +988,15 @@ export function mergeLocalAndCloudWorkspaces({
   const warnings = [];
   const conflictCopySources = [];
 
-  function addResume({ resumeId, draft, meta = {}, origin = 'cloud', forceUpsert = false }) {
+  function addResume({ resumeId, draft, meta = {}, origin = 'cloud', forceUpsert = false, cloudVersion = null }) {
     if (!resumeId || mergedDrafts.has(resumeId) || tombstonedResumeIds.has(resumeId)) {
       return;
     }
 
-    const normalizedDraft = normalizeDraftState(draft);
+    const normalizedDraft = normalizeDraftState({
+      ...draft,
+      cloudVersion: cloudVersion === null ? draft?.cloudVersion : cloudVersion,
+    });
     const name = trimText(meta.name) || `Resume ${mergedResumeIds.length + 1}`;
     const updatedAt = normalizedDraft.savedAt || meta.updatedAt || '';
 
@@ -873,6 +1023,7 @@ export function mergeLocalAndCloudWorkspaces({
       },
       origin: 'copy',
       forceUpsert: true,
+      cloudVersion: 0,
     });
     conflictCopySources.push({ copyId, sourceResumeId });
   }
@@ -906,6 +1057,7 @@ export function mergeLocalAndCloudWorkspaces({
           meta: normalizedLocalWorkspace.meta[resumeId],
           origin: localHasContent ? 'local' : 'blank-local',
           forceUpsert: localHasContent,
+          cloudVersion: 0,
         });
         return;
       }
@@ -926,6 +1078,7 @@ export function mergeLocalAndCloudWorkspaces({
           meta: localHasContent ? normalizedLocalWorkspace.meta[resumeId] : normalizedCloudWorkspace.meta[resumeId],
           origin: mergedFullHash !== cloudFullHash ? 'local' : 'cloud',
           forceUpsert: mergedFullHash !== cloudFullHash,
+          cloudVersion: cloudDraft.cloudVersion,
         });
         return;
       }
@@ -939,6 +1092,7 @@ export function mergeLocalAndCloudWorkspaces({
           meta: normalizedLocalWorkspace.meta[resumeId],
           origin: 'local',
           forceUpsert: true,
+          cloudVersion: cloudDraft.cloudVersion,
         });
         addConflictCopy({
           sourceResumeId: resumeId,
@@ -954,6 +1108,7 @@ export function mergeLocalAndCloudWorkspaces({
           meta: normalizedCloudWorkspace.meta[resumeId],
           origin: 'cloud',
           forceUpsert: createDraftContentHash(mergedCloudDraft) !== cloudFullHash,
+          cloudVersion: cloudDraft.cloudVersion,
         });
         addConflictCopy({
           sourceResumeId: resumeId,
@@ -978,6 +1133,49 @@ export function mergeLocalAndCloudWorkspaces({
           origin: 'cloud',
         });
       }
+    });
+  }
+
+  let preservedRemoteDeleteConflict = false;
+
+  remotelyTombstonedResumeIds.forEach((resumeId) => {
+    if (
+      localTombstonedResumeIds.has(resumeId)
+      || !unsyncedLocalUpsertResumeIds.has(resumeId)
+      || !normalizedLocalWorkspace.resumeIds.includes(resumeId)
+    ) {
+      return;
+    }
+
+    const localDraft = localDrafts.get(resumeId);
+
+    if (!localDraft) {
+      return;
+    }
+
+    addConflictCopy({
+      sourceResumeId: resumeId,
+      draft: localDraft,
+      meta: normalizedLocalWorkspace.meta[resumeId],
+    });
+    preservedRemoteDeleteConflict = true;
+  });
+
+  if (preservedRemoteDeleteConflict) {
+    warnings.push('A resume deleted on another device had local edits, so those edits were preserved as a separate copy.');
+  }
+
+  if (mergedResumeIds.length === 0) {
+    const fresh = createFreshWorkspaceDraft();
+
+    existingIds.add(fresh.activeResumeId);
+    addResume({
+      resumeId: fresh.activeResumeId,
+      draft: fresh.draft,
+      meta: fresh.workspace.meta[fresh.activeResumeId],
+      origin: 'local',
+      forceUpsert: true,
+      cloudVersion: 0,
     });
   }
 
@@ -1053,6 +1251,8 @@ export function mergeLocalAndCloudWorkspaces({
       deleteResumeIds,
     },
     warnings,
+    tombstones: tombstoneRecords,
+    workspaceCloudVersion: normalizeCloudVersion(workspaceCloudVersion),
     localHasContent,
     cloudHasContent,
   };
@@ -1085,9 +1285,25 @@ export async function persistLocalDraftSnapshot({
       return { workspace: normalizedWorkspace, draft: draftWithRevision, conflict: false };
     }
 
-    const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE], 'readwrite');
+    const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
     const existingRecord = await tx.objectStore(DRAFTS_STORE).get(resumeId);
+    const existingWorkspaceRecord = await tx.objectStore(WORKSPACE_STORE).get(LOCAL_WORKSPACE_ID);
+    const tombstones = filterTombstonesForAccount(
+      await tx.objectStore(TOMBSTONES_STORE).getAll(),
+      accountUid,
+    );
     const currentRevision = existingRecord ? getDraftRecordRevision(existingRecord) : '';
+
+    if (tombstones.some((record) => record?.resumeId === resumeId)) {
+      await tx.done;
+      return {
+        workspace: normalizeWorkspaceIndex(existingWorkspaceRecord?.workspace || normalizedWorkspace),
+        draft: null,
+        conflict: false,
+        deleted: true,
+        skipped: true,
+      };
+    }
 
     if (
       expectedRevision &&
@@ -1106,29 +1322,38 @@ export async function persistLocalDraftSnapshot({
     }
 
     const nextRevision = createLocalRevision();
-    const draftWithRevision = normalizeDraftWithRevision(normalizedDraft, nextRevision);
+    const draftWithRevision = normalizeDraftWithRevision({
+      ...normalizedDraft,
+      cloudVersion: Math.max(
+        normalizeCloudVersion(normalizedDraft.cloudVersion),
+        normalizeCloudVersion(existingRecord?.cloudVersion ?? existingRecord?.draft?.cloudVersion),
+      ),
+    }, nextRevision);
+    const persistedWorkspace = persistWorkspace
+      ? mergeConcurrentLocalWorkspaces(existingWorkspaceRecord?.workspace, normalizedWorkspace, tombstones)
+      : normalizedWorkspace;
 
     if (persistWorkspace) {
-      await writeWorkspaceRecord(tx, normalizedWorkspace);
+      await writeWorkspaceRecord(tx, persistedWorkspace);
     }
     await writeDraftRecord(tx, resumeId, draftWithRevision, { localRevision: nextRevision });
 
     if (enqueueSync && persistWorkspace) {
-      await queueWorkspaceSyncInTx(tx, normalizedWorkspace, { accountUid, reason });
+      await queueWorkspaceSyncInTx(tx, persistedWorkspace, { accountUid, reason });
     }
 
     if (enqueueSync) {
-      await queueDraftSyncInTx(tx, resumeId, normalizedWorkspace, draftWithRevision, { accountUid, reason });
+      await queueDraftSyncInTx(tx, resumeId, persistedWorkspace, draftWithRevision, { accountUid, reason });
     }
 
     await tx.done;
 
     if (persistWorkspace) {
-      writeLocalStorageWorkspace(normalizedWorkspace);
+      writeLocalStorageWorkspace(persistedWorkspace);
     }
     writeLocalStorageDraft(resumeId, draftWithRevision);
 
-    return { workspace: normalizedWorkspace, draft: draftWithRevision, conflict: false };
+    return { workspace: persistedWorkspace, draft: draftWithRevision, conflict: false };
   });
 }
 
@@ -1142,22 +1367,32 @@ export async function persistLocalWorkspaceSnapshot({
     const db = await getLocalWorkspaceDb();
     const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
 
-    writeLocalStorageWorkspace(normalizedWorkspace);
-
     if (!db) {
+      writeLocalStorageWorkspace(normalizedWorkspace);
       return normalizedWorkspace;
     }
 
-    const tx = db.transaction([WORKSPACE_STORE, OUTBOX_STORE], 'readwrite');
+    const tx = db.transaction([WORKSPACE_STORE, OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
+    const [existingWorkspaceRecord, allTombstones] = await Promise.all([
+      tx.objectStore(WORKSPACE_STORE).get(LOCAL_WORKSPACE_ID),
+      tx.objectStore(TOMBSTONES_STORE).getAll(),
+    ]);
+    const tombstones = filterTombstonesForAccount(allTombstones, accountUid);
+    const persistedWorkspace = mergeConcurrentLocalWorkspaces(
+      existingWorkspaceRecord?.workspace,
+      normalizedWorkspace,
+      tombstones,
+    );
 
-    await writeWorkspaceRecord(tx, normalizedWorkspace);
+    await writeWorkspaceRecord(tx, persistedWorkspace);
 
     if (enqueueSync) {
-      await queueWorkspaceSyncInTx(tx, normalizedWorkspace, { accountUid, reason });
+      await queueWorkspaceSyncInTx(tx, persistedWorkspace, { accountUid, reason });
     }
 
     await tx.done;
-    return normalizedWorkspace;
+    writeLocalStorageWorkspace(persistedWorkspace);
+    return persistedWorkspace;
   });
 }
 
@@ -1177,31 +1412,46 @@ export async function persistLocalResumeBatchDelete({
         .filter(Boolean),
     )];
 
-    writeLocalStorageWorkspace(normalizedWorkspace);
-    deletedResumeIds.forEach(removeLocalStorageDraft);
-
     if (!db || deletedResumeIds.length === 0) {
+      writeLocalStorageWorkspace(normalizedWorkspace);
+      deletedResumeIds.forEach(removeLocalStorageDraft);
       return normalizedWorkspace;
     }
 
     const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
+    const [existingWorkspaceRecord, allExistingTombstones] = await Promise.all([
+      tx.objectStore(WORKSPACE_STORE).get(LOCAL_WORKSPACE_ID),
+      tx.objectStore(TOMBSTONES_STORE).getAll(),
+    ]);
+    const existingTombstones = filterTombstonesForAccount(allExistingTombstones, accountUid);
+    const mergedWorkspace = mergeConcurrentLocalWorkspaces(
+      existingWorkspaceRecord?.workspace,
+      normalizedWorkspace,
+      existingTombstones,
+    );
+    const deletionResult = removeWorkspaceResumes(mergedWorkspace, deletedResumeIds);
+    const persistedWorkspace = deletionResult.rejectedReason
+      ? normalizedWorkspace
+      : deletionResult.workspace;
 
-    await writeWorkspaceRecord(tx, normalizedWorkspace);
+    await writeWorkspaceRecord(tx, persistedWorkspace);
 
     for (const resumeId of deletedResumeIds) {
       await tx.objectStore(DRAFTS_STORE).delete(resumeId);
     }
 
     if (enqueueSync) {
-      await queueWorkspaceSyncInTx(tx, normalizedWorkspace, { accountUid, reason });
+      await queueWorkspaceSyncInTx(tx, persistedWorkspace, { accountUid, reason });
 
       for (const resumeId of deletedResumeIds) {
-        await queueDeleteSyncInTx(tx, resumeId, normalizedWorkspace, { accountUid, reason });
+        await queueDeleteSyncInTx(tx, resumeId, persistedWorkspace, { accountUid, reason });
       }
     }
 
     await tx.done;
-    return normalizedWorkspace;
+    writeLocalStorageWorkspace(persistedWorkspace);
+    deletedResumeIds.forEach(removeLocalStorageDraft);
+    return persistedWorkspace;
   });
 }
 
@@ -1216,6 +1466,7 @@ export async function persistLoginMergedWorkspace({
     const normalizedWorkspace = normalizeWorkspaceIndex(mergeResult?.workspace);
     const draftsByResumeId = normalizeDraftMap(mergeResult?.draftsByResumeId);
     const syncPlan = mergeResult?.syncPlan || {};
+    const mergedTombstones = normalizeTombstoneList(mergeResult?.tombstones);
     const upsertResumeIds = Array.isArray(syncPlan.upsertResumeIds) ? syncPlan.upsertResumeIds : [];
     const deleteResumeIds = Array.isArray(syncPlan.deleteResumeIds) ? syncPlan.deleteResumeIds : [];
 
@@ -1235,10 +1486,39 @@ export async function persistLoginMergedWorkspace({
 
     const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE, ACCOUNT_BINDING_STORE], 'readwrite');
 
-    await writeWorkspaceRecord(tx, normalizedWorkspace);
+    const effectiveAccountUid = trimText(accountUid || account?.uid);
+    const [existingOutboxRecords, existingTombstones] = await Promise.all([
+      tx.objectStore(OUTBOX_STORE).getAll(),
+      tx.objectStore(TOMBSTONES_STORE).getAll(),
+    ]);
+    const preservedOutboxRecords = existingOutboxRecords.filter((record) => (
+      trimText(record?.accountUid) && trimText(record.accountUid) !== effectiveAccountUid
+    ));
+    const preservedTombstones = existingTombstones.filter((record) => (
+      trimText(record?.accountUid) && trimText(record.accountUid) !== effectiveAccountUid
+    ));
+
+    await writeWorkspaceRecord(tx, normalizedWorkspace, {
+      cloudVersion: mergeResult?.workspaceCloudVersion,
+    });
     await tx.objectStore(DRAFTS_STORE).clear();
     await tx.objectStore(OUTBOX_STORE).clear();
     await tx.objectStore(TOMBSTONES_STORE).clear();
+
+    for (const record of preservedOutboxRecords) {
+      await tx.objectStore(OUTBOX_STORE).put(record);
+    }
+
+    for (const tombstone of preservedTombstones) {
+      await tx.objectStore(TOMBSTONES_STORE).put(tombstone);
+    }
+
+    for (const tombstone of mergedTombstones) {
+      await tx.objectStore(TOMBSTONES_STORE).put({
+        ...tombstone,
+        accountUid: tombstone.accountUid || accountUid || account?.uid || '',
+      });
+    }
 
     for (const resumeId of normalizedWorkspace.resumeIds) {
       const draft = draftsByResumeId.get(resumeId);
@@ -1270,6 +1550,7 @@ export async function persistLoginMergedWorkspace({
         uid: accountUid || account.uid,
         email: account?.email || '',
         displayName: account?.displayName || '',
+        clearSessionWhenSynced: false,
         updatedAt: new Date().toISOString(),
       });
     }
@@ -1280,6 +1561,65 @@ export async function persistLoginMergedWorkspace({
       workspace: normalizedWorkspace,
       draftsByResumeId,
     };
+  });
+}
+
+export async function readLocalAccountBinding() {
+  const db = await getLocalWorkspaceDb();
+
+  if (!db) {
+    return null;
+  }
+
+  return db.get(ACCOUNT_BINDING_STORE, LOCAL_ACCOUNT_BINDING_ID);
+}
+
+export async function readDurableLocalBrowserContext() {
+  const db = await getLocalWorkspaceDb();
+
+  if (!db) {
+    const legacy = readLegacyWorkspaceSnapshot();
+    return {
+      accountBinding: null,
+      hasWorkspaceData: legacy.workspace.resumeIds.length > 0,
+    };
+  }
+
+  const [workspaceRecord, draftRecords, accountBinding] = await Promise.all([
+    db.get(WORKSPACE_STORE, LOCAL_WORKSPACE_ID),
+    db.getAll(DRAFTS_STORE),
+    db.get(ACCOUNT_BINDING_STORE, LOCAL_ACCOUNT_BINDING_ID),
+  ]);
+  const workspace = normalizeWorkspaceIndex(workspaceRecord?.workspace);
+
+  return {
+    accountBinding: accountBinding || null,
+    hasWorkspaceData: workspace.resumeIds.length > 0 || draftRecords.length > 0,
+  };
+}
+
+export async function setSyncSessionCleanupRequested(accountUid, requested = true) {
+  const uid = trimText(accountUid);
+  const db = await getLocalWorkspaceDb();
+
+  if (!db || !uid) {
+    return false;
+  }
+
+  return runLocalMutation(async () => {
+    const current = await db.get(ACCOUNT_BINDING_STORE, LOCAL_ACCOUNT_BINDING_ID);
+
+    if (trimText(current?.uid) !== uid) {
+      return false;
+    }
+
+    await db.put(ACCOUNT_BINDING_STORE, {
+      ...current,
+      id: LOCAL_ACCOUNT_BINDING_ID,
+      clearSessionWhenSynced: Boolean(requested),
+      updatedAt: new Date().toISOString(),
+    });
+    return true;
   });
 }
 
@@ -1299,7 +1639,6 @@ export async function deleteLocalWorkspaceDatabase() {
 
   await deleteDB(LOCAL_WORKSPACE_DB_NAME);
   localMutationQueue = Promise.resolve();
-  localMutationDepth = 0;
 }
 
 export async function readPendingOutbox({ limit = 150, accountUid = null } = {}) {
@@ -1334,19 +1673,93 @@ export async function markOutboxSynced(operations) {
     return;
   }
 
-  const tx = db.transaction([OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
+  const tx = db.transaction([
+    WORKSPACE_STORE,
+    DRAFTS_STORE,
+    OUTBOX_STORE,
+    TOMBSTONES_STORE,
+    ACCOUNT_BINDING_STORE,
+  ], 'readwrite');
+  const accountBinding = await tx.objectStore(ACCOUNT_BINDING_STORE).get(LOCAL_ACCOUNT_BINDING_ID);
+  const boundAccountUid = trimText(accountBinding?.uid);
 
   for (const ack of acks) {
-    const record = await tx.objectStore(OUTBOX_STORE).get(ack.id);
+    const outboxStore = tx.objectStore(OUTBOX_STORE);
+    const record = await outboxStore.get(ack.id);
 
-    if (!outboxOperationMatchesAck(record, ack)) {
+    if (!record) {
       continue;
     }
 
-    await tx.objectStore(OUTBOX_STORE).delete(ack.id);
+    const exactMatch = outboxOperationMatchesAck(record, ack);
+    const recordAccountUid = trimText(record.accountUid);
+    const recordOwnsCurrentWorkspace = Boolean(
+      recordAccountUid
+      && boundAccountUid
+      && recordAccountUid === boundAccountUid
+    );
+
+    if (recordOwnsCurrentWorkspace && Number.isSafeInteger(ack.cloudVersion) && ack.cloudVersion >= 0) {
+      if (record.type === 'workspace') {
+        const workspaceStore = tx.objectStore(WORKSPACE_STORE);
+        const workspaceRecord = await workspaceStore.get(LOCAL_WORKSPACE_ID);
+
+        if (workspaceRecord) {
+          await workspaceStore.put({
+            ...workspaceRecord,
+            cloudVersion: Math.max(normalizeCloudVersion(workspaceRecord.cloudVersion), ack.cloudVersion),
+          });
+        }
+      } else if (record.type === 'upsertDraft' && record.resumeId) {
+        const draftsStore = tx.objectStore(DRAFTS_STORE);
+        const draftRecord = await draftsStore.get(record.resumeId);
+
+        if (draftRecord) {
+          const cloudVersion = Math.max(
+            normalizeCloudVersion(draftRecord.cloudVersion ?? draftRecord.draft?.cloudVersion),
+            ack.cloudVersion,
+          );
+          await draftsStore.put({
+            ...draftRecord,
+            cloudVersion,
+            draft: {
+              ...draftRecord.draft,
+              cloudVersion,
+            },
+          });
+        }
+      }
+
+      if (!exactMatch && record.status === 'pending') {
+        await outboxStore.put({
+          ...record,
+          baseCloudVersion: Math.max(normalizeCloudVersion(record.baseCloudVersion), ack.cloudVersion),
+        });
+      }
+    }
+
+    if (!exactMatch) {
+      continue;
+    }
+
+    await outboxStore.delete(ack.id);
 
     if (record?.type === 'deleteDraft' && record.resumeId) {
-      await tx.objectStore(TOMBSTONES_STORE).delete(record.resumeId);
+      const tombstoneStore = tx.objectStore(TOMBSTONES_STORE);
+      const tombstone = await tombstoneStore.get(record.resumeId);
+
+      if (
+        tombstone
+        && (
+          !trimText(tombstone.accountUid)
+          || trimText(tombstone.accountUid) === recordAccountUid
+        )
+      ) {
+        await tombstoneStore.put({
+          ...tombstone,
+          syncedAt: new Date().toISOString(),
+        });
+      }
     }
   }
 
@@ -1410,7 +1823,7 @@ export async function markOutboxStale(operations, errorMessage = 'Skipped stale 
   await tx.done;
 }
 
-export function createSavedDraftState({ resume, template, localRevision = '' }) {
+export function createSavedDraftState({ resume, template, localRevision = '', cloudVersion = 0 }) {
   const payload = createDraftPayload({
     resume,
     template,
@@ -1423,5 +1836,6 @@ export function createSavedDraftState({ resume, template, localRevision = '' }) 
     template: payload.template,
     savedAt: payload.savedAt,
     localRevision: payload.localRevision,
+    cloudVersion: normalizeCloudVersion(cloudVersion),
   };
 }

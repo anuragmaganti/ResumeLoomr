@@ -113,15 +113,17 @@ function withWorkspaceResumeMeta(workspace, resumeId, updates) {
 }
 
 function normalizeCloudSnapshot(payload) {
-  if (!payload?.workspace || !payload?.drafts || typeof payload.drafts !== 'object') {
+  if (!payload || typeof payload !== 'object') {
     return null;
   }
 
   const workspace = normalizeWorkspaceIndex(payload.workspace);
+  const rawDrafts = payload.drafts && typeof payload.drafts === 'object' ? payload.drafts : {};
+  const tombstones = Array.isArray(payload.tombstones) ? payload.tombstones : [];
   const draftsByResumeId = new Map();
 
   workspace.resumeIds.forEach((resumeId) => {
-    const draft = payload.drafts[resumeId];
+    const draft = rawDrafts[resumeId];
 
     if (draft) {
       const normalizedDraft = normalizeDraftPayload(draft);
@@ -129,11 +131,12 @@ function normalizeCloudSnapshot(payload) {
         resume: normalizedDraft.resume,
         template: normalizedDraft.template,
         savedAt: draft.savedAt || null,
+        cloudVersion: Math.max(0, Number(draft.cloudVersion || 0) || 0),
       });
     }
   });
 
-  if (workspace.resumeIds.length === 0 || draftsByResumeId.size === 0) {
+  if (workspace.resumeIds.length === 0 && tombstones.length === 0) {
     return null;
   }
 
@@ -141,6 +144,8 @@ function normalizeCloudSnapshot(payload) {
     workspace,
     draftsByResumeId,
     activeResumeId: workspace.activeResumeId || workspace.resumeIds[0],
+    tombstones,
+    workspaceCloudVersion: Math.max(0, Number(payload.workspaceVersion || 0) || 0),
   };
 }
 
@@ -158,6 +163,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   const [notice, setNotice] = useState(null);
   const [conflict, setConflict] = useState(null);
   const [syncState, setSyncState] = useState('idle');
+  const [cloudReconcileRequest, setCloudReconcileRequest] = useState(0);
   const [localReady, setLocalReady] = useState(false);
   const hasMounted = useRef(false);
   const skipNextAutosaveRef = useRef(false);
@@ -174,6 +180,11 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   const resumeLoadRunIdRef = useRef(0);
   const editorMutationVersionRef = useRef(0);
   const editorSaveQueueRef = useRef(Promise.resolve());
+  const workspaceSaveQueueRef = useRef(Promise.resolve());
+  const workspaceMutationVersionRef = useRef(0);
+  const cloudReconcileRetryTimerRef = useRef(null);
+  const cloudReconcileRetryCountRef = useRef(0);
+  const cloudReconcileRetryAccountRef = useRef('');
   const draftRevisionByResumeIdRef = useRef(new Map([
     [initialWorkspaceState.workspace.activeResumeId, initialWorkspaceState.draft.localRevision || ''],
   ]));
@@ -198,6 +209,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       template,
       savedAt,
       localRevision,
+      cloudVersion: currentDraftRef.current.cloudVersion || 0,
     };
   }, [resume, savedAt, template]);
 
@@ -282,6 +294,16 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return;
     }
 
+    if (cloudReconcileRetryAccountRef.current !== (user?.uid || '')) {
+      cloudReconcileRetryAccountRef.current = user?.uid || '';
+      cloudReconcileRetryCountRef.current = 0;
+    }
+
+    if (cloudReconcileRetryTimerRef.current) {
+      window.clearTimeout(cloudReconcileRetryTimerRef.current);
+      cloudReconcileRetryTimerRef.current = null;
+    }
+
     const runId = bootstrapRunIdRef.current + 1;
     bootstrapRunIdRef.current = runId;
 
@@ -313,13 +335,25 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
           return;
         }
 
+        const localTombstones = localBundle.tombstones.filter((record) => (
+          !record?.accountUid || record.accountUid === user.uid
+        ));
+        const localPendingOutbox = localBundle.pendingOutbox.filter((operation) => (
+          !operation?.accountUid || operation.accountUid === user.uid
+        ));
+        const localOutboxRecords = (localBundle.outboxRecords || localBundle.pendingOutbox).filter((operation) => (
+          !operation?.accountUid || operation.accountUid === user.uid
+        ));
         const mergeResult = mergeLocalAndCloudWorkspaces({
           localWorkspace: localBundle.workspace,
           localDraftsByResumeId: localBundle.draftsByResumeId,
           cloudWorkspace: cloudSnapshot?.workspace,
           cloudDraftsByResumeId: cloudSnapshot?.draftsByResumeId,
-          tombstones: localBundle.tombstones,
-          pendingOutbox: localBundle.pendingOutbox,
+          tombstones: localTombstones,
+          cloudTombstones: cloudSnapshot?.tombstones,
+          pendingOutbox: localPendingOutbox,
+          outboxRecords: localOutboxRecords,
+          workspaceCloudVersion: cloudSnapshot?.workspaceCloudVersion,
         });
 
         await persistLoginMergedWorkspace({
@@ -371,6 +405,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         const mergeWarning = mergeResult.warnings[0] || '';
 
         await flushCloudQueue({ reason: 'login', immediate: true });
+        cloudReconcileRetryCountRef.current = 0;
 
         if (mergeWarning && bootstrapRunIdRef.current === runId) {
           setNotice({
@@ -385,14 +420,32 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
             tone: 'error',
             message: 'Cloud sync is unavailable. Your local draft is still editable.',
           });
+
+          if (isOnline() && userRef.current?.uid === user.uid) {
+            const retryCount = cloudReconcileRetryCountRef.current;
+            const retryDelay = Math.min(30_000, 2_000 * (2 ** retryCount));
+
+            cloudReconcileRetryCountRef.current = Math.min(retryCount + 1, 4);
+            cloudReconcileRetryTimerRef.current = window.setTimeout(() => {
+              cloudReconcileRetryTimerRef.current = null;
+              setCloudReconcileRequest((request) => request + 1);
+            }, retryDelay);
+          }
         }
       }
     }
 
     bootstrapSignedInSync();
-  // Auth bootstrap should run only when the signed-in account or local readiness changes.
+
+    return () => {
+      if (cloudReconcileRetryTimerRef.current) {
+        window.clearTimeout(cloudReconcileRetryTimerRef.current);
+        cloudReconcileRetryTimerRef.current = null;
+      }
+    };
+  // Reconnect and version conflicts rerun the same no-loss login merge.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authReady, localReady, user?.uid]);
+  }, [authReady, cloudReconcileRequest, localReady, user?.uid]);
 
   useEffect(() => {
     function handleBeforePrint() {
@@ -417,7 +470,11 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
 
   useEffect(() => {
     function handleOnline() {
-      flushCloudQueue({ reason: 'online', immediate: true });
+      if (userRef.current?.uid) {
+        setCloudReconcileRequest((request) => request + 1);
+      } else {
+        requestResumeBackgroundSync();
+      }
     }
 
     function handlePageExit() {
@@ -475,6 +532,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       template: normalizedDraft.template,
       savedAt: nextDraft?.savedAt || null,
       localRevision: nextDraft?.localRevision || normalizedDraft.localRevision || '',
+      cloudVersion: Math.max(0, Number(nextDraft?.cloudVersion || 0) || 0),
     };
     const nextSectionIds = getDraftEditorSectionIds(draftState);
 
@@ -499,27 +557,54 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     return true;
   }
 
-  function commitWorkspace(nextWorkspace, { persist = true, enqueueSync = true, reason = 'workspace' } = {}) {
+  function applyWorkspaceState(nextWorkspace) {
     const normalizedWorkspace = normalizeWorkspaceIndex(nextWorkspace);
     workspaceRef.current = normalizedWorkspace;
     activeResumeIdRef.current = normalizedWorkspace.activeResumeId;
     setWorkspace(normalizedWorkspace);
 
-    if (persist) {
+    return normalizedWorkspace;
+  }
+
+  function commitWorkspace(nextWorkspace, { persist = true, enqueueSync = true, reason = 'workspace' } = {}) {
+    const previousWorkspace = workspaceRef.current;
+    const normalizedWorkspace = applyWorkspaceState(nextWorkspace);
+    const mutationVersion = workspaceMutationVersionRef.current + 1;
+
+    workspaceMutationVersionRef.current = mutationVersion;
+
+    if (!persist) {
+      return Promise.resolve(normalizedWorkspace);
+    }
+
+    const persistOperation = workspaceSaveQueueRef.current.then(() => (
       persistLocalWorkspaceSnapshot({
         workspace: normalizedWorkspace,
         accountUid: userRef.current?.uid || '',
         enqueueSync,
         reason,
-      }).then(() => {
-        if (enqueueSync) {
-          scheduleCloudSync(reason);
-        }
-      }).catch(() => {
-        setSaveState('error');
-        setNotice({ tone: 'error', message: 'Local autosave failed in this browser.' });
-      });
-    }
+      })
+    )).then((persistedWorkspace) => {
+      if (workspaceMutationVersionRef.current === mutationVersion) {
+        applyWorkspaceState(persistedWorkspace);
+      }
+
+      if (enqueueSync) {
+        scheduleCloudSync(reason);
+      }
+
+      return persistedWorkspace;
+    }).catch(() => {
+      if (workspaceMutationVersionRef.current === mutationVersion) {
+        applyWorkspaceState(previousWorkspace);
+      }
+      setSaveState('error');
+      setNotice({ tone: 'error', message: 'Local autosave failed in this browser.' });
+      return null;
+    });
+
+    workspaceSaveQueueRef.current = persistOperation.then(() => undefined, () => undefined);
+    return persistOperation;
   }
 
   function scheduleCloudSync(reason = 'autosave', delay = 2500) {
@@ -561,9 +646,41 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       const idToken = await currentUser.getIdToken();
       await createResumeSyncSession(idToken);
       let result = null;
+      let oversizedResumeDetected = false;
 
       for (let pass = 0; pass < 5; pass += 1) {
         result = await syncLocalOutbox({ idToken, accountUid: currentUser.uid });
+        const editorResumeId = editorDraftResumeIdRef.current;
+
+        if (editorResumeId) {
+          const storedDraft = await readLocalDraft(editorResumeId);
+
+          if (storedDraft.localRevision === editorDraftRevisionRef.current) {
+            currentDraftRef.current = {
+              ...currentDraftRef.current,
+              cloudVersion: storedDraft.cloudVersion || 0,
+            };
+          }
+        }
+
+        if (result.oversizedCount > 0) {
+          oversizedResumeDetected = true;
+          setSyncState('stale');
+          setNotice({
+            tone: 'warning',
+            message: 'One resume is too large for cloud sync. It remains saved in this browser.',
+          });
+
+          if (
+            result.pendingCount > 0
+            && result.staleCount === 0
+            && result.rejectedCount === result.oversizedCount
+          ) {
+            continue;
+          }
+
+          return false;
+        }
 
         if (result.staleCount > 0 || result.status === 'stale') {
           setSyncState('stale');
@@ -571,10 +688,19 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
             tone: 'warning',
             message: 'Some cloud changes were skipped because a newer version already exists. Your local draft is still saved.',
           });
+
+          if (result.requiresReconcile) {
+            setCloudReconcileRequest((request) => request + 1);
+          }
           return false;
         }
 
         if (result.pendingCount === 0) {
+          if (oversizedResumeDetected) {
+            setSyncState('stale');
+            return false;
+          }
+
           setSyncState('saved');
           setNotice((currentNotice) => (currentNotice?.tone === 'error' || currentNotice?.tone === 'warning' ? null : currentNotice));
           return true;
@@ -668,6 +794,25 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
             setNotice({
               tone: 'warning',
               message: 'This resume changed in another tab. Choose which version to keep.',
+            });
+          }
+
+          return result;
+        }
+
+        if (result?.deleted) {
+          await commitWorkspace(result.workspace, { persist: false });
+
+          if (editorDraftResumeIdRef.current === resumeId) {
+            const nextResumeId = result.workspace.activeResumeId;
+
+            if (nextResumeId && nextResumeId !== resumeId) {
+              loadDraftIntoEditor(await readLocalDraft(nextResumeId), { resumeId: nextResumeId });
+            }
+
+            setNotice({
+              tone: 'warning',
+              message: 'This resume was deleted in another tab, so this stale edit was not saved.',
             });
           }
 
@@ -833,7 +978,11 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       activeResumeId: nextResumeId,
     });
 
-    commitWorkspace(nextWorkspace, { reason: 'switch-resume' });
+    const persistedWorkspace = await commitWorkspace(nextWorkspace, { reason: 'switch-resume' });
+
+    if (!persistedWorkspace?.resumeIds.includes(nextResumeId)) {
+      return;
+    }
     const nextDraft = await readLocalDraft(nextResumeId);
 
     if (activeResumeIdRef.current !== nextResumeId || resumeLoadRunIdRef.current !== loadRequestId) {
@@ -843,16 +992,25 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     loadDraftIntoEditor(nextDraft, { resumeId: nextResumeId, loadRequestId });
   }
 
-  function createResume() {
+  async function createResume() {
     if (!canAddResume || conflictRef.current) {
       if (conflictRef.current) {
         setNotice({ tone: 'warning', message: 'Resolve the current save conflict before creating another resume.' });
       }
-      return;
+      return null;
     }
 
-    persistCurrentEditorDraft({ reason: 'create-resume', persistWorkspace: false });
+    const saveResult = await persistCurrentEditorDraft({ reason: 'create-resume', persistWorkspace: false });
+
+    if (saveResult?.conflict || saveResult?.error || saveResult?.skipped) {
+      return null;
+    }
+
     const currentWorkspace = workspaceRef.current;
+
+    if (currentWorkspace.resumeIds.length >= MAX_WORKSPACE_RESUMES) {
+      return null;
+    }
     const existingNames = currentWorkspace.resumeIds.map((resumeId) => currentWorkspace.meta[resumeId]?.name || '');
     const nextResumeId = createWorkspaceResumeId();
     const nextResumeName = createNextResumeName(existingNames);
@@ -868,18 +1026,27 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     });
     const nextWorkspace = applyWorkspaceOrganization(workspaceWithResume, workspaceWithResume.organization);
 
-    commitWorkspace(nextWorkspace, { persist: false });
-    persistLocalDraftSnapshot({
-      resumeId: nextResumeId,
-      workspace: nextWorkspace,
-      draft: nextDraft,
-      accountUid: userRef.current?.uid || '',
-      reason: 'create-resume',
-    }).then(() => scheduleCloudSync('create-resume'));
-    loadDraftIntoEditor(nextDraft, { focusPersonal: true, resumeId: nextResumeId });
+    try {
+      const persisted = await persistLocalDraftSnapshot({
+        resumeId: nextResumeId,
+        workspace: nextWorkspace,
+        draft: nextDraft,
+        accountUid: userRef.current?.uid || '',
+        reason: 'create-resume',
+      });
+
+      await commitWorkspace(persisted.workspace, { persist: false });
+      loadDraftIntoEditor(persisted.draft, { focusPersonal: true, resumeId: nextResumeId });
+      scheduleCloudSync('create-resume');
+      return nextResumeId;
+    } catch {
+      setSaveState('error');
+      setNotice({ tone: 'error', message: 'The new resume could not be saved in this browser.' });
+      return null;
+    }
   }
 
-  function createImportPlaceholderResume({ sourceFileName = '' } = {}) {
+  async function createImportPlaceholderResume({ sourceFileName = '' } = {}) {
     if (!canAddResume || conflictRef.current) {
       setNotice({
         tone: conflictRef.current ? 'warning' : 'error',
@@ -890,8 +1057,17 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return null;
     }
 
-    persistCurrentEditorDraft({ reason: 'import-placeholder', persistWorkspace: false });
+    const saveResult = await persistCurrentEditorDraft({ reason: 'import-placeholder', persistWorkspace: false });
+
+    if (saveResult?.conflict || saveResult?.error || saveResult?.skipped) {
+      return null;
+    }
+
     const currentWorkspace = workspaceRef.current;
+
+    if (currentWorkspace.resumeIds.length >= MAX_WORKSPACE_RESUMES) {
+      return null;
+    }
     const existingNames = currentWorkspace.resumeIds.map((resumeId) => currentWorkspace.meta[resumeId]?.name || '');
     const sourceName = sourceFileName.replace(/\.[^.]+$/, '');
     const nextResumeId = createWorkspaceResumeId();
@@ -908,16 +1084,24 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     });
     const nextWorkspace = applyWorkspaceOrganization(workspaceWithResume, workspaceWithResume.organization);
 
-    commitWorkspace(nextWorkspace, { persist: false });
-    persistLocalDraftSnapshot({
-      resumeId: nextResumeId,
-      workspace: nextWorkspace,
-      draft: nextDraft,
-      accountUid: userRef.current?.uid || '',
-      reason: 'import-placeholder',
-    }).then(() => scheduleCloudSync('import-placeholder'));
-    loadDraftIntoEditor(nextDraft, { focusPersonal: true, resumeId: nextResumeId });
-    return nextResumeId;
+    try {
+      const persisted = await persistLocalDraftSnapshot({
+        resumeId: nextResumeId,
+        workspace: nextWorkspace,
+        draft: nextDraft,
+        accountUid: userRef.current?.uid || '',
+        reason: 'import-placeholder',
+      });
+
+      await commitWorkspace(persisted.workspace, { persist: false });
+      loadDraftIntoEditor(persisted.draft, { focusPersonal: true, resumeId: nextResumeId });
+      scheduleCloudSync('import-placeholder');
+      return nextResumeId;
+    } catch {
+      setSaveState('error');
+      setNotice({ tone: 'error', message: 'The imported resume could not be prepared in this browser.' });
+      return null;
+    }
   }
 
   async function replaceResumeDraft(resumeId, importedDraft, { name } = {}) {
@@ -946,7 +1130,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       activeResumeId: resumeId,
     });
 
-    commitWorkspace(nextWorkspace, { persist: false });
     const persistedDraft = await persistLocalDraftSnapshot({
       resumeId,
       workspace: nextWorkspace,
@@ -954,21 +1137,31 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       accountUid: userRef.current?.uid || '',
       reason: 'import-replace',
     });
+    await commitWorkspace(persistedDraft.workspace, { persist: false });
     scheduleCloudSync('import-replace', 500);
     loadDraftIntoEditor(persistedDraft.draft, { focusPersonal: true, resumeId });
     return true;
   }
 
-  function duplicateActiveResume() {
+  async function duplicateActiveResume() {
     if (!canAddResume || !activeResumeIdRef.current || conflictRef.current) {
       if (conflictRef.current) {
         setNotice({ tone: 'warning', message: 'Resolve the current save conflict before duplicating this resume.' });
       }
-      return;
+      return null;
     }
 
-    persistCurrentEditorDraft({ reason: 'duplicate-resume', persistWorkspace: false });
+    const saveResult = await persistCurrentEditorDraft({ reason: 'duplicate-resume', persistWorkspace: false });
+
+    if (saveResult?.conflict || saveResult?.error || saveResult?.skipped) {
+      return null;
+    }
+
     const currentWorkspace = workspaceRef.current;
+
+    if (currentWorkspace.resumeIds.length >= MAX_WORKSPACE_RESUMES) {
+      return null;
+    }
     const sourceResumeId = activeResumeIdRef.current;
     const nextResumeId = createWorkspaceResumeId();
     const existingNames = currentWorkspace.resumeIds.map((resumeId) => currentWorkspace.meta[resumeId]?.name || '');
@@ -985,15 +1178,24 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       },
     }), nextResumeId, sourceResumeId);
 
-    commitWorkspace(nextWorkspace, { persist: false });
-    persistLocalDraftSnapshot({
-      resumeId: nextResumeId,
-      workspace: nextWorkspace,
-      draft: duplicateDraft,
-      accountUid: userRef.current?.uid || '',
-      reason: 'duplicate-resume',
-    }).then(() => scheduleCloudSync('duplicate-resume'));
-    loadDraftIntoEditor(duplicateDraft, { resumeId: nextResumeId });
+    try {
+      const persisted = await persistLocalDraftSnapshot({
+        resumeId: nextResumeId,
+        workspace: nextWorkspace,
+        draft: duplicateDraft,
+        accountUid: userRef.current?.uid || '',
+        reason: 'duplicate-resume',
+      });
+
+      await commitWorkspace(persisted.workspace, { persist: false });
+      loadDraftIntoEditor(persisted.draft, { resumeId: nextResumeId });
+      scheduleCloudSync('duplicate-resume');
+      return nextResumeId;
+    } catch {
+      setSaveState('error');
+      setNotice({ tone: 'error', message: 'This resume could not be duplicated in this browser.' });
+      return null;
+    }
   }
 
   async function renameResume(resumeId, nextName) {
@@ -1016,14 +1218,17 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       name: trimmedName,
       updatedAt: renamedAt,
     });
-    commitWorkspace(nextWorkspace, { persist: false });
-    await persistLocalWorkspaceSnapshot({
-      workspace: nextWorkspace,
-      accountUid: userRef.current?.uid || '',
+    const persistedWorkspace = await commitWorkspace(nextWorkspace, {
       enqueueSync: true,
       reason: 'rename-resume',
     });
+
+    if (!persistedWorkspace) {
+      return false;
+    }
+
     scheduleCloudSync('rename-resume', 500);
+    return true;
   }
 
   async function createResumeFolder(resumeIds) {
@@ -1139,8 +1344,10 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       editorDraftResumeIdRef.current = '';
     }
 
+    let persistedWorkspace = null;
+
     try {
-      await persistLocalResumeBatchDelete({
+      persistedWorkspace = await persistLocalResumeBatchDelete({
         resumeIds: deletion.deletedResumeIds,
         workspace: deletion.workspace,
         accountUid: userRef.current?.uid || '',
@@ -1155,11 +1362,11 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return false;
     }
 
-    commitWorkspace(deletion.workspace, { persist: false });
+    await commitWorkspace(persistedWorkspace, { persist: false });
     scheduleCloudSync('delete-resumes', 500);
 
     if (deletesActiveResume) {
-      const nextResumeId = deletion.workspace.activeResumeId;
+      const nextResumeId = persistedWorkspace.activeResumeId;
       const nextDraft = await readLocalDraft(nextResumeId);
       loadDraftIntoEditor(nextDraft, { resumeId: nextResumeId });
     }
@@ -1243,20 +1450,26 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       },
     }), nextResumeId, currentConflict.resumeId);
 
-    conflictRef.current = null;
-    setConflict(null);
-    commitWorkspace(nextWorkspace, { persist: false });
-    const persistedCopy = await persistLocalDraftSnapshot({
-      resumeId: nextResumeId,
-      workspace: nextWorkspace,
-      draft: copyDraft,
-      accountUid: userRef.current?.uid || '',
-      reason: 'conflict-copy',
-    });
-    scheduleCloudSync('conflict-copy', 500);
-    loadDraftIntoEditor(persistedCopy.draft, { resumeId: nextResumeId });
-    setNotice({ tone: 'warning', message: 'Your edits were preserved as a separate resume copy.' });
-    return true;
+    try {
+      const persistedCopy = await persistLocalDraftSnapshot({
+        resumeId: nextResumeId,
+        workspace: nextWorkspace,
+        draft: copyDraft,
+        accountUid: userRef.current?.uid || '',
+        reason: 'conflict-copy',
+      });
+
+      conflictRef.current = null;
+      setConflict(null);
+      await commitWorkspace(persistedCopy.workspace, { persist: false });
+      scheduleCloudSync('conflict-copy', 500);
+      loadDraftIntoEditor(persistedCopy.draft, { resumeId: nextResumeId });
+      setNotice({ tone: 'warning', message: 'Your edits were preserved as a separate resume copy.' });
+      return true;
+    } catch {
+      setNotice({ tone: 'error', message: 'The conflict copy could not be saved in this browser.' });
+      return false;
+    }
   }
 
   const actions = {

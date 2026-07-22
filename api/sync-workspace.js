@@ -9,6 +9,7 @@ import {
 import {
   FirebaseAdminError,
   getAdminDb,
+  verifyFirebaseIdTokenHeader,
   verifyRequestUser,
 } from '../server/firebaseAdmin.js';
 import { createHash } from 'node:crypto';
@@ -114,12 +115,44 @@ export function shouldAcceptDraftSyncOperation(operation, cursorData = null, tom
   return !tombstoneExists && shouldAcceptSyncOperation(operation, cursorData);
 }
 
-function createOperationAck(operation) {
-  return {
+function getBaseCloudVersion(operation) {
+  const version = Number(operation?.baseCloudVersion);
+
+  return Number.isSafeInteger(version) && version >= 0 ? version : null;
+}
+
+export function shouldAcceptCloudVersion(operation, currentVersion = 0) {
+  const normalizedCurrentVersion = Number.isSafeInteger(Number(currentVersion))
+    ? Math.max(0, Number(currentVersion))
+    : 0;
+  const baseCloudVersion = getBaseCloudVersion(operation);
+
+  // A brand-new cloud document is the only safe legacy rollout case. Existing
+  // documents require an explicit precondition so another browser cannot win
+  // merely because it has a different client cursor.
+  if (baseCloudVersion === null) {
+    return normalizedCurrentVersion === 0;
+  }
+
+  return baseCloudVersion === normalizedCurrentVersion;
+}
+
+function createOperationAck(operation, { cloudVersion = null, reason = '' } = {}) {
+  const ack = {
     id: operation.id,
     operationVersion: Number(operation.operationVersion || 0) || 0,
     localRevision: typeof operation.localRevision === 'string' ? operation.localRevision : '',
   };
+
+  if (cloudVersion !== null && Number.isSafeInteger(Number(cloudVersion)) && Number(cloudVersion) >= 0) {
+    ack.cloudVersion = Number(cloudVersion);
+  }
+
+  if (reason) {
+    ack.reason = reason;
+  }
+
+  return ack;
 }
 
 function getOperationAccountUid(operation) {
@@ -147,6 +180,38 @@ export function partitionSyncOperationsByAccount(operations, accountUid) {
     scopedOperations,
     rejectedOperations,
   };
+}
+
+export function partitionOversizedSyncOperations(operations) {
+  const acceptedOperations = [];
+  const rejectedOperations = [];
+
+  operations.forEach((operation) => {
+    if (operation.type !== 'upsertDraft') {
+      acceptedOperations.push(operation);
+      return;
+    }
+
+    try {
+      createDraftDoc({
+        resumeId: operation.resumeId,
+        workspace: operation.workspace,
+        draft: operation.draft,
+        version: Math.max(1, Number(operation.baseCloudVersion || 0) + 1),
+      });
+      acceptedOperations.push(operation);
+    } catch (error) {
+      if (error?.code !== 'sync/payload-too-large') {
+        throw error;
+      }
+
+      rejectedOperations.push(createOperationAck(operation, {
+        reason: 'payload-too-large',
+      }));
+    }
+  });
+
+  return { acceptedOperations, rejectedOperations };
 }
 
 export function createWorkspaceDoc(workspace, { deviceId = 'browser', sessionId = 'background-sync', updatedAt = new Date().toISOString(), version = Date.now() } = {}) {
@@ -247,6 +312,7 @@ function cloudDocToDraft(data) {
     resume: normalizedDraft.resume,
     template: normalizedDraft.template,
     savedAt: data?.savedAt || data?.updatedAt || null,
+    cloudVersion: Math.max(0, Number(data?.version || 0) || 0),
   };
 }
 
@@ -310,7 +376,11 @@ async function readCloudSnapshot(uid) {
     db.collection(`users/${uid}/resumes`).get(),
     db.collection(`users/${uid}/resumeTombstones`).get(),
   ]);
-  const tombstonedResumeIds = new Set(tombstonesSnapshot.docs.map((doc) => doc.id));
+  const tombstones = tombstonesSnapshot.docs.map((doc) => ({
+    ...doc.data(),
+    resumeId: doc.id,
+  }));
+  const tombstonedResumeIds = new Set(tombstones.map((record) => record.resumeId));
   const resumeDocs = sortResumeDocsByUpdatedAt(
     resumesSnapshot.docs
       .map((doc) => ({ id: doc.id, data: doc.data() }))
@@ -328,7 +398,7 @@ async function readCloudSnapshot(uid) {
       ]
     : resumeDocs.map((record) => record.id);
 
-  if (orderedResumeIds.length === 0) {
+  if (orderedResumeIds.length === 0 && tombstones.length === 0) {
     return null;
   }
 
@@ -355,13 +425,13 @@ async function readCloudSnapshot(uid) {
     organization: storedWorkspace?.organization,
   });
 
-  await workspaceRef.set(createWorkspaceDoc(workspace), { merge: false });
-
   return {
     workspace,
+    workspaceVersion: Math.max(0, Number(workspaceSnapshot.data()?.version || 0) || 0),
     drafts: Object.fromEntries(
       workspace.resumeIds.map((resumeId) => [resumeId, draftsByResumeId.get(resumeId)]).filter(([, draft]) => draft),
     ),
+    tombstones,
   };
 }
 
@@ -447,8 +517,10 @@ async function applySyncOperations(uid, operations) {
 
     if (workspaceWrite) {
       const currentVersion = Number(workspaceSnapshot?.exists ? workspaceSnapshot.data()?.version || 0 : 0);
+      const cursorIsCurrent = shouldAcceptSyncOperation(workspaceWrite.operation, workspaceCursorSnapshot?.data?.());
+      const cloudVersionMatches = shouldAcceptCloudVersion(workspaceWrite.operation, currentVersion);
 
-      if (shouldAcceptSyncOperation(workspaceWrite.operation, workspaceCursorSnapshot?.data?.())) {
+      if (cursorIsCurrent && cloudVersionMatches) {
         const acceptedDeleteResumeIds = deleteWrites
           .filter((write, index) => shouldAcceptSyncOperation(write.operation, deleteCursorSnapshots[index]?.data?.()))
           .map((write) => write.operation.resumeId);
@@ -463,22 +535,31 @@ async function applySyncOperations(uid, operations) {
           version: currentVersion + 1,
         }), { merge: false });
         writeCursor(workspaceWrite);
-        syncedOperations.push(createOperationAck(workspaceWrite.operation));
+        syncedOperations.push(createOperationAck(workspaceWrite.operation, {
+          cloudVersion: currentVersion + 1,
+        }));
       } else {
-        staleOperations.push(createOperationAck(workspaceWrite.operation));
+        staleOperations.push(createOperationAck(workspaceWrite.operation, {
+          cloudVersion: currentVersion,
+          reason: cloudVersionMatches ? 'duplicate-operation' : 'version-conflict',
+        }));
       }
     }
 
     draftWrites.forEach((write, index) => {
       const currentSnapshot = draftSnapshots[index];
       const currentVersion = Number(currentSnapshot.exists ? currentSnapshot.data()?.version || 0 : 0);
+      const cursorIsCurrent = shouldAcceptSyncOperation(
+        write.operation,
+        draftCursorSnapshots[index]?.data?.(),
+      );
+      const cloudVersionMatches = shouldAcceptCloudVersion(write.operation, currentVersion);
+      const tombstoneExists = draftTombstoneSnapshots[index].exists;
 
       if (
-        shouldAcceptDraftSyncOperation(
-          write.operation,
-          draftCursorSnapshots[index]?.data?.(),
-          draftTombstoneSnapshots[index].exists,
-        )
+        !tombstoneExists
+        && cursorIsCurrent
+        && cloudVersionMatches
       ) {
         transaction.set(write.ref, createDraftDoc({
           resumeId: write.operation.resumeId,
@@ -491,9 +572,16 @@ async function applySyncOperations(uid, operations) {
           version: currentVersion + 1,
         }), { merge: false });
         writeCursor(write);
-        syncedOperations.push(createOperationAck(write.operation));
+        syncedOperations.push(createOperationAck(write.operation, {
+          cloudVersion: currentVersion + 1,
+        }));
       } else {
-        staleOperations.push(createOperationAck(write.operation));
+        staleOperations.push(createOperationAck(write.operation, {
+          cloudVersion: currentVersion,
+          reason: tombstoneExists
+            ? 'deleted-remotely'
+            : (cloudVersionMatches ? 'duplicate-operation' : 'version-conflict'),
+        }));
       }
     });
 
@@ -508,9 +596,13 @@ async function applySyncOperations(uid, operations) {
           localRevision: write.operation.localRevision || '',
         }, { merge: false });
         writeCursor(write);
-        syncedOperations.push(createOperationAck(write.operation));
+        syncedOperations.push(createOperationAck(write.operation, {
+          cloudVersion: 0,
+        }));
       } else {
-        staleOperations.push(createOperationAck(write.operation));
+        staleOperations.push(createOperationAck(write.operation, {
+          reason: 'duplicate-operation',
+        }));
       }
     });
   });
@@ -520,7 +612,9 @@ async function applySyncOperations(uid, operations) {
 
 export default async function handler(req, res) {
   try {
-    const decodedUser = await verifyRequestUser(req);
+    const decodedUser = req.method === 'GET'
+      ? await verifyFirebaseIdTokenHeader(req.headers.authorization)
+      : await verifyRequestUser(req);
 
     if (req.method === 'GET') {
       const snapshot = await readCloudSnapshot(decodedUser.uid);
@@ -577,12 +671,14 @@ export default async function handler(req, res) {
       return;
     }
 
-    const {
-      scopedOperations,
-      rejectedOperations,
-    } = partitionSyncOperationsByAccount(operations, decodedUser.uid);
-    const { syncedOperations, staleOperations } = scopedOperations.length > 0
-      ? await applySyncOperations(decodedUser.uid, scopedOperations)
+    const accountPartition = partitionSyncOperationsByAccount(operations, decodedUser.uid);
+    const sizePartition = partitionOversizedSyncOperations(accountPartition.scopedOperations);
+    const rejectedOperations = [
+      ...accountPartition.rejectedOperations,
+      ...sizePartition.rejectedOperations,
+    ];
+    const { syncedOperations, staleOperations } = sizePartition.acceptedOperations.length > 0
+      ? await applySyncOperations(decodedUser.uid, sizePartition.acceptedOperations)
       : { syncedOperations: [], staleOperations: [] };
 
     sendJson(res, 200, {

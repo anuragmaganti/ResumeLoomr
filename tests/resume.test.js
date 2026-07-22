@@ -109,6 +109,7 @@ import {
 } from '../src/lib/localWorkspaceDb.js';
 import {
   getOperationAcksFromResponse,
+  partitionClientSyncOperations,
 } from '../src/lib/backgroundSync.js';
 import {
   cloudWorkspaceFromDoc,
@@ -116,9 +117,11 @@ import {
   getSyncCursorId,
   mergeCloudWorkspaceForWrite,
   operationBelongsToSyncAccount,
+  partitionOversizedSyncOperations,
   partitionSyncOperationsByAccount,
   preservePermanentSampleDismissal,
   shouldAcceptDraftSyncOperation,
+  shouldAcceptCloudVersion,
   shouldAcceptSyncOperation,
 } from '../api/sync-workspace.js';
 import {
@@ -3164,6 +3167,121 @@ test('server sync cursors reject older same-browser operations without using wal
   assert.equal(shouldAcceptSyncOperation(operation, { lastSequence: 8 }), false);
 });
 
+test('cloud document versions reject stale writes from a different browser', () => {
+  assert.equal(shouldAcceptCloudVersion({ baseCloudVersion: 4 }, 4), true);
+  assert.equal(shouldAcceptCloudVersion({ baseCloudVersion: 3 }, 4), false);
+  assert.equal(shouldAcceptCloudVersion({}, 4), false);
+  assert.equal(shouldAcceptCloudVersion({}, 0), true);
+});
+
+test('remote tombstones remove deleted resumes without requeueing an upsert', () => {
+  const localWorkspace = createWorkspace(['resume-1', 'resume-2'], { activeResumeId: 'resume-2' });
+  const cloudWorkspace = createWorkspace(['resume-1'], { activeResumeId: 'resume-1' });
+  const sharedResumeOne = createDraft('Resume one');
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace,
+    localDraftsByResumeId: new Map([
+      ['resume-1', sharedResumeOne],
+      ['resume-2', createDraft('Resume two')],
+    ]),
+    cloudWorkspace,
+    cloudDraftsByResumeId: new Map([['resume-1', {
+      ...sharedResumeOne,
+      cloudVersion: 9,
+    }]]),
+    cloudTombstones: [{ resumeId: 'resume-2', deletedAt: '2026-07-21T12:00:00.000Z' }],
+    workspaceCloudVersion: 6,
+  });
+
+  assert.deepEqual(result.workspace.resumeIds, ['resume-1']);
+  assert.equal(result.draftsByResumeId.has('resume-2'), false);
+  assert.equal(result.syncPlan.upsertResumeIds.includes('resume-2'), false);
+  assert.equal(result.tombstones.some((record) => record.resumeId === 'resume-2'), true);
+  assert.equal(result.workspaceCloudVersion, 6);
+  assert.equal(result.draftsByResumeId.get('resume-1').cloudVersion, 9);
+});
+
+test('remote deletion preserves an unsynced local edit as a conflict copy', () => {
+  const localWorkspace = createWorkspace(['resume-1', 'resume-2'], {
+    activeResumeId: 'resume-2',
+    names: { 'resume-2': 'Offline edit' },
+  });
+  const cloudWorkspace = createWorkspace(['resume-1']);
+  const sharedResumeOne = createDraft('Resume one');
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace,
+    localDraftsByResumeId: new Map([
+      ['resume-1', sharedResumeOne],
+      ['resume-2', createDraft('Unsynced local version')],
+    ]),
+    cloudWorkspace,
+    cloudDraftsByResumeId: new Map([['resume-1', sharedResumeOne]]),
+    cloudTombstones: [{ resumeId: 'resume-2', deletedAt: '2026-07-21T12:00:00.000Z' }],
+    outboxRecords: [{
+      id: 'account-a:upsertDraft:resume-2',
+      type: 'upsertDraft',
+      resumeId: 'resume-2',
+      status: 'stale',
+    }],
+  });
+  const preservedCopyId = result.workspace.resumeIds.find((resumeId) => (
+    resumeId !== 'resume-1'
+  ));
+
+  assert.notEqual(preservedCopyId, 'resume-2');
+  assert.equal(result.workspace.resumeIds.includes('resume-2'), false);
+  assert.equal(result.draftsByResumeId.get(preservedCopyId).resume.personal.name, 'Unsynced local version');
+  assert.equal(result.syncPlan.upsertResumeIds.includes(preservedCopyId), true);
+  assert.match(result.warnings[0], /preserved as a separate copy/i);
+});
+
+test('remote deletion of the final clean resume leaves a fresh local workspace', () => {
+  const result = mergeLocalAndCloudWorkspaces({
+    localWorkspace: createWorkspace(['resume-1']),
+    localDraftsByResumeId: new Map([['resume-1', createDraft('')]]),
+    cloudTombstones: [{ resumeId: 'resume-1', deletedAt: '2026-07-21T12:00:00.000Z' }],
+  });
+
+  assert.equal(result.workspace.resumeIds.length, 1);
+  assert.notEqual(result.workspace.resumeIds[0], 'resume-1');
+  assert.equal(result.draftsByResumeId.has(result.workspace.resumeIds[0]), true);
+  assert.deepEqual(result.syncPlan.upsertResumeIds, [result.workspace.resumeIds[0]]);
+});
+
+test('one oversized draft does not block valid operations in the same sync batch', () => {
+  const workspace = createWorkspace(['resume-1'], { activeResumeId: 'resume-1' });
+  const oversizedDraft = createDraft('Large resume');
+
+  oversizedDraft.resume.personal.aboutMe = 'x'.repeat(900_000);
+
+  const result = partitionOversizedSyncOperations([
+    {
+      id: 'workspace',
+      type: 'workspace',
+      workspace,
+      accountUid: 'account-a',
+    },
+    {
+      id: 'upsertDraft:resume-1',
+      type: 'upsertDraft',
+      resumeId: 'resume-1',
+      workspace,
+      draft: oversizedDraft,
+      operationVersion: 2,
+      localRevision: 'large-draft',
+      accountUid: 'account-a',
+    },
+  ]);
+
+  assert.deepEqual(result.acceptedOperations.map((operation) => operation.id), ['workspace']);
+  assert.deepEqual(result.rejectedOperations, [{
+    id: 'upsertDraft:resume-1',
+    operationVersion: 2,
+    localRevision: 'large-draft',
+    reason: 'payload-too-large',
+  }]);
+});
+
 test('draft upserts and deletes share a cursor and permanent tombstones block resurrection', () => {
   const upsert = {
     id: 'upsertDraft:r1',
@@ -3285,6 +3403,37 @@ test('sync response acknowledgement mapping preserves sent operation descriptors
     syncedOperationIds: ['upsertDraft:r1'],
   }, operations, 'syncedOperations', 'syncedOperationIds'), [
     { id: 'upsertDraft:r1', operationVersion: 20, localRevision: 'draft-rev' },
+  ]);
+});
+
+test('client sync batching isolates impossible operations and stays below the request budget', () => {
+  const createOperation = (id, payloadSize) => ({
+    id,
+    type: 'upsertDraft',
+    resumeId: id,
+    operationVersion: Number(id.replace(/\D/g, '')) || 1,
+    localRevision: `revision-${id}`,
+    draft: { payload: 'x'.repeat(payloadSize) },
+  });
+  const operations = [
+    createOperation('resume-1', 1_050_000),
+    createOperation('resume-2', 800_000),
+    createOperation('resume-3', 800_000),
+    createOperation('resume-4', 800_000),
+    createOperation('resume-5', 800_000),
+  ];
+  const result = partitionClientSyncOperations(operations);
+
+  assert.deepEqual(result.oversizedOperations, [{
+    id: 'resume-1',
+    operationVersion: 1,
+    localRevision: 'revision-resume-1',
+    reason: 'payload-too-large',
+  }]);
+  assert.deepEqual(result.operations.map((operation) => operation.id), [
+    'resume-2',
+    'resume-3',
+    'resume-4',
   ]);
 });
 
