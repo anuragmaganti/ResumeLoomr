@@ -7,10 +7,8 @@ import {
   FirebaseAdminError,
   verifyFirebaseIdTokenHeader,
 } from './firebaseAdmin.js';
-import {
-  getPreviewModel,
-  normalizeDraftPayload,
-} from '../src/lib/resume.js';
+import { normalizeDraftPayload } from '../src/lib/resume.js';
+import { getPreviewModel } from '../src/lib/resumePreviewModel.js';
 import { trimText } from '../src/lib/text.js';
 import { sanitizeWorkspaceResumeName } from '../src/lib/workspace.js';
 

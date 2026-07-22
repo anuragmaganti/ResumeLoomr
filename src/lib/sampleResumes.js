@@ -2,7 +2,6 @@ import {
   awardEntryHasContent,
   certificationEntryHasContent,
   educationEntryHasContent,
-  getPreviewModel,
   languageEntryHasContent,
   normalizeResume,
   projectEntryHasContent,
@@ -10,6 +9,7 @@ import {
   roleEntryHasContent,
   skillsEntryHasContent,
 } from './resume.js';
+import { getPreviewModel } from './resumePreviewModel.js';
 import { trimText } from './text.js';
 
 const SAMPLE_RESUMES = [

@@ -18,7 +18,6 @@ import {
   dismissSampleInformation,
   getDefaultEntryHeaderLayout,
   getEffectivePersonalAlignment,
-  getPreviewModel,
   materializeAndReorderSectionBlockEntries,
   moveSectionHeaderField,
   moveSectionBlockEntry,
@@ -50,8 +49,9 @@ import {
   updateSectionBlockEntry,
   updateSectionBlockTextList,
   updateSectionTitle,
-  validateResume,
 } from '../src/lib/resume.js';
+import { getPreviewModel } from '../src/lib/resumePreviewModel.js';
+import { validateResume } from '../src/lib/resumeValidation.js';
 import { createFreshWorkspaceDraft } from '../src/lib/workspaceDraft.js';
 import {
   MAX_WORKSPACE_RESUME_NAME_LENGTH,

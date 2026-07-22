@@ -11,7 +11,6 @@ import {
   commitSectionTitle,
   createEmptyResume,
   dismissSampleInformation,
-  getPreviewModel,
   moveResumeSectionBlock,
   moveSectionBlockEducationCustomSection,
   moveSectionBlockEducationProgram,
@@ -42,8 +41,9 @@ import {
   updateSectionBlockEntry,
   updateSectionBlockTextList,
   updateSectionTitle,
-  validateResume,
 } from '../lib/resume.js';
+import { getPreviewModel } from '../lib/resumePreviewModel.js';
+import { validateResume } from '../lib/resumeValidation.js';
 import {
   MAX_WORKSPACE_RESUMES,
   createDuplicateResumeName,
