@@ -30,6 +30,10 @@ import {
   partitionClientSyncOperations,
 } from '../src/lib/backgroundSync.js';
 import {
+  runBrowserDisconnect,
+  runBrowserSignOut,
+} from '../src/lib/browserAccountLifecycle.js';
+import {
   cloudWorkspaceFromDoc,
   createWorkspaceDoc,
   getSyncCursorId,
@@ -726,17 +730,161 @@ test('draft upserts and deletes share a cursor and permanent tombstones block re
   assert.equal(shouldAcceptSyncOperation(upsert, { lastSequence: 8 }), false);
 });
 
-test('local persistence serializes editor saves and awaits them before switching or clearing', () => {
+test('local persistence serializes editor saves and database clears', () => {
   const builderHook = fs.readFileSync('src/hooks/useResumeBuilder.js', 'utf8');
-  const appComponent = fs.readFileSync('src/App.jsx', 'utf8');
   const browserConnection = fs.readFileSync('src/lib/browserConnection.js', 'utf8');
 
   assert.match(builderHook, /const editorSaveQueueRef = useRef\(Promise\.resolve\(\)\)/);
   assert.match(builderHook, /const saveResult = await persistCurrentEditorDraft\(\{ reason: 'switch-resume'/);
   assert.match(builderHook, /saveResult\?\.conflict \|\|\s*saveResult\?\.error \|\|\s*saveResult\?\.skipped/);
-  assert.match(appComponent, /const flushedDraft = await flushActiveCloudDraft\(\{ reason: 'signout' \}\)/);
-  assert.match(appComponent, /await clearLocalResumeWorkspaceData\(\)/);
   assert.match(browserConnection, /await deleteLocalWorkspaceDatabase\(\)/);
+});
+
+test('sign-out refuses to clear browser data until cloud sync completes', async () => {
+  const calls = [];
+  const result = await runBrowserSignOut({
+    user: { uid: 'account-a' },
+    allowSignedOutEditing: false,
+    flushActiveCloudDraft: async ({ reason }) => {
+      calls.push(`flush:${reason}`);
+      return false;
+    },
+    requestBackgroundSync: async () => calls.push('background-sync'),
+    setSessionCleanupRequested: async () => calls.push('cleanup-request'),
+    clearSyncSession: async () => calls.push('clear-session'),
+    signOut: async () => calls.push('sign-out'),
+    clearLocalWorkspace: async () => calls.push('clear-local'),
+    reloadBrowser: () => calls.push('reload'),
+  });
+
+  assert.equal(result.status, 'cloud-sync-incomplete');
+  assert.deepEqual(calls, ['flush:signout']);
+});
+
+test('signed-out editing defers session cleanup when cloud sync remains queued', async () => {
+  const calls = [];
+  const result = await runBrowserSignOut({
+    user: { uid: 'account-a' },
+    allowSignedOutEditing: true,
+    flushActiveCloudDraft: async ({ reason }) => {
+      calls.push(`flush:${reason}`);
+      return false;
+    },
+    requestBackgroundSync: async () => calls.push('background-sync'),
+    setSessionCleanupRequested: async (uid, requested) => calls.push(`cleanup:${uid}:${requested}`),
+    clearSyncSession: async () => calls.push('clear-session'),
+    signOut: async () => {
+      calls.push('sign-out');
+      return true;
+    },
+    clearLocalWorkspace: async () => calls.push('clear-local'),
+    reloadBrowser: () => calls.push('reload'),
+  });
+
+  assert.deepEqual(result, { status: 'signed-out', cloudSyncCompleted: false });
+  assert.deepEqual(calls, [
+    'flush:signout',
+    'cleanup:account-a:true',
+    'background-sync',
+    'sign-out',
+  ]);
+});
+
+test('remove-on-sign-out clears data only after cloud, session, and auth succeed', async () => {
+  const calls = [];
+  const result = await runBrowserSignOut({
+    user: { uid: 'account-a' },
+    allowSignedOutEditing: false,
+    flushActiveCloudDraft: async ({ reason }) => {
+      calls.push(`flush:${reason}`);
+      return true;
+    },
+    requestBackgroundSync: async () => calls.push('background-sync'),
+    setSessionCleanupRequested: async () => calls.push('cleanup-request'),
+    clearSyncSession: async () => {
+      calls.push('clear-session');
+      return true;
+    },
+    signOut: async () => {
+      calls.push('sign-out');
+      return true;
+    },
+    clearLocalWorkspace: async () => calls.push('clear-local'),
+    reloadBrowser: () => calls.push('reload'),
+  });
+
+  assert.deepEqual(result, { status: 'signed-out', cloudSyncCompleted: true });
+  assert.deepEqual(calls, [
+    'flush:signout',
+    'clear-session',
+    'sign-out',
+    'clear-local',
+    'reload',
+  ]);
+});
+
+test('failed deferred sign-out cancels the pending session cleanup request', async () => {
+  const calls = [];
+  const result = await runBrowserSignOut({
+    user: { uid: 'account-a' },
+    allowSignedOutEditing: true,
+    flushActiveCloudDraft: async () => false,
+    requestBackgroundSync: async () => calls.push('background-sync'),
+    setSessionCleanupRequested: async (uid, requested) => calls.push(`cleanup:${uid}:${requested}`),
+    clearSyncSession: async () => calls.push('clear-session'),
+    signOut: async () => false,
+    clearLocalWorkspace: async () => calls.push('clear-local'),
+    reloadBrowser: () => calls.push('reload'),
+  });
+
+  assert.equal(result.status, 'auth-signout-failed');
+  assert.deepEqual(calls, [
+    'cleanup:account-a:true',
+    'background-sync',
+    'cleanup:account-a:false',
+  ]);
+});
+
+test('browser disconnect never clears local data after an incomplete cloud flush', async () => {
+  const calls = [];
+  const result = await runBrowserDisconnect({
+    user: { uid: 'account-a' },
+    flushActiveCloudDraft: async ({ reason }) => {
+      calls.push(`flush:${reason}`);
+      return false;
+    },
+    disconnectAuth: async () => calls.push('disconnect-auth'),
+    clearBrowserData: async () => calls.push('clear-browser'),
+    reloadBrowser: () => calls.push('reload'),
+  });
+
+  assert.equal(result.status, 'cloud-sync-incomplete');
+  assert.deepEqual(calls, ['flush:disconnect-browser']);
+});
+
+test('browser disconnect clears local data only after the auth connection is removed', async () => {
+  const calls = [];
+  const result = await runBrowserDisconnect({
+    user: { uid: 'account-a' },
+    flushActiveCloudDraft: async ({ reason }) => {
+      calls.push(`flush:${reason}`);
+      return true;
+    },
+    disconnectAuth: async () => {
+      calls.push('disconnect-auth');
+      return true;
+    },
+    clearBrowserData: async () => calls.push('clear-browser'),
+    reloadBrowser: () => calls.push('reload'),
+  });
+
+  assert.equal(result.status, 'disconnected');
+  assert.deepEqual(calls, [
+    'flush:disconnect-browser',
+    'disconnect-auth',
+    'clear-browser',
+    'reload',
+  ]);
 });
 
 test('outbox account filtering keeps cloud sync scoped to the signed-in user', () => {

@@ -15,28 +15,15 @@ import EditorPanel from './components/editorPanel';
 import SeparatorSettingsPopup from './components/separatorSettingsPopup';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
+import { useAccountSwitchGate } from './hooks/useAccountSwitchGate.js';
 import { usePreviewEditorController } from './hooks/usePreviewEditorController.js';
 import { useSeparatorSettingsController } from './hooks/useSeparatorSettingsController.js';
+import { useSignOutController } from './hooks/useSignOutController.js';
 import { importResumeFile } from './lib/importResume.js';
-import {
-  requestResumeBackgroundSync,
-} from './lib/backgroundSync.js';
-import { clearResumeSyncSession } from './lib/syncSession.js';
-import {
-  readDurableLocalBrowserContext,
-  setSyncSessionCleanupRequested,
-} from './lib/localWorkspaceDb.js';
 import {
   createMixedSamplePreviewModel,
   createSamplePlaceholderResolver,
 } from './lib/sampleResumes.js';
-import {
-  clearBrowserResumeConnectionData,
-  clearLocalResumeWorkspaceData,
-  readConnectedAccount,
-  readSignedOutEditingPreference,
-  writeSignedOutEditingPreference,
-} from './lib/browserConnection.js';
 
 const THEME_STORAGE_KEY = 'resumeloomr:theme';
 const EMPTY_SAMPLE_ORDER_OVERRIDES = {};
@@ -82,21 +69,11 @@ function App() {
   const previewPanelRef = useRef(null);
   const documentTitleRef = useRef('ResumeLoomr | Professional Resume Builder');
   const authUserRef = useRef(null);
-  const preSignInConnectedAccountRef = useRef(readConnectedAccount());
   const [editorStageMaxHeight, setEditorStageMaxHeight] = useState(null);
   const auth = useFirebaseAuth();
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
-  const [isSignedOutPromptOpen, setIsSignedOutPromptOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importState, setImportState] = useState({ status: 'idle' });
-  const [isSignOutInProgress, setIsSignOutInProgress] = useState(false);
-  const [accountSwitchResolutionUid, setAccountSwitchResolutionUid] = useState('');
-  const [durableAccountContext, setDurableAccountContext] = useState(() => ({
-    checkedForUid: '',
-    previousAccount: preSignInConnectedAccountRef.current,
-    hasWorkspaceData: false,
-  }));
-  const [signedOutEditingPreference, setSignedOutEditingPreference] = useState(() => readSignedOutEditingPreference());
   const [previewLayout, setPreviewLayout] = useState({ mode: 'fitPage', width: 0 });
   const [emptyChoiceNudgeCount, setEmptyChoiceNudgeCount] = useState(0);
   const [isPrintRendering, setIsPrintRendering] = useState(false);
@@ -112,18 +89,18 @@ function App() {
 
     return 'light';
   });
-  const accountContextReady = !auth.user || durableAccountContext.checkedForUid === auth.user.uid;
-  const pendingAccountSwitchAccount = auth.user && durableAccountContext.previousAccount?.uid !== auth.user.uid
-    ? durableAccountContext.previousAccount
-    : null;
-  const isAccountSwitchPending = Boolean(
-    auth.user &&
-    accountContextReady &&
-    pendingAccountSwitchAccount?.uid &&
-    accountSwitchResolutionUid !== auth.user.uid &&
-    durableAccountContext.hasWorkspaceData
-  );
-  const builderUser = !accountContextReady || isAccountSwitchPending ? null : auth.user;
+  const {
+    builderUser,
+    clearLocalData: clearAccountSwitchLocalData,
+    importLocalData: importAccountSwitchLocalData,
+    isClearing: isClearingAccountSwitchData,
+    isSwitchPending: isAccountSwitchPending,
+    previousAccount: pendingAccountSwitchAccount,
+  } = useAccountSwitchGate({
+    user: auth.user,
+    authReady: auth.authReady,
+    connectedAccount: auth.connectedAccount,
+  });
   const {
     resume,
     template,
@@ -171,6 +148,22 @@ function App() {
   } = useResumeBuilder({
     user: builderUser,
     authReady: auth.authReady,
+  });
+  const {
+    cancelSignOut: handleSignOutPromptCancel,
+    chooseSignOutBehavior: handleSignedOutPromptChoice,
+    disconnectBrowser: handleDisconnectBrowser,
+    editingPreference: signedOutEditingPreference,
+    isDisconnecting,
+    isPromptOpen: isSignedOutPromptOpen,
+    isSigningOut: isSignOutInProgress,
+    requestSignOut: handleSignOut,
+    updateEditingPreference: updateSignedOutEditingPreference,
+  } = useSignOutController({
+    auth,
+    flushActiveCloudDraft,
+    showNotice,
+    syncState,
   });
   const sampleOrderOverrides = resume.sampleDisplay?.textListOrders || EMPTY_SAMPLE_ORDER_OVERRIDES;
   const sampleDisplay = resume.sampleDisplay || {};
@@ -239,59 +232,6 @@ function App() {
   useEffect(() => {
     authUserRef.current = auth.user;
   }, [auth.user]);
-
-  useEffect(() => {
-    if (!auth.user) {
-      preSignInConnectedAccountRef.current = auth.connectedAccount;
-      setAccountSwitchResolutionUid('');
-    }
-  }, [auth.connectedAccount, auth.user]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!auth.authReady) {
-      return undefined;
-    }
-
-    readDurableLocalBrowserContext()
-      .then((context) => {
-        if (cancelled) {
-          return;
-        }
-
-        const previousAccount = context.accountBinding || preSignInConnectedAccountRef.current || auth.connectedAccount;
-
-        if (!auth.user && previousAccount) {
-          preSignInConnectedAccountRef.current = previousAccount;
-        }
-
-        setDurableAccountContext({
-          checkedForUid: auth.user?.uid || '',
-          previousAccount,
-          hasWorkspaceData: context.hasWorkspaceData,
-        });
-      })
-      .catch(() => {
-        if (!cancelled) {
-          const previousAccount = preSignInConnectedAccountRef.current || auth.connectedAccount;
-
-          setDurableAccountContext({
-            checkedForUid: auth.user?.uid || '',
-            previousAccount,
-            hasWorkspaceData: Boolean(
-              auth.user &&
-              previousAccount?.uid &&
-              previousAccount.uid !== auth.user.uid
-            ),
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [auth.authReady, auth.connectedAccount, auth.user]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -443,161 +383,11 @@ function App() {
     }
   }
 
-  useEffect(() => {
-    if (!auth.user || signedOutEditingPreference.allow) {
-      return undefined;
-    }
-
-    function handleBeforeUnload(event) {
-      if (syncState !== 'syncing' && syncState !== 'error' && syncState !== 'offline') {
-        return;
-      }
-
-      event.preventDefault();
-      event.returnValue = '';
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [auth.user, signedOutEditingPreference.allow, syncState]);
-
-  function updateSignedOutEditingPreference(nextPreference) {
-    setSignedOutEditingPreference(writeSignedOutEditingPreference(nextPreference));
-  }
-
-  async function completeSignOut({ allowSignedOutEditing }) {
-    setIsSignOutInProgress(true);
-
-    try {
-      const accountUid = auth.user?.uid || '';
-      let cloudSyncCompleted = true;
-
-      if (!allowSignedOutEditing) {
-        const flushedDraft = await flushActiveCloudDraft({ reason: 'signout' });
-
-        if (auth.user && !flushedDraft) {
-          showNotice({
-            tone: 'error',
-            message: 'Cloud sync did not finish, so this browser was not cleared. Reconnect and try again.',
-          });
-          return;
-        }
-      } else {
-        cloudSyncCompleted = await flushActiveCloudDraft({ reason: 'signout' });
-
-        if (accountUid && !cloudSyncCompleted) {
-          await setSyncSessionCleanupRequested(accountUid, true);
-          await requestResumeBackgroundSync();
-        }
-      }
-
-      if (cloudSyncCompleted) {
-        const sessionCleared = await clearResumeSyncSession();
-
-        if (!sessionCleared) {
-          showNotice({
-            tone: 'error',
-            message: 'Secure sign-out could not finish. Check your connection and try again.',
-          });
-          return;
-        }
-      }
-
-      const signedOut = await auth.signOut();
-
-      if (!signedOut) {
-        if (accountUid && !cloudSyncCompleted) {
-          await setSyncSessionCleanupRequested(accountUid, false);
-        }
-        return;
-      }
-
-      if (!allowSignedOutEditing) {
-        await clearLocalResumeWorkspaceData();
-        window.location.reload();
-      }
-    } finally {
-      setIsSignOutInProgress(false);
-      setIsSignedOutPromptOpen(false);
-    }
-  }
-
-  async function handleSignOut() {
-    if (signedOutEditingPreference.skipPrompt) {
-      await completeSignOut({ allowSignedOutEditing: signedOutEditingPreference.allow });
-      return;
-    }
-
-    setIsSignedOutPromptOpen(true);
-  }
-
-  async function handleSignedOutPromptChoice(choice) {
-    if (choice.skipPrompt) {
-      updateSignedOutEditingPreference(choice);
-    } else {
-      updateSignedOutEditingPreference({
-        ...signedOutEditingPreference,
-        allow: choice.allow,
-      });
-    }
-
-    await completeSignOut({ allowSignedOutEditing: choice.allow });
-  }
-
-  async function handleSignOutPromptCancel() {
-    if (isSignOutInProgress) {
-      return;
-    }
-
-    setIsSignedOutPromptOpen(false);
-  }
-
-  async function handleDisconnectBrowser() {
-    if (auth.user) {
-      const flushedDraft = await flushActiveCloudDraft({ reason: 'disconnect-browser' });
-
-      if (!flushedDraft) {
-        showNotice({
-          tone: 'error',
-          message: 'Cloud sync did not finish, so this browser was not cleared. Reconnect and try again.',
-        });
-        return;
-      }
-    }
-
-    const disconnected = await auth.clearBrowserConnection();
-
-    if (!disconnected) {
-      showNotice({
-        tone: 'error',
-        message: 'This browser could not be disconnected securely. Check your connection and try again.',
-      });
-      return;
-    }
-
-    await clearBrowserResumeConnectionData();
-    window.location.reload();
-  }
-
   function handleAccountSwitchImport() {
-    if (!auth.user) {
+    if (!importAccountSwitchLocalData()) {
       return;
     }
 
-    preSignInConnectedAccountRef.current = {
-      uid: auth.user.uid,
-      email: auth.user.email || '',
-      displayName: auth.user.displayName || '',
-    };
-    setDurableAccountContext((current) => ({
-      ...current,
-      checkedForUid: auth.user.uid,
-      previousAccount: preSignInConnectedAccountRef.current,
-    }));
-    setAccountSwitchResolutionUid(auth.user.uid);
     showNotice({
       tone: 'warning',
       message: 'Browser resumes will be imported into this signed-in account.',
@@ -605,23 +395,12 @@ function App() {
   }
 
   async function handleAccountSwitchClear() {
-    if (!auth.user) {
-      return;
+    if (!await clearAccountSwitchLocalData()) {
+      showNotice({
+        tone: 'error',
+        message: 'Browser resumes could not be cleared. Reload and try again.',
+      });
     }
-
-    await clearLocalResumeWorkspaceData();
-    preSignInConnectedAccountRef.current = {
-      uid: auth.user.uid,
-      email: auth.user.email || '',
-      displayName: auth.user.displayName || '',
-    };
-    setDurableAccountContext({
-      checkedForUid: auth.user.uid,
-      previousAccount: preSignInConnectedAccountRef.current,
-      hasWorkspaceData: false,
-    });
-    setAccountSwitchResolutionUid(auth.user.uid);
-    window.location.reload();
   }
 
   function handleOpenAuthFromSettings() {
@@ -693,7 +472,7 @@ function App() {
           isOpen={isAccountSwitchPending}
           previousAccount={pendingAccountSwitchAccount}
           nextAccount={auth.user}
-          busy={auth.authBusy}
+          busy={auth.authBusy || isClearingAccountSwitchData}
           onImportLocalData={handleAccountSwitchImport}
           onClearLocalData={handleAccountSwitchClear}
         />
@@ -707,7 +486,7 @@ function App() {
           connectedAccount={auth.connectedAccount}
           firebaseEnabled={auth.firebaseEnabled}
           signedOutEditingPreference={signedOutEditingPreference}
-          busy={auth.authBusy}
+          busy={auth.authBusy || isDisconnecting}
           onOpen={() => setIsAccountSettingsOpen(true)}
           onClose={() => setIsAccountSettingsOpen(false)}
           onToggleTheme={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}

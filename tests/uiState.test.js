@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { getSaveStatusPresentation } from '../src/lib/saveStatus.js';
 import { createResumeStorageKey } from '../src/lib/localWorkspaceKeys.js';
+import { deriveAccountSwitchGate } from '../src/hooks/useAccountSwitchGate.js';
 import {
   clearLocalResumeWorkspaceData,
   createSignOutStoragePreference,
@@ -56,6 +57,37 @@ test('account settings maps sign-out choices to the existing browser storage pre
     allow: false,
     skipPrompt: true,
   });
+});
+
+test('account switching gates cloud bootstrap until the browser owner is resolved', () => {
+  const nextUser = { uid: 'account-b', email: 'b@example.com' };
+  const unresolved = deriveAccountSwitchGate({
+    user: nextUser,
+    durableContext: {
+      checkedForUid: 'account-b',
+      previousAccount: { uid: 'account-a', email: 'a@example.com' },
+      hasWorkspaceData: true,
+    },
+    resolvedAccountUid: '',
+  });
+
+  assert.equal(unresolved.builderUser, null);
+  assert.equal(unresolved.isSwitchPending, true);
+  assert.equal(unresolved.previousAccount.uid, 'account-a');
+
+  const resolved = deriveAccountSwitchGate({
+    user: nextUser,
+    durableContext: {
+      checkedForUid: 'account-b',
+      previousAccount: { uid: 'account-b', email: 'b@example.com' },
+      hasWorkspaceData: true,
+    },
+    resolvedAccountUid: 'account-b',
+  });
+
+  assert.equal(resolved.builderUser, nextUser);
+  assert.equal(resolved.isSwitchPending, false);
+  assert.equal(resolved.previousAccount, null);
 });
 
 test('browser workspace cleanup removes current and obsolete storage protocols', async () => {
