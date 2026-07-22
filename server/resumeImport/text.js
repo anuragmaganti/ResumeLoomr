@@ -31,3 +31,38 @@ export function mergeUniqueText(values, separator = '; ') {
     })
     .join(separator);
 }
+
+export function splitTopLevelCommaParts(value) {
+  const parts = [];
+  let current = '';
+  let depth = 0;
+
+  Array.from(trimText(value)).forEach((character) => {
+    if (character === '(') {
+      depth += 1;
+    } else if (character === ')' && depth > 0) {
+      depth -= 1;
+    }
+
+    if (character === ',' && depth === 0) {
+      const part = trimText(current);
+
+      if (part) {
+        parts.push(part);
+      }
+
+      current = '';
+      return;
+    }
+
+    current += character;
+  });
+
+  const finalPart = trimText(current);
+
+  if (finalPart) {
+    parts.push(finalPart);
+  }
+
+  return parts;
+}
