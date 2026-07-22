@@ -126,7 +126,7 @@ import {
   shouldAcceptDraftSyncOperation,
   shouldAcceptCloudVersion,
   shouldAcceptSyncOperation,
-} from '../api/sync-workspace.js';
+} from '../server/syncWorkspace.js';
 import {
   DEFAULT_GEMINI_IMPORT_MODEL,
   DEFAULT_GEMINI_THINKING_LEVEL,
