@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal, flushSync } from 'react-dom';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
     DndContext,
     DragOverlay,
@@ -40,12 +40,7 @@ import {
 import {
     createPreviewEditAttributes,
     getPreviewCaretOffsetFromPoint,
-    getPreviewEditorInputMode,
-    parseEditorTargetPath,
-    isPreviewEditorTargetMultiline,
-    mapDisplayedCaretOffsetToSource,
     personalEditorPath,
-    readResumeEditorTargetValue,
     sectionEntryEditorPath,
     sectionEntryListEditorPath,
     sectionEntryNestedEditorPath,
@@ -55,12 +50,10 @@ import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from '../lib/sort
 import MobilePreviewEditorProxy from './mobilePreviewEditorProxy.jsx';
 import {
     collectPreviewBreakCandidates,
-    getMobileEditorProxyStyle,
     getPreviewStickyTop,
     isMobilePreviewEditingViewport,
     measurePreviewContentFlowHeight,
     metricsAreEqual,
-    mobileProxyStylesMatch,
     parseCssLengthToPixels,
     parseCssPixelValue,
 } from './resumePreviewGeometry.js';
@@ -79,6 +72,7 @@ import {
     previewVerticalListSortingStrategy,
     sectionDragId,
 } from './resumePreviewDrag.js';
+import { useMobilePreviewEditor } from './useMobilePreviewEditor.js';
 
 function templateClassName(template) {
     return `resumePage--${template}`;
@@ -792,20 +786,12 @@ export default function ResumePreview({
     const headerLayoutDoubleClickRef = useRef(null);
     const headerLayoutLongPressRef = useRef(null);
     const personalChromeActiveRef = useRef(false);
-    const mobileEditorRef = useRef(null);
-    const mobileEditSessionRef = useRef(null);
-    const mobileCaretFrameRef = useRef(0);
-    const mobileBlurTimerRef = useRef(0);
-    const previewValueChangeRef = useRef(onPreviewValueChange);
-    const previewValueCommitRef = useRef(onPreviewValueCommit);
-    const previewCaretChangeRef = useRef(onPreviewCaretChange);
     const [activeDragMeta, setActiveDragMeta] = useState(null);
     const [activeDragRect, setActiveDragRect] = useState(null);
     const [activeHeaderLayout, setActiveHeaderLayout] = useState(null);
     const [hoverHeaderLayout, setHoverHeaderLayout] = useState(null);
     const [isPersonalChromeActive, setIsPersonalChromeActive] = useState(false);
     const [summaryWidthDrag, setSummaryWidthDrag] = useState(null);
-    const [mobileEditSession, setMobileEditSession] = useState(null);
     const isPreviewDragActive = Boolean(activeDragMeta?.type);
     const canShowHeaderLayoutHover = !activeDragMeta?.type || activeDragMeta.type === 'headerSlot';
     const [pageMetrics, setPageMetrics] = useState({
@@ -816,6 +802,29 @@ export default function ResumePreview({
         pageBreaks: [],
         scale: 1,
         layoutWidth: 0,
+    });
+    const {
+        closeSession: closeMobileEditSession,
+        handleBlur: handleMobileEditorBlur,
+        handleChange: handleMobileEditorChange,
+        handleProxyTap: handleMobileProxyTap,
+        inputRef: mobileEditorRef,
+        openSession: openMobileEditSession,
+        scheduleCaretSync: scheduleMobileCaretSync,
+        session: mobileEditSession,
+        sessionRef: mobileEditSessionRef,
+    } = useMobilePreviewEditor({
+        activeEditorCaret,
+        isPrintRendering,
+        onEditTarget,
+        onPreviewCaretChange,
+        onPreviewEditorHandoff,
+        onPreviewValueChange,
+        onPreviewValueCommit,
+        pageScale: pageMetrics.scale,
+        resume,
+        resumeId,
+        resumeRootRef: resumeRef,
     });
     const presentationVars = useMemo(() => getResumePresentationVars(settings, template), [settings, template]);
     const printPageRule = useMemo(() => getResumePrintPageRule(settings, template), [settings, template]);
@@ -861,384 +870,6 @@ export default function ResumePreview({
                 : personalDetails.length > 0
         ))
     ), [personalDetails.length, personalHeaderOrder, previewModel.personal.headline]);
-
-    useEffect(() => {
-        previewValueChangeRef.current = onPreviewValueChange;
-        previewValueCommitRef.current = onPreviewValueCommit;
-        previewCaretChangeRef.current = onPreviewCaretChange;
-    }, [onPreviewCaretChange, onPreviewValueChange, onPreviewValueCommit]);
-
-    const findPreviewValueElement = useCallback((path) => {
-        if (!path || !resumeRef.current) {
-            return null;
-        }
-
-        return Array.from(resumeRef.current.querySelectorAll('[data-preview-caret-text="true"]'))
-            .find((element) => element.dataset.previewCaretPath === path) || null;
-    }, []);
-
-    const updateMobileProxyPosition = useCallback(() => {
-        const currentSession = mobileEditSessionRef.current;
-
-        if (!currentSession) {
-            return false;
-        }
-
-        const valueElement = findPreviewValueElement(currentSession.target.path);
-        const proxyStyle = getMobileEditorProxyStyle(valueElement, resumeRef.current);
-
-        if (!valueElement || !proxyStyle) {
-            return false;
-        }
-
-        if (!mobileProxyStylesMatch(currentSession.proxyStyle, proxyStyle)) {
-            const nextSession = { ...currentSession, proxyStyle };
-            mobileEditSessionRef.current = nextSession;
-            setMobileEditSession(nextSession);
-        }
-
-        return true;
-    }, [findPreviewValueElement]);
-
-    const scheduleMobileCaretSync = useCallback((inputElement = mobileEditorRef.current) => {
-        window.cancelAnimationFrame(mobileCaretFrameRef.current);
-        mobileCaretFrameRef.current = window.requestAnimationFrame(() => {
-            mobileCaretFrameRef.current = 0;
-            const currentSession = mobileEditSessionRef.current;
-
-            if (!currentSession || !inputElement || document.activeElement !== inputElement) {
-                return;
-            }
-
-            previewCaretChangeRef.current?.({
-                path: currentSession.target.path,
-                offset: Number.isFinite(inputElement.selectionStart)
-                    ? inputElement.selectionStart
-                    : currentSession.value.length,
-                value: currentSession.value,
-            });
-        });
-    }, []);
-
-    function closeMobileEditSession({ commit = true } = {}) {
-        const currentSession = mobileEditSessionRef.current;
-
-        if (!currentSession) {
-            return;
-        }
-
-        window.clearTimeout(mobileBlurTimerRef.current);
-        window.cancelAnimationFrame(mobileCaretFrameRef.current);
-        mobileBlurTimerRef.current = 0;
-        mobileCaretFrameRef.current = 0;
-
-        if (commit) {
-            previewValueCommitRef.current?.(currentSession.target);
-        }
-
-        mobileEditSessionRef.current = null;
-        setMobileEditSession(null);
-        previewCaretChangeRef.current?.(null);
-
-        if (document.activeElement === mobileEditorRef.current) {
-            mobileEditorRef.current.blur();
-        }
-    }
-
-    const openMobileEditSession = useCallback((target, valueElement, sourceResume = resume, sourceOffsetOverride = null) => {
-        const sourceValue = readResumeEditorTargetValue(sourceResume, target);
-
-        if (sourceValue === null) {
-            return false;
-        }
-
-        const sourceOffset = Number.isFinite(sourceOffsetOverride)
-            ? Math.max(0, Math.min(sourceOffsetOverride, sourceValue.length))
-            : mapDisplayedCaretOffsetToSource({
-                displayText: target.displayText,
-                sourceValue,
-                displayOffset: target.displayOffset,
-                isPlaceholder: sourceValue.trim() === '',
-            });
-        const nextSession = {
-            target,
-            resumeId,
-            value: sourceValue,
-            selectionOffset: sourceOffset,
-            isMultiline: isPreviewEditorTargetMultiline(target),
-            inputMode: getPreviewEditorInputMode(target),
-            proxyStyle: getMobileEditorProxyStyle(valueElement, resumeRef.current),
-        };
-
-        flushSync(() => {
-            mobileEditSessionRef.current = nextSession;
-            setMobileEditSession(nextSession);
-        });
-        return true;
-    }, [resume, resumeId]);
-
-    useLayoutEffect(() => {
-        if (!mobileEditSession?.target.path) {
-            return;
-        }
-
-        const inputElement = mobileEditorRef.current;
-
-        if (!inputElement) {
-            return;
-        }
-
-        const sourceOffset = Number.isFinite(mobileEditSession.selectionOffset)
-            ? mobileEditSession.selectionOffset
-            : 0;
-
-        inputElement.focus({ preventScroll: true });
-
-        try {
-            inputElement.setSelectionRange(sourceOffset, sourceOffset);
-        } catch {
-            // The textarea supports selection ranges; retain the start fallback if a browser refuses it.
-        }
-
-        scheduleMobileCaretSync(inputElement);
-    }, [
-        mobileEditSession?.resumeId,
-        mobileEditSession?.selectionOffset,
-        mobileEditSession?.target.path,
-        scheduleMobileCaretSync,
-    ]);
-
-    function handleMobileEditorChange(event) {
-        const currentSession = mobileEditSessionRef.current;
-
-        if (!currentSession) {
-            return;
-        }
-
-        const rawValue = event.target.value;
-        const nextValue = currentSession.isMultiline
-            ? rawValue
-            : rawValue.replace(/[\r\n]+/g, '');
-        const nextSession = { ...currentSession, value: nextValue };
-
-        mobileEditSessionRef.current = nextSession;
-        setMobileEditSession(nextSession);
-        previewValueChangeRef.current?.(currentSession.target, nextValue);
-        scheduleMobileCaretSync(event.currentTarget);
-    }
-
-    function handleMobileEditorBlur() {
-        const blurredSession = mobileEditSessionRef.current;
-
-        window.clearTimeout(mobileBlurTimerRef.current);
-        mobileBlurTimerRef.current = window.setTimeout(() => {
-            if (
-                blurredSession
-                && mobileEditSessionRef.current === blurredSession
-                && document.activeElement !== mobileEditorRef.current
-            ) {
-                closeMobileEditSession();
-            }
-        }, 0);
-    }
-
-    function handleMobileProxyTap(event) {
-        const currentSession = mobileEditSessionRef.current;
-        const inputElement = event.currentTarget;
-
-        if (!currentSession || !inputElement) {
-            return;
-        }
-
-        const previousPointerEvents = inputElement.style.pointerEvents;
-        inputElement.style.pointerEvents = 'none';
-        const underlyingElement = document.elementFromPoint(event.clientX, event.clientY);
-        const clickedValueElement = underlyingElement?.closest?.('[data-preview-caret-text="true"]');
-        const valueElement = clickedValueElement?.dataset.previewCaretPath === currentSession.target.path
-            ? clickedValueElement
-            : findPreviewValueElement(currentSession.target.path);
-        const displayText = valueElement?.dataset.previewCaretDisplay
-            ?? valueElement?.textContent
-            ?? currentSession.value;
-        const displayOffset = valueElement
-            ? getPreviewCaretOffsetFromPoint(valueElement, event.clientX, event.clientY)
-            : null;
-        inputElement.style.pointerEvents = previousPointerEvents;
-
-        const sourceOffset = mapDisplayedCaretOffsetToSource({
-            displayText,
-            sourceValue: currentSession.value,
-            displayOffset: Number.isFinite(displayOffset) ? displayOffset : currentSession.value.length,
-            isPlaceholder: currentSession.value.trim() === '',
-        });
-
-        inputElement.focus({ preventScroll: true });
-        inputElement.setSelectionRange(sourceOffset, sourceOffset);
-        scheduleMobileCaretSync(inputElement);
-    }
-
-    useEffect(() => {
-        const currentSession = mobileEditSessionRef.current;
-
-        if (!currentSession) {
-            return;
-        }
-
-        if (isPrintRendering || currentSession.resumeId !== resumeId) {
-            closeMobileEditSession();
-        }
-    }, [isPrintRendering, resumeId]);
-
-    useLayoutEffect(() => {
-        if (!mobileEditSession?.target.path || typeof window === 'undefined') {
-            return undefined;
-        }
-
-        let frameId = 0;
-        let missingTargetReads = 0;
-        const viewport = window.visualViewport;
-        const mediaQuery = window.matchMedia('(max-width: 980px)');
-
-        function readPosition() {
-            window.cancelAnimationFrame(frameId);
-            frameId = window.requestAnimationFrame(() => {
-                if (!mediaQuery.matches) {
-                    const currentSession = mobileEditSessionRef.current;
-                    const inputElement = mobileEditorRef.current;
-
-                    if (currentSession) {
-                        const sourceOffset = Number.isFinite(inputElement?.selectionStart)
-                            ? inputElement.selectionStart
-                            : currentSession.value.length;
-
-                        closeMobileEditSession({ commit: false });
-                        onPreviewEditorHandoff?.({
-                            ...currentSession.target,
-                            sourceOffset,
-                        });
-                    }
-                    return;
-                }
-
-                if (updateMobileProxyPosition()) {
-                    missingTargetReads = 0;
-                    return;
-                }
-
-                missingTargetReads += 1;
-
-                if (missingTargetReads >= 2) {
-                    closeMobileEditSession();
-                }
-            });
-        }
-
-        readPosition();
-        window.addEventListener('resize', readPosition);
-        window.addEventListener('scroll', readPosition, true);
-        viewport?.addEventListener('resize', readPosition);
-        viewport?.addEventListener('scroll', readPosition);
-        mediaQuery.addEventListener?.('change', readPosition);
-
-        const resizeObserver = typeof ResizeObserver === 'undefined'
-            ? null
-            : new ResizeObserver(readPosition);
-        if (resizeObserver && resumeRef.current) {
-            resizeObserver.observe(resumeRef.current);
-        }
-
-        return () => {
-            window.cancelAnimationFrame(frameId);
-            window.removeEventListener('resize', readPosition);
-            window.removeEventListener('scroll', readPosition, true);
-            viewport?.removeEventListener('resize', readPosition);
-            viewport?.removeEventListener('scroll', readPosition);
-            mediaQuery.removeEventListener?.('change', readPosition);
-            resizeObserver?.disconnect();
-        };
-    }, [mobileEditSession?.target.path, mobileEditSession?.value, onPreviewEditorHandoff, pageMetrics.scale, updateMobileProxyPosition]);
-
-    useEffect(() => {
-        if (typeof window === 'undefined' || !activeEditorCaret?.path) {
-            return undefined;
-        }
-
-        const mediaQuery = window.matchMedia('(max-width: 980px)');
-
-        function handoffEditorToMobile() {
-            if (!mediaQuery.matches || mobileEditSessionRef.current || isPrintRendering) {
-                return;
-            }
-
-            const parsedTarget = parseEditorTargetPath(activeEditorCaret.path);
-            const valueElement = findPreviewValueElement(activeEditorCaret.path);
-
-            if (!parsedTarget || !valueElement) {
-                return;
-            }
-
-            const displayText = valueElement.dataset.previewCaretDisplay
-                ?? valueElement.textContent
-                ?? '';
-            const target = {
-                ...parsedTarget,
-                displayText,
-                displayOffset: Number.isFinite(activeEditorCaret.offset) ? activeEditorCaret.offset : 0,
-                stayInPreview: true,
-                preserveTransient: true,
-            };
-            const targetResume = onEditTarget?.(target);
-
-            if (targetResume) {
-                openMobileEditSession(
-                    target,
-                    valueElement,
-                    targetResume,
-                    activeEditorCaret.offset,
-                );
-            }
-        }
-
-        handoffEditorToMobile();
-        window.addEventListener('resize', handoffEditorToMobile);
-        mediaQuery.addEventListener?.('change', handoffEditorToMobile);
-
-        return () => {
-            window.removeEventListener('resize', handoffEditorToMobile);
-            mediaQuery.removeEventListener?.('change', handoffEditorToMobile);
-        };
-    }, [activeEditorCaret, findPreviewValueElement, isPrintRendering, onEditTarget, openMobileEditSession]);
-
-    useEffect(() => {
-        if (!mobileEditSession?.target.path || typeof document === 'undefined') {
-            return undefined;
-        }
-
-        function handleOutsidePointerDown(event) {
-            if (event.target.closest?.('[data-mobile-preview-editor="true"]')) {
-                return;
-            }
-
-            const editTarget = event.target.closest?.('[data-edit-section-id][data-edit-path]');
-
-            if (editTarget && resumeRef.current?.contains(editTarget)) {
-                return;
-            }
-
-            closeMobileEditSession();
-        }
-
-        document.addEventListener('pointerdown', handleOutsidePointerDown, true);
-
-        return () => {
-            document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
-        };
-    }, [mobileEditSession?.target.path]);
-
-    useEffect(() => () => {
-        window.clearTimeout(mobileBlurTimerRef.current);
-        window.cancelAnimationFrame(mobileCaretFrameRef.current);
-    }, []);
 
     useEffect(() => {
         if (!activeHeaderLayout?.sectionId || typeof document === 'undefined') {
