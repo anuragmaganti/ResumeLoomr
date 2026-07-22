@@ -61,7 +61,7 @@ The app uses a block-first resume model, IndexedDB as the working store, Firebas
 - Edits, imports, deletes, switches, reorders, and template/settings changes save locally before cloud sync is attempted.
 - Local saves update the visible `Saved locally` timestamp from the actual local save time.
 - Local drafts include `localRevision` metadata to prevent stale tab saves from overwriting newer local changes.
-- IndexedDB remains canonical; `localStorage` keeps a best-effort compatibility mirror plus theme, browser-preference, and folder-open keys. If IndexedDB cannot open, the app enters a clearly reported limited localStorage mode and pauses cloud sync rather than claiming unsafely queued work was synced.
+- IndexedDB remains canonical; `localStorage` keeps a best-effort compatibility mirror plus theme, browser-preference, and folder-open keys.
 - Workspace organization is stored separately from resume bodies, so folder operations never rewrite resume content.
 - On sign-out, users can clearly choose whether to keep local resumes editable on that browser or sync first and remove its local copies; neither choice deletes cloud resumes.
 

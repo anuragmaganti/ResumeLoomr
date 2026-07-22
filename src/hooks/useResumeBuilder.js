@@ -69,12 +69,6 @@ function isOnline() {
   return typeof navigator === 'undefined' || navigator.onLine;
 }
 
-const LIMITED_BROWSER_STORAGE_NOTICE = {
-  id: 'limited-browser-storage',
-  tone: 'warning',
-  message: 'IndexedDB is unavailable. Changes are using limited browser storage, and cloud sync is paused until you reload with browser storage enabled.',
-};
-
 export function useResumeBuilder({ user = null, authReady = true } = {}) {
   const initialWorkspaceState = useMemo(() => readLegacyWorkspaceSnapshot(), []);
   const [workspace, setWorkspace] = useState(initialWorkspaceState.workspace);
@@ -116,7 +110,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   ]));
   const conflictRef = useRef(null);
   const transientSampleEntryRef = useRef(null);
-  const localStorageFallbackRef = useRef(false);
   const activeResumeId = workspace.activeResumeId;
   const errors = useMemo(() => validateResume(resume), [resume]);
   const previewModel = useMemo(() => getPreviewModel(resume), [resume]);
@@ -176,15 +169,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         }
 
         skipNextAutosaveRef.current = true;
-        localStorageFallbackRef.current = snapshot.storageMode === 'localStorage';
         commitWorkspace(snapshot.workspace, { persist: false });
         loadDraftIntoEditor(snapshot.draft, { resumeId: snapshot.activeResumeId });
         setLocalReady(true);
-
-        if (localStorageFallbackRef.current) {
-          setSyncState(userRef.current?.uid ? 'error' : 'idle');
-          setNotice(LIMITED_BROWSER_STORAGE_NOTICE);
-        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -548,11 +535,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return;
     }
 
-    if (localStorageFallbackRef.current) {
-      setSyncState('error');
-      return;
-    }
-
     if (syncTimerRef.current) {
       window.clearTimeout(syncTimerRef.current);
     }
@@ -569,16 +551,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
 
     if (!currentUser?.uid) {
       return true;
-    }
-
-    if (localStorageFallbackRef.current) {
-      setSyncState('error');
-
-      if (immediate) {
-        setNotice(LIMITED_BROWSER_STORAGE_NOTICE);
-      }
-
-      return false;
     }
 
     if (!isOnline()) {
