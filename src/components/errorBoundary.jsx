@@ -1,5 +1,5 @@
 import React from 'react';
-import { DRAFT_STORAGE_KEY } from '../lib/resume.js';
+import { DRAFT_STORAGE_KEY } from '../lib/workspace.js';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {

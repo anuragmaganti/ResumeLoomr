@@ -26,7 +26,7 @@ import {
   createWorkspaceResumeMeta,
   normalizeWorkspaceIndex,
   removeWorkspaceResumes,
-} from '../src/lib/resume.js';
+} from '../src/lib/workspace.js';
 
 class MemoryStorage {
   #values = new Map();

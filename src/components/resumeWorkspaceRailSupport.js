@@ -1,7 +1,7 @@
 import {
   WORKSPACE_FOLDER_TONE_COUNT,
   WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
-} from '../lib/resume.js';
+} from '../lib/workspace.js';
 
 export const FOLDER_AUTO_OPEN_DELAY_MS = 320;
 export const FOLDER_AUTO_CLOSE_DELAY_MS = 140;

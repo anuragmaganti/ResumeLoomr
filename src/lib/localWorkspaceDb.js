@@ -1,12 +1,12 @@
 import { deleteDB, openDB } from 'idb';
+import { createFreshWorkspaceDraft } from './workspaceDraft.js';
 import {
   WORKSPACE_INDEX_STORAGE_KEY,
-  createFreshWorkspaceDraft,
   createResumeStorageKey,
   normalizeWorkspaceIndex,
   removeWorkspaceResumes,
-  trimText,
-} from './resume.js';
+} from './workspace.js';
+import { trimText } from './text.js';
 import {
   getDraftStateRevision,
   normalizeCloudVersion,

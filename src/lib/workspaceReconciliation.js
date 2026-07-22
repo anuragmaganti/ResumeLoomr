@@ -1,14 +1,14 @@
 import {
   MAX_WORKSPACE_RESUMES,
   createDuplicateResumeName,
-  createFreshWorkspaceDraft,
   createWorkspaceResumeId,
   createWorkspaceResumeMeta,
   mergeWorkspaceOrganizations,
   normalizeWorkspaceIndex,
   placeWorkspaceResumeAfter,
-  trimText,
-} from './resume.js';
+} from './workspace.js';
+import { createFreshWorkspaceDraft } from './workspaceDraft.js';
+import { trimText } from './text.js';
 import {
   createDraftContentHash,
   createDraftMergeContentHash,

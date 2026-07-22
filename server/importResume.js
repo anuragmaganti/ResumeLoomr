@@ -10,9 +10,9 @@ import {
 import {
   getPreviewModel,
   normalizeDraftPayload,
-  sanitizeWorkspaceResumeName,
-  trimText,
 } from '../src/lib/resume.js';
+import { trimText } from '../src/lib/text.js';
+import { sanitizeWorkspaceResumeName } from '../src/lib/workspace.js';
 
 export const IMPORT_FILE_MAX_BYTES = 3 * 1024 * 1024;
 export const DEFAULT_GEMINI_IMPORT_MODEL = 'gemini-3.1-flash-lite';

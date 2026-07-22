@@ -1,11 +1,13 @@
 import {
   createDraftPayload,
-  createWorkspaceResumeMeta,
   dismissSampleInformation,
-  mergeWorkspaceOrganizations,
   normalizeDraftPayload,
-  normalizeWorkspaceIndex,
 } from '../src/lib/resume.js';
+import {
+  createWorkspaceResumeMeta,
+  mergeWorkspaceOrganizations,
+  normalizeWorkspaceIndex,
+} from '../src/lib/workspace.js';
 import { getAdminDb } from './firebaseAdmin.js';
 import { createHash } from 'node:crypto';
 

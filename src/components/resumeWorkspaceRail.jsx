@@ -20,7 +20,7 @@ import {
   createNextWorkspaceFolderName,
   sanitizeWorkspaceFolderName,
   sanitizeWorkspaceResumeName,
-} from '../lib/resume.js';
+} from '../lib/workspace.js';
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from '../lib/sortableSensors.js';
 import {
   buildResumeRailLayout,

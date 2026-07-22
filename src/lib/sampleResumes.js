@@ -9,8 +9,8 @@ import {
   publicationEntryHasContent,
   roleEntryHasContent,
   skillsEntryHasContent,
-  trimText,
 } from './resume.js';
+import { trimText } from './text.js';
 
 const SAMPLE_RESUMES = [
   {

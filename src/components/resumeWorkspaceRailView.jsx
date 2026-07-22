@@ -7,7 +7,7 @@ import { AnimatePresence, motion as Motion, useReducedMotion } from 'motion/reac
 import {
   MAX_WORKSPACE_FOLDER_NAME_LENGTH,
   MAX_WORKSPACE_RESUME_NAME_LENGTH,
-} from '../lib/resume.js';
+} from '../lib/workspace.js';
 import {
   createWorkspaceItemId,
   isResumeBundleSourcePlaceholder,

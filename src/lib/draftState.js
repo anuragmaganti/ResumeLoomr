@@ -3,8 +3,8 @@ import {
   createEmptyResume,
   dismissSampleInformation,
   normalizeDraftPayload,
-  trimText,
 } from './resume.js';
+import { trimText } from './text.js';
 
 export function normalizeCloudVersion(value) {
   const version = Number(value);

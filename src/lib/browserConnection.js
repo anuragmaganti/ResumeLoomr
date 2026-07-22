@@ -3,7 +3,7 @@ import {
   RESUME_STORAGE_KEY_PREFIX,
   WORKSPACE_INDEX_STORAGE_KEY,
   WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
-} from './resume.js';
+} from './workspace.js';
 import {
   LOCAL_WORKSPACE_PRESENT_KEY,
   deleteLocalWorkspaceDatabase,
