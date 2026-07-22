@@ -289,11 +289,15 @@ test('preview page break helper keeps raw marker when no clean candidate is vali
 
 test('preview page markers measure rendered content instead of fixed page scroll height', () => {
   const previewComponent = fs.readFileSync('src/components/resumePreview.jsx', 'utf8');
+  const previewGeometry = fs.readFileSync('src/components/resumePreviewGeometry.js', 'utf8');
   const previewCss = fs.readFileSync('src/styles/preview.css', 'utf8');
 
-  assert.match(previewComponent, /function measurePreviewContentFlowHeight/);
+  assert.match(previewGeometry, /export function measurePreviewContentFlowHeight/);
+  assert.match(previewComponent, /measurePreviewContentFlowHeight\(/);
   assert.match(previewComponent, /data-preview-page-content="true"/);
-  assert.doesNotMatch(previewComponent, /Math\.max\(printableHeight,\s*resumeElement\.scrollHeight - paddingTop - paddingBottom\)/);
+  assert.doesNotMatch(
+    `${previewComponent}\n${previewGeometry}`,
+    /Math\.max\(printableHeight,\s*resumeElement\.scrollHeight - paddingTop - paddingBottom\)/,
+  );
   assert.match(previewCss, /\.resumePageContent\s*\{/);
 });
-
