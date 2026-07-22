@@ -10,18 +10,14 @@ import {
   addSectionBlockTextListItem,
   commitSectionTitle,
   createEmptyResume,
-  didTransientSampleEntryChange,
   dismissSampleInformation,
-  materializeAndReorderSectionBlockEntries,
   moveSectionBlockEntry,
   moveResumeSectionBlock,
   normalizeDraftPayload,
-  projectTransientSampleEntry,
   removeResumeSectionBlock,
   reorderSectionBlockEntriesToMatch,
   reorderSectionBlockTextListItem,
   reorderResumeSectionBlocksToMatch,
-  resolveTransientSampleEntry,
   setSampleTextListOrder,
   setSectionEntryHeaderLayout,
   updatePersonalField,
@@ -37,6 +33,12 @@ import {
   moveSectionHeaderField,
   normalizeEntryHeaderLayout,
 } from '../src/lib/resumeEntryLayout.js';
+import {
+  didTransientSampleEntryChange,
+  materializeAndReorderSectionBlockEntries,
+  projectTransientSampleEntry,
+  resolveTransientSampleEntry,
+} from '../src/lib/resumeSampleProjection.js';
 import { getPreviewModel } from '../src/lib/resumePreviewModel.js';
 import {
   DEFAULT_TEMPLATE,

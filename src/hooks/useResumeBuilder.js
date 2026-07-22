@@ -14,9 +14,7 @@ import {
   moveSectionBlockEducationProgram,
   moveSectionBlockEntry,
   moveSectionBlockTextListItem,
-  materializeAndReorderSectionBlockEntries,
   normalizeDraftPayload,
-  projectTransientSampleEntry,
   removeResumeSectionBlock,
   removeSectionBlockEducationCustomSection,
   removeSectionBlockEducationProgram,
@@ -25,7 +23,6 @@ import {
   reorderSectionBlockEntriesToMatch,
   reorderSectionBlockTextListItem,
   reorderResumeSectionBlocksToMatch,
-  resolveTransientSampleEntry,
   setPersonalContactOrder,
   setSampleTextListOrder,
   setResumeSettingValue,
@@ -40,6 +37,11 @@ import {
   updateSectionBlockTextList,
   updateSectionTitle,
 } from '../lib/resume.js';
+import {
+  materializeAndReorderSectionBlockEntries,
+  projectTransientSampleEntry,
+  resolveTransientSampleEntry,
+} from '../lib/resumeSampleProjection.js';
 import { getPreviewModel } from '../lib/resumePreviewModel.js';
 import {
   DEFAULT_TEMPLATE,
