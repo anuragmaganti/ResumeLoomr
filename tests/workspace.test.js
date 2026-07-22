@@ -7,6 +7,7 @@ import { readLegacyWorkspaceSnapshot } from '../src/lib/localWorkspaceMirror.js'
 import {
   MAX_WORKSPACE_RESUME_NAME_LENGTH,
   MAX_WORKSPACE_RESUMES,
+  addWorkspaceResume,
   createDuplicateResumeName,
   createNextResumeName,
   createWorkspaceFolderFromResumes,
@@ -72,6 +73,35 @@ test('blank drafts and resume metadata share canonical workspace helpers', () =>
   assert.equal(updatedWorkspace.meta.r2.name, 'Updated resume');
   assert.equal(updatedWorkspace.meta.r2.updatedAt, '2026-07-22T12:00:00.000Z');
   assert.deepEqual(updateWorkspaceResumeMeta(workspace, 'missing', { name: 'Ignored' }), workspace);
+});
+
+test('workspace resume creation centralizes metadata, activation, and organization placement', () => {
+  const workspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['r1', 'r2']),
+    organization: {
+      rootItems: [{ type: 'folder', id: 'folder-1' }],
+      folders: {
+        'folder-1': { id: 'folder-1', name: 'Applications', resumeIds: ['r1', 'r2'] },
+      },
+    },
+  });
+  const created = addWorkspaceResume(workspace, {
+    resumeId: 'r3',
+    name: 'Backend roles',
+    updatedAt: '2026-07-22T12:00:00.000Z',
+    afterResumeId: 'r1',
+    now: '2026-07-22T12:00:01.000Z',
+  });
+
+  assert.equal(created.resumeId, 'r3');
+  assert.equal(created.workspace.activeResumeId, 'r3');
+  assert.deepEqual(created.workspace.meta.r3, {
+    name: 'Backend roles',
+    updatedAt: '2026-07-22T12:00:00.000Z',
+  });
+  assert.deepEqual(created.workspace.organization.folders['folder-1'].resumeIds, ['r1', 'r3', 'r2']);
+  assert.equal(created.workspace.organization.updatedAt, '2026-07-22T12:00:01.000Z');
+  assert.equal(addWorkspaceResume(created.workspace, { resumeId: 'r3' }).resumeId, '');
 });
 
 test('legacy workspace fallback returns a normalized fresh draft without browser storage', () => {

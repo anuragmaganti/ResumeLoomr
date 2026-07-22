@@ -337,6 +337,54 @@ export function normalizeWorkspaceIndex(candidate = {}) {
   };
 }
 
+export function addWorkspaceResume(workspace, {
+  resumeId = '',
+  name = '',
+  updatedAt = '',
+  afterResumeId = '',
+  now = '',
+} = {}) {
+  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+
+  if (normalizedWorkspace.resumeIds.length >= MAX_WORKSPACE_RESUMES) {
+    return { workspace: normalizedWorkspace, resumeId: '' };
+  }
+
+  let nextResumeId = trimText(resumeId);
+  if (nextResumeId && normalizedWorkspace.resumeIds.includes(nextResumeId)) {
+    return { workspace: normalizedWorkspace, resumeId: '' };
+  }
+
+  while (!nextResumeId || normalizedWorkspace.resumeIds.includes(nextResumeId)) {
+    nextResumeId = createWorkspaceResumeId();
+  }
+
+  const existingNames = normalizedWorkspace.resumeIds.map((id) => normalizedWorkspace.meta[id]?.name || '');
+  const nextName = sanitizeWorkspaceResumeName(name, createNextResumeName(existingNames));
+  const organizationUpdatedAt = now || new Date().toISOString();
+  let nextWorkspace = normalizeWorkspaceIndex({
+    ...normalizedWorkspace,
+    activeResumeId: nextResumeId,
+    resumeIds: [...normalizedWorkspace.resumeIds, nextResumeId],
+    meta: {
+      ...normalizedWorkspace.meta,
+      [nextResumeId]: createWorkspaceResumeMeta(nextName, updatedAt),
+    },
+    organization: {
+      ...normalizedWorkspace.organization,
+      updatedAt: organizationUpdatedAt,
+    },
+  });
+
+  if (normalizedWorkspace.resumeIds.includes(trimText(afterResumeId))) {
+    nextWorkspace = placeWorkspaceResumeAfter(nextWorkspace, nextResumeId, afterResumeId, {
+      now: organizationUpdatedAt,
+    });
+  }
+
+  return { workspace: nextWorkspace, resumeId: nextResumeId };
+}
+
 function findWorkspaceResumePlacement(workspace, resumeId) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const targetId = trimText(resumeId);
