@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { getSaveStatusPresentation } from '../src/lib/saveStatus.js';
+import { createResumeStorageKey } from '../src/lib/localWorkspaceKeys.js';
 import {
   clearLocalResumeWorkspaceData,
   createSignOutStoragePreference,
   getSignOutStorageMode,
-  hasLocalResumeWorkspaceData,
 } from '../src/lib/browserConnection.js';
 
 test('save status presentation prioritizes local writes before cloud state', () => {
@@ -58,9 +58,14 @@ test('account settings maps sign-out choices to the existing browser storage pre
   });
 });
 
-test('folder open state is cleared with browser resume data but is not itself resume data', async () => {
+test('browser workspace cleanup removes current and obsolete storage protocols', async () => {
   const values = new Map([
     ['resumeloomr:open-folders:v1', JSON.stringify(['folder-1'])],
+    ['resumeloomr:index:v1', '{}'],
+    ['resumeloomr:resume:resume-1', '{}'],
+    ['resumeloomr:sync-client-id:v1', 'client-1'],
+    ['resumeloomr:sync-sequence:v1', '4'],
+    ['resumeloomr:draft:v2', '{}'],
     ['unrelated', 'keep'],
   ]);
   const storage = {
@@ -71,9 +76,13 @@ test('folder open state is cleared with browser resume data but is not itself re
     removeItem(key) { values.delete(key); },
   };
 
-  assert.equal(hasLocalResumeWorkspaceData(storage), false);
+  assert.equal(createResumeStorageKey('abc123'), 'resumeloomr:resume:abc123');
   await clearLocalResumeWorkspaceData(storage);
   assert.equal(storage.getItem('resumeloomr:open-folders:v1'), null);
+  assert.equal(storage.getItem('resumeloomr:index:v1'), null);
+  assert.equal(storage.getItem('resumeloomr:resume:resume-1'), null);
+  assert.equal(storage.getItem('resumeloomr:sync-client-id:v1'), null);
+  assert.equal(storage.getItem('resumeloomr:sync-sequence:v1'), null);
+  assert.equal(storage.getItem('resumeloomr:draft:v2'), null);
   assert.equal(storage.getItem('unrelated'), 'keep');
 });
-

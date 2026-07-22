@@ -3,13 +3,12 @@ import {
   serializeDraftState,
 } from './draftState.js';
 import {
+  LOCAL_WORKSPACE_PRESENT_KEY,
   WORKSPACE_INDEX_STORAGE_KEY,
   createResumeStorageKey,
-  normalizeWorkspaceIndex,
-} from './workspace.js';
+} from './localWorkspaceKeys.js';
+import { normalizeWorkspaceIndex } from './workspace.js';
 import { createBlankDraftState, createFreshWorkspaceDraft } from './workspaceDraft.js';
-
-export const LOCAL_WORKSPACE_PRESENT_KEY = 'resumeloomr:local-workspace-present:v1';
 
 export function getLocalWorkspaceStorage() {
   if (typeof window === 'undefined') {

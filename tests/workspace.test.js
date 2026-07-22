@@ -9,7 +9,6 @@ import {
   MAX_WORKSPACE_RESUMES,
   createDuplicateResumeName,
   createNextResumeName,
-  createResumeStorageKey,
   createWorkspaceFolderFromResumes,
   createWorkspaceResumeId,
   normalizeWorkspaceFolderToneIndex,
@@ -53,7 +52,6 @@ test('workspace helpers support local-first resume ordering and naming', () => {
 
   assert.match(resumeId, /^id-|^[0-9a-f-]{8,}$/i);
   assert.equal(MAX_WORKSPACE_RESUMES, 100);
-  assert.equal(createResumeStorageKey('abc123'), 'resumeloomr:resume:abc123');
   assert.equal(workspace.workspace.meta[workspace.activeResumeId].name, 'Resume 1');
   assert.equal(createNextResumeName(['Resume 1', 'Resume 3']), 'Resume 2');
   assert.equal(createDuplicateResumeName('Resume no skills', ['Resume no skills']), 'Resume no skills copy');

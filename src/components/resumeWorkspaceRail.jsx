@@ -16,9 +16,9 @@ import {
 import { LayoutGroup, motion as Motion, useReducedMotion } from 'motion/react';
 import {
   MAX_WORKSPACE_FOLDERS,
-  WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
   createNextWorkspaceFolderName,
 } from '../lib/workspace.js';
+import { WORKSPACE_OPEN_FOLDERS_STORAGE_KEY } from '../lib/localWorkspaceKeys.js';
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from '../lib/sortableSensors.js';
 import {
   buildResumeRailLayout,

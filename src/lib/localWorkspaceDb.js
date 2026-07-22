@@ -31,6 +31,10 @@ import {
   writeLocalStorageDraft,
   writeLocalStorageWorkspace,
 } from './localWorkspaceMirror.js';
+import {
+  LOCAL_SYNC_CLIENT_ID_KEY,
+  LOCAL_SYNC_SEQUENCE_KEY,
+} from './localWorkspaceKeys.js';
 
 const LOCAL_WORKSPACE_DB_NAME = 'resumeloomr-local-workspace';
 const LOCAL_WORKSPACE_DB_VERSION = 1;
@@ -43,9 +47,6 @@ const OUTBOX_STORE = 'outbox';
 const TOMBSTONES_STORE = 'tombstones';
 const ACCOUNT_BINDING_STORE = 'accountBinding';
 const LOCAL_WORKSPACE_LOCK_NAME = 'resumeloomr-local-workspace-mutation';
-const LOCAL_SYNC_CLIENT_ID_KEY = 'resumeloomr:sync-client-id:v1';
-const LOCAL_SYNC_SEQUENCE_KEY = 'resumeloomr:sync-sequence:v1';
-
 let dbPromise = null;
 let localMutationQueue = Promise.resolve();
 let fallbackSyncSequence = 0;

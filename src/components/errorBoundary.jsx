@@ -1,5 +1,4 @@
 import React from 'react';
-import { DRAFT_STORAGE_KEY } from '../lib/workspace.js';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -15,13 +14,7 @@ export default class ErrorBoundary extends React.Component {
     console.error('ResumeLoomr render error:', error);
   }
 
-  handleReset = () => {
-    try {
-      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-    } catch {
-      // Ignore storage failures and still reload.
-    }
-
+  handleReload = () => {
     window.location.reload();
   };
 
@@ -36,9 +29,9 @@ export default class ErrorBoundary extends React.Component {
           <section className="panel errorState">
             <p className="kicker">Recovery</p>
             <h1>Something went wrong while loading the editor.</h1>
-            <p className="errorStateCopy">Your latest draft may still be recoverable, but the safest next step is to reset the broken session and reload the app.</p>
-            <button type="button" className="button buttonPrimary" onClick={this.handleReset}>
-              Reset and reload
+            <p className="errorStateCopy">Your locally saved resumes are unchanged. Reload the app to start a fresh editor session.</p>
+            <button type="button" className="button buttonPrimary" onClick={this.handleReload}>
+              Reload app
             </button>
           </section>
         </div>

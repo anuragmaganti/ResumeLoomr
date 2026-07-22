@@ -1,13 +1,15 @@
 import {
-  DRAFT_STORAGE_KEY,
+  LEGACY_DRAFT_STORAGE_KEY,
+  LOCAL_SYNC_CLIENT_ID_KEY,
+  LOCAL_SYNC_SEQUENCE_KEY,
+  LOCAL_WORKSPACE_PRESENT_KEY,
   RESUME_STORAGE_KEY_PREFIX,
   WORKSPACE_INDEX_STORAGE_KEY,
   WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
-} from './workspace.js';
+} from './localWorkspaceKeys.js';
 import {
   deleteLocalWorkspaceDatabase,
 } from './localWorkspaceDb.js';
-import { LOCAL_WORKSPACE_PRESENT_KEY } from './localWorkspaceMirror.js';
 
 const CONNECTED_ACCOUNT_STORAGE_KEY = 'resumeloomr:connected-account:v1';
 const SIGNED_OUT_EDITING_PREFERENCE_KEY = 'resumeloomr:signed-out-editing-preference:v1';
@@ -40,18 +42,24 @@ export function createSignOutStoragePreference(mode, currentPreference = DEFAULT
     skipPrompt: false,
   };
 }
-const STALE_LOCAL_STORAGE_KEYS = [
+const WORKSPACE_LOCAL_STORAGE_KEYS = [
+  WORKSPACE_INDEX_STORAGE_KEY,
+  WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
+  LOCAL_WORKSPACE_PRESENT_KEY,
+  LOCAL_SYNC_CLIENT_ID_KEY,
+  LOCAL_SYNC_SEQUENCE_KEY,
+];
+const OBSOLETE_LOCAL_STORAGE_KEYS = [
+  LEGACY_DRAFT_STORAGE_KEY,
   'resumeloomr:guest-backup-before-cloud-mirror:v1',
   'resumeloomr:cloud-mirror-manifest:v1',
   'resumeloomr:firebase-device-id',
   'resumeloomr:firebase-trusted-device',
-  'resumeloomr:sync-client-id:v1',
-  'resumeloomr:sync-sequence:v1',
 ];
-const STALE_SESSION_STORAGE_KEYS = [
+const OBSOLETE_SESSION_STORAGE_KEYS = [
   'resumeloomr:firebase-session-id',
 ];
-const STALE_LOCAL_STORAGE_PREFIXES = [
+const OBSOLETE_LOCAL_STORAGE_PREFIXES = [
   'resumeloomr:firebase-imported:',
 ];
 
@@ -177,29 +185,6 @@ export function writeSignedOutEditingPreference(preference, storage) {
   return nextPreference;
 }
 
-export function hasLocalResumeWorkspaceData(storage) {
-  const targetStorage = getStorage(storage);
-
-  if (!targetStorage) {
-    return false;
-  }
-
-  for (let index = 0; index < targetStorage.length; index += 1) {
-    const key = targetStorage.key(index);
-
-    if (
-      key === LOCAL_WORKSPACE_PRESENT_KEY ||
-      key === WORKSPACE_INDEX_STORAGE_KEY ||
-      key === DRAFT_STORAGE_KEY ||
-      key?.startsWith(RESUME_STORAGE_KEY_PREFIX)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 export async function clearLocalResumeWorkspaceData(storage) {
   const targetStorage = getStorage(storage);
 
@@ -209,13 +194,10 @@ export async function clearLocalResumeWorkspaceData(storage) {
     const key = targetStorage.key(index);
 
     if (
-      key === WORKSPACE_INDEX_STORAGE_KEY ||
-      key === WORKSPACE_OPEN_FOLDERS_STORAGE_KEY ||
-      key === DRAFT_STORAGE_KEY ||
-      key === LOCAL_WORKSPACE_PRESENT_KEY ||
-      STALE_LOCAL_STORAGE_KEYS.includes(key) ||
+      WORKSPACE_LOCAL_STORAGE_KEYS.includes(key) ||
+      OBSOLETE_LOCAL_STORAGE_KEYS.includes(key) ||
       key?.startsWith(RESUME_STORAGE_KEY_PREFIX) ||
-      STALE_LOCAL_STORAGE_PREFIXES.some((prefix) => key?.startsWith(prefix))
+      OBSOLETE_LOCAL_STORAGE_PREFIXES.some((prefix) => key?.startsWith(prefix))
     ) {
       keysToRemove.push(key);
     }
@@ -235,6 +217,5 @@ export async function clearBrowserResumeConnectionData({ storage, sessionStorage
   await clearLocalResumeWorkspaceData(targetStorage);
   targetStorage?.removeItem(CONNECTED_ACCOUNT_STORAGE_KEY);
   targetStorage?.removeItem(SIGNED_OUT_EDITING_PREFERENCE_KEY);
-  STALE_LOCAL_STORAGE_KEYS.forEach((key) => targetStorage?.removeItem(key));
-  STALE_SESSION_STORAGE_KEYS.forEach((key) => targetSessionStorage?.removeItem(key));
+  OBSOLETE_SESSION_STORAGE_KEYS.forEach((key) => targetSessionStorage?.removeItem(key));
 }
