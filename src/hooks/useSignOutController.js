@@ -23,6 +23,7 @@ const SIGN_OUT_ERROR_MESSAGES = {
 const DISCONNECT_ERROR_MESSAGES = {
   'cloud-sync-incomplete': 'Cloud sync did not finish, so this browser was not cleared. Reconnect and try again.',
   'browser-disconnect-failed': 'This browser could not be disconnected securely. Check your connection and try again.',
+  'browser-data-clear-failed': 'You are signed out, but local data could not be removed. Try Remove from this browser again.',
 };
 
 export function useSignOutController({
@@ -145,7 +146,7 @@ export function useSignOutController({
       const result = await runBrowserDisconnect({
         user: auth.user,
         flushActiveCloudDraft,
-        disconnectAuth: auth.clearBrowserConnection,
+        disconnectAuthSession: auth.disconnectAuthSession,
         clearBrowserData: clearBrowserResumeConnectionData,
         reloadBrowser: () => window.location.reload(),
       });

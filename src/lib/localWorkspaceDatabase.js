@@ -1,4 +1,5 @@
 import { deleteDB, openDB } from 'idb';
+import { createSerialTaskQueue, runWithOptionalWebLock } from './asyncQueue.js';
 import { normalizeWorkspaceIndex } from './workspace.js';
 import {
   getDraftStateRevision,
@@ -19,7 +20,7 @@ const LOCAL_WORKSPACE_DB_VERSION = 1;
 const LOCAL_WORKSPACE_LOCK_NAME = 'resumeloomr-local-workspace-mutation';
 
 let dbPromise = null;
-let localMutationQueue = Promise.resolve();
+const runLocalMutationInProcess = createSerialTaskQueue();
 
 export function createLocalRevision() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -37,22 +38,10 @@ export function getDraftRecordRevision(record) {
   return `legacy:${record?.updatedAt || record?.draft?.savedAt || 'unknown'}`;
 }
 
-async function withLocalWorkspaceLock(callback) {
-  const locks = typeof navigator !== 'undefined' ? navigator.locks : null;
-
-  if (!locks?.request) {
-    return callback();
-  }
-
-  return locks.request(LOCAL_WORKSPACE_LOCK_NAME, { mode: 'exclusive' }, callback);
-}
-
 export function runLocalMutation(callback) {
-  const run = () => withLocalWorkspaceLock(callback);
-  const resultPromise = localMutationQueue.then(run, run);
-
-  localMutationQueue = resultPromise.catch(() => null);
-  return resultPromise;
+  return runLocalMutationInProcess(() => (
+    runWithOptionalWebLock(LOCAL_WORKSPACE_LOCK_NAME, callback)
+  ));
 }
 
 export async function getLocalWorkspaceDb() {
@@ -136,19 +125,19 @@ export async function writeDraftRecord(tx, resumeId, draft, { localRevision = ''
 }
 
 export async function deleteLocalWorkspaceDatabase() {
-  await localMutationQueue.catch(() => null);
-  const pendingDb = dbPromise;
-  dbPromise = null;
+  return runLocalMutation(async () => {
+    const pendingDb = dbPromise;
+    dbPromise = null;
 
-  if (pendingDb) {
-    try {
-      const db = await pendingDb;
-      db?.close?.();
-    } catch {
-      // Continue with deletion even if opening the old connection failed.
+    if (pendingDb) {
+      try {
+        const db = await pendingDb;
+        db?.close?.();
+      } catch {
+        // Continue with deletion even if opening the old connection failed.
+      }
     }
-  }
 
-  await deleteDB(LOCAL_WORKSPACE_DB_NAME);
-  localMutationQueue = Promise.resolve();
+    await deleteDB(LOCAL_WORKSPACE_DB_NAME);
+  });
 }

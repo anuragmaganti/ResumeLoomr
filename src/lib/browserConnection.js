@@ -204,25 +204,24 @@ export async function clearBrowserResumeConnectionData({ storage, sessionStorage
   const targetStorage = getStorage(storage);
   const targetSessionStorage = getSessionStorage(sessionStorage);
 
-  let cleanupError = null;
+  // Keep the account marker until every earlier cleanup step succeeds. If
+  // storage is partially unavailable, that marker keeps the removal action
+  // visible so the user can retry after signing out.
+  await clearLocalResumeWorkspaceData(targetStorage);
 
-  try {
-    await clearLocalResumeWorkspaceData(targetStorage);
-  } catch (error) {
-    cleanupError = error;
-  }
-
-  const localMetadataResults = !targetStorage ? [] : [
-    CONNECTED_ACCOUNT_STORAGE_KEY,
-    SIGNED_OUT_EDITING_PREFERENCE_KEY,
-  ].map((key) => removeStorageItem(targetStorage, key));
   const sessionMetadataResults = !targetSessionStorage ? [] : OBSOLETE_SESSION_STORAGE_KEYS.map((key) => (
     removeStorageItem(targetSessionStorage, key)
   ));
-  const localMetadataCleared = localMetadataResults.every(Boolean);
-  const sessionMetadataCleared = sessionMetadataResults.every(Boolean);
 
-  if (cleanupError || !localMetadataCleared || !sessionMetadataCleared) {
-    throw cleanupError || new Error('Browser connection data could not be cleared completely.');
+  if (!sessionMetadataResults.every(Boolean)) {
+    throw new Error('Browser connection data could not be cleared completely.');
+  }
+
+  if (targetStorage && !removeStorageItem(targetStorage, SIGNED_OUT_EDITING_PREFERENCE_KEY)) {
+    throw new Error('Browser connection data could not be cleared completely.');
+  }
+
+  if (targetStorage && !removeStorageItem(targetStorage, CONNECTED_ACCOUNT_STORAGE_KEY)) {
+    throw new Error('Browser connection data could not be cleared completely.');
   }
 }

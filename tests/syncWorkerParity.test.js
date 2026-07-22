@@ -158,6 +158,54 @@ test('sync worker creates the same indexed outbox shape as the page database', a
   indexedDB.deleteDatabase(databaseName);
 });
 
+test('sync worker coalesces concurrent triggers and reruns once after the active attempt', async () => {
+  const { context } = loadWorkerContext();
+  const releases = [];
+  let callCount = 0;
+
+  context.syncOutbox = () => {
+    callCount += 1;
+    return new Promise((resolve) => releases.push(resolve));
+  };
+
+  const firstAttempt = context.requestOutboxSync();
+  const sharedAttempt = context.requestOutboxSync();
+
+  assert.equal(callCount, 1);
+  releases.shift()();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(callCount, 2);
+  releases.shift()();
+
+  await Promise.all([firstAttempt, sharedAttempt]);
+  assert.equal(callCount, 2);
+});
+
+test('sync worker does not lose a trigger that arrives during a failed attempt', async () => {
+  const { context } = loadWorkerContext();
+  let rejectFirst;
+  let callCount = 0;
+
+  context.syncOutbox = () => {
+    callCount += 1;
+
+    if (callCount === 1) {
+      return new Promise((_resolve, reject) => {
+        rejectFirst = reject;
+      });
+    }
+
+    return Promise.resolve();
+  };
+
+  const firstAttempt = context.requestOutboxSync();
+  const sharedAttempt = context.requestOutboxSync();
+
+  rejectFirst(new Error('Temporary network failure.'));
+  await Promise.all([firstAttempt, sharedAttempt]);
+  assert.equal(callCount, 2);
+});
+
 test('sync worker acknowledgements cannot clear or fail a newer outbox replacement', async () => {
   const databaseName = `resumeloomr-worker-ack-test-${Date.now()}`;
   const isolatedIndexedDb = {

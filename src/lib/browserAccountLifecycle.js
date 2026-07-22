@@ -52,7 +52,7 @@ export async function runBrowserSignOut({
 export async function runBrowserDisconnect({
   user,
   flushActiveCloudDraft,
-  disconnectAuth,
+  disconnectAuthSession,
   clearBrowserData,
   reloadBrowser,
 }) {
@@ -60,11 +60,16 @@ export async function runBrowserDisconnect({
     return { status: 'cloud-sync-incomplete' };
   }
 
-  if (!await disconnectAuth()) {
+  if (!await disconnectAuthSession()) {
     return { status: 'browser-disconnect-failed' };
   }
 
-  await clearBrowserData();
+  try {
+    await clearBrowserData();
+  } catch {
+    return { status: 'browser-data-clear-failed' };
+  }
+
   reloadBrowser();
   return { status: 'disconnected' };
 }

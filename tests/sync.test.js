@@ -885,7 +885,7 @@ test('browser disconnect never clears local data after an incomplete cloud flush
       calls.push(`flush:${reason}`);
       return false;
     },
-    disconnectAuth: async () => calls.push('disconnect-auth'),
+    disconnectAuthSession: async () => calls.push('disconnect-auth'),
     clearBrowserData: async () => calls.push('clear-browser'),
     reloadBrowser: () => calls.push('reload'),
   });
@@ -902,7 +902,7 @@ test('browser disconnect clears local data only after the auth connection is rem
       calls.push(`flush:${reason}`);
       return true;
     },
-    disconnectAuth: async () => {
+    disconnectAuthSession: async () => {
       calls.push('disconnect-auth');
       return true;
     },
@@ -916,6 +916,33 @@ test('browser disconnect clears local data only after the auth connection is rem
     'disconnect-auth',
     'clear-browser',
     'reload',
+  ]);
+});
+
+test('browser disconnect keeps cleanup retryable when local data removal fails', async () => {
+  const calls = [];
+  const result = await runBrowserDisconnect({
+    user: { uid: 'account-a' },
+    flushActiveCloudDraft: async ({ reason }) => {
+      calls.push(`flush:${reason}`);
+      return true;
+    },
+    disconnectAuthSession: async () => {
+      calls.push('disconnect-auth');
+      return true;
+    },
+    clearBrowserData: async () => {
+      calls.push('clear-browser');
+      throw new Error('Storage is blocked.');
+    },
+    reloadBrowser: () => calls.push('reload'),
+  });
+
+  assert.equal(result.status, 'browser-data-clear-failed');
+  assert.deepEqual(calls, [
+    'flush:disconnect-browser',
+    'disconnect-auth',
+    'clear-browser',
   ]);
 });
 

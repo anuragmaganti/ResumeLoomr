@@ -1,4 +1,5 @@
 import { setSyncSessionCleanupRequested } from './localWorkspaceDb.js';
+import { fetchWithTimeout } from './httpClient.js';
 
 const SYNC_SESSION_REFRESH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -13,7 +14,7 @@ function createEmptySessionState() {
 let syncSessionState = createEmptySessionState();
 
 async function createResumeSyncSession(idToken, { signal } = {}) {
-  const response = await fetch('/api/sync-session', {
+  const response = await fetchWithTimeout('/api/sync-session', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${idToken}`,
@@ -95,7 +96,7 @@ export async function clearResumeSyncSession() {
   resetResumeSyncSessionState();
 
   try {
-    const response = await fetch('/api/sync-session', {
+    const response = await fetchWithTimeout('/api/sync-session', {
       method: 'DELETE',
       credentials: 'include',
     });

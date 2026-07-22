@@ -13,7 +13,6 @@ import {
   initializeFirebaseAppCheck,
 } from '../lib/firebaseClient.js';
 import {
-  clearConnectedAccount,
   readConnectedAccount,
   writeConnectedAccount,
 } from '../lib/browserConnection.js';
@@ -149,7 +148,7 @@ export function useFirebaseAuth() {
         setAuthBusy(false);
       }
     },
-    async clearBrowserConnection() {
+    async disconnectAuthSession() {
       setAuthError('');
       const auth = getFirebaseAuth();
 
@@ -166,8 +165,6 @@ export function useFirebaseAuth() {
           await signOut(auth);
         }
 
-        clearConnectedAccount();
-        setConnectedAccount(null);
         return true;
       } catch (error) {
         setAuthError(getFriendlyAuthError(error));

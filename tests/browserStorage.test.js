@@ -8,6 +8,7 @@ import {
   writeStorageItem,
 } from '../src/lib/browserStorage.js';
 import {
+  clearBrowserResumeConnectionData,
   clearConnectedAccount,
   readConnectedAccount,
   readSignedOutEditingPreference,
@@ -81,4 +82,34 @@ test('storage key enumeration returns a stable snapshot', () => {
     keys: ['one', 'two'],
     succeeded: true,
   });
+});
+
+test('browser cleanup preserves the account marker when workspace cleanup fails', async () => {
+  const accountKey = 'resumeloomr:connected-account:v1';
+  const preferenceKey = 'resumeloomr:signed-out-editing-preference:v1';
+  const workspaceKey = 'resumeloomr:index:v1';
+  const values = new Map([
+    [accountKey, JSON.stringify({ uid: 'account-a' })],
+    [preferenceKey, JSON.stringify({ allow: true, skipPrompt: false })],
+    [workspaceKey, '{}'],
+  ]);
+  const storage = {
+    get length() { return values.size; },
+    key(index) { return [...values.keys()][index] || null; },
+    getItem(key) { return values.get(key) ?? null; },
+    removeItem(key) {
+      if (key === workspaceKey) {
+        throw new Error('Workspace storage is blocked.');
+      }
+
+      values.delete(key);
+    },
+  };
+
+  await assert.rejects(
+    clearBrowserResumeConnectionData({ storage }),
+    /Browser resume storage could not be cleared completely/,
+  );
+  assert.notEqual(storage.getItem(accountKey), null);
+  assert.notEqual(storage.getItem(preferenceKey), null);
 });

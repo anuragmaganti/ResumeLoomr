@@ -328,7 +328,8 @@ function sortResumeDocsByUpdatedAt(docs) {
 export async function readCloudSnapshot(uid) {
   const db = getAdminDb();
   const workspaceRef = db.doc(`users/${uid}/workspace/main`);
-  const [resumesSnapshot, tombstonesSnapshot] = await Promise.all([
+  const [workspaceSnapshot, resumesSnapshot, tombstonesSnapshot] = await Promise.all([
+    workspaceRef.get(),
     db.collection(`users/${uid}/resumes`).get(),
     db.collection(`users/${uid}/resumeTombstones`).get(),
   ]);
@@ -345,7 +346,6 @@ export async function readCloudSnapshot(uid) {
   const draftsByResumeId = new Map(
     resumeDocs.map((record) => [record.id, cloudDocToDraft(record.data)]),
   );
-  const workspaceSnapshot = await workspaceRef.get();
   const storedWorkspace = workspaceSnapshot.exists ? cloudWorkspaceFromDoc(workspaceSnapshot.data()) : null;
   const orderedResumeIds = storedWorkspace
     ? [
