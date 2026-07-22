@@ -61,35 +61,40 @@ export async function getLocalWorkspaceDb() {
   }
 
   if (!dbPromise) {
-    dbPromise = openDB(LOCAL_WORKSPACE_DB_NAME, LOCAL_WORKSPACE_DB_VERSION, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(WORKSPACE_STORE)) {
-          db.createObjectStore(WORKSPACE_STORE, { keyPath: 'id' });
-        }
+    // Opening IndexedDB can either throw synchronously or reject asynchronously.
+    // Cache a null result for this page session so callers consistently use the
+    // explicit localStorage fallback instead of repeatedly attempting a broken DB.
+    dbPromise = Promise.resolve()
+      .then(() => openDB(LOCAL_WORKSPACE_DB_NAME, LOCAL_WORKSPACE_DB_VERSION, {
+        upgrade(db) {
+          if (!db.objectStoreNames.contains(WORKSPACE_STORE)) {
+            db.createObjectStore(WORKSPACE_STORE, { keyPath: 'id' });
+          }
 
-        if (!db.objectStoreNames.contains(DRAFTS_STORE)) {
-          db.createObjectStore(DRAFTS_STORE, { keyPath: 'resumeId' });
-        }
+          if (!db.objectStoreNames.contains(DRAFTS_STORE)) {
+            db.createObjectStore(DRAFTS_STORE, { keyPath: 'resumeId' });
+          }
 
-        if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
-          const outboxStore = db.createObjectStore(OUTBOX_STORE, { keyPath: 'id' });
-          outboxStore.createIndex('status', 'status');
-          outboxStore.createIndex('updatedAt', 'updatedAt');
-          outboxStore.createIndex('resumeId', 'resumeId');
-        }
+          if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
+            const outboxStore = db.createObjectStore(OUTBOX_STORE, { keyPath: 'id' });
+            outboxStore.createIndex('status', 'status');
+            outboxStore.createIndex('updatedAt', 'updatedAt');
+            outboxStore.createIndex('resumeId', 'resumeId');
+          }
 
-        if (!db.objectStoreNames.contains(TOMBSTONES_STORE)) {
-          db.createObjectStore(TOMBSTONES_STORE, { keyPath: 'resumeId' });
-        }
+          if (!db.objectStoreNames.contains(TOMBSTONES_STORE)) {
+            db.createObjectStore(TOMBSTONES_STORE, { keyPath: 'resumeId' });
+          }
 
-        if (!db.objectStoreNames.contains(ACCOUNT_BINDING_STORE)) {
-          db.createObjectStore(ACCOUNT_BINDING_STORE, { keyPath: 'id' });
-        }
-      },
-      blocking(_currentVersion, _blockedVersion, event) {
-        event?.target?.close?.();
-      },
-    });
+          if (!db.objectStoreNames.contains(ACCOUNT_BINDING_STORE)) {
+            db.createObjectStore(ACCOUNT_BINDING_STORE, { keyPath: 'id' });
+          }
+        },
+        blocking(_currentVersion, _blockedVersion, event) {
+          event?.target?.close?.();
+        },
+      }))
+      .catch(() => null);
   }
 
   return dbPromise;

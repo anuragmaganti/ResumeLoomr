@@ -15,7 +15,11 @@ export function getLocalWorkspaceStorage() {
     return null;
   }
 
-  return window.localStorage;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
 }
 
 function safeJsonParse(rawValue) {
@@ -32,41 +36,78 @@ function safeJsonParse(rawValue) {
 
 export function markLocalWorkspacePresent() {
   try {
-    getLocalWorkspaceStorage()?.setItem(LOCAL_WORKSPACE_PRESENT_KEY, 'true');
+    const storage = getLocalWorkspaceStorage();
+
+    if (!storage) {
+      return false;
+    }
+
+    storage.setItem(LOCAL_WORKSPACE_PRESENT_KEY, 'true');
+    return true;
   } catch {
     // IndexedDB remains the durable source of truth if localStorage is full.
+    return false;
   }
 }
 
 export function writeLocalStorageWorkspace(workspace) {
   try {
-    getLocalWorkspaceStorage()?.setItem(
+    const storage = getLocalWorkspaceStorage();
+
+    if (!storage) {
+      return false;
+    }
+
+    storage.setItem(
       WORKSPACE_INDEX_STORAGE_KEY,
       JSON.stringify(normalizeWorkspaceIndex(workspace)),
     );
     markLocalWorkspacePresent();
+    return true;
   } catch {
-    markLocalWorkspacePresent();
+    return false;
   }
 }
 
 export function writeLocalStorageDraft(resumeId, draft) {
+  if (!resumeId) {
+    return false;
+  }
+
   try {
-    getLocalWorkspaceStorage()?.setItem(
+    const storage = getLocalWorkspaceStorage();
+
+    if (!storage) {
+      return false;
+    }
+
+    storage.setItem(
       createResumeStorageKey(resumeId),
       JSON.stringify(serializeDraftState(draft)),
     );
     markLocalWorkspacePresent();
+    return true;
   } catch {
-    markLocalWorkspacePresent();
+    return false;
   }
 }
 
 export function removeLocalStorageDraft(resumeId) {
+  if (!resumeId) {
+    return false;
+  }
+
   try {
-    getLocalWorkspaceStorage()?.removeItem(createResumeStorageKey(resumeId));
+    const storage = getLocalWorkspaceStorage();
+
+    if (!storage) {
+      return false;
+    }
+
+    storage.removeItem(createResumeStorageKey(resumeId));
+    return true;
   } catch {
-    // Best effort only.
+    return false;
   }
 }
 
@@ -77,7 +118,13 @@ export function readLegacyDraftFromLocalStorage(resumeId) {
     return null;
   }
 
-  return normalizeDraftState(safeJsonParse(storage.getItem(createResumeStorageKey(resumeId))));
+  try {
+    const draft = safeJsonParse(storage.getItem(createResumeStorageKey(resumeId)));
+
+    return draft ? normalizeDraftState(draft) : null;
+  } catch {
+    return null;
+  }
 }
 
 function readLegacyWorkspaceFromLocalStorage() {
@@ -88,7 +135,13 @@ function readLegacyWorkspaceFromLocalStorage() {
     return fresh;
   }
 
-  const rawWorkspace = safeJsonParse(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY));
+  let rawWorkspace = null;
+
+  try {
+    rawWorkspace = safeJsonParse(storage.getItem(WORKSPACE_INDEX_STORAGE_KEY));
+  } catch {
+    return fresh;
+  }
 
   if (!rawWorkspace) {
     return fresh;

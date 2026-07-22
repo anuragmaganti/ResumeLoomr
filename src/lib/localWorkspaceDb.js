@@ -49,6 +49,28 @@ import { getSyncOperationIdentity } from './localOutboxIdentity.js';
 
 export { deleteLocalWorkspaceDatabase } from './localWorkspaceDatabase.js';
 
+const INDEXED_DB_STORAGE_MODE = 'indexedDB';
+const LOCAL_STORAGE_FALLBACK_MODE = 'localStorage';
+const MEMORY_STORAGE_MODE = 'memory';
+
+function isBrowserRuntime() {
+  return typeof window !== 'undefined';
+}
+
+function getFallbackStorageMode() {
+  return isBrowserRuntime() ? LOCAL_STORAGE_FALLBACK_MODE : MEMORY_STORAGE_MODE;
+}
+
+function createLocalStorageFallbackError() {
+  return new Error('Browser storage could not persist this workspace.');
+}
+
+function requireLocalStorageFallbackWrite(success) {
+  if (!success) {
+    throw createLocalStorageFallbackError();
+  }
+}
+
 function createOutboxRecordId(type, resumeId = '', accountUid = '') {
   const accountScope = encodeURIComponent(trimText(accountUid) || 'guest');
   const operationKey = type === 'workspace' ? 'workspace' : `${type}:${resumeId}`;
@@ -159,7 +181,19 @@ export async function initializeLocalWorkspace() {
     const db = await getLocalWorkspaceDb();
 
     if (!db) {
-      return readLegacyWorkspaceSnapshot();
+      const fallbackSnapshot = readLegacyWorkspaceSnapshot();
+
+      if (isBrowserRuntime()) {
+        requireLocalStorageFallbackWrite(writeLocalStorageWorkspace(fallbackSnapshot.workspace));
+        requireLocalStorageFallbackWrite(
+          writeLocalStorageDraft(fallbackSnapshot.activeResumeId, fallbackSnapshot.draft),
+        );
+      }
+
+      return {
+        ...fallbackSnapshot,
+        storageMode: getFallbackStorageMode(),
+      };
     }
 
     const existingWorkspaceRecord = await readWorkspaceRecord(db);
@@ -176,6 +210,7 @@ export async function initializeLocalWorkspace() {
         draft,
         workspaceLocalRevision: existingWorkspaceRecord.localRevision || '',
         workspaceCloudVersion: normalizeCloudVersion(existingWorkspaceRecord.cloudVersion),
+        storageMode: INDEXED_DB_STORAGE_MODE,
       };
     }
 
@@ -205,6 +240,7 @@ export async function initializeLocalWorkspace() {
       ...legacySnapshot,
       workspaceLocalRevision: workspaceRecord?.localRevision || '',
       workspaceCloudVersion: normalizeCloudVersion(workspaceRecord?.cloudVersion),
+      storageMode: INDEXED_DB_STORAGE_MODE,
     };
   });
 }
@@ -213,7 +249,10 @@ async function readLocalWorkspaceSnapshot() {
   const db = await getLocalWorkspaceDb();
 
   if (!db) {
-    return readLegacyWorkspaceSnapshot();
+    return {
+      ...readLegacyWorkspaceSnapshot(),
+      storageMode: getFallbackStorageMode(),
+    };
   }
 
   await initializeLocalWorkspace();
@@ -232,6 +271,7 @@ async function readLocalWorkspaceSnapshot() {
     draft: await readLocalDraft(activeResumeId),
     workspaceLocalRevision: workspaceRecord?.localRevision || '',
     workspaceCloudVersion: normalizeCloudVersion(workspaceRecord?.cloudVersion),
+    storageMode: INDEXED_DB_STORAGE_MODE,
   };
 }
 
@@ -329,15 +369,70 @@ export async function persistLocalDraftSnapshot({
     const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
     const normalizedDraft = normalizeDraftState(draft);
 
-    if (!db || !resumeId) {
+    if (!resumeId) {
+      throw new TypeError('A resume ID is required to persist a draft.');
+    }
+
+    if (!db) {
+      const fallbackSnapshot = readLegacyWorkspaceSnapshot();
+      const existingDraft = readLegacyDraftFromLocalStorage(resumeId);
+      const currentRevision = getDraftStateRevision(existingDraft);
+
+      if (
+        expectedRevision
+        && !fallbackSnapshot.workspace.resumeIds.includes(resumeId)
+        && !allowStaleOverwrite
+      ) {
+        return {
+          workspace: fallbackSnapshot.workspace,
+          draft: null,
+          conflict: false,
+          deleted: true,
+          skipped: true,
+          storageMode: LOCAL_STORAGE_FALLBACK_MODE,
+        };
+      }
+
+      if (
+        expectedRevision
+        && currentRevision
+        && currentRevision !== expectedRevision
+        && !allowStaleOverwrite
+      ) {
+        return {
+          workspace: normalizedWorkspace,
+          draft: existingDraft,
+          conflict: true,
+          expectedRevision,
+          currentRevision,
+          storageMode: getFallbackStorageMode(),
+        };
+      }
+
       const nextRevision = createLocalRevision();
       const draftWithRevision = normalizeDraftWithRevision(normalizedDraft, nextRevision);
+      const persistedWorkspace = persistWorkspace
+        ? mergeConcurrentLocalWorkspaces(
+          fallbackSnapshot.workspace,
+          normalizedWorkspace,
+          [],
+        )
+        : normalizedWorkspace;
 
       if (persistWorkspace) {
-        writeLocalStorageWorkspace(normalizedWorkspace);
+        if (isBrowserRuntime()) {
+          requireLocalStorageFallbackWrite(writeLocalStorageWorkspace(persistedWorkspace));
+        }
       }
-      writeLocalStorageDraft(resumeId, draftWithRevision);
-      return { workspace: normalizedWorkspace, draft: draftWithRevision, conflict: false };
+      if (isBrowserRuntime()) {
+        requireLocalStorageFallbackWrite(writeLocalStorageDraft(resumeId, draftWithRevision));
+      }
+      return {
+        workspace: persistedWorkspace,
+        draft: draftWithRevision,
+        conflict: false,
+        storageMode: getFallbackStorageMode(),
+      };
     }
 
     const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
@@ -408,7 +503,12 @@ export async function persistLocalDraftSnapshot({
     }
     writeLocalStorageDraft(resumeId, draftWithRevision);
 
-    return { workspace: persistedWorkspace, draft: draftWithRevision, conflict: false };
+    return {
+      workspace: persistedWorkspace,
+      draft: draftWithRevision,
+      conflict: false,
+      storageMode: INDEXED_DB_STORAGE_MODE,
+    };
   });
 }
 
@@ -423,8 +523,18 @@ export async function persistLocalWorkspaceSnapshot({
     const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
 
     if (!db) {
-      writeLocalStorageWorkspace(normalizedWorkspace);
-      return normalizedWorkspace;
+      if (!isBrowserRuntime()) {
+        return normalizedWorkspace;
+      }
+
+      const persistedWorkspace = mergeConcurrentLocalWorkspaces(
+        readLegacyWorkspaceSnapshot().workspace,
+        normalizedWorkspace,
+        [],
+      );
+
+      requireLocalStorageFallbackWrite(writeLocalStorageWorkspace(persistedWorkspace));
+      return persistedWorkspace;
     }
 
     const tx = db.transaction([WORKSPACE_STORE, OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
@@ -467,10 +577,30 @@ export async function persistLocalResumeBatchDelete({
         .filter(Boolean),
     )];
 
-    if (!db || deletedResumeIds.length === 0) {
-      writeLocalStorageWorkspace(normalizedWorkspace);
-      deletedResumeIds.forEach(removeLocalStorageDraft);
+    if (deletedResumeIds.length === 0) {
       return normalizedWorkspace;
+    }
+
+    if (!db) {
+      if (!isBrowserRuntime()) {
+        return normalizedWorkspace;
+      }
+
+      const mergedWorkspace = mergeConcurrentLocalWorkspaces(
+        readLegacyWorkspaceSnapshot().workspace,
+        normalizedWorkspace,
+        [],
+      );
+      const deletionResult = removeWorkspaceResumes(mergedWorkspace, deletedResumeIds);
+      const persistedWorkspace = deletionResult.rejectedReason
+        ? normalizedWorkspace
+        : deletionResult.workspace;
+
+      requireLocalStorageFallbackWrite(writeLocalStorageWorkspace(persistedWorkspace));
+      deletedResumeIds.forEach((resumeId) => {
+        requireLocalStorageFallbackWrite(removeLocalStorageDraft(resumeId));
+      });
+      return persistedWorkspace;
     }
 
     const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
@@ -525,17 +655,23 @@ export async function persistLoginMergedWorkspace({
     const upsertResumeIds = Array.isArray(syncPlan.upsertResumeIds) ? syncPlan.upsertResumeIds : [];
     const deleteResumeIds = Array.isArray(syncPlan.deleteResumeIds) ? syncPlan.deleteResumeIds : [];
 
-    writeLocalStorageWorkspace(normalizedWorkspace);
+    const workspaceMirrored = writeLocalStorageWorkspace(normalizedWorkspace);
+    let draftsMirrored = true;
+
     draftsByResumeId.forEach((draft, resumeId) => {
       if (normalizedWorkspace.resumeIds.includes(resumeId)) {
-        writeLocalStorageDraft(resumeId, draft);
+        draftsMirrored = writeLocalStorageDraft(resumeId, draft) && draftsMirrored;
       }
     });
 
     if (!db) {
+      if (isBrowserRuntime()) {
+        requireLocalStorageFallbackWrite(workspaceMirrored && draftsMirrored);
+      }
       return {
         workspace: normalizedWorkspace,
         draftsByResumeId,
+        storageMode: getFallbackStorageMode(),
       };
     }
 
@@ -615,6 +751,7 @@ export async function persistLoginMergedWorkspace({
     return {
       workspace: normalizedWorkspace,
       draftsByResumeId,
+      storageMode: INDEXED_DB_STORAGE_MODE,
     };
   });
 }
@@ -637,6 +774,7 @@ export async function readDurableLocalBrowserContext() {
     return {
       accountBinding: null,
       hasWorkspaceData: legacy.workspace.resumeIds.length > 0,
+      storageMode: getFallbackStorageMode(),
     };
   }
 
@@ -650,6 +788,7 @@ export async function readDurableLocalBrowserContext() {
   return {
     accountBinding: accountBinding || null,
     hasWorkspaceData: workspace.resumeIds.length > 0 || draftRecords.length > 0,
+    storageMode: INDEXED_DB_STORAGE_MODE,
   };
 }
 

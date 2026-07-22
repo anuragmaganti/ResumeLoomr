@@ -27,10 +27,14 @@ function NoticeDismissIcon() {
 function getNoticePresentation(notice, syncState) {
   const isSyncError = syncState === 'error';
   const isCloudUnavailable = isSyncError && notice?.message === 'Cloud sync is unavailable. Your local draft is still editable.';
+  const isLimitedBrowserStorage = notice?.id === 'limited-browser-storage';
 
   return {
     isSyncError,
-    title: isCloudUnavailable ? 'Cloud sync unavailable' : '',
+    showRetry: isSyncError && !isLimitedBrowserStorage,
+    title: isLimitedBrowserStorage
+      ? 'Limited browser storage'
+      : (isCloudUnavailable ? 'Cloud sync unavailable' : ''),
     message: isCloudUnavailable ? 'Your work is saved locally and remains editable.' : notice?.message,
   };
 }
@@ -57,7 +61,7 @@ export default function NoticeToast({ notice, syncState, onRetry, onDismiss }) {
         <span>{presentation.message}</span>
       </span>
       <span className="noticeToastActions">
-        {presentation.isSyncError ? (
+        {presentation.showRetry ? (
           <button type="button" className="noticeToastRetry" onClick={onRetry}>
             Retry
           </button>
