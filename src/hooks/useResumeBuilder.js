@@ -11,6 +11,7 @@ import {
   resolveTransientSampleEntry,
 } from '../lib/resumeSampleProjection.js';
 import { createResumeEditorActions } from '../lib/resumeEditorActions.js';
+import { createCoverLetterEditorActions } from '../lib/coverLetterEditorActions.js';
 import { getPreviewModel } from '../lib/resumePreviewModel.js';
 import {
   TEMPLATE_OPTIONS,
@@ -63,14 +64,9 @@ import {
 import { ensureResumeSyncSession } from '../lib/syncSession.js';
 import {
   createBlankCoverLetterDraft,
-  createCoverLetterBulletItem,
-  createCoverLetterBulletListBlock,
-  createCoverLetterParagraphBlock,
   createSavedCoverLetterDraft,
   normalizeCoverLetterDraft,
   reconcileImportedCoverLetterSender,
-  reorderCoverLetterBodyBlocks,
-  reorderCoverLetterBullets,
   updateCoverLetter as applyCoverLetterUpdate,
 } from '../lib/coverLetter.js';
 import {
@@ -92,6 +88,14 @@ function getDraftEditorSectionIds(draft) {
 
 function isOnline() {
   return typeof navigator === 'undefined' || navigator.onLine;
+}
+
+function useLatestRef(value) {
+  const ref = useRef(value);
+  useEffect(() => {
+    ref.current = value;
+  }, [value]);
+  return ref;
 }
 
 export function useResumeBuilder({ user = null, authReady = true } = {}) {
@@ -129,10 +133,10 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   const editorCoverLetterResumeIdRef = useRef('');
   const editorDraftRevisionRef = useRef(initialWorkspaceState.draft.localRevision || '');
   const editorCoverLetterRevisionRef = useRef('');
-  const workspaceRef = useRef(initialWorkspaceState.workspace);
-  const activeResumeIdRef = useRef(initialWorkspaceState.workspace.activeResumeId);
-  const activeDocumentTypeRef = useRef('resume');
-  const userRef = useRef(user);
+  const workspaceRef = useLatestRef(workspace);
+  const activeResumeIdRef = useLatestRef(workspace.activeResumeId);
+  const activeDocumentTypeRef = useLatestRef(activeDocumentType);
+  const userRef = useLatestRef(user);
   const printViewRef = useRef(null);
   const mobileViewRef = useRef('editor');
   const syncTimerRef = useRef(null);
@@ -150,7 +154,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     [initialWorkspaceState.workspace.activeResumeId, initialWorkspaceState.draft.localRevision || ''],
   ]));
   const coverLetterRevisionByIdRef = useRef(new Map());
-  const conflictRef = useRef(null);
+  const conflictRef = useLatestRef(conflict);
   const transientSampleEntryRef = useRef(null);
   const activeResumeId = workspace.activeResumeId;
   const errors = useMemo(() => validateResume(resume), [resume]);
@@ -207,16 +211,8 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   }, [coverLetter, coverLetterSavedAt, coverLetterTemplate]);
 
   useEffect(() => {
-    workspaceRef.current = workspace;
-  }, [workspace]);
-
-  useEffect(() => {
-    activeResumeIdRef.current = activeResumeId;
-  }, [activeResumeId]);
-
-  useEffect(() => {
-    activeDocumentTypeRef.current = activeDocumentType;
-  }, [activeDocumentType]);
+    mobileViewRef.current = mobileView;
+  }, [mobileView]);
 
   useEffect(() => {
     if (!localReady || !activeResumeId) return;
@@ -226,18 +222,6 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       coverLetterId: activeDocumentType === 'coverLetter' ? activeCoverLetterId : '',
     });
   }, [activeCoverLetterId, activeDocumentType, activeResumeId, localReady]);
-
-  useEffect(() => {
-    userRef.current = user;
-  }, [user]);
-
-  useEffect(() => {
-    conflictRef.current = conflict;
-  }, [conflict]);
-
-  useEffect(() => {
-    mobileViewRef.current = mobileView;
-  }, [mobileView]);
 
   useEffect(() => {
     registerResumeSyncWorker();
@@ -2054,173 +2038,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     endTransientSampleEntry,
     endTransientSampleEntryUnless,
   });
-  const coverLetterActions = {
-    setSenderMode(mode) {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        sender: { ...letter.sender, mode: mode === 'custom' ? 'custom' : 'resume' },
-      }));
-    },
-    updateSenderOverride(field, value) {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        sender: {
-          ...letter.sender,
-          overrides: { ...letter.sender.overrides, [field]: value },
-        },
-      }));
-    },
-    resetSenderOverride(field) {
-      updateCoverLetter((letter) => {
-        const overrides = { ...letter.sender.overrides };
-        delete overrides[field];
-        return { ...letter, sender: { ...letter.sender, overrides } };
-      });
-    },
-    updateRecipientField(field, value) {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        recipient: { ...letter.recipient, [field]: value },
-      }));
-    },
-    updateRecipientAddressLine(index, value) {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        recipient: {
-          ...letter.recipient,
-          addressLines: letter.recipient.addressLines.map((line, lineIndex) => (
-            lineIndex === index ? value : line
-          )),
-        },
-      }));
-    },
-    addRecipientAddressLine() {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        recipient: {
-          ...letter.recipient,
-          addressLines: [...letter.recipient.addressLines, ''],
-        },
-      }));
-    },
-    removeRecipientAddressLine(index) {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        recipient: {
-          ...letter.recipient,
-          addressLines: letter.recipient.addressLines.filter((_, lineIndex) => lineIndex !== index),
-        },
-      }));
-    },
-    updateGreeting(value) {
-      updateCoverLetter((letter) => ({ ...letter, greeting: value }));
-    },
-    updateBodyBlock(blockId, value) {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        bodyBlocks: letter.bodyBlocks.map((block) => (
-          block.id === blockId && block.kind === 'paragraph' ? { ...block, text: value } : block
-        )),
-      }));
-    },
-    addParagraph(role = 'evidence') {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        bodyBlocks: [...letter.bodyBlocks, createCoverLetterParagraphBlock(role)],
-      }));
-    },
-    addBulletList() {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        bodyBlocks: [...letter.bodyBlocks, createCoverLetterBulletListBlock()],
-      }));
-    },
-    removeBodyBlock(blockId) {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        bodyBlocks: letter.bodyBlocks.filter((block) => block.id !== blockId),
-      }));
-    },
-    reorderBodyBlocks(orderedIds) {
-      updateCoverLetter((letter) => reorderCoverLetterBodyBlocks(letter, orderedIds));
-    },
-    updateBullet(blockId, bulletId, value) {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        bodyBlocks: letter.bodyBlocks.map((block) => (
-          block.id === blockId && block.kind === 'bulletList'
-            ? {
-              ...block,
-              items: block.items.map((item) => (item.id === bulletId ? { ...item, text: value } : item)),
-            }
-            : block
-        )),
-      }));
-    },
-    addBullet(blockId) {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        bodyBlocks: letter.bodyBlocks.map((block) => (
-          block.id === blockId && block.kind === 'bulletList'
-            ? { ...block, items: [...block.items, createCoverLetterBulletItem()] }
-            : block
-        )),
-      }));
-    },
-    removeBullet(blockId, bulletId) {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        bodyBlocks: letter.bodyBlocks.map((block) => (
-          block.id === blockId && block.kind === 'bulletList'
-            ? { ...block, items: block.items.filter((item) => item.id !== bulletId) }
-            : block
-        )),
-      }));
-    },
-    reorderBullets(blockId, orderedIds) {
-      updateCoverLetter((letter) => reorderCoverLetterBullets(letter, blockId, orderedIds));
-    },
-    updateSignOff(value) {
-      updateCoverLetter((letter) => ({ ...letter, signOff: value }));
-    },
-    updateSignatureName(value) {
-      updateCoverLetter((letter) => ({ ...letter, signatureName: value }));
-    },
-    setSampleInformationVisible(showInformation) {
-      updateCoverLetter((letter) => {
-        if (letter.sampleDisplay.isDismissed) return letter;
-        return {
-          ...letter,
-          sampleDisplay: {
-            ...letter.sampleDisplay,
-            hasStarted: true,
-            showInformation: Boolean(showInformation),
-          },
-        };
-      });
-    },
-    dismissSampleInformation() {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        sampleDisplay: {
-          hasStarted: true,
-          showInformation: false,
-          isDismissed: true,
-          entryBindings: {},
-          textListOrders: {},
-        },
-      }));
-    },
-    updateSetting(settingId, delta) {
-      updateCoverLetter((letter) => ({
-        ...letter,
-        settings: {
-          ...letter.settings,
-          [settingId]: Number(letter.settings[settingId] || 0) + delta,
-        },
-      }));
-    },
-  };
+  const coverLetterActions = createCoverLetterEditorActions(updateCoverLetter);
 
   return {
     resume,

@@ -4,6 +4,30 @@ import { createPortal } from 'react-dom';
 import { COVER_LETTER_TEMPLATE_OPTIONS } from '../lib/coverLetter.js';
 import { trapTabKey } from '../lib/focusTrap.js';
 
+function useDialogKeyboard({ isOpen, busy, onClose, dialogRef, initialFocus = 'button' }) {
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const frameId = window.requestAnimationFrame(() => (
+      dialogRef.current?.querySelector(initialFocus)?.focus()
+    ));
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape' && !busy) {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      trapTabKey(event, dialogRef.current);
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [busy, dialogRef, initialFocus, isOpen, onClose]);
+}
+
 function TemplateMiniature({ template }) {
   return (
     <span className={`coverLetterTemplateMiniature coverLetterTemplateMiniature--${template}`} aria-hidden="true">
@@ -28,30 +52,12 @@ export function CoverLetterTemplateDialog({
   const dialogRef = useRef(null);
   const [selectedTemplate, setSelectedTemplate] = useState(initialTemplate);
 
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    const frameId = window.requestAnimationFrame(() => dialogRef.current?.querySelector('button')?.focus());
-
-    function handleKeyDown(event) {
-      if (event.key === 'Escape' && !busy) {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      trapTabKey(event, dialogRef.current);
-    }
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [busy, initialTemplate, isOpen, onClose]);
+  useDialogKeyboard({ isOpen, busy, onClose, dialogRef });
 
   if (!isOpen || typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="authOverlay coverLetterTemplateOverlay">
+    <div className="authOverlay">
       <button type="button" className="authBackdrop" onClick={onClose} aria-label="Close template chooser" disabled={busy} />
       <section
         ref={dialogRef}
@@ -97,23 +103,13 @@ export function CoverLetterTemplateDialog({
 export function CoverLetterDeleteDialog({ letter, busy = false, onCancel, onConfirm }) {
   const dialogRef = useRef(null);
 
-  useEffect(() => {
-    if (!letter) return undefined;
-    const frameId = window.requestAnimationFrame(() => dialogRef.current?.querySelector('[data-cancel]')?.focus());
-    function handleKeyDown(event) {
-      if (event.key === 'Escape' && !busy) {
-        event.preventDefault();
-        onCancel();
-        return;
-      }
-      trapTabKey(event, dialogRef.current);
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [busy, letter, onCancel]);
+  useDialogKeyboard({
+    isOpen: Boolean(letter),
+    busy,
+    onClose: onCancel,
+    dialogRef,
+    initialFocus: '[data-cancel]',
+  });
 
   if (!letter || typeof document === 'undefined') return null;
 

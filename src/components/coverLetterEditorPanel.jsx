@@ -27,7 +27,7 @@ const senderLabels = {
   customField: 'Custom field',
 };
 
-function Field({ label, path, value, placeholder = '', multiline = false, onChange, onBlur }) {
+function Field({ label, path, value, placeholder = '', multiline = false, onChange }) {
   const Component = multiline ? 'textarea' : 'input';
   return (
     <div className="field">
@@ -38,7 +38,6 @@ function Field({ label, path, value, placeholder = '', multiline = false, onChan
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        onBlur={onBlur}
         rows={multiline ? 4 : undefined}
       />
     </div>

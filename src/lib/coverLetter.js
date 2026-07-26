@@ -40,6 +40,11 @@ const SETTING_MIN = -5;
 const SETTING_MAX = 5;
 const BODY_ROLES = new Set(['opening', 'evidence', 'closing']);
 const TEMPLATE_IDS = new Set(COVER_LETTER_TEMPLATE_OPTIONS.map((option) => option.id));
+const TEMPLATE_PRESENTATION = {
+  compact: { margin: 0.56, body: 0.76, line: 1.46, paragraph: 12, name: 1.12 },
+  executive: { margin: 0.68, body: 0.79, line: 1.55, paragraph: 14, name: 1.15 },
+  modern: { margin: 0.62, body: 0.78, line: 1.52, paragraph: 15, name: 1.22 },
+};
 
 function createId(prefix) {
   return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Math.random().toString(36).slice(2, 12)}`;
@@ -53,6 +58,17 @@ function normalizeInteger(value, fallback = 0) {
 
 function normalizeString(value, maxLength = 12_000) {
   return typeof value === 'string' ? value.slice(0, maxLength) : '';
+}
+
+function getTemplatePresentation(template) {
+  return TEMPLATE_PRESENTATION[template] || TEMPLATE_PRESENTATION.compact;
+}
+
+function reorderExact(items, orderedIds) {
+  const requested = Array.isArray(orderedIds) ? orderedIds : [];
+  const byId = new Map(items.map((item) => [item.id, item]));
+  if (requested.length !== byId.size || requested.some((id) => !byId.has(id))) return null;
+  return requested.map((id) => byId.get(id));
 }
 
 function normalizeAddressLines(value) {
@@ -338,10 +354,8 @@ export function updateCoverLetter(candidate, updater) {
 
 export function reorderCoverLetterBodyBlocks(candidate, orderedIds) {
   return updateCoverLetter(candidate, (letter) => {
-    const byId = new Map(letter.bodyBlocks.map((block) => [block.id, block]));
-    const requested = Array.isArray(orderedIds) ? orderedIds : [];
-    if (requested.length !== byId.size || requested.some((id) => !byId.has(id))) return letter;
-    return { ...letter, bodyBlocks: requested.map((id) => byId.get(id)) };
+    const bodyBlocks = reorderExact(letter.bodyBlocks, orderedIds);
+    return bodyBlocks ? { ...letter, bodyBlocks } : letter;
   });
 }
 
@@ -350,21 +364,15 @@ export function reorderCoverLetterBullets(candidate, blockId, orderedIds) {
     ...letter,
     bodyBlocks: letter.bodyBlocks.map((block) => {
       if (block.id !== blockId || block.kind !== 'bulletList') return block;
-      const byId = new Map(block.items.map((item) => [item.id, item]));
-      const requested = Array.isArray(orderedIds) ? orderedIds : [];
-      if (requested.length !== byId.size || requested.some((id) => !byId.has(id))) return block;
-      return { ...block, items: requested.map((id) => byId.get(id)) };
+      const items = reorderExact(block.items, orderedIds);
+      return items ? { ...block, items } : block;
     }),
   }));
 }
 
 export function getCoverLetterPresentationVars(candidate, template = 'compact') {
   const settings = normalizeCoverLetter(candidate, candidate?.resumeId).settings;
-  const base = template === 'executive'
-    ? { margin: 0.68, body: 0.79, line: 1.55, paragraph: 14, name: 1.15 }
-    : template === 'modern'
-      ? { margin: 0.62, body: 0.78, line: 1.52, paragraph: 15, name: 1.22 }
-      : { margin: 0.56, body: 0.76, line: 1.46, paragraph: 12, name: 1.12 };
+  const base = getTemplatePresentation(template);
 
   const marginInline = `${base.margin + settings.horizontalMargins * 0.04}in`;
   const marginBlock = `${base.margin + settings.verticalMargins * 0.04}in`;
@@ -384,9 +392,9 @@ export function getCoverLetterPresentationVars(candidate, template = 'compact') 
 
 export function getCoverLetterPrintPageRule(candidate, template = 'compact') {
   const settings = normalizeCoverLetter(candidate, candidate?.resumeId).settings;
-  const baseMargin = template === 'executive' ? 0.68 : template === 'modern' ? 0.62 : 0.56;
-  const marginInline = baseMargin + settings.horizontalMargins * 0.04;
-  const marginBlock = baseMargin + settings.verticalMargins * 0.04;
+  const { margin } = getTemplatePresentation(template);
+  const marginInline = margin + settings.horizontalMargins * 0.04;
+  const marginBlock = margin + settings.verticalMargins * 0.04;
 
   return `
     @page { size: Letter; margin: ${marginBlock}in ${marginInline}in; }

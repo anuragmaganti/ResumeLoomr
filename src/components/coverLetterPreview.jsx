@@ -236,22 +236,22 @@ export default function CoverLetterPreview({
       : {};
   }
 
-  function targetAttributes(target) {
+  function targetAttributes(path) {
     return {
       'data-edit-section-id': 'coverLetter',
-      'data-edit-path': target.path,
-      ...pulseAttributes(target.path),
+      'data-edit-path': path,
+      ...pulseAttributes(path),
     };
   }
 
-  function renderEditableText(value, target, { fallback = '', prefix = '', suffix = '' } = {}) {
+  function renderEditableText(value, path, { fallback = '', prefix = '', suffix = '' } = {}) {
     const sourceText = value === undefined || value === null ? '' : String(value);
     const displayText = sourceText || fallback;
     const hasTypedCaret = typeof activeEditorCaret?.value === 'string' && activeEditorCaret.value.length > 0;
     const showCaret = (
       (!isSamplePreview || hasTypedCaret)
       && !activeDrag
-      && activeEditorCaret?.path === target.path
+      && activeEditorCaret?.path === path
       && Number.isFinite(activeEditorCaret.offset)
     );
     const caretValue = typeof activeEditorCaret?.value === 'string' ? activeEditorCaret.value : sourceText;
@@ -262,7 +262,7 @@ export default function CoverLetterPreview({
         {prefix ? <span data-preview-caret-decoration="prefix">{prefix}</span> : null}
         <span
           data-preview-caret-text="true"
-          data-preview-caret-path={target.path}
+          data-preview-caret-path={path}
           data-preview-caret-display={showCaret ? (caretValue || fallback) : displayText}
         >
           {showCaret ? (
@@ -363,6 +363,11 @@ export default function CoverLetterPreview({
     ['portfolioUrl', renderedSender.portfolioUrl],
     ['customField', renderedSender.customField],
   ].filter(([, value]) => Boolean(value));
+  const recipientDetails = [
+    ['hiringManagerName', renderedLetter.recipient.hiringManagerName],
+    ['hiringManagerTitle', renderedLetter.recipient.hiringManagerTitle],
+    ['company', renderedLetter.recipient.company],
+  ].filter(([, value]) => Boolean(value));
   const signatureName = renderedLetter.signatureName || renderedSender.name;
   const bodyIds = renderedLetter.bodyBlocks.map((block) => blockDragId(block.id));
   const pageHeight = Math.max(pageMetrics.pageHeight || 1056, pageMetrics.contentHeight || 1056);
@@ -409,21 +414,21 @@ export default function CoverLetterPreview({
                     <div className="resumePageContent coverLetterPageContent" data-preview-page-content="true">
                       {isSamplePreview ? <p className="coverLetterSampleLabel">Sample cover letter. Disappears as you replace it.</p> : null}
                       <header className="coverLetterSender">
-                        <h1 {...targetAttributes({ path: coverLetterSenderPath('name') })}>
-                          {renderEditableText(renderedSender.name, { path: coverLetterSenderPath('name') }, { fallback: isPrintRendering ? '' : 'Your Name' })}
+                        <h1 {...targetAttributes(coverLetterSenderPath('name'))}>
+                          {renderEditableText(renderedSender.name, coverLetterSenderPath('name'), { fallback: isPrintRendering ? '' : 'Your Name' })}
                         </h1>
                         {renderedSender.headline ? (
-                          <p {...targetAttributes({ path: coverLetterSenderPath('headline') })}>
-                            {renderEditableText(renderedSender.headline, { path: coverLetterSenderPath('headline') })}
+                          <p {...targetAttributes(coverLetterSenderPath('headline'))}>
+                            {renderEditableText(renderedSender.headline, coverLetterSenderPath('headline'))}
                           </p>
                         ) : null}
                         {senderDetails.length ? (
                           <p className="coverLetterSenderDetails">
-                            {senderDetails.map(([field, detail], index) => {
-                              const target = { path: coverLetterSenderPath(field) };
+                            {senderDetails.map(([field, detail]) => {
+                              const path = coverLetterSenderPath(field);
                               return (
-                                <span key={`${field}-${index}`} {...targetAttributes(target)}>
-                                  {renderEditableText(detail, target)}
+                                <span key={field} {...targetAttributes(path)}>
+                                  {renderEditableText(detail, path)}
                                 </span>
                               );
                             })}
@@ -433,36 +438,25 @@ export default function CoverLetterPreview({
 
                       <div className="coverLetterRecipientDate">
                         <div className="coverLetterRecipient" data-page-break-kind="entry">
-                          {renderedLetter.recipient.hiringManagerName ? (
-                            <p {...targetAttributes({ path: coverLetterRecipientPath('hiringManagerName') })}>
-                              {renderEditableText(renderedLetter.recipient.hiringManagerName, { path: coverLetterRecipientPath('hiringManagerName') })}
-                            </p>
-                          ) : null}
-                          {renderedLetter.recipient.hiringManagerTitle ? (
-                            <p {...targetAttributes({ path: coverLetterRecipientPath('hiringManagerTitle') })}>
-                              {renderEditableText(renderedLetter.recipient.hiringManagerTitle, { path: coverLetterRecipientPath('hiringManagerTitle') })}
-                            </p>
-                          ) : null}
-                          {renderedLetter.recipient.company ? (
-                            <p {...targetAttributes({ path: coverLetterRecipientPath('company') })}>
-                              {renderEditableText(renderedLetter.recipient.company, { path: coverLetterRecipientPath('company') })}
-                            </p>
-                          ) : null}
-                          {renderedLetter.recipient.addressLines.map((line, index) => line ? (
-                            <p key={`address-${index}`} {...targetAttributes({ path: coverLetterAddressPath(index) })}>
-                              {renderEditableText(line, { path: coverLetterAddressPath(index) })}
-                            </p>
-                          ) : null)}
+                          {recipientDetails.map(([field, value]) => {
+                            const path = coverLetterRecipientPath(field);
+                            return <p key={field} {...targetAttributes(path)}>{renderEditableText(value, path)}</p>;
+                          })}
+                          {renderedLetter.recipient.addressLines.map((line, index) => {
+                            if (!line) return null;
+                            const path = coverLetterAddressPath(index);
+                            return <p key={`address-${index}`} {...targetAttributes(path)}>{renderEditableText(line, path)}</p>;
+                          })}
                         </div>
                         {renderedLetter.recipient.date ? (
-                          <p className="coverLetterDate" {...targetAttributes({ path: coverLetterRecipientPath('date') })}>
-                            {renderEditableText(renderedLetter.recipient.date, { path: coverLetterRecipientPath('date') })}
+                          <p className="coverLetterDate" {...targetAttributes(coverLetterRecipientPath('date'))}>
+                            {renderEditableText(renderedLetter.recipient.date, coverLetterRecipientPath('date'))}
                           </p>
                         ) : null}
                       </div>
 
-                      <p className="coverLetterGreeting" {...targetAttributes({ path: coverLetterSimplePath('greeting') })}>
-                        {renderEditableText(renderedLetter.greeting, { path: coverLetterSimplePath('greeting') }, { fallback: isPrintRendering ? '' : 'Dear Hiring Manager,' })}
+                      <p className="coverLetterGreeting" {...targetAttributes(coverLetterSimplePath('greeting'))}>
+                        {renderEditableText(renderedLetter.greeting, coverLetterSimplePath('greeting'), { fallback: isPrintRendering ? '' : 'Dear Hiring Manager,' })}
                       </p>
 
                       <SortableContext items={bodyIds} strategy={verticalListSortingStrategy}>
@@ -470,8 +464,8 @@ export default function CoverLetterPreview({
                           {renderedLetter.bodyBlocks.map((block) => (
                             <SortableLetterBlock block={block} key={block.id}>
                               {block.kind === 'paragraph' ? (
-                                <p {...targetAttributes({ path: coverLetterBodyPath(block.id) })}>
-                                  {renderEditableText(block.text, { path: coverLetterBodyPath(block.id) }, { fallback: isPrintRendering ? '' : 'Write your cover letter here.' })}
+                                <p {...targetAttributes(coverLetterBodyPath(block.id))}>
+                                  {renderEditableText(block.text, coverLetterBodyPath(block.id), { fallback: isPrintRendering ? '' : 'Write your cover letter here.' })}
                                 </p>
                               ) : (
                                 <SortableContext
@@ -481,8 +475,8 @@ export default function CoverLetterPreview({
                                   <ul>
                                     {block.items.map((item) => (
                                       <SortableLetterBullet blockId={block.id} item={item} key={item.id}>
-                                        <span {...targetAttributes({ path: coverLetterBulletPath(block.id, item.id) })}>
-                                          {renderEditableText(item.text, { path: coverLetterBulletPath(block.id, item.id) }, { fallback: isPrintRendering ? '' : 'Add a proof point.' })}
+                                        <span {...targetAttributes(coverLetterBulletPath(block.id, item.id))}>
+                                          {renderEditableText(item.text, coverLetterBulletPath(block.id, item.id), { fallback: isPrintRendering ? '' : 'Add a proof point.' })}
                                         </span>
                                       </SortableLetterBullet>
                                     ))}
@@ -495,11 +489,11 @@ export default function CoverLetterPreview({
                       </SortableContext>
 
                       <footer className="coverLetterClosing" data-page-break-kind="entry">
-                        <p {...targetAttributes({ path: coverLetterSimplePath('signOff') })}>
-                          {renderEditableText(renderedLetter.signOff, { path: coverLetterSimplePath('signOff') }, { fallback: isPrintRendering ? '' : 'Sincerely,' })}
+                        <p {...targetAttributes(coverLetterSimplePath('signOff'))}>
+                          {renderEditableText(renderedLetter.signOff, coverLetterSimplePath('signOff'), { fallback: isPrintRendering ? '' : 'Sincerely,' })}
                         </p>
-                        <p className="coverLetterSignature" {...targetAttributes({ path: coverLetterSimplePath('signatureName') })}>
-                          {renderEditableText(signatureName, { path: coverLetterSimplePath('signatureName') }, { fallback: isPrintRendering ? '' : 'Your Name' })}
+                        <p className="coverLetterSignature" {...targetAttributes(coverLetterSimplePath('signatureName'))}>
+                          {renderEditableText(signatureName, coverLetterSimplePath('signatureName'), { fallback: isPrintRendering ? '' : 'Your Name' })}
                         </p>
                       </footer>
                     </div>
