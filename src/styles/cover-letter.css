@@ -43,8 +43,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  padding: 9px 11px;
+  gap: var(--space-2);
+  padding: 7px 9px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-control);
   background: var(--color-surface-muted);
@@ -53,7 +53,7 @@
 .coverLetterSenderInheritance p {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 680;
   line-height: 1.35;
 }
@@ -78,10 +78,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: 100%;
-  min-height: 34px;
-  padding: 7px 10px;
+  min-height: 30px;
+  padding: 5px 9px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-control);
   background: var(--color-surface-elevated);
@@ -112,11 +112,11 @@
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  min-height: 20px;
-  padding: 3px 4px 0;
+  min-height: 16px;
+  padding: 1px 3px 0;
   color: var(--color-text-subtle);
-  font-size: 0.62rem;
-  font-weight: 700;
+  font-size: 0.59rem;
+  font-weight: 560;
 }
 
 .coverLetterFieldSource button {
@@ -125,17 +125,19 @@
   background: transparent;
   color: var(--color-accent-strong);
   font: inherit;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .coverLetterFieldSource.isOverride span {
   color: var(--color-text-muted);
+  font-weight: 650;
 }
 
 .coverLetterAddressLines,
 .coverLetterBlockActions {
   display: grid;
-  gap: var(--space-2);
+  gap: 6px;
 }
 
 .coverLetterWordCount {
@@ -149,30 +151,32 @@
   color: var(--color-warning-text, #9a6700);
 }
 
-.coverLetterAddressRow,
-.coverLetterBulletEditor {
+.coverLetterAddressRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  gap: var(--space-2);
+  gap: 6px;
 }
 
-.coverLetterAddressRow > .button,
-.coverLetterBulletEditor > .button {
-  min-width: 34px;
-  min-height: 34px;
-  padding-inline: 8px;
+.coverLetterAddressRow > .button {
+  min-width: 30px;
+  min-height: 30px;
+  padding-inline: 7px;
+}
+
+.coverLetterBulletEditor {
+  min-width: 0;
 }
 
 .coverLetterAddButton {
   justify-self: start;
-  min-height: 31px;
+  min-height: 28px;
 }
 
 .coverLetterBlockCard {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-3);
+  gap: 5px;
+  padding: 7px 9px 8px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-card);
   background: var(--color-surface-raised);
@@ -193,6 +197,22 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+}
+
+.coverLetterEditorPanel .editorStage .formStack {
+  gap: 6px;
+}
+
+.coverLetterEditorPanel .editorStage .fieldGrid {
+  gap: 6px 8px;
+}
+
+.coverLetterEditorPanel .editorStage .field {
+  gap: 3px;
+}
+
+.coverLetterEditorPanel .coverLetterBlockCard textarea {
+  min-height: 0;
 }
 
 .coverLetterBlockActions {
