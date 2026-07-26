@@ -114,9 +114,9 @@
   gap: 8px;
   min-height: 16px;
   padding: 1px 3px 0;
-  color: var(--color-text-subtle);
+  color: var(--color-text-muted);
   font-size: 0.59rem;
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .coverLetterFieldSource button {
@@ -127,11 +127,6 @@
   font: inherit;
   font-weight: 700;
   cursor: pointer;
-}
-
-.coverLetterFieldSource.isOverride span {
-  color: var(--color-text-muted);
-  font-weight: 650;
 }
 
 .coverLetterAddressLines,
