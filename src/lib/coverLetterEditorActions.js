@@ -35,11 +35,6 @@ export function createCoverLetterEditorActions(updateCoverLetter) {
   };
 
   return {
-    setSenderMode(mode) {
-      updateCoverLetter((letter) => updateSender(letter, {
-        mode: mode === 'custom' ? 'custom' : 'resume',
-      }));
-    },
     updateSenderOverride(field, value) {
       updateCoverLetter((letter) => updateSender(letter, {
         overrides: { ...letter.sender.overrides, [field]: value },
@@ -51,6 +46,9 @@ export function createCoverLetterEditorActions(updateCoverLetter) {
         delete overrides[field];
         return updateSender(letter, { overrides });
       });
+    },
+    resetAllSenderOverrides() {
+      updateCoverLetter((letter) => updateSender(letter, { overrides: {} }));
     },
     updateRecipientField(field, value) {
       updateCoverLetter((letter) => updateRecipient(letter, { [field]: value }));

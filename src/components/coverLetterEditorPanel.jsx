@@ -1,8 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import CoverLetterSettingsRail from './coverLetterSettingsRail.jsx';
 import {
   COVER_LETTER_EDITOR_GROUPS,
-  COVER_LETTER_SENDER_FIELDS,
   getCoverLetterWordCount,
 } from '../lib/coverLetter.js';
 import {
@@ -24,8 +23,10 @@ const senderLabels = {
   linkedinUrl: 'LinkedIn URL',
   githubUrl: 'GitHub URL',
   portfolioUrl: 'Portfolio or website',
-  customField: 'Custom field',
+  customField: 'Additional detail',
 };
+const PRIMARY_SENDER_FIELDS = ['name', 'location', 'phone', 'email'];
+const ADDITIONAL_SENDER_FIELDS = ['headline', 'linkedinUrl', 'portfolioUrl', 'githubUrl', 'customField'];
 
 function Field({ label, path, value, placeholder = '', multiline = false, onChange }) {
   const Component = multiline ? 'textarea' : 'input';
@@ -61,6 +62,11 @@ export default function CoverLetterEditorPanel({
 }) {
   const handledRequestRef = useRef(0);
   const caretFrameRef = useRef(0);
+  const [showAdditionalSenderFields, setShowAdditionalSenderFields] = useState(false);
+  const hasAdditionalPreviewTarget = ADDITIONAL_SENDER_FIELDS.some((field) => (
+    previewEditTarget?.path === coverLetterSenderPath(field)
+  ));
+  const additionalSenderFieldsVisible = showAdditionalSenderFields || hasAdditionalPreviewTarget;
   const editorWorkspaceStyle = maxHeight ? {
     minHeight: `${maxHeight}px`,
     '--editor-stage-max-height': `${maxHeight}px`,
@@ -70,8 +76,12 @@ export default function CoverLetterEditorPanel({
     if (!previewEditTarget?.requestId || handledRequestRef.current === previewEditTarget.requestId) return;
     handledRequestRef.current = previewEditTarget.requestId;
     setActiveGroup(previewEditTarget.group || 'letter');
+    const shouldKeepAdditionalSenderFieldsOpen = ADDITIONAL_SENDER_FIELDS.some((field) => (
+      previewEditTarget.path === coverLetterSenderPath(field)
+    ));
 
     const frameId = window.requestAnimationFrame(() => {
+      if (shouldKeepAdditionalSenderFieldsOpen) setShowAdditionalSenderFields(true);
       const field = document.querySelector(`[data-editor-path="${CSS.escape(previewEditTarget.path)}"]`);
       if (!field) return;
       field.closest('.formContainer')?.scrollTo({
@@ -106,35 +116,54 @@ export default function CoverLetterEditorPanel({
   }
 
   function renderSender() {
+    const overrides = coverLetter.sender.overrides;
+    const hasOverrides = Object.keys(overrides).length > 0;
+    const additionalFieldsInUse = ADDITIONAL_SENDER_FIELDS.filter((field) => Boolean(resolvedSender[field])).length;
+
+    const renderSenderField = (field) => {
+      const hasOverride = Object.hasOwn(overrides, field);
+      const value = hasOverride ? overrides[field] : resolvedSender[field] || '';
+      return (
+        <div className="coverLetterLinkedField" key={field}>
+          <Field
+            label={senderLabels[field]}
+            path={coverLetterSenderPath(field)}
+            value={value}
+            placeholder={placeholderFor(coverLetterSenderPath(field), '')}
+            onChange={(nextValue) => actions.updateSenderOverride(field, nextValue)}
+          />
+          <div className={`coverLetterFieldSource${hasOverride ? ' isOverride' : ''}`}>
+            <span>{hasOverride ? 'Customized for this letter' : 'From attached resume'}</span>
+            {hasOverride ? <button type="button" onClick={() => actions.resetSenderOverride(field)}>Use resume</button> : null}
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div className="formStack">
-        <div className="coverLetterLinkMode" role="group" aria-label="Sender information source">
-          <button type="button" className={coverLetter.sender.mode === 'resume' ? 'isActive' : ''} onClick={() => actions.setSenderMode('resume')}>Linked to resume</button>
-          <button type="button" className={coverLetter.sender.mode === 'custom' ? 'isActive' : ''} onClick={() => actions.setSenderMode('custom')}>Custom sender</button>
+        <div className="coverLetterSenderInheritance">
+          <p>Resume details stay linked. Edit a field to customize only this letter.</p>
+          {hasOverrides ? <button type="button" onClick={actions.resetAllSenderOverrides}>Use all resume details</button> : null}
         </div>
         <div className="fieldGrid fieldGridTwo">
-          {COVER_LETTER_SENDER_FIELDS.map((field) => {
-            const hasOverride = Object.hasOwn(coverLetter.sender.overrides, field);
-            const value = hasOverride ? coverLetter.sender.overrides[field] : resolvedSender[field] || '';
-            return (
-              <div className="coverLetterLinkedField" key={field}>
-                <Field
-                  label={senderLabels[field]}
-                  path={coverLetterSenderPath(field)}
-                  value={value}
-                  placeholder={placeholderFor(coverLetterSenderPath(field), '')}
-                  onChange={(nextValue) => actions.updateSenderOverride(field, nextValue)}
-                />
-                {coverLetter.sender.mode === 'resume' ? (
-                  <div className="coverLetterFieldSource">
-                    <span>{hasOverride ? 'Custom override' : 'Linked to resume'}</span>
-                    {hasOverride ? <button type="button" onClick={() => actions.resetSenderOverride(field)}>Reset</button> : null}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
+          {PRIMARY_SENDER_FIELDS.map(renderSenderField)}
         </div>
+        <button
+          type="button"
+          className="coverLetterSenderDisclosure"
+          aria-expanded={additionalSenderFieldsVisible}
+          aria-controls="cover-letter-additional-sender-fields"
+          onClick={() => setShowAdditionalSenderFields((visible) => !visible)}
+        >
+          <span>Additional details &amp; links</span>
+          <span>{additionalFieldsInUse > 0 ? `${additionalFieldsInUse} in use` : 'Optional'} {additionalSenderFieldsVisible ? '−' : '+'}</span>
+        </button>
+        {additionalSenderFieldsVisible ? (
+          <div id="cover-letter-additional-sender-fields" className="fieldGrid fieldGridTwo">
+            {ADDITIONAL_SENDER_FIELDS.map(renderSenderField)}
+          </div>
+        ) : null}
       </div>
     );
   }

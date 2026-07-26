@@ -6,6 +6,7 @@ import {
   createBlankCoverLetterDraft,
   createCoverLetterContentHash,
   getCoverLetterWordCount,
+  normalizeCoverLetter,
   reconcileImportedCoverLetterSender,
   resolveCoverLetterSender,
   serializeCoverLetterDraft,
@@ -15,6 +16,7 @@ import {
   normalizeCoverLetterRegistry,
 } from '../src/lib/coverLetterWorkspace.js';
 import { mergeCoverLettersForWorkspace } from '../src/lib/coverLetterReconciliation.js';
+import { createCoverLetterEditorActions } from '../src/lib/coverLetterEditorActions.js';
 import {
   createMixedSampleCoverLetterModel,
   getSampleCoverLetterCharacterId,
@@ -79,6 +81,49 @@ test('linked sender values resolve from the resume while explicit blank override
     portfolioUrl: '',
     customField: '',
   });
+});
+
+test('legacy custom senders normalize to field-level overrides without revealing resume values', () => {
+  const resume = createBlankDraftState().resume;
+  resume.personal.name = 'Resume Name';
+  resume.personal.phone = '(555) 000-0000';
+  const letter = normalizeCoverLetter({
+    sender: {
+      mode: 'custom',
+      overrides: { name: 'Letter Name', email: 'letter@example.com' },
+    },
+  }, 'resume-1');
+
+  assert.equal(Object.hasOwn(letter.sender, 'mode'), false);
+  assert.equal(letter.sender.overrides.phone, '');
+  assert.deepEqual(resolveCoverLetterSender(letter, resume), {
+    name: 'Letter Name',
+    headline: '',
+    location: '',
+    phone: '',
+    email: 'letter@example.com',
+    linkedinUrl: '',
+    githubUrl: '',
+    portfolioUrl: '',
+    customField: '',
+  });
+});
+
+test('sender editor actions customize individual fields and can restore resume inheritance', () => {
+  let letter = createBlankCoverLetterDraft('resume-1').coverLetter;
+  const actions = createCoverLetterEditorActions((updater) => {
+    letter = updater(letter);
+  });
+
+  actions.updateSenderOverride('email', 'letter@example.com');
+  actions.updateSenderOverride('phone', '');
+  assert.deepEqual(letter.sender.overrides, { email: 'letter@example.com', phone: '' });
+
+  actions.resetSenderOverride('email');
+  assert.deepEqual(letter.sender.overrides, { phone: '' });
+
+  actions.resetAllSenderOverrides();
+  assert.deepEqual(letter.sender.overrides, {});
 });
 
 test('paired imports dedupe matching sender fields, backfill blanks, and preserve conflicts', () => {

@@ -92,7 +92,7 @@ export function createCoverLetterBulletListBlock() {
 function createEmptyCoverLetter(resumeId = '') {
   return {
     resumeId: trimText(resumeId),
-    sender: { mode: 'resume', overrides: {} },
+    sender: { overrides: {} },
     recipient: {
       date: '',
       hiringManagerName: '',
@@ -117,18 +117,19 @@ function normalizeSender(candidate = {}) {
   const rawOverrides = candidate?.overrides && typeof candidate.overrides === 'object'
     ? candidate.overrides
     : {};
+  const legacyCustomMode = candidate?.mode === 'custom';
   const overrides = {};
 
   COVER_LETTER_SENDER_FIELDS.forEach((field) => {
     if (Object.hasOwn(rawOverrides, field)) {
       overrides[field] = normalizeString(rawOverrides[field], 500);
+    } else if (legacyCustomMode) {
+      // The old custom mode suppressed every field that was not explicitly set.
+      overrides[field] = '';
     }
   });
 
-  return {
-    mode: candidate?.mode === 'custom' ? 'custom' : 'resume',
-    overrides,
-  };
+  return { overrides };
 }
 
 function normalizeBodyBlock(block, index) {
@@ -282,10 +283,6 @@ export function resolveCoverLetterSender(candidate, resume = {}) {
     customField: personal.customField || '',
   };
 
-  if (letter.sender.mode === 'custom') {
-    return Object.fromEntries(COVER_LETTER_SENDER_FIELDS.map((field) => [field, letter.sender.overrides[field] || '']));
-  }
-
   return Object.fromEntries(COVER_LETTER_SENDER_FIELDS.map((field) => [
     field,
     Object.hasOwn(letter.sender.overrides, field) ? letter.sender.overrides[field] : linked[field],
@@ -339,10 +336,7 @@ export function reconcileImportedCoverLetterSender({
     nextCoverLetterDraft.coverLetter.signatureName = '';
   }
 
-  nextCoverLetterDraft.coverLetter.sender = {
-    mode: 'resume',
-    overrides,
-  };
+  nextCoverLetterDraft.coverLetter.sender = { overrides };
   nextCoverLetterDraft.importWarnings = [...new Set(warnings)];
   return { resumeDraft: nextResumeDraft, coverLetterDraft: nextCoverLetterDraft };
 }

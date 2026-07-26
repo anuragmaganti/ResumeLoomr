@@ -84,7 +84,7 @@ export function compileCoverLetterSourceDocument(sourceDocument, {
     ...draft,
     coverLetter: {
       ...draft.coverLetter,
-      sender: { mode: 'resume', overrides: senderOverrides },
+      sender: { overrides: senderOverrides },
       recipient: { ...recipient, date: source.dateLine },
       greeting: source.greeting,
       bodyBlocks,

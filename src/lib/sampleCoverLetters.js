@@ -196,8 +196,7 @@ export function createMixedSampleCoverLetterModel({
   let usesSampleText = false;
 
   COVER_LETTER_SENDER_FIELDS.forEach((field) => {
-    const explicitlyControlled = normalized.sender.mode === 'custom'
-      || Object.hasOwn(normalized.sender.overrides, field);
+    const explicitlyControlled = Object.hasOwn(normalized.sender.overrides, field);
     const resolvedValue = resolvedSender?.[field] || '';
     renderedSender[field] = explicitlyControlled
       ? resolvedValue

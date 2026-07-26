@@ -48,7 +48,7 @@ Use a dedicated block-first draft:
 {
   coverLetter: {
     resumeId,
-    sender: { mode: 'resume' | 'custom', overrides: {} },
+    sender: { overrides: {} },
     recipient: { date, hiringManagerName, hiringManagerTitle, company, addressLines: [] },
     greeting,
     bodyBlocks: [
@@ -141,7 +141,7 @@ Shared-field reconciliation:
 - Reuse current tokens/primitives for surfaces, borders, radii, typography, spacing, controls, dialogs, toasts, focus, themes, and reduced motion; no separate letter theme.
 - Preserve the shell, folder/resume rail geometry, breakpoints, and resume mode pixel-for-pixel. The switcher fits the tile action area without shifting the checkbox or `...` and has tooltip, pressed, and active states.
 - Letter navigation/settings use the same rails, replacing resume controls in place. Switching restores each document's group, caret, and scroll without a layout jump.
-- Label sender values **Linked to resume** or **Custom override**, show the resolved value, and allow **Reset to resume**; linked fields must not look disabled.
+- Sender fields inherit from the attached resume until edited. Store only per-letter overrides, allow explicit blanks to hide a field, and provide per-field or reset-all actions.
 - Reuse portal dialogs. Import uses a compact desktop grid/mobile stack with inline per-file progress/error and one primary action.
 - Reuse preview paper and interaction chrome. Hover actions need focus/touch equivalents and 44px targets. Namespace letter CSS, reuse motion timing, and suppress initial-load animation.
 
