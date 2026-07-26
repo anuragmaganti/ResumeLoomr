@@ -28,11 +28,16 @@ const senderLabels = {
 const PRIMARY_SENDER_FIELDS = ['name', 'location', 'phone', 'email'];
 const ADDITIONAL_SENDER_FIELDS = ['headline', 'linkedinUrl', 'portfolioUrl', 'githubUrl', 'customField'];
 
-function Field({ label, path, value, placeholder = '', multiline = false, onChange }) {
+function Field({ label, labelAction = null, path, value, placeholder = '', multiline = false, onChange }) {
   const Component = multiline ? 'textarea' : 'input';
   return (
     <div className="field">
-      <label htmlFor={path}>{label}</label>
+      {labelAction ? (
+        <div className="coverLetterFieldLabelRow">
+          <label htmlFor={path}>{label}</label>
+          {labelAction}
+        </div>
+      ) : <label htmlFor={path}>{label}</label>}
       <Component
         id={path}
         {...createEditorTargetAttributes(path)}
@@ -197,22 +202,32 @@ export default function CoverLetterEditorPanel({
         <Field label="Greeting" path={coverLetterSimplePath('greeting')} value={coverLetter.greeting} placeholder={placeholderFor(coverLetterSimplePath('greeting'), 'Dear Hiring Manager,')} onChange={actions.updateGreeting} />
         {coverLetter.bodyBlocks.map((block, index) => (
           <section className="formSection coverLetterBlockCard" key={block.id}>
-            <div className="coverLetterBlockHeader">
-              <span>{block.kind === 'paragraph' ? `${block.role[0].toUpperCase()}${block.role.slice(1)} paragraph` : 'Bullet list'}</span>
-              <button type="button" className="button entryCollapseButton" onClick={() => actions.removeBodyBlock(block.id)}>Remove</button>
-            </div>
             {block.kind === 'paragraph' ? (
-              <Field label={`Paragraph ${index + 1}`} path={coverLetterBodyPath(block.id)} value={block.text} placeholder={placeholderFor(coverLetterBodyPath(block.id), 'Write a focused paragraph…')} multiline onChange={(value) => actions.updateBodyBlock(block.id, value)} />
+              <Field
+                label={`Paragraph ${index + 1}`}
+                labelAction={<button type="button" className="button entryCollapseButton" onClick={() => actions.removeBodyBlock(block.id)}>Remove</button>}
+                path={coverLetterBodyPath(block.id)}
+                value={block.text}
+                placeholder={placeholderFor(coverLetterBodyPath(block.id), 'Write a focused paragraph…')}
+                multiline
+                onChange={(value) => actions.updateBodyBlock(block.id, value)}
+              />
             ) : (
-              <div className="formStack">
-                {block.items.map((item, itemIndex) => (
-                  <div className="coverLetterBulletEditor" key={item.id}>
-                    <Field label={`Bullet ${itemIndex + 1}`} path={coverLetterBulletPath(block.id, item.id)} value={item.text} placeholder={placeholderFor(coverLetterBulletPath(block.id, item.id), 'Add a concise proof point…')} multiline onChange={(value) => actions.updateBullet(block.id, item.id, value)} />
-                    {block.items.length > 1 ? <button type="button" className="button buttonSecondary" onClick={() => actions.removeBullet(block.id, item.id)}>Remove</button> : null}
-                  </div>
-                ))}
-                <button type="button" className="button buttonSecondary coverLetterAddButton" onClick={() => actions.addBullet(block.id)}>+ Add bullet</button>
-              </div>
+              <>
+                <div className="coverLetterBlockHeader">
+                  <span>Bullet list</span>
+                  <button type="button" className="button entryCollapseButton" onClick={() => actions.removeBodyBlock(block.id)}>Remove</button>
+                </div>
+                <div className="formStack">
+                  {block.items.map((item, itemIndex) => (
+                    <div className="coverLetterBulletEditor" key={item.id}>
+                      <Field label={`Bullet ${itemIndex + 1}`} path={coverLetterBulletPath(block.id, item.id)} value={item.text} placeholder={placeholderFor(coverLetterBulletPath(block.id, item.id), 'Add a concise proof point…')} multiline onChange={(value) => actions.updateBullet(block.id, item.id, value)} />
+                      {block.items.length > 1 ? <button type="button" className="button buttonSecondary" onClick={() => actions.removeBullet(block.id, item.id)}>Remove</button> : null}
+                    </div>
+                  ))}
+                  <button type="button" className="button buttonSecondary coverLetterAddButton" onClick={() => actions.addBullet(block.id)}>+ Add bullet</button>
+                </div>
+              </>
             )}
           </section>
         ))}

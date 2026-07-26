@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragOverlay,
@@ -46,6 +47,7 @@ import {
 } from '../lib/coverLetterEditorTargets.js';
 import { getPreviewCaretOffsetFromPoint } from '../lib/editorTargets.js';
 import { ResumeLoomrKeyboardSensor, ResumeLoomrPointerSensor } from '../lib/sortableSensors.js';
+import { normalizePreviewSortableTransform } from './resumePreviewDrag.js';
 
 function blockDragId(blockId) {
   return `cover-letter-block:${blockId}`;
@@ -55,7 +57,12 @@ function bulletDragId(blockId, itemId) {
   return `cover-letter-bullet:${blockId}:${itemId}`;
 }
 
-function SortableLetterBlock({ block, children }) {
+function getCoverLetterSortableElement(id) {
+  return [...document.querySelectorAll('[data-cover-letter-drag-id]')]
+    .find((element) => element.dataset.coverLetterDragId === String(id));
+}
+
+function SortableLetterBlock({ block, previewScale, children }) {
   const {
     attributes,
     isDragging,
@@ -72,9 +79,10 @@ function SortableLetterBlock({ block, children }) {
     <div
       ref={setNodeRef}
       className={`coverLetterBodyBlock${isDragging ? ' isDragging' : ''}`}
+      data-cover-letter-drag-id={blockDragId(block.id)}
       data-page-break-kind="entry"
       style={{
-        transform: DndCss.Transform.toString(transform),
+        transform: DndCss.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
         transition,
       }}
       {...attributes}
@@ -85,7 +93,7 @@ function SortableLetterBlock({ block, children }) {
   );
 }
 
-function SortableLetterBullet({ blockId, item, children }) {
+function SortableLetterBullet({ blockId, item, previewScale, children }) {
   const {
     attributes,
     isDragging,
@@ -102,9 +110,10 @@ function SortableLetterBullet({ blockId, item, children }) {
     <li
       ref={setNodeRef}
       className={`coverLetterBullet${isDragging ? ' isDragging' : ''}`}
+      data-cover-letter-drag-id={bulletDragId(blockId, item.id)}
       data-page-break-kind="item"
       style={{
-        transform: DndCss.Transform.toString(transform),
+        transform: DndCss.Translate.toString(normalizePreviewSortableTransform(transform, previewScale)),
         transition,
       }}
       {...attributes}
@@ -122,10 +131,16 @@ function CoverLetterDragPreview({ activeDrag, coverLetter }) {
     const block = coverLetter.bodyBlocks.find((candidate) => candidate.id === activeDrag.blockId);
     if (!block) return null;
     return (
-      <div className="coverLetterDragPreview">
-        {block.kind === 'paragraph'
-          ? (block.text || 'Empty paragraph')
-          : `${block.items.length} ${block.items.length === 1 ? 'bullet' : 'bullets'}`}
+      <div className="coverLetterBody coverLetterDragPreview">
+        <div className="coverLetterBodyBlock">
+          {block.kind === 'paragraph' ? (
+            <p>{block.text || 'Empty paragraph'}</p>
+          ) : (
+            <ul>
+              {block.items.map((item) => <li key={item.id}>{item.text || 'Empty bullet'}</li>)}
+            </ul>
+          )}
+        </div>
       </div>
     );
   }
@@ -134,7 +149,11 @@ function CoverLetterDragPreview({ activeDrag, coverLetter }) {
   const item = block?.kind === 'bulletList'
     ? block.items.find((candidate) => candidate.id === activeDrag.itemId)
     : null;
-  return item ? <div className="coverLetterDragPreview coverLetterDragPreview--bullet">{item.text || 'Empty bullet'}</div> : null;
+  return item ? (
+    <div className="coverLetterDragPreview coverLetterDragPreview--bullet">
+      {item.text || 'Empty bullet'}
+    </div>
+  ) : null;
 }
 
 export default function CoverLetterPreview({
@@ -166,6 +185,7 @@ export default function CoverLetterPreview({
   const pageRef = useRef(null);
   const suppressClickRef = useRef(false);
   const [activeDrag, setActiveDrag] = useState(null);
+  const [activeDragRect, setActiveDragRect] = useState(null);
   const renderedLetter = sampleModel?.coverLetter || coverLetter;
   const renderedSender = sampleModel?.resolvedSender || resolvedSender;
   const hasContent = coverLetterHasContent(renderedLetter) || Boolean(sampleModel);
@@ -318,12 +338,16 @@ export default function CoverLetterPreview({
     closeMobileEditSession();
     suppressClickRef.current = true;
     setActiveDrag(event.active.data.current || null);
+    const rect = getCoverLetterSortableElement(event.active.id)?.getBoundingClientRect()
+      || event.active.rect.current.initial;
+    setActiveDragRect(rect ? { width: rect.width, height: rect.height } : null);
   }
 
   function handleDragEnd(event) {
     const dragMeta = event.active.data.current;
     const overMeta = event.over?.data.current;
     setActiveDrag(null);
+    setActiveDragRect(null);
     window.setTimeout(() => { suppressClickRef.current = false; }, 0);
     if (!dragMeta || !overMeta || event.active.id === event.over.id) return;
 
@@ -351,6 +375,7 @@ export default function CoverLetterPreview({
 
   function handleDragCancel() {
     setActiveDrag(null);
+    setActiveDragRect(null);
     window.setTimeout(() => { suppressClickRef.current = false; }, 0);
   }
 
@@ -371,6 +396,23 @@ export default function CoverLetterPreview({
   const signatureName = renderedLetter.signatureName || renderedSender.name;
   const bodyIds = renderedLetter.bodyBlocks.map((block) => blockDragId(block.id));
   const pageHeight = Math.max(pageMetrics.pageHeight || 1056, pageMetrics.contentHeight || 1056);
+  const dragOverlayScale = Number.isFinite(pageMetrics.scale) && pageMetrics.scale > 0
+    ? pageMetrics.scale
+    : 1;
+  const dragOverlayStyle = {
+    ...presentationVars,
+    ...(activeDragRect ? {
+      width: `${activeDragRect.width}px`,
+      height: `${activeDragRect.height}px`,
+    } : {}),
+  };
+  const dragOverlayContentStyle = activeDragRect
+    ? {
+        width: `${activeDragRect.width / dragOverlayScale}px`,
+        height: `${activeDragRect.height / dragOverlayScale}px`,
+        transform: `scale(${dragOverlayScale})`,
+      }
+    : undefined;
 
   return (
     <>
@@ -462,7 +504,7 @@ export default function CoverLetterPreview({
                       <SortableContext items={bodyIds} strategy={verticalListSortingStrategy}>
                         <div className="coverLetterBody" data-page-break-kind="section">
                           {renderedLetter.bodyBlocks.map((block) => (
-                            <SortableLetterBlock block={block} key={block.id}>
+                            <SortableLetterBlock block={block} previewScale={pageMetrics.scale} key={block.id}>
                               {block.kind === 'paragraph' ? (
                                 <p {...targetAttributes(coverLetterBodyPath(block.id))}>
                                   {renderEditableText(block.text, coverLetterBodyPath(block.id), { fallback: isPrintRendering ? '' : 'Write your cover letter here.' })}
@@ -474,7 +516,7 @@ export default function CoverLetterPreview({
                                 >
                                   <ul>
                                     {block.items.map((item) => (
-                                      <SortableLetterBullet blockId={block.id} item={item} key={item.id}>
+                                      <SortableLetterBullet blockId={block.id} item={item} previewScale={pageMetrics.scale} key={item.id}>
                                         <span {...targetAttributes(coverLetterBulletPath(block.id, item.id))}>
                                           {renderEditableText(item.text, coverLetterBulletPath(block.id, item.id), { fallback: isPrintRendering ? '' : 'Add a proof point.' })}
                                         </span>
@@ -499,9 +541,19 @@ export default function CoverLetterPreview({
                     </div>
                     <PreviewPageMarkers hasContent={hasContent} pageBreaks={pageMetrics.pageBreaks} />
                   </article>
-                  <DragOverlay adjustScale={false} zIndex={1000}>
-                    <CoverLetterDragPreview activeDrag={activeDrag} coverLetter={renderedLetter} />
-                  </DragOverlay>
+                  {typeof document === 'undefined' ? null : createPortal(
+                    <DragOverlay adjustScale={false} zIndex={1000}>
+                      <div
+                        className={`coverLetterDragPreviewFrame coverLetterPage coverLetterPage--${template}`}
+                        style={dragOverlayStyle}
+                      >
+                        <div className="coverLetterDragPreviewScaleLayer" style={dragOverlayContentStyle}>
+                          <CoverLetterDragPreview activeDrag={activeDrag} coverLetter={renderedLetter} />
+                        </div>
+                      </div>
+                    </DragOverlay>,
+                    document.body,
+                  )}
                 </DndContext>
               </div>
             </div>
