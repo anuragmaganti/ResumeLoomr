@@ -17,7 +17,6 @@ const LOCATION_PATTERN = /(?:,\s*[A-Z]{2}\b|\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*
 function stripProtocol(value) {
   return trimText(value).replace(/^https?:\/\//i, '').replace(/^www\./i, '');
 }
-
 function parseSender(lines) {
   const values = lines.map(trimText).filter(Boolean);
   const joined = values.join(' | ');
@@ -103,4 +102,3 @@ export function compileCoverLetterSourceDocument(sourceDocument, {
     senderValues: senderOverrides,
   };
 }
-

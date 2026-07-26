@@ -61,7 +61,6 @@ function parseWireOutput(text) {
   }
   return normalizeCoverLetterSourceDocument(parsed.data);
 }
-
 function instructions() {
   return [
     'TASK: Transcribe this cover letter into an ordered source document model.',
@@ -103,4 +102,3 @@ export function generateCoverLetterSourceFromGemini({ ai, model, file, generatio
     parseResponse: parseWireOutput,
   });
 }
-

@@ -30,7 +30,6 @@ function createDiagnostics(file, model, sourceMode) {
     fileSizeBytes: file.size || file.buffer?.length || 0,
   };
 }
-
 async function generateVisualSource({ ai, model, file, generationConfig, sourceMode, createContents }) {
   return generateCoverLetterSourceFromGemini({
     ai,
@@ -140,4 +139,3 @@ export async function parseCoverLetterWithGemini(file, { resumeId = '' } = {}) {
     },
   };
 }
-

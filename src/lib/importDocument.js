@@ -16,7 +16,6 @@ export function validateImportDocumentFile(file, label = 'document') {
   }
   return '';
 }
-
 function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -57,4 +56,3 @@ export async function importDocumentFile({ file, documentKind, idToken, resumeId
   }
   return payload;
 }
-
