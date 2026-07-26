@@ -150,8 +150,18 @@ test('sync worker creates the same indexed outbox shape as the page database', a
   const db = await context.openWorkspaceDb();
   const transaction = db.transaction('outbox', 'readonly');
   const indexNames = Array.from(transaction.objectStore('outbox').indexNames).sort();
+  const storeNames = Array.from(db.objectStoreNames).sort();
 
   assert.deepEqual(indexNames, ['resumeId', 'status', 'updatedAt']);
+  assert.deepEqual(storeNames, [
+    'accountBinding',
+    'coverLetterDrafts',
+    'coverLetterTombstones',
+    'drafts',
+    'outbox',
+    'tombstones',
+    'workspace',
+  ]);
   assert.deepEqual([...listeners.keys()], ['install', 'activate', 'message', 'sync']);
 
   db.close();

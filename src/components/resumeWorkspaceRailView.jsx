@@ -130,6 +130,21 @@ function MenuIcon() {
   );
 }
 
+function CoverLetterDestinationIcon({ destination }) {
+  return destination === 'resume' ? (
+    <svg className="resumeDocumentSwitchIcon" aria-hidden="true" viewBox="0 0 18 18" focusable="false">
+      <path d="M4.25 2.75h6.2l3.3 3.3v9.2H4.25z" />
+      <path d="M10.45 2.75v3.3h3.3M6.5 9h5M6.5 11.4h5" />
+    </svg>
+  ) : (
+    <svg className="resumeDocumentSwitchIcon" aria-hidden="true" viewBox="0 0 18 18" focusable="false">
+      <path d="M3.75 2.75h6.4l3.6 3.6v8.9h-10z" />
+      <path d="M10.15 2.75v3.6h3.6M6 9.1h5.5M6 11.45h3.8" />
+      <path d="m11.3 14.4 1.55 1.05 1.55-1.05" />
+    </svg>
+  );
+}
+
 export function DeleteIcon() {
   return (
     <svg className="resumeSelectionDeleteIcon" aria-hidden="true" viewBox="0 0 18 18" focusable="false">
@@ -201,7 +216,7 @@ function ResumePlaceholderShape() {
   );
 }
 
-export function BatchDeleteDialog({ resumeCount, folderCount, isDeleting, isSignedIn, onCancel, onConfirm }) {
+export function BatchDeleteDialog({ resumeCount, folderCount, attachedCoverLetterCount = 0, isDeleting, isSignedIn, onCancel, onConfirm }) {
   const dialogRef = useRef(null);
   const cancelButtonRef = useRef(null);
   const totalCount = resumeCount + folderCount;
@@ -246,6 +261,7 @@ export function BatchDeleteDialog({ resumeCount, folderCount, isDeleting, isSign
           <h2 id="workspace-delete-dialog-title">Remove {titleParts.join(' and ')}?</h2>
           <p id="workspace-delete-dialog-description">
             {resumeCount ? `Selected resumes will be deleted from this browser${isSignedIn ? ' and your synced account' : ''}. ` : ''}
+            {attachedCoverLetterCount ? `${attachedCoverLetterCount} attached ${attachedCoverLetterCount === 1 ? 'cover letter' : 'cover letters'} will be deleted with them. ` : ''}
             {folderCount ? 'Selected folders will be removed, but their remaining resumes will stay.' : ''}
           </p>
         </div>
@@ -350,11 +366,41 @@ export function ResumeTile({
   onDeleteResume,
   onMoveResumeToRoot,
   onToggleSelected,
+  activeDocumentType,
+  activeCoverLetterId,
+  onOpenCoverLetter,
+  onOpenResumeDocument,
+  onRequestCoverLetter,
+  onRequestDeleteCoverLetter,
   motion,
   motionReady = true,
 }) {
   const sortableId = createWorkspaceItemId('resume', resume.id);
   const longPressRename = useLongPressRename(() => onStartRename(resume), isRenaming);
+  const coverLetters = Array.isArray(resume.coverLetters) ? resume.coverLetters : [];
+  const primaryCoverLetter = coverLetters[0] || null;
+  const isActiveCoverLetter = isActive && activeDocumentType === 'coverLetter';
+  const documentSwitchLabel = isActiveCoverLetter ? 'Open resume' : 'Open cover letter';
+  const coverLetterMenuItems = primaryCoverLetter
+    ? [
+        ...coverLetters.map((letter, index) => ({
+          key: `open-cover-letter:${letter.id}`,
+          label: index === 0 ? 'Open cover letter' : `Open ${letter.name}`,
+          onSelect: () => onOpenCoverLetter(letter.id),
+          disabled: isActiveCoverLetter && activeCoverLetterId === letter.id,
+        })),
+        ...coverLetters.map((letter, index) => ({
+          key: `delete-cover-letter:${letter.id}`,
+          label: index === 0 ? 'Delete cover letter' : `Delete ${letter.name}`,
+          onSelect: () => onRequestDeleteCoverLetter({ ...letter, resumeId: resume.id }),
+          tone: 'danger',
+        })),
+      ]
+    : [{
+        key: 'add-cover-letter',
+        label: 'Add a cover letter',
+        onSelect: () => onRequestCoverLetter(resume.id),
+      }];
   return (
     <SortableCell
       id={sortableId}
@@ -420,23 +466,38 @@ export function ResumeTile({
           )}
           <span className="resumePillActions">
             <SelectionControl item={{ ...resume, type: 'resume' }} isSelected={isSelected} onToggle={onToggleSelected} />
-            <span className="resumePillMenuHost" data-dnd-no-drag="true" aria-hidden={!isActive}>
-              {isActive ? (
-                <EntryActionMenu
-                  menuLabel={`${resume.name} actions`}
-                  triggerContent={<MenuIcon />}
-                  extraItems={[
-                    { label: 'Rename', onSelect: () => onStartRename(resume) },
-                    { label: 'Duplicate', onSelect: onDuplicateResume, disabled: !canAddResume },
-                    ...(containerId !== 'root' ? [{
-                      label: 'Move out of folder',
-                      onSelect: () => onMoveResumeToRoot(resume.id),
-                    }] : []),
-                    { label: 'Delete', onSelect: () => onDeleteResume([resume.id], []), tone: 'danger', disabled: !canDeleteActiveResume },
-                  ]}
-                  buttonClassName="resumePillMenuButton"
-                />
-              ) : <span className="resumePillMenuPlaceholder" />}
+            {primaryCoverLetter ? (
+              <button
+                type="button"
+                className="resumeDocumentSwitch"
+                data-dnd-no-drag="true"
+                title={documentSwitchLabel}
+                aria-label={`${documentSwitchLabel} attached to ${resume.name}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (isActiveCoverLetter) onOpenResumeDocument();
+                  else onOpenCoverLetter(primaryCoverLetter.id);
+                }}
+              >
+                <CoverLetterDestinationIcon destination={isActiveCoverLetter ? 'resume' : 'coverLetter'} />
+              </button>
+            ) : null}
+            <span className="resumePillMenuHost" data-dnd-no-drag="true">
+              <EntryActionMenu
+                menuLabel={`${resume.name} actions`}
+                triggerContent={<MenuIcon />}
+                extraItems={[
+                  ...coverLetterMenuItems,
+                  { label: 'Rename', onSelect: () => onStartRename(resume) },
+                  ...(isActive ? [{ label: 'Duplicate', onSelect: onDuplicateResume, disabled: !canAddResume }] : []),
+                  ...(containerId !== 'root' ? [{
+                    label: 'Move out of folder',
+                    onSelect: () => onMoveResumeToRoot(resume.id),
+                  }] : []),
+                  { label: 'Delete', onSelect: () => onDeleteResume([resume.id], []), tone: 'danger', disabled: !canDeleteActiveResume },
+                ]}
+                buttonClassName="resumePillMenuButton"
+              />
             </span>
           </span>
         </div>

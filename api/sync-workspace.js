@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     sendPrivateJson(res, 405, {
       error: {
         code: 'sync/method-not-allowed',
-        message: 'Use GET or POST to sync resumes.',
+        message: 'Use GET or POST to sync resume documents.',
       },
     });
     return;
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
         sendPrivateJson(res, 404, {
           error: {
             code: 'sync/not-found',
-            message: 'No cloud resumes found.',
+            message: 'No cloud resume documents found.',
           },
         });
         return;
@@ -121,7 +121,7 @@ export default async function handler(req, res) {
 
     sendPrivateError(res, statusCode, error, {
       code: 'sync/failed',
-      message: 'Could not sync resumes.',
+      message: 'Could not sync resume documents.',
     });
   }
 }

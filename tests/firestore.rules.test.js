@@ -25,7 +25,12 @@ test('firestore is owner-readable and server-write-only', { skip: !FIRESTORE_EMU
       const db = context.firestore();
       await db.doc('users/user-a/workspace/main').set({ activeResumeId: 'resume-1' });
       await db.doc('users/user-a/resumes/resume-1').set({ resumeId: 'resume-1' });
+      await db.doc('users/user-a/coverLetters/letter-1').set({
+        coverLetterId: 'letter-1',
+        resumeId: 'resume-1',
+      });
       await db.doc('users/user-a/resumeTombstones/resume-2').set({ resumeId: 'resume-2' });
+      await db.doc('users/user-a/coverLetterTombstones/letter-2').set({ coverLetterId: 'letter-2' });
       await db.doc('users/user-a/syncCursors/cursor-1').set({ lastSequence: 1 });
     });
 
@@ -35,13 +40,18 @@ test('firestore is owner-readable and server-write-only', { skip: !FIRESTORE_EMU
 
     await assertSucceeds(ownerDb.doc('users/user-a/workspace/main').get());
     await assertSucceeds(ownerDb.doc('users/user-a/resumes/resume-1').get());
+    await assertSucceeds(ownerDb.doc('users/user-a/coverLetters/letter-1').get());
     await assertFails(otherDb.doc('users/user-a/resumes/resume-1').get());
+    await assertFails(otherDb.doc('users/user-a/coverLetters/letter-1').get());
     await assertFails(anonDb.doc('users/user-a/workspace/main').get());
 
     await assertFails(ownerDb.doc('users/user-a/workspace/main').set({ activeResumeId: 'resume-2' }));
     await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').set({ resumeId: 'resume-1' }));
     await assertFails(ownerDb.doc('users/user-a/resumes/resume-1').delete());
+    await assertFails(ownerDb.doc('users/user-a/coverLetters/letter-1').set({ resumeId: 'resume-1' }));
+    await assertFails(ownerDb.doc('users/user-a/coverLetters/letter-1').delete());
     await assertFails(ownerDb.doc('users/user-a/resumeTombstones/resume-2').get());
+    await assertFails(ownerDb.doc('users/user-a/coverLetterTombstones/letter-2').get());
     await assertFails(ownerDb.doc('users/user-a/syncCursors/cursor-1').get());
   } finally {
     await testEnv.cleanup();

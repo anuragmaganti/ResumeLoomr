@@ -43,6 +43,12 @@ export default function Header({
   onRenameResumeFolder,
   onSetResumeOrganization,
   onDeleteResume,
+  activeDocumentType,
+  activeCoverLetterId,
+  onOpenCoverLetter,
+  onOpenResumeDocument,
+  onRequestCoverLetter,
+  onRequestDeleteCoverLetter,
   workspaceReady,
   authUser,
   authReady,
@@ -100,6 +106,12 @@ export default function Header({
         onRenameResumeFolder={onRenameResumeFolder}
         onSetResumeOrganization={onSetResumeOrganization}
         onDeleteResume={onDeleteResume}
+        activeDocumentType={activeDocumentType}
+        activeCoverLetterId={activeCoverLetterId}
+        onOpenCoverLetter={onOpenCoverLetter}
+        onOpenResumeDocument={onOpenResumeDocument}
+        onRequestCoverLetter={onRequestCoverLetter}
+        onRequestDeleteCoverLetter={onRequestDeleteCoverLetter}
         workspaceReady={workspaceReady}
         authUser={authUser}
       />

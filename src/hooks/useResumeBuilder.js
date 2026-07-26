@@ -41,11 +41,16 @@ import {
 } from '../lib/workspaceReconciliation.js';
 import {
   initializeLocalWorkspace,
+  persistLocalCoverLetterCreation,
+  persistLocalCoverLetterDelete,
+  persistLocalCoverLetterDraftSnapshot,
   persistLocalDraftSnapshot,
+  persistLocalImportedDocuments,
   persistLocalResumeBatchDelete,
   persistLocalWorkspaceSnapshot,
   persistLoginMergedWorkspace,
   readLocalWorkspaceBundle,
+  readLocalCoverLetterDraft,
   readLocalDraft,
 } from '../lib/localWorkspaceDb.js';
 import { readLegacyWorkspaceSnapshot } from '../lib/localWorkspaceMirror.js';
@@ -56,6 +61,26 @@ import {
   syncLocalOutbox,
 } from '../lib/backgroundSync.js';
 import { ensureResumeSyncSession } from '../lib/syncSession.js';
+import {
+  createBlankCoverLetterDraft,
+  createCoverLetterBulletItem,
+  createCoverLetterBulletListBlock,
+  createCoverLetterParagraphBlock,
+  createSavedCoverLetterDraft,
+  normalizeCoverLetterDraft,
+  reconcileImportedCoverLetterSender,
+  reorderCoverLetterBodyBlocks,
+  reorderCoverLetterBullets,
+  updateCoverLetter as applyCoverLetterUpdate,
+} from '../lib/coverLetter.js';
+import {
+  getPrimaryCoverLetterId,
+  getResumeCoverLetterIds,
+} from '../lib/coverLetterWorkspace.js';
+import {
+  readActiveDocumentView,
+  writeActiveDocumentView,
+} from '../lib/activeDocumentView.js';
 
 function getDraftEditorSectionIds(draft) {
   const blockIds = Array.isArray(draft?.resume?.sections)
@@ -74,6 +99,15 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   const [workspace, setWorkspace] = useState(initialWorkspaceState.workspace);
   const [resume, setResume] = useState(initialWorkspaceState.draft.resume);
   const [template, setTemplate] = useState(initialWorkspaceState.draft.template);
+  const initialCoverLetterDraft = useMemo(() => (
+    createBlankCoverLetterDraft(initialWorkspaceState.workspace.activeResumeId)
+  ), [initialWorkspaceState.workspace.activeResumeId]);
+  const [activeDocumentType, setActiveDocumentType] = useState('resume');
+  const [activeCoverLetterId, setActiveCoverLetterId] = useState('');
+  const [coverLetter, setCoverLetter] = useState(initialCoverLetterDraft.coverLetter);
+  const [coverLetterTemplate, setCoverLetterTemplate] = useState(initialCoverLetterDraft.template);
+  const [coverLetterSavedAt, setCoverLetterSavedAt] = useState(initialCoverLetterDraft.savedAt);
+  const [activeCoverLetterGroup, setActiveCoverLetterGroup] = useState('sender');
   const [activeTab, setActiveTab] = useState('personal');
   const [mobileView, setMobileView] = useState('editor');
   const [touched, setTouched] = useState({});
@@ -87,11 +121,17 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   const [localReady, setLocalReady] = useState(false);
   const hasMounted = useRef(false);
   const skipNextAutosaveRef = useRef(false);
+  const skipNextCoverLetterAutosaveRef = useRef(false);
   const currentDraftRef = useRef(initialWorkspaceState.draft);
+  const currentCoverLetterDraftRef = useRef(initialCoverLetterDraft);
   const editorDraftResumeIdRef = useRef(initialWorkspaceState.workspace.activeResumeId);
+  const editorCoverLetterIdRef = useRef('');
+  const editorCoverLetterResumeIdRef = useRef('');
   const editorDraftRevisionRef = useRef(initialWorkspaceState.draft.localRevision || '');
+  const editorCoverLetterRevisionRef = useRef('');
   const workspaceRef = useRef(initialWorkspaceState.workspace);
   const activeResumeIdRef = useRef(initialWorkspaceState.workspace.activeResumeId);
+  const activeDocumentTypeRef = useRef('resume');
   const userRef = useRef(user);
   const printViewRef = useRef(null);
   const mobileViewRef = useRef('editor');
@@ -100,6 +140,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   const resumeLoadRunIdRef = useRef(0);
   const editorMutationVersionRef = useRef(0);
   const editorSaveQueueRef = useRef(Promise.resolve());
+  const coverLetterSaveQueueRef = useRef(Promise.resolve());
   const workspaceSaveQueueRef = useRef(Promise.resolve());
   const workspaceMutationVersionRef = useRef(0);
   const cloudReconcileRetryTimerRef = useRef(null);
@@ -108,6 +149,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   const draftRevisionByResumeIdRef = useRef(new Map([
     [initialWorkspaceState.workspace.activeResumeId, initialWorkspaceState.draft.localRevision || ''],
   ]));
+  const coverLetterRevisionByIdRef = useRef(new Map());
   const conflictRef = useRef(null);
   const transientSampleEntryRef = useRef(null);
   const activeResumeId = workspace.activeResumeId;
@@ -118,9 +160,25 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       id: resumeId,
       name: workspace.meta[resumeId]?.name || '',
       updatedAt: workspace.meta[resumeId]?.updatedAt || '',
+      coverLetters: getResumeCoverLetterIds(workspace, resumeId).map((coverLetterId) => ({
+        id: coverLetterId,
+        name: workspace.coverLetters.meta[coverLetterId]?.name || 'Cover letter',
+      })),
     }))
   ), [workspace]);
   const canAddResume = workspace.resumeIds.length < MAX_WORKSPACE_RESUMES;
+  const activeResumeCoverLetterIds = useMemo(
+    () => getResumeCoverLetterIds(workspace, activeResumeId),
+    [activeResumeId, workspace],
+  );
+  const activeResumeCoverLetters = useMemo(() => (
+    activeResumeCoverLetterIds.map((coverLetterId) => ({
+      id: coverLetterId,
+      name: workspace.coverLetters.meta[coverLetterId]?.name || 'Cover letter',
+      resumeId: activeResumeId,
+      updatedAt: workspace.coverLetters.meta[coverLetterId]?.updatedAt || '',
+    }))
+  ), [activeResumeCoverLetterIds, activeResumeId, workspace.coverLetters.meta]);
 
   useEffect(() => {
     const localRevision = editorDraftRevisionRef.current || currentDraftRef.current.localRevision || '';
@@ -136,12 +194,38 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   }, [resume, savedAt, template]);
 
   useEffect(() => {
+    currentCoverLetterDraftRef.current = {
+      ...normalizeCoverLetterDraft(currentCoverLetterDraftRef.current, editorCoverLetterResumeIdRef.current),
+      coverLetter,
+      template: coverLetterTemplate,
+      savedAt: coverLetterSavedAt,
+      localRevision: editorCoverLetterRevisionRef.current
+        || currentCoverLetterDraftRef.current.localRevision
+        || '',
+      cloudVersion: currentCoverLetterDraftRef.current.cloudVersion || 0,
+    };
+  }, [coverLetter, coverLetterSavedAt, coverLetterTemplate]);
+
+  useEffect(() => {
     workspaceRef.current = workspace;
   }, [workspace]);
 
   useEffect(() => {
     activeResumeIdRef.current = activeResumeId;
   }, [activeResumeId]);
+
+  useEffect(() => {
+    activeDocumentTypeRef.current = activeDocumentType;
+  }, [activeDocumentType]);
+
+  useEffect(() => {
+    if (!localReady || !activeResumeId) return;
+    writeActiveDocumentView({
+      resumeId: activeResumeId,
+      type: activeDocumentType,
+      coverLetterId: activeDocumentType === 'coverLetter' ? activeCoverLetterId : '',
+    });
+  }, [activeCoverLetterId, activeDocumentType, activeResumeId, localReady]);
 
   useEffect(() => {
     userRef.current = user;
@@ -163,7 +247,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     let cancelled = false;
 
     initializeLocalWorkspace()
-      .then((snapshot) => {
+      .then(async (snapshot) => {
         if (cancelled) {
           return;
         }
@@ -171,6 +255,25 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         skipNextAutosaveRef.current = true;
         commitWorkspace(snapshot.workspace, { persist: false });
         loadDraftIntoEditor(snapshot.draft, { resumeId: snapshot.activeResumeId });
+        const storedView = readActiveDocumentView();
+        const storedLetterMeta = storedView?.type === 'coverLetter'
+          ? snapshot.workspace.coverLetters.meta[storedView.coverLetterId]
+          : null;
+
+        if (
+          storedView?.resumeId === snapshot.activeResumeId
+          && storedLetterMeta?.resumeId === snapshot.activeResumeId
+        ) {
+          const storedLetterDraft = await readLocalCoverLetterDraft(
+            storedView.coverLetterId,
+            snapshot.activeResumeId,
+          );
+          if (cancelled) return;
+          loadCoverLetterIntoEditor(storedLetterDraft, {
+            coverLetterId: storedView.coverLetterId,
+            resumeId: snapshot.activeResumeId,
+          });
+        }
         setLocalReady(true);
       })
       .catch(() => {
@@ -212,6 +315,29 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   }, [activeResumeId, localReady, resume, template]);
 
   useEffect(() => {
+    if (
+      !localReady
+      || activeDocumentType !== 'coverLetter'
+      || skipNextCoverLetterAutosaveRef.current
+    ) {
+      skipNextCoverLetterAutosaveRef.current = false;
+      return;
+    }
+
+    if (!activeCoverLetterId || editorCoverLetterIdRef.current !== activeCoverLetterId) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      saveCoverLetterFromRefs({ reason: 'cover-letter-autosave' });
+    }, 180);
+
+    return () => window.clearTimeout(timeoutId);
+  // Cover-letter persistence reads exact document refs rather than active tile state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCoverLetterId, activeDocumentType, coverLetter, coverLetterTemplate, localReady]);
+
+  useEffect(() => {
     if (!authReady || !localReady) {
       return;
     }
@@ -240,7 +366,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         await ensureResumeSyncSession({ idToken, accountUid: user.uid });
         const cloudSnapshot = normalizeCloudWorkspaceSnapshot(await pullCloudWorkspaceSnapshot(idToken));
 
-        const preMergeSave = await saveEditorDraftFromRefs({
+        const preMergeSave = await saveActiveDocumentFromRefs({
           reason: 'login-premerge',
           scheduleSync: false,
         });
@@ -259,6 +385,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         const localTombstones = localBundle.tombstones.filter((record) => (
           !record?.accountUid || record.accountUid === user.uid
         ));
+        const localCoverLetterTombstones = localBundle.coverLetterTombstones.filter((record) => (
+          !record?.accountUid || record.accountUid === user.uid
+        ));
         const localPendingOutbox = localBundle.pendingOutbox.filter((operation) => (
           !operation?.accountUid || operation.accountUid === user.uid
         ));
@@ -270,8 +399,12 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
           localDraftsByResumeId: localBundle.draftsByResumeId,
           cloudWorkspace: cloudSnapshot?.workspace,
           cloudDraftsByResumeId: cloudSnapshot?.draftsByResumeId,
+          localCoverLetterDraftsById: localBundle.coverLetterDraftsById,
+          cloudCoverLetterDraftsById: cloudSnapshot?.coverLetterDraftsById,
           tombstones: localTombstones,
           cloudTombstones: cloudSnapshot?.tombstones,
+          coverLetterTombstones: localCoverLetterTombstones,
+          cloudCoverLetterTombstones: cloudSnapshot?.coverLetterTombstones,
           pendingOutbox: localPendingOutbox,
           outboxRecords: localOutboxRecords,
           workspaceCloudVersion: cloudSnapshot?.workspaceCloudVersion,
@@ -289,7 +422,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         }
 
         if (editorMutationVersionRef.current !== editorVersionAtMerge) {
-          const currentEditorResumeId = editorDraftResumeIdRef.current;
+          const currentEditorResumeId = activeResumeIdRef.current;
           const preservesCurrentEditor = mergeResult.workspace.resumeIds.includes(currentEditorResumeId);
           const nextWorkspace = preservesCurrentEditor
             ? normalizeWorkspaceIndex({
@@ -300,7 +433,26 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
 
           commitWorkspace(nextWorkspace, { persist: false });
 
-          if (preservesCurrentEditor) {
+          if (preservesCurrentEditor && activeDocumentTypeRef.current === 'coverLetter') {
+            const currentCoverLetterId = editorCoverLetterIdRef.current;
+            const meta = mergeResult.workspace.coverLetters.meta[currentCoverLetterId];
+
+            if (meta?.resumeId === currentEditorResumeId) {
+              const storedDraft = await readLocalCoverLetterDraft(currentCoverLetterId, currentEditorResumeId);
+              editorCoverLetterRevisionRef.current = storedDraft.localRevision || '';
+              coverLetterRevisionByIdRef.current.set(currentCoverLetterId, storedDraft.localRevision || '');
+              currentCoverLetterDraftRef.current = {
+                ...currentCoverLetterDraftRef.current,
+                localRevision: editorCoverLetterRevisionRef.current,
+              };
+              await saveCoverLetterFromRefs({
+                reason: 'login-concurrent-cover-letter-edit',
+                scheduleSync: false,
+              });
+            } else {
+              setActiveDocument('resume');
+            }
+          } else if (preservesCurrentEditor) {
             const storedDraft = await readLocalDraft(currentEditorResumeId);
             editorDraftRevisionRef.current = storedDraft.localRevision || '';
             draftRevisionByResumeIdRef.current.set(currentEditorResumeId, storedDraft.localRevision || '');
@@ -320,6 +472,21 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
             skipNextAutosaveRef.current = true;
             commitWorkspace(mergeResult.workspace, { persist: false });
             loadDraftIntoEditor(nextDraft, { resumeId: mergeResult.activeResumeId });
+
+            const currentCoverLetterId = editorCoverLetterIdRef.current;
+            const nextCoverLetterDraft = mergeResult.coverLetterDraftsById.get(currentCoverLetterId);
+            if (
+              activeDocumentTypeRef.current === 'coverLetter'
+              && nextCoverLetterDraft
+              && mergeResult.workspace.coverLetters.meta[currentCoverLetterId]?.resumeId === mergeResult.activeResumeId
+            ) {
+              loadCoverLetterIntoEditor(nextCoverLetterDraft, {
+                coverLetterId: currentCoverLetterId,
+                resumeId: mergeResult.activeResumeId,
+              });
+            } else {
+              setActiveDocument('resume');
+            }
           }
         }
 
@@ -399,13 +566,13 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     }
 
     function handlePageExit() {
-      saveEditorDraftFromRefs({ reason: 'pagehide', scheduleSync: false });
+      saveActiveDocumentFromRefs({ reason: 'pagehide', scheduleSync: false });
       requestResumeBackgroundSync();
     }
 
     function handleVisibilityChange() {
       if (document.visibilityState === 'hidden') {
-        saveEditorDraftFromRefs({ reason: 'visibilitychange', scheduleSync: false });
+        saveActiveDocumentFromRefs({ reason: 'visibilitychange', scheduleSync: false });
         requestResumeBackgroundSync();
       }
     }
@@ -432,6 +599,40 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   function resetValidationState() {
     setTouched({});
     setShowAllErrors(false);
+  }
+
+  function setActiveDocument(nextType) {
+    const normalizedType = nextType === 'coverLetter' ? 'coverLetter' : 'resume';
+    activeDocumentTypeRef.current = normalizedType;
+    setActiveDocumentType(normalizedType);
+  }
+
+  function loadCoverLetterIntoEditor(nextDraft, {
+    coverLetterId,
+    resumeId = activeResumeIdRef.current,
+    focusGroup = '',
+  } = {}) {
+    const normalizedDraft = normalizeCoverLetterDraft(nextDraft, resumeId);
+
+    if (!coverLetterId || normalizedDraft.coverLetter.resumeId !== resumeId) {
+      return false;
+    }
+
+    skipNextCoverLetterAutosaveRef.current = true;
+    currentCoverLetterDraftRef.current = normalizedDraft;
+    editorCoverLetterIdRef.current = coverLetterId;
+    editorCoverLetterResumeIdRef.current = resumeId;
+    editorCoverLetterRevisionRef.current = normalizedDraft.localRevision || '';
+    coverLetterRevisionByIdRef.current.set(coverLetterId, normalizedDraft.localRevision || '');
+    editorMutationVersionRef.current += 1;
+    setActiveCoverLetterId(coverLetterId);
+    setCoverLetter(normalizedDraft.coverLetter);
+    setCoverLetterTemplate(normalizedDraft.template);
+    setCoverLetterSavedAt(normalizedDraft.savedAt);
+    setSaveState(normalizedDraft.savedAt ? 'saved' : 'idle');
+    setActiveDocument('coverLetter');
+    if (focusGroup) setActiveCoverLetterGroup(focusGroup);
+    return true;
   }
 
   function loadDraftIntoEditor(nextDraft, {
@@ -586,12 +787,26 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
           }
         }
 
+        const editorCoverLetterId = editorCoverLetterIdRef.current;
+        if (editorCoverLetterId) {
+          const storedCoverLetter = await readLocalCoverLetterDraft(
+            editorCoverLetterId,
+            editorCoverLetterResumeIdRef.current,
+          );
+          if (storedCoverLetter.localRevision === editorCoverLetterRevisionRef.current) {
+            currentCoverLetterDraftRef.current = {
+              ...currentCoverLetterDraftRef.current,
+              cloudVersion: storedCoverLetter.cloudVersion || 0,
+            };
+          }
+        }
+
         if (result.oversizedCount > 0) {
           oversizedResumeDetected = true;
           setSyncState('stale');
           setNotice({
             tone: 'warning',
-            message: 'One resume is too large for cloud sync. It remains saved in this browser.',
+            message: 'One document is too large for cloud sync. It remains saved in this browser.',
           });
 
           if (
@@ -713,6 +928,8 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
         if (result?.conflict) {
           if (editorDraftResumeIdRef.current === resumeId) {
             const nextConflict = {
+              type: 'resume',
+              documentId: resumeId,
               resumeId,
               localDraft: nextDraft,
               storedDraft: result.draft,
@@ -788,8 +1005,131 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     return saveOperation;
   }
 
-  function persistCurrentEditorDraft(options = {}) {
-    return saveEditorDraftFromRefs(options);
+  function saveCoverLetterFromRefs({
+    reason = 'manual-cover-letter',
+    scheduleSync = true,
+    allowStaleOverwrite = false,
+  } = {}) {
+    const coverLetterId = editorCoverLetterIdRef.current;
+    const resumeId = editorCoverLetterResumeIdRef.current;
+    const draftSnapshot = currentCoverLetterDraftRef.current;
+    const accountUid = userRef.current?.uid || '';
+
+    if (!coverLetterId || !resumeId || !draftSnapshot) {
+      return Promise.resolve({ skipped: true });
+    }
+
+    if (
+      !allowStaleOverwrite
+      && conflictRef.current?.type === 'coverLetter'
+      && conflictRef.current?.documentId === coverLetterId
+    ) {
+      return Promise.resolve({ conflict: true, draft: conflictRef.current.storedDraft });
+    }
+
+    const nextDraft = createSavedCoverLetterDraft(draftSnapshot);
+    if (editorCoverLetterIdRef.current === coverLetterId) {
+      setCoverLetterSavedAt(nextDraft.savedAt);
+      setSaveState('saving');
+      currentCoverLetterDraftRef.current = { ...currentCoverLetterDraftRef.current, savedAt: nextDraft.savedAt };
+    }
+
+    const saveOperation = coverLetterSaveQueueRef.current.then(async () => {
+      const meta = workspaceRef.current.coverLetters.meta[coverLetterId];
+      if (meta?.resumeId !== resumeId) return { skipped: true, deleted: true };
+
+      const expectedRevision = coverLetterRevisionByIdRef.current.get(coverLetterId)
+        || draftSnapshot.localRevision
+        || '';
+
+      try {
+        const result = await persistLocalCoverLetterDraftSnapshot({
+          coverLetterId,
+          resumeId,
+          workspace: workspaceRef.current,
+          draft: nextDraft,
+          accountUid,
+          enqueueSync: true,
+          reason,
+          expectedRevision,
+          allowStaleOverwrite,
+        });
+
+        if (result?.conflict) {
+          if (editorCoverLetterIdRef.current === coverLetterId) {
+            const nextConflict = {
+              type: 'coverLetter',
+              documentId: coverLetterId,
+              resumeId,
+              localDraft: nextDraft,
+              storedDraft: result.draft,
+            };
+            conflictRef.current = nextConflict;
+            setConflict(nextConflict);
+            setSaveState('conflict');
+            setNotice({
+              tone: 'warning',
+              message: 'This cover letter changed in another tab. Choose which version to keep.',
+            });
+          }
+          return result;
+        }
+
+        if (result?.deleted) {
+          if (editorCoverLetterIdRef.current === coverLetterId) {
+            editorCoverLetterIdRef.current = '';
+            editorCoverLetterResumeIdRef.current = '';
+            setActiveCoverLetterId('');
+            setActiveDocument('resume');
+            setNotice({
+              tone: 'warning',
+              message: 'This cover letter was deleted in another tab, so this stale edit was not saved.',
+            });
+          }
+          return result;
+        }
+
+        if (result?.draft?.localRevision) {
+          coverLetterRevisionByIdRef.current.set(coverLetterId, result.draft.localRevision);
+          if (editorCoverLetterIdRef.current === coverLetterId) {
+            editorCoverLetterRevisionRef.current = result.draft.localRevision;
+            currentCoverLetterDraftRef.current = {
+              ...currentCoverLetterDraftRef.current,
+              localRevision: result.draft.localRevision,
+              cloudVersion: result.draft.cloudVersion || currentCoverLetterDraftRef.current.cloudVersion || 0,
+            };
+            setCoverLetterSavedAt(result.draft.savedAt);
+            setSaveState('saved');
+            if (
+              allowStaleOverwrite
+              && conflictRef.current?.type === 'coverLetter'
+              && conflictRef.current.documentId === coverLetterId
+            ) {
+              conflictRef.current = null;
+              setConflict(null);
+            }
+          }
+        }
+
+        if (scheduleSync) scheduleCloudSync(reason);
+        return result;
+      } catch (error) {
+        if (editorCoverLetterIdRef.current === coverLetterId) {
+          setSaveState('error');
+          setNotice({ tone: 'error', message: 'This cover letter could not be saved in this browser.' });
+        }
+        return { error: true, cause: error };
+      }
+    });
+
+    coverLetterSaveQueueRef.current = saveOperation.then(() => undefined, () => undefined);
+    return saveOperation;
+  }
+
+  function saveActiveDocumentFromRefs(options = {}) {
+    return activeDocumentTypeRef.current === 'coverLetter'
+      ? saveCoverLetterFromRefs(options)
+      : saveEditorDraftFromRefs(options);
   }
 
   function updateResume(transform) {
@@ -806,6 +1146,19 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       };
 
       return nextResume;
+    });
+  }
+
+  function updateCoverLetter(transform) {
+    setSaveState('saving');
+    editorMutationVersionRef.current += 1;
+    setCoverLetter((currentCoverLetter) => {
+      const nextCoverLetter = applyCoverLetterUpdate(currentCoverLetter, transform);
+      currentCoverLetterDraftRef.current = {
+        ...currentCoverLetterDraftRef.current,
+        coverLetter: nextCoverLetter,
+      };
+      return nextCoverLetter;
     });
   }
 
@@ -937,7 +1290,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     endTransientSampleEntry();
     revealAllErrors();
     printViewRef.current = mobileViewRef.current;
-    persistCurrentEditorDraft({ reason: 'print' });
+    saveActiveDocumentFromRefs({ reason: 'print' });
     flushCloudQueue({ reason: 'print' });
     preparePrintView();
 
@@ -981,8 +1334,156 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       focusPersonal,
       resumeId: addition.resumeId,
     });
+    editorCoverLetterIdRef.current = '';
+    editorCoverLetterResumeIdRef.current = '';
+    setActiveCoverLetterId('');
+    setActiveDocument('resume');
     scheduleCloudSync(reason, syncDelay);
     return addition.resumeId;
+  }
+
+  async function activateResumeForDocument(resumeId) {
+    if (!workspaceRef.current.resumeIds.includes(resumeId)) return false;
+    if (workspaceRef.current.activeResumeId === resumeId) return true;
+
+    const nextWorkspace = normalizeWorkspaceIndex({
+      ...workspaceRef.current,
+      activeResumeId: resumeId,
+    });
+    const persistedWorkspace = await commitWorkspace(nextWorkspace, { reason: 'switch-document-resume' });
+    if (!persistedWorkspace?.resumeIds.includes(resumeId)) return false;
+    loadDraftIntoEditor(await readLocalDraft(resumeId), { resumeId });
+    return true;
+  }
+
+  async function openCoverLetter(coverLetterId) {
+    const meta = workspaceRef.current.coverLetters.meta[coverLetterId];
+    if (!meta || conflictRef.current) return false;
+    if (activeDocumentTypeRef.current === 'coverLetter' && editorCoverLetterIdRef.current === coverLetterId) {
+      return true;
+    }
+
+    const saveResult = await saveActiveDocumentFromRefs({
+      reason: 'switch-document',
+      persistWorkspace: false,
+    });
+    if (saveResult?.conflict || saveResult?.error || saveResult?.skipped) return false;
+    if (!await activateResumeForDocument(meta.resumeId)) return false;
+
+    const draft = await readLocalCoverLetterDraft(coverLetterId, meta.resumeId);
+    return loadCoverLetterIntoEditor(draft, { coverLetterId, resumeId: meta.resumeId });
+  }
+
+  async function openResumeDocument() {
+    if (activeDocumentTypeRef.current === 'resume') return true;
+    const saveResult = await saveCoverLetterFromRefs({ reason: 'switch-to-resume' });
+    if (saveResult?.conflict || saveResult?.error) return false;
+    setActiveDocument('resume');
+    return true;
+  }
+
+  async function getResumeTemplateForCoverLetter(resumeId = activeResumeIdRef.current) {
+    if (!workspaceRef.current.resumeIds.includes(resumeId)) return '';
+    if (resumeId === editorDraftResumeIdRef.current) {
+      return currentDraftRef.current.template === 'executive' ? 'executive' : 'compact';
+    }
+
+    const draft = await readLocalDraft(resumeId);
+    return draft.template === 'executive' ? 'executive' : 'compact';
+  }
+
+  async function createCoverLetter({
+    resumeId = activeResumeIdRef.current,
+    template: requestedTemplate = '',
+    name = 'Cover letter',
+  } = {}) {
+    const currentWorkspace = workspaceRef.current;
+    if (!currentWorkspace.resumeIds.includes(resumeId) || conflictRef.current) return '';
+    const existingPrimaryId = getPrimaryCoverLetterId(currentWorkspace, resumeId);
+    if (existingPrimaryId) {
+      await openCoverLetter(existingPrimaryId);
+      return existingPrimaryId;
+    }
+
+    const saveResult = await saveActiveDocumentFromRefs({
+      reason: 'create-cover-letter',
+      persistWorkspace: false,
+    });
+    if (saveResult?.conflict || saveResult?.error || saveResult?.skipped) return '';
+
+    const resumeTemplate = resumeId === editorDraftResumeIdRef.current
+      ? currentDraftRef.current.template
+      : (await readLocalDraft(resumeId)).template;
+    const initialTemplate = ['compact', 'executive', 'modern'].includes(requestedTemplate)
+      ? requestedTemplate
+      : (resumeTemplate === 'executive' ? 'executive' : 'compact');
+    const result = await persistLocalCoverLetterCreation({
+      workspace: workspaceRef.current,
+      resumeId,
+      name,
+      draft: createBlankCoverLetterDraft(resumeId, initialTemplate),
+      accountUid: userRef.current?.uid || '',
+      enqueueSync: true,
+      reason: 'create-cover-letter',
+    });
+    if (!result.coverLetterId || !result.draft) return '';
+
+    await commitWorkspace(result.workspace, { persist: false });
+    if (!await activateResumeForDocument(resumeId)) return '';
+    loadCoverLetterIntoEditor(result.draft, {
+      coverLetterId: result.coverLetterId,
+      resumeId,
+      focusGroup: 'sender',
+    });
+    scheduleCloudSync('create-cover-letter', 500);
+    return result.coverLetterId;
+  }
+
+  async function deleteCoverLetter(coverLetterId = editorCoverLetterIdRef.current) {
+    const meta = workspaceRef.current.coverLetters.meta[coverLetterId];
+    if (!meta || conflictRef.current) return false;
+    const deletesActiveCoverLetter = editorCoverLetterIdRef.current === coverLetterId;
+    const previousDocumentType = activeDocumentTypeRef.current;
+
+    if (deletesActiveCoverLetter) {
+      editorCoverLetterIdRef.current = '';
+      editorCoverLetterResumeIdRef.current = '';
+      setActiveCoverLetterId('');
+      setActiveDocument('resume');
+    }
+
+    try {
+      const nextWorkspace = await persistLocalCoverLetterDelete({
+        coverLetterId,
+        resumeId: meta.resumeId,
+        workspace: workspaceRef.current,
+        accountUid: userRef.current?.uid || '',
+        enqueueSync: true,
+      });
+      await commitWorkspace(nextWorkspace, { persist: false });
+      scheduleCloudSync('delete-cover-letter', 500);
+      return true;
+    } catch {
+      if (deletesActiveCoverLetter) {
+        editorCoverLetterIdRef.current = coverLetterId;
+        editorCoverLetterResumeIdRef.current = meta.resumeId;
+        setActiveCoverLetterId(coverLetterId);
+        setActiveDocument(previousDocumentType);
+      }
+      setNotice({ tone: 'error', message: 'This cover letter could not be removed from this browser.' });
+      return false;
+    }
+  }
+
+  function changeCoverLetterTemplate(nextTemplate) {
+    if (!['compact', 'executive', 'modern'].includes(nextTemplate)) return;
+    setSaveState('saving');
+    editorMutationVersionRef.current += 1;
+    currentCoverLetterDraftRef.current = {
+      ...currentCoverLetterDraftRef.current,
+      template: nextTemplate,
+    };
+    setCoverLetterTemplate(nextTemplate);
   }
 
   async function setActiveResume(nextResumeId) {
@@ -994,6 +1495,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
 
     if (nextResumeId === currentWorkspace.activeResumeId) {
       resumeLoadRunIdRef.current += 1;
+      if (activeDocumentTypeRef.current === 'coverLetter') {
+        await openResumeDocument();
+      }
       return;
     }
 
@@ -1004,7 +1508,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
 
     const loadRequestId = resumeLoadRunIdRef.current + 1;
     resumeLoadRunIdRef.current = loadRequestId;
-    const saveResult = await persistCurrentEditorDraft({ reason: 'switch-resume', persistWorkspace: false });
+    const saveResult = await saveActiveDocumentFromRefs({ reason: 'switch-resume', persistWorkspace: false });
 
     if (
       resumeLoadRunIdRef.current !== loadRequestId ||
@@ -1032,6 +1536,10 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     }
 
     loadDraftIntoEditor(nextDraft, { resumeId: nextResumeId, loadRequestId });
+    editorCoverLetterIdRef.current = '';
+    editorCoverLetterResumeIdRef.current = '';
+    setActiveCoverLetterId('');
+    setActiveDocument('resume');
   }
 
   async function createResume() {
@@ -1042,7 +1550,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return null;
     }
 
-    const saveResult = await persistCurrentEditorDraft({ reason: 'create-resume', persistWorkspace: false });
+    const saveResult = await saveActiveDocumentFromRefs({ reason: 'create-resume', persistWorkspace: false });
 
     if (saveResult?.conflict || saveResult?.error || saveResult?.skipped) {
       return null;
@@ -1072,86 +1580,81 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     }
   }
 
-  async function createImportPlaceholderResume({ sourceFileName = '' } = {}) {
-    if (!canAddResume || conflictRef.current) {
-      setNotice({
-        tone: conflictRef.current ? 'warning' : 'error',
-        message: conflictRef.current
-          ? 'Resolve the current save conflict before importing another resume.'
-          : `You can keep up to ${MAX_WORKSPACE_RESUMES} resumes in this browser.`,
-      });
-      return null;
+  async function importDocuments({
+    resumeImport = null,
+    coverLetterImport = null,
+    targetResumeId = '',
+    replaceCoverLetterId = '',
+    expectedAccountUid = '',
+  } = {}) {
+    if (!resumeImport && !coverLetterImport) return null;
+    if (!userRef.current?.uid || userRef.current.uid !== expectedAccountUid) {
+      throw new Error('Your account changed before the import could be saved.');
     }
-
-    const saveResult = await persistCurrentEditorDraft({ reason: 'import-placeholder', persistWorkspace: false });
-
+    if (resumeImport && !canAddResume) {
+      throw new Error(`You can keep up to ${MAX_WORKSPACE_RESUMES} resumes in this browser.`);
+    }
+    const saveResult = await saveActiveDocumentFromRefs({
+      reason: 'document-import',
+      persistWorkspace: false,
+    });
     if (saveResult?.conflict || saveResult?.error || saveResult?.skipped) {
-      return null;
+      throw new Error('Resolve the current save conflict before importing documents.');
     }
 
-    const currentWorkspace = workspaceRef.current;
+    let normalizedResumeImport = resumeImport
+      ? { ...resumeImport, draft: normalizeDraftPayload(resumeImport.draft) }
+      : null;
+    let normalizedCoverLetterImport = coverLetterImport
+      ? { ...coverLetterImport, draft: normalizeCoverLetterDraft(coverLetterImport.draft, targetResumeId) }
+      : null;
 
-    if (currentWorkspace.resumeIds.length >= MAX_WORKSPACE_RESUMES) {
-      return null;
-    }
-    const existingNames = currentWorkspace.resumeIds.map((resumeId) => currentWorkspace.meta[resumeId]?.name || '');
-    const sourceName = sourceFileName.replace(/\.[^.]+$/, '');
-    const nextResumeName = sanitizeWorkspaceResumeName(sourceName, createNextResumeName(existingNames));
-    const nextDraft = createSavedDraftState(createBlankDraftState());
-
-    try {
-      return await persistCreatedResume({
-        sourceWorkspace: currentWorkspace,
-        name: nextResumeName,
-        draft: nextDraft,
-        reason: 'import-placeholder',
-        focusPersonal: true,
+    if (normalizedCoverLetterImport) {
+      const reconciliationResumeDraft = normalizedResumeImport?.draft
+        || (targetResumeId === editorDraftResumeIdRef.current
+          ? currentDraftRef.current
+          : await readLocalDraft(targetResumeId));
+      const reconciled = reconcileImportedCoverLetterSender({
+        resumeDraft: reconciliationResumeDraft,
+        coverLetterDraft: normalizedCoverLetterImport.draft,
+        allowResumeBackfill: Boolean(normalizedResumeImport),
       });
-    } catch {
-      setSaveState('error');
-      setNotice({ tone: 'error', message: 'The imported resume could not be prepared in this browser.' });
-      return null;
+      if (normalizedResumeImport) {
+        normalizedResumeImport = { ...normalizedResumeImport, draft: reconciled.resumeDraft };
+      }
+      normalizedCoverLetterImport = {
+        ...normalizedCoverLetterImport,
+        draft: reconciled.coverLetterDraft,
+      };
     }
-  }
 
-  async function replaceResumeDraft(resumeId, importedDraft, { name } = {}) {
-    const currentWorkspace = workspaceRef.current;
-
-    if (!resumeId || !currentWorkspace.resumeIds.includes(resumeId)) {
-      setNotice({
-        tone: 'error',
-        message: 'The import finished, but the new resume was removed before it could be filled.',
+    const result = await persistLocalImportedDocuments({
+      workspace: workspaceRef.current,
+      resumeImport: normalizedResumeImport,
+      coverLetterImport: normalizedCoverLetterImport,
+      targetResumeId,
+      replaceCoverLetterId,
+      accountUid: expectedAccountUid,
+      enqueueSync: true,
+      reason: 'document-import',
+    });
+    await commitWorkspace(result.workspace, { persist: false });
+    if (result.resumeDraft) {
+      loadDraftIntoEditor(result.resumeDraft, { resumeId: result.resumeId, focusPersonal: true });
+    } else if (result.resumeId !== editorDraftResumeIdRef.current) {
+      loadDraftIntoEditor(await readLocalDraft(result.resumeId), { resumeId: result.resumeId });
+    }
+    if (result.coverLetterDraft) {
+      loadCoverLetterIntoEditor(result.coverLetterDraft, {
+        coverLetterId: result.coverLetterId,
+        resumeId: result.resumeId,
+        focusGroup: 'sender',
       });
-      return false;
+    } else {
+      setActiveDocument('resume');
     }
-
-    const normalizedDraft = normalizeDraftPayload(importedDraft);
-    const nextDraft = createSavedDraftState({
-      resume: normalizedDraft.resume,
-      template: normalizedDraft.template,
-    });
-    const existingName = currentWorkspace.meta[resumeId]?.name || 'Imported resume';
-    const nextName = sanitizeWorkspaceResumeName(name, existingName);
-    const nextWorkspace = normalizeWorkspaceIndex({
-      ...updateWorkspaceResumeMeta(currentWorkspace, resumeId, {
-        name: nextName,
-        updatedAt: nextDraft.savedAt,
-      }),
-      activeResumeId: resumeId,
-    });
-
-    const persistedDraft = await persistLocalDraftSnapshot({
-      resumeId,
-      workspace: nextWorkspace,
-      draft: nextDraft,
-      accountUid: userRef.current?.uid || '',
-      enqueueWorkspaceSync: true,
-      reason: 'import-replace',
-    });
-    await commitWorkspace(persistedDraft.workspace, { persist: false });
-    scheduleCloudSync('import-replace', 500);
-    loadDraftIntoEditor(persistedDraft.draft, { focusPersonal: true, resumeId });
-    return true;
+    scheduleCloudSync('document-import', 500);
+    return result;
   }
 
   async function duplicateActiveResume() {
@@ -1162,7 +1665,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       return null;
     }
 
-    const saveResult = await persistCurrentEditorDraft({ reason: 'duplicate-resume', persistWorkspace: false });
+    const saveResult = await saveActiveDocumentFromRefs({ reason: 'duplicate-resume', persistWorkspace: false });
 
     if (saveResult?.conflict || saveResult?.error || saveResult?.skipped) {
       return null;
@@ -1317,9 +1820,11 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const deletedIds = new Set(deletion.deletedResumeIds);
     const deletesActiveResume = deletedIds.has(currentWorkspace.activeResumeId);
     const deletedActiveResumeId = deletesActiveResume ? editorDraftResumeIdRef.current : '';
+    const deletedActiveCoverLetterId = deletesActiveResume ? editorCoverLetterIdRef.current : '';
+    const deletedActiveDocumentType = activeDocumentTypeRef.current;
 
     if (!deletesActiveResume) {
-      const saveResult = await persistCurrentEditorDraft({
+      const saveResult = await saveActiveDocumentFromRefs({
         reason: 'batch-delete',
         persistWorkspace: false,
       });
@@ -1338,6 +1843,8 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     if (deletesActiveResume) {
       // Prevent exit/visibility handlers from recreating the draft while its delete is queued.
       editorDraftResumeIdRef.current = '';
+      editorCoverLetterIdRef.current = '';
+      editorCoverLetterResumeIdRef.current = '';
     }
 
     let persistedWorkspace;
@@ -1352,6 +1859,9 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     } catch {
       if (deletesActiveResume) {
         editorDraftResumeIdRef.current = deletedActiveResumeId;
+        editorCoverLetterIdRef.current = deletedActiveCoverLetterId;
+        editorCoverLetterResumeIdRef.current = deletedActiveResumeId;
+        setActiveDocument(deletedActiveDocumentType);
       }
       setSaveState('error');
       setNotice({ tone: 'error', message: 'These resumes could not be removed from this browser.' });
@@ -1365,13 +1875,15 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
       const nextResumeId = persistedWorkspace.activeResumeId;
       const nextDraft = await readLocalDraft(nextResumeId);
       loadDraftIntoEditor(nextDraft, { resumeId: nextResumeId });
+      setActiveCoverLetterId('');
+      setActiveDocument('resume');
     }
 
     return true;
   }
 
   async function retryCloudSync() {
-    const saveResult = await persistCurrentEditorDraft({ reason: 'retry-sync' });
+    const saveResult = await saveActiveDocumentFromRefs({ reason: 'retry-sync' });
 
     if (saveResult?.conflict || saveResult?.error) {
       return false;
@@ -1381,7 +1893,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
   }
 
   async function flushActiveCloudDraft({ reason = 'manual' } = {}) {
-    const saveResult = await persistCurrentEditorDraft({ reason });
+    const saveResult = await saveActiveDocumentFromRefs({ reason });
 
     if (saveResult?.conflict || saveResult?.error || saveResult?.skipped) {
       return false;
@@ -1400,11 +1912,31 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     conflictRef.current = null;
     setConflict(null);
     setNotice(null);
-    loadDraftIntoEditor(currentConflict.storedDraft, { resumeId: currentConflict.resumeId });
+    if (currentConflict.type === 'coverLetter') {
+      loadCoverLetterIntoEditor(currentConflict.storedDraft, {
+        coverLetterId: currentConflict.documentId,
+        resumeId: currentConflict.resumeId,
+      });
+    } else {
+      loadDraftIntoEditor(currentConflict.storedDraft, { resumeId: currentConflict.resumeId });
+    }
   }
 
   async function resolveConflictWithLocal() {
     const currentConflict = conflictRef.current;
+
+    if (currentConflict?.type === 'coverLetter') {
+      if (editorCoverLetterIdRef.current !== currentConflict.documentId) return false;
+      const result = await saveCoverLetterFromRefs({
+        reason: 'resolve-local-cover-letter-conflict',
+        allowStaleOverwrite: true,
+      });
+      if (!result?.conflict) {
+        setNotice(null);
+        return true;
+      }
+      return false;
+    }
 
     if (!currentConflict || editorDraftResumeIdRef.current !== currentConflict.resumeId) {
       return false;
@@ -1427,9 +1959,40 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     const currentConflict = conflictRef.current;
     const currentWorkspace = workspaceRef.current;
 
-    if (!currentConflict || currentWorkspace.resumeIds.length >= MAX_WORKSPACE_RESUMES) {
+    if (!currentConflict) {
       return false;
     }
+
+    if (currentConflict.type === 'coverLetter') {
+      const sourceMeta = currentWorkspace.coverLetters.meta[currentConflict.documentId];
+      if (!sourceMeta) return false;
+      const result = await persistLocalCoverLetterCreation({
+        workspace: currentWorkspace,
+        resumeId: currentConflict.resumeId,
+        name: `${sourceMeta.name} copy`,
+        draft: {
+          ...currentCoverLetterDraftRef.current,
+          cloudVersion: 0,
+          localRevision: '',
+        },
+        accountUid: userRef.current?.uid || '',
+        enqueueSync: true,
+        reason: 'cover-letter-conflict-copy',
+      });
+      if (!result.coverLetterId) return false;
+      await commitWorkspace(result.workspace, { persist: false });
+      conflictRef.current = null;
+      setConflict(null);
+      loadCoverLetterIntoEditor(result.draft, {
+        coverLetterId: result.coverLetterId,
+        resumeId: currentConflict.resumeId,
+      });
+      scheduleCloudSync('cover-letter-conflict-copy', 500);
+      setNotice({ tone: 'warning', message: 'Your edits were preserved as a separate cover letter copy.' });
+      return true;
+    }
+
+    if (currentWorkspace.resumeIds.length >= MAX_WORKSPACE_RESUMES) return false;
 
     const sourceName = currentWorkspace.meta[currentConflict.resumeId]?.name || 'Resume';
     const existingNames = currentWorkspace.resumeIds.map((resumeId) => currentWorkspace.meta[resumeId]?.name || '');
@@ -1491,6 +2054,173 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     endTransientSampleEntry,
     endTransientSampleEntryUnless,
   });
+  const coverLetterActions = {
+    setSenderMode(mode) {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        sender: { ...letter.sender, mode: mode === 'custom' ? 'custom' : 'resume' },
+      }));
+    },
+    updateSenderOverride(field, value) {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        sender: {
+          ...letter.sender,
+          overrides: { ...letter.sender.overrides, [field]: value },
+        },
+      }));
+    },
+    resetSenderOverride(field) {
+      updateCoverLetter((letter) => {
+        const overrides = { ...letter.sender.overrides };
+        delete overrides[field];
+        return { ...letter, sender: { ...letter.sender, overrides } };
+      });
+    },
+    updateRecipientField(field, value) {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        recipient: { ...letter.recipient, [field]: value },
+      }));
+    },
+    updateRecipientAddressLine(index, value) {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        recipient: {
+          ...letter.recipient,
+          addressLines: letter.recipient.addressLines.map((line, lineIndex) => (
+            lineIndex === index ? value : line
+          )),
+        },
+      }));
+    },
+    addRecipientAddressLine() {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        recipient: {
+          ...letter.recipient,
+          addressLines: [...letter.recipient.addressLines, ''],
+        },
+      }));
+    },
+    removeRecipientAddressLine(index) {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        recipient: {
+          ...letter.recipient,
+          addressLines: letter.recipient.addressLines.filter((_, lineIndex) => lineIndex !== index),
+        },
+      }));
+    },
+    updateGreeting(value) {
+      updateCoverLetter((letter) => ({ ...letter, greeting: value }));
+    },
+    updateBodyBlock(blockId, value) {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        bodyBlocks: letter.bodyBlocks.map((block) => (
+          block.id === blockId && block.kind === 'paragraph' ? { ...block, text: value } : block
+        )),
+      }));
+    },
+    addParagraph(role = 'evidence') {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        bodyBlocks: [...letter.bodyBlocks, createCoverLetterParagraphBlock(role)],
+      }));
+    },
+    addBulletList() {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        bodyBlocks: [...letter.bodyBlocks, createCoverLetterBulletListBlock()],
+      }));
+    },
+    removeBodyBlock(blockId) {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        bodyBlocks: letter.bodyBlocks.filter((block) => block.id !== blockId),
+      }));
+    },
+    reorderBodyBlocks(orderedIds) {
+      updateCoverLetter((letter) => reorderCoverLetterBodyBlocks(letter, orderedIds));
+    },
+    updateBullet(blockId, bulletId, value) {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        bodyBlocks: letter.bodyBlocks.map((block) => (
+          block.id === blockId && block.kind === 'bulletList'
+            ? {
+              ...block,
+              items: block.items.map((item) => (item.id === bulletId ? { ...item, text: value } : item)),
+            }
+            : block
+        )),
+      }));
+    },
+    addBullet(blockId) {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        bodyBlocks: letter.bodyBlocks.map((block) => (
+          block.id === blockId && block.kind === 'bulletList'
+            ? { ...block, items: [...block.items, createCoverLetterBulletItem()] }
+            : block
+        )),
+      }));
+    },
+    removeBullet(blockId, bulletId) {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        bodyBlocks: letter.bodyBlocks.map((block) => (
+          block.id === blockId && block.kind === 'bulletList'
+            ? { ...block, items: block.items.filter((item) => item.id !== bulletId) }
+            : block
+        )),
+      }));
+    },
+    reorderBullets(blockId, orderedIds) {
+      updateCoverLetter((letter) => reorderCoverLetterBullets(letter, blockId, orderedIds));
+    },
+    updateSignOff(value) {
+      updateCoverLetter((letter) => ({ ...letter, signOff: value }));
+    },
+    updateSignatureName(value) {
+      updateCoverLetter((letter) => ({ ...letter, signatureName: value }));
+    },
+    setSampleInformationVisible(showInformation) {
+      updateCoverLetter((letter) => {
+        if (letter.sampleDisplay.isDismissed) return letter;
+        return {
+          ...letter,
+          sampleDisplay: {
+            ...letter.sampleDisplay,
+            hasStarted: true,
+            showInformation: Boolean(showInformation),
+          },
+        };
+      });
+    },
+    dismissSampleInformation() {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        sampleDisplay: {
+          hasStarted: true,
+          showInformation: false,
+          isDismissed: true,
+          entryBindings: {},
+          textListOrders: {},
+        },
+      }));
+    },
+    updateSetting(settingId, delta) {
+      updateCoverLetter((letter) => ({
+        ...letter,
+        settings: {
+          ...letter.settings,
+          [settingId]: Number(letter.settings[settingId] || 0) + delta,
+        },
+      }));
+    },
+  };
 
   return {
     resume,
@@ -1506,6 +2236,21 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     getFieldError,
     markTouched,
     actions,
+    activeDocumentType,
+    activeCoverLetterId,
+    activeCoverLetterGroup,
+    setActiveCoverLetterGroup,
+    coverLetter,
+    coverLetterTemplate,
+    setCoverLetterTemplate: changeCoverLetterTemplate,
+    coverLetterSavedAt,
+    coverLetterActions,
+    activeResumeCoverLetters,
+    openCoverLetter,
+    openResumeDocument,
+    getResumeTemplateForCoverLetter,
+    createCoverLetter,
+    deleteCoverLetter,
     printResume,
     notice,
     showNotice(nextNotice) {
@@ -1532,8 +2277,7 @@ export function useResumeBuilder({ user = null, authReady = true } = {}) {
     canDeleteActiveResume: workspace.resumeIds.length > 1,
     setActiveResume,
     createResume,
-    createImportPlaceholderResume,
-    replaceResumeDraft,
+    importDocuments,
     duplicateActiveResume,
     renameActiveResume: renameResume,
     createResumeFolder,

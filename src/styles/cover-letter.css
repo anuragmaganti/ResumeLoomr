@@ -1,0 +1,594 @@
+.coverLetterEditorPanel .editorSidebar {
+  align-content: start;
+}
+
+.coverLetterTabs {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.coverLetterTab {
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 750;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.coverLetterTab:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.coverLetterTab.isActive {
+  border-color: color-mix(in srgb, var(--color-accent) 46%, var(--color-border));
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 9%, transparent);
+}
+
+.coverLetterLinkMode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+}
+
+.coverLetterLinkMode button {
+  min-height: 31px;
+  border: 0;
+  border-radius: calc(var(--radius-control) - 3px);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.coverLetterLinkMode button.isActive {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-xs);
+}
+
+.coverLetterLinkedField {
+  min-width: 0;
+}
+
+.coverLetterFieldSource {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  padding: 3px 4px 0;
+  color: var(--color-text-subtle);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.coverLetterFieldSource button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-strong);
+  font: inherit;
+  cursor: pointer;
+}
+
+.coverLetterAddressLines,
+.coverLetterBlockActions {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.coverLetterWordCount {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.7rem;
+  font-weight: 680;
+}
+
+.coverLetterWordCount.isWarning {
+  color: var(--color-warning-text, #9a6700);
+}
+
+.coverLetterAddressRow,
+.coverLetterBulletEditor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+.coverLetterAddressRow > .button,
+.coverLetterBulletEditor > .button {
+  min-width: 34px;
+  min-height: 34px;
+  padding-inline: 8px;
+}
+
+.coverLetterAddButton {
+  justify-self: start;
+  min-height: 31px;
+}
+
+.coverLetterBlockCard {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+.coverLetterBlockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.coverLetterBlockActions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.coverLetterLinkedHint {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.7rem;
+}
+
+.coverLetterSettingsRail .settingsTemplateSegment {
+  grid-template-columns: 1fr;
+}
+
+.coverLetterTemplateDialog {
+  width: min(760px, 100%);
+}
+
+.coverLetterDialogEyebrow {
+  margin: 0 0 3px;
+  color: var(--color-accent-strong);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.coverLetterTemplateGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.coverLetterTemplateCard {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.coverLetterTemplateCard:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.coverLetterTemplateCard.isSelected {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-soft) 52%, var(--color-surface-raised));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 11%, transparent);
+}
+
+.coverLetterTemplateMiniature {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  aspect-ratio: 8.5 / 11;
+  padding: 14px 12px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, #fff);
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.coverLetterTemplateMiniature > span {
+  display: block;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.coverLetterTemplateMiniName {
+  width: 48%;
+  height: 7px;
+  background: #334155 !important;
+}
+
+.coverLetterTemplateMiniContact {
+  width: 68%;
+  height: 3px;
+}
+
+.coverLetterTemplateMiniRecipient {
+  width: 36%;
+  height: 18px;
+  margin-top: 14px;
+}
+
+.coverLetterTemplateMiniLine {
+  width: 86%;
+  height: 3px;
+}
+
+.coverLetterTemplateMiniLine--wide {
+  width: 100%;
+  margin-top: 11px;
+}
+
+.coverLetterTemplateMiniLine--short {
+  width: 58%;
+}
+
+.coverLetterTemplateMiniSignature {
+  width: 28%;
+  height: 5px;
+  margin-top: auto;
+  background: #64748b !important;
+}
+
+.coverLetterTemplateMiniature--compact {
+  justify-items: center;
+}
+
+.coverLetterTemplateMiniature--compact .coverLetterTemplateMiniName,
+.coverLetterTemplateMiniature--compact .coverLetterTemplateMiniContact {
+  justify-self: center;
+}
+
+.coverLetterTemplateMiniature--executive {
+  border-left: 4px solid #3158d5;
+}
+
+.coverLetterTemplateMiniature--modern .coverLetterTemplateMiniName {
+  background: #3158d5 !important;
+}
+
+.coverLetterTemplateMiniature--modern::after {
+  content: "";
+  position: absolute;
+  top: 34px;
+  right: 12px;
+  left: 12px;
+  height: 2px;
+  background: #3158d5;
+}
+
+.coverLetterTemplateName {
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.coverLetterDialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.coverLetterDeleteDialog {
+  width: min(430px, 100%);
+}
+
+.coverLetterDeleteDialog h2,
+.coverLetterDeleteDialog p {
+  margin: 0;
+}
+
+.coverLetterDeleteDialog p {
+  margin-top: 8px;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.coverLetterDeleteIcon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.coverLetterPage {
+  --cover-letter-body-size: 0.76rem;
+  --cover-letter-line-height: 1.46;
+  --cover-letter-paragraph-gap: 12px;
+  --cover-letter-name-size: 1.12rem;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: var(--cover-letter-body-size);
+  line-height: var(--cover-letter-line-height);
+}
+
+.coverLetterPageContent {
+  display: grid;
+  align-content: start;
+  min-height: calc(1056px - var(--resume-page-margin-top) - var(--resume-page-margin-bottom));
+}
+
+.coverLetterSampleLabel {
+  margin: 0 0 16px;
+  color: var(--resume-page-subtle);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.coverLetterSender {
+  margin-bottom: 28px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--resume-page-divider);
+}
+
+.coverLetterSender h1 {
+  margin: 0;
+  color: var(--resume-page-heading);
+  font-size: var(--cover-letter-name-size);
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  text-align: left;
+}
+
+.coverLetterSender > p {
+  margin: 3px 0 0;
+  color: var(--resume-page-muted);
+}
+
+.coverLetterSenderDetails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  font-size: 0.92em;
+}
+
+.coverLetterRecipientDate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.coverLetterRecipient p,
+.coverLetterDate,
+.coverLetterGreeting,
+.coverLetterBody p,
+.coverLetterClosing p {
+  margin: 0;
+}
+
+.coverLetterRecipient p:first-child,
+.coverLetterRecipient p:nth-child(3) {
+  color: var(--resume-page-heading);
+  font-weight: 700;
+}
+
+.coverLetterDate {
+  color: var(--resume-page-muted);
+  white-space: nowrap;
+}
+
+.coverLetterGreeting {
+  margin-bottom: var(--cover-letter-paragraph-gap);
+}
+
+.coverLetterBody {
+  display: grid;
+  gap: var(--cover-letter-paragraph-gap);
+}
+
+.coverLetterBodyBlock {
+  position: relative;
+  min-width: 0;
+  border-radius: 3px;
+  cursor: grab;
+  touch-action: manipulation;
+}
+
+.coverLetterBodyBlock:active,
+.coverLetterBullet:active {
+  cursor: grabbing;
+}
+
+.coverLetterBodyBlock.isDragging,
+.coverLetterBullet.isDragging {
+  opacity: 0.24;
+}
+
+.coverLetterBody ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.coverLetterBullet {
+  border-radius: 3px;
+  cursor: grab;
+}
+
+.coverLetterClosing {
+  display: grid;
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.coverLetterSignature {
+  color: var(--resume-page-heading);
+  font-weight: 700;
+}
+
+.coverLetterPage--compact .coverLetterSender {
+  text-align: center;
+}
+
+.coverLetterPage--compact .coverLetterSender h1 {
+  text-align: center;
+}
+
+.coverLetterPage--compact .coverLetterSenderDetails {
+  justify-content: center;
+}
+
+.coverLetterPage--executive .coverLetterSender {
+  padding-left: 14px;
+  border-left: 3px solid var(--color-accent);
+}
+
+.coverLetterPage--modern .coverLetterSender {
+  border-bottom-width: 2px;
+}
+
+.coverLetterPage--modern .coverLetterSender h1 {
+  color: var(--color-accent-strong);
+}
+
+.coverLetterPage [data-edit-path] {
+  border-radius: 3px;
+  cursor: text;
+  transition:
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .coverLetterPage [data-edit-path]:hover {
+    background: var(--preview-edit-highlight-bg);
+    box-shadow: 0 0 0 2px var(--preview-edit-highlight-ring);
+  }
+
+  .coverLetterBodyBlock:hover,
+  .coverLetterBullet:hover {
+    background: var(--preview-edit-highlight-bg);
+    box-shadow: 0 0 0 2px var(--preview-edit-highlight-ring);
+  }
+}
+
+.coverLetterPage [data-preview-pulse="odd"],
+.coverLetterPage [data-preview-pulse="even"] {
+  animation: previewFieldPulse 620ms ease-out;
+}
+
+.coverLetterDragPreview {
+  width: min(520px, 72vw);
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 44%, var(--color-border));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--resume-page-bg) 92%, var(--color-accent-soft));
+  color: var(--resume-page-text);
+  font: 600 0.75rem/1.4 Arial, Helvetica, sans-serif;
+  box-shadow: var(--shadow-lg);
+}
+
+.coverLetterDragPreview--bullet {
+  width: min(460px, 68vw);
+}
+
+@media (max-width: 980px) {
+  .coverLetterEditorPanel .editorSidebar {
+    order: 0;
+  }
+
+  .coverLetterTabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .coverLetterTab {
+    text-align: center;
+  }
+}
+
+@media (max-width: 720px) {
+  .coverLetterTabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .coverLetterBlockActions,
+  .coverLetterLinkMode {
+    grid-template-columns: 1fr;
+  }
+
+  .coverLetterTemplateGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .coverLetterTemplateCard {
+    grid-template-columns: 82px minmax(0, 1fr);
+    align-items: center;
+  }
+}
+
+@media print {
+  .coverLetterSampleLabel,
+  .coverLetterDragPreview {
+    display: none !important;
+  }
+
+  .coverLetterPage {
+    min-height: var(--resume-print-min-height);
+    color: #111827;
+    background: #fff;
+  }
+
+  .coverLetterPageContent {
+    min-height: 0;
+  }
+
+  .coverLetterBodyBlock,
+  .coverLetterBullet,
+  .coverLetterPage [data-edit-path] {
+    background: transparent !important;
+    box-shadow: none !important;
+    cursor: default;
+  }
+}

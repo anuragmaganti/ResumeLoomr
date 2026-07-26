@@ -1203,3 +1203,168 @@ html[data-theme="dark"] .signedOutPrompt {
   padding-inline: 14px;
   font-size: 0.78rem;
 }
+
+.importDocumentDialog {
+  width: min(760px, 100%);
+}
+
+.importDocumentDialog .importResumeHeader {
+  align-items: flex-start;
+}
+
+.importDocumentDialog .importResumeHeader p {
+  margin: 5px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+}
+
+.importDocumentGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.importDocumentSlot {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.importDocumentSlotHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-size: 0.79rem;
+  font-weight: 800;
+}
+
+.importDocumentOptional {
+  color: var(--color-text-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.importDocumentDialog .importResumeDropzone {
+  min-height: 146px;
+  padding: var(--space-3);
+  background: var(--color-surface-muted);
+}
+
+.importDocumentDialog .importResumeDropzoneIcon {
+  width: 66px;
+  height: 66px;
+}
+
+.importDocumentDialog .importResumeDropzoneIcon svg {
+  width: 58px;
+  height: 58px;
+}
+
+.importDocumentFileName {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-text-subtle);
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.importDocumentSlot.hasFile .importResumeDropzone {
+  border-style: solid;
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+}
+
+.importDocumentTarget {
+  display: grid;
+  gap: 7px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-muted);
+}
+
+.importDocumentTarget > label:first-child {
+  color: var(--color-text-subtle);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.importDocumentTarget select {
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-item);
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.importDocumentReplace {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--color-text-subtle);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.importDocumentReplace input {
+  margin-top: 2px;
+  accent-color: var(--color-accent);
+}
+
+.importDocumentPartial {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-card);
+  background: var(--color-warning-soft);
+  color: var(--color-text-subtle);
+  font-size: 0.76rem;
+}
+
+.importDocumentPartial strong {
+  color: var(--color-text);
+}
+
+.importDocumentPartial span {
+  grid-column: 1;
+}
+
+.importDocumentPartial .button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+@media (max-width: 720px) {
+  .importDocumentGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .importDocumentDialog .importResumeDropzone {
+    min-height: 112px;
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  .importDocumentDialog .importResumeDropzoneIcon {
+    grid-row: 1;
+  }
+
+  .importDocumentPartial {
+    grid-template-columns: 1fr;
+  }
+
+  .importDocumentPartial .button,
+  .importDocumentPartial span {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}

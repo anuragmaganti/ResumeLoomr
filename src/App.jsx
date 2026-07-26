@@ -3,6 +3,7 @@ import './App.css'
 import './styles/buttons.css'
 import './styles/forms.css'
 import './styles/preview.css'
+import './styles/cover-letter.css'
 import Header from './components/header';
 import AuthModal from './components/authModal';
 import ImportResumeModal from './components/importResumeModal';
@@ -11,6 +12,12 @@ import SignedOutEditingPrompt from './components/signedOutEditingPrompt';
 import AccountSwitchPrompt from './components/accountSwitchPrompt';
 import ResumePreview from './components/resumePreview';
 import EditorPanel from './components/editorPanel';
+import CoverLetterEditorPanel from './components/coverLetterEditorPanel.jsx';
+import CoverLetterPreview from './components/coverLetterPreview.jsx';
+import {
+  CoverLetterDeleteDialog,
+  CoverLetterTemplateDialog,
+} from './components/coverLetterDialogs.jsx';
 import SeparatorSettingsPopup from './components/separatorSettingsPopup';
 import NoticeToast from './components/noticeToast.jsx';
 import ResumeConflictBanner from './components/resumeConflictBanner.jsx';
@@ -18,6 +25,7 @@ import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
 import { useAccountSwitchGate } from './hooks/useAccountSwitchGate.js';
 import { usePreviewEditorController } from './hooks/usePreviewEditorController.js';
+import { useCoverLetterPreviewEditorController } from './hooks/useCoverLetterPreviewEditorController.js';
 import { useSeparatorSettingsController } from './hooks/useSeparatorSettingsController.js';
 import { useSignOutController } from './hooks/useSignOutController.js';
 import { useResumeImportController } from './hooks/useResumeImportController.js';
@@ -28,6 +36,14 @@ import {
   createMixedSamplePreviewModel,
   createSamplePlaceholderResolver,
 } from './lib/sampleResumes.js';
+import {
+  coverLetterHasContent,
+  resolveCoverLetterSender,
+} from './lib/coverLetter.js';
+import {
+  createMixedSampleCoverLetterModel,
+  createSampleCoverLetterPlaceholderResolver,
+} from './lib/sampleCoverLetters.js';
 
 const EMPTY_SAMPLE_ORDER_OVERRIDES = {};
 
@@ -37,6 +53,10 @@ function App() {
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [previewLayout, setPreviewLayout] = useState({ mode: 'fitPage', width: 0 });
   const [emptyChoiceNudgeCount, setEmptyChoiceNudgeCount] = useState(0);
+  const [coverLetterCreateRequest, setCoverLetterCreateRequest] = useState(null);
+  const [coverLetterDeleteRequest, setCoverLetterDeleteRequest] = useState(null);
+  const [isCreatingCoverLetter, setIsCreatingCoverLetter] = useState(false);
+  const [isDeletingCoverLetter, setIsDeletingCoverLetter] = useState(false);
   const { theme, toggleTheme } = useAppTheme();
   const {
     builderUser,
@@ -64,6 +84,20 @@ function App() {
     getFieldError,
     markTouched,
     actions,
+    activeDocumentType,
+    activeCoverLetterId,
+    activeCoverLetterGroup,
+    setActiveCoverLetterGroup,
+    coverLetter,
+    coverLetterTemplate,
+    setCoverLetterTemplate,
+    coverLetterActions,
+    activeResumeCoverLetters,
+    openCoverLetter,
+    openResumeDocument,
+    getResumeTemplateForCoverLetter,
+    createCoverLetter,
+    deleteCoverLetter,
     printResume,
     notice,
     showNotice,
@@ -86,8 +120,7 @@ function App() {
     canDeleteActiveResume,
     setActiveResume,
     createResume,
-    createImportPlaceholderResume,
-    replaceResumeDraft,
+    importDocuments,
     duplicateActiveResume,
     renameActiveResume,
     createResumeFolder,
@@ -98,8 +131,10 @@ function App() {
     user: builderUser,
     authReady: auth.authReady,
   });
+  const activeCoverLetterName = activeResumeCoverLetters.find((item) => item.id === activeCoverLetterId)?.name || 'Cover letter';
+  const activeDocumentName = activeDocumentType === 'coverLetter' ? activeCoverLetterName : activeResumeName;
   const { handlePrint, isPrintRendering } = useResumePrint({
-    activeResumeName,
+    activeResumeName: activeDocumentName,
     printResume,
   });
   const {
@@ -120,7 +155,9 @@ function App() {
   });
   const sampleOrderOverrides = resume.sampleDisplay?.textListOrders || EMPTY_SAMPLE_ORDER_OVERRIDES;
   const sampleDisplay = resume.sampleDisplay || {};
-  const shouldShowEmptyResumeChoice = !previewModel.hasContent && !sampleDisplay.hasStarted;
+  const shouldShowEmptyResumeChoice = activeDocumentType === 'resume'
+    && !previewModel.hasContent
+    && !sampleDisplay.hasStarted;
   const canUseSampleInformation = Boolean(sampleDisplay.hasStarted && !sampleDisplay.isDismissed);
   const shouldShowSampleInformation = Boolean(canUseSampleInformation && sampleDisplay.showInformation);
   const samplePreviewModel = useMemo(
@@ -137,10 +174,42 @@ function App() {
   );
   const displayPreviewModel = isPrintRendering ? previewModel : (samplePreviewModel || previewModel);
   const isSamplePreview = Boolean(samplePreviewModel) && !isPrintRendering;
+  const resolvedCoverLetterSender = useMemo(
+    () => resolveCoverLetterSender(coverLetter, resume),
+    [coverLetter, resume],
+  );
+  const canUseCoverLetterSample = Boolean(
+    !resume.sampleDisplay?.isDismissed
+    && !coverLetter.sampleDisplay?.isDismissed
+    && (resume.sampleDisplay?.hasStarted || !previewModel.hasContent),
+  );
+  const shouldShowCoverLetterSample = Boolean(
+    canUseCoverLetterSample && coverLetter.sampleDisplay?.showInformation,
+  );
+  const coverLetterSampleModel = useMemo(
+    () => (shouldShowCoverLetterSample
+      ? createMixedSampleCoverLetterModel({
+        coverLetter,
+        resolvedSender: resolvedCoverLetterSender,
+        resumeId: activeResumeId,
+      })
+      : null),
+    [activeResumeId, coverLetter, resolvedCoverLetterSender, shouldShowCoverLetterSample],
+  );
+  const coverLetterPlaceholderFor = useMemo(
+    () => createSampleCoverLetterPlaceholderResolver(coverLetter, coverLetterSampleModel),
+    [coverLetter, coverLetterSampleModel],
+  );
+  const displayCoverLetterSampleModel = isPrintRendering ? null : coverLetterSampleModel;
+  const isCoverLetterSamplePreview = Boolean(displayCoverLetterSampleModel?.usesSampleText);
+  const coverLetterPreviewModel = useMemo(
+    () => ({ hasContent: coverLetterHasContent(coverLetter) || isCoverLetterSamplePreview }),
+    [coverLetter, isCoverLetterSamplePreview],
+  );
   const editorStageMaxHeight = useEditorStageMaxHeight({
     panelRef: previewPanelRef,
-    previewModel: displayPreviewModel,
-    template,
+    previewModel: activeDocumentType === 'coverLetter' ? coverLetterPreviewModel : displayPreviewModel,
+    template: activeDocumentType === 'coverLetter' ? coverLetterTemplate : template,
   });
   const {
     clearPreviewEditTarget,
@@ -170,6 +239,23 @@ function App() {
     setMobileView,
   });
   const {
+    clearPreviewEditTarget: clearCoverLetterPreviewEditTarget,
+    editorCaretTarget: coverLetterEditorCaretTarget,
+    handlePreviewEditTarget: handleCoverLetterPreviewEditTarget,
+    handlePreviewEditorHandoff: handleCoverLetterPreviewEditorHandoff,
+    handlePreviewValueChange: handleCoverLetterPreviewValueChange,
+    previewEditTarget: coverLetterPreviewEditTarget,
+    previewPulseTarget: coverLetterPreviewPulseTarget,
+    pulsePreviewTarget: handleCoverLetterPreviewPulseTarget,
+    updateEditorCaretTarget: updateCoverLetterEditorCaretTarget,
+  } = useCoverLetterPreviewEditorController({
+    actions: coverLetterActions,
+    coverLetter,
+    resolvedSender: resolvedCoverLetterSender,
+    setActiveGroup: setActiveCoverLetterGroup,
+    setMobileView,
+  });
+  const {
     anchor: separatorSettingsAnchor,
     close: closeSeparatorSettings,
     handleSettingChange: handleSeparatorSettingChange,
@@ -180,16 +266,17 @@ function App() {
   });
   const {
     closeImport: closeImportResume,
+    importState,
+    importSuccessfulDocument,
     isImporting: isImportingResume,
     isModalOpen: isImportModalOpen,
     openImport: handleImportResumeClick,
-    uploadResume: handleImportResumeUpload,
+    uploadDocuments: handleImportResumeUpload,
   } = useResumeImportController({
     authUser: auth.user,
     openAuthModal: auth.openAuthModal,
     endTransientSampleEntry: actions.endTransientSampleEntry,
-    createImportPlaceholderResume,
-    replaceResumeDraft,
+    importDocuments,
     showNotice,
   });
 
@@ -203,6 +290,44 @@ function App() {
   const handleStartPendingInteraction = useCallback(() => {
     setEmptyChoiceNudgeCount((count) => count + 1);
   }, []);
+
+  const handleRequestCoverLetter = useCallback(async (resumeId = activeResumeId) => {
+    const targetResume = resumeList.find((item) => item.id === resumeId);
+    const primaryLetter = targetResume?.coverLetters?.[0];
+    if (primaryLetter) {
+      await openCoverLetter(primaryLetter.id);
+      return;
+    }
+
+    const initialTemplate = await getResumeTemplateForCoverLetter(resumeId);
+    if (!initialTemplate) return;
+    setCoverLetterCreateRequest({ resumeId, initialTemplate });
+  }, [activeResumeId, getResumeTemplateForCoverLetter, openCoverLetter, resumeList]);
+
+  const handleCreateCoverLetter = useCallback(async (selectedTemplate) => {
+    if (!coverLetterCreateRequest || isCreatingCoverLetter) return;
+    setIsCreatingCoverLetter(true);
+    try {
+      const createdId = await createCoverLetter({
+        resumeId: coverLetterCreateRequest.resumeId,
+        template: selectedTemplate,
+      });
+      if (createdId) setCoverLetterCreateRequest(null);
+    } finally {
+      setIsCreatingCoverLetter(false);
+    }
+  }, [coverLetterCreateRequest, createCoverLetter, isCreatingCoverLetter]);
+
+  const handleConfirmCoverLetterDelete = useCallback(async () => {
+    if (!coverLetterDeleteRequest || isDeletingCoverLetter) return;
+    setIsDeletingCoverLetter(true);
+    try {
+      const deleted = await deleteCoverLetter(coverLetterDeleteRequest.id);
+      if (deleted) setCoverLetterDeleteRequest(null);
+    } finally {
+      setIsDeletingCoverLetter(false);
+    }
+  }, [coverLetterDeleteRequest, deleteCoverLetter, isDeletingCoverLetter]);
 
   function handleAccountSwitchImport() {
     if (!importAccountSwitchLocalData()) {
@@ -248,6 +373,12 @@ function App() {
           onRenameResumeFolder={renameResumeFolder}
           onSetResumeOrganization={setResumeOrganization}
           onDeleteResume={deleteResumes}
+          activeDocumentType={activeDocumentType}
+          activeCoverLetterId={activeCoverLetterId}
+          onOpenCoverLetter={openCoverLetter}
+          onOpenResumeDocument={openResumeDocument}
+          onRequestCoverLetter={handleRequestCoverLetter}
+          onRequestDeleteCoverLetter={setCoverLetterDeleteRequest}
           workspaceReady={localReady}
           authUser={auth.user}
           authReady={auth.authReady}
@@ -269,8 +400,30 @@ function App() {
         <ImportResumeModal
           isOpen={isImportModalOpen}
           busy={isImportingResume}
+          importState={importState}
+          resumeOptions={resumeList}
+          activeResumeId={activeResumeId}
           onClose={closeImportResume}
           onUpload={handleImportResumeUpload}
+          onImportSuccessful={importSuccessfulDocument}
+        />
+
+        {coverLetterCreateRequest ? (
+          <CoverLetterTemplateDialog
+            key={`${coverLetterCreateRequest.resumeId}:${coverLetterCreateRequest.initialTemplate}`}
+            isOpen
+            initialTemplate={coverLetterCreateRequest.initialTemplate}
+            busy={isCreatingCoverLetter}
+            onClose={() => setCoverLetterCreateRequest(null)}
+            onCreate={handleCreateCoverLetter}
+          />
+        ) : null}
+
+        <CoverLetterDeleteDialog
+          letter={coverLetterDeleteRequest}
+          busy={isDeletingCoverLetter}
+          onCancel={() => setCoverLetterDeleteRequest(null)}
+          onConfirm={handleConfirmCoverLetterDelete}
         />
 
         {separatorSettingsAnchor && (
@@ -356,7 +509,24 @@ function App() {
             : undefined}
         >
           <div className={`workspaceColumn workspaceColumnEditor ${mobileView === 'preview' ? 'isMobileHidden' : ''}`}>
-            <EditorPanel
+            {activeDocumentType === 'coverLetter' ? (
+              <CoverLetterEditorPanel
+                activeGroup={activeCoverLetterGroup}
+                setActiveGroup={setActiveCoverLetterGroup}
+                coverLetter={coverLetter}
+                resolvedSender={resolvedCoverLetterSender}
+                template={coverLetterTemplate}
+                onTemplateChange={setCoverLetterTemplate}
+                actions={coverLetterActions}
+                maxHeight={editorStageMaxHeight}
+                previewEditTarget={coverLetterPreviewEditTarget}
+                onClearPreviewEditTarget={clearCoverLetterPreviewEditTarget}
+                onPreviewPulseTarget={handleCoverLetterPreviewPulseTarget}
+                onEditorCaretChange={updateCoverLetterEditorCaretTarget}
+                placeholderFor={coverLetterPlaceholderFor}
+              />
+            ) : (
+              <EditorPanel
               activeTab={activeTab}
               setActiveTab={setActiveTab}
               onMoveSection={moveSection}
@@ -378,11 +548,38 @@ function App() {
               onEditorCaretChange={updateEditorCaretTarget}
               onEditorEntryFocus={handleEditorEntryFocus}
               onEditorEntryExit={handleEditorEntryExit}
-            />
+              />
+            )}
           </div>
 
           <div className={`workspaceColumn workspaceColumnPreview ${mobileView === 'editor' ? 'isMobileHidden' : ''}`}>
-            <ResumePreview
+            {activeDocumentType === 'coverLetter' ? (
+              <CoverLetterPreview
+                coverLetter={coverLetter}
+                coverLetterId={activeCoverLetterId}
+                template={coverLetterTemplate}
+                resolvedSender={resolvedCoverLetterSender}
+                panelRef={previewPanelRef}
+                activeEditorCaret={coverLetterEditorCaretTarget}
+                previewPulseTarget={coverLetterPreviewPulseTarget}
+                isPrintRendering={isPrintRendering}
+                onEditTarget={handleCoverLetterPreviewEditTarget}
+                onPreviewValueChange={handleCoverLetterPreviewValueChange}
+                onPreviewCaretChange={updateCoverLetterEditorCaretTarget}
+                onPreviewEditorHandoff={handleCoverLetterPreviewEditorHandoff}
+                onReorderBodyBlocks={coverLetterActions.reorderBodyBlocks}
+                onReorderBullets={coverLetterActions.reorderBullets}
+                onAdjustSetting={coverLetterActions.updateSetting}
+                onLayoutChange={handlePreviewLayoutChange}
+                sampleModel={displayCoverLetterSampleModel}
+                isSamplePreview={isCoverLetterSamplePreview}
+                showSampleInformationToggle={canUseCoverLetterSample}
+                showSampleInformation={shouldShowCoverLetterSample}
+                onToggleSampleInformation={coverLetterActions.setSampleInformationVisible}
+                onDismissSampleInformation={coverLetterActions.dismissSampleInformation}
+              />
+            ) : (
+              <ResumePreview
               resume={resume}
               resumeId={activeResumeId}
               previewModel={displayPreviewModel}
@@ -419,9 +616,11 @@ function App() {
               showSampleInformation={shouldShowSampleInformation}
               onImportResume={handleImportResumeClick}
               onStartFromScratch={actions.startFromScratch}
+              onAddCoverLetter={() => handleRequestCoverLetter(activeResumeId)}
               onToggleSampleInformation={actions.setSampleInformationVisible}
               onDismissSampleInformation={actions.dismissSampleInformation}
-            />
+              />
+            )}
           </div>
         </main>
       </div>

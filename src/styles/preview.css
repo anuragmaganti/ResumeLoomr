@@ -1999,6 +1999,10 @@ html[data-theme="dark"] .personalSection {
   background: color-mix(in srgb, var(--color-accent-soft) 64%, var(--resume-page-bg) 36%);
 }
 
+.emptyStartOption--cover-letter .emptyStartIcon {
+  color: var(--color-accent-strong);
+}
+
 .emptyStartOption:hover {
   border-color: var(--color-accent-border);
   background: color-mix(in srgb, var(--color-accent-soft) 72%, var(--resume-page-bg) 28%);

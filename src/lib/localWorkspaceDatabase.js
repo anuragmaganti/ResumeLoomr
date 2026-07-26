@@ -6,17 +6,20 @@ import {
   normalizeCloudVersion,
   normalizeDraftWithRevision,
 } from './draftState.js';
+import { normalizeCoverLetterDraft } from './coverLetter.js';
 
 export const LOCAL_WORKSPACE_ID = 'main';
 export const LOCAL_ACCOUNT_BINDING_ID = 'current';
 export const WORKSPACE_STORE = 'workspace';
 export const DRAFTS_STORE = 'drafts';
+export const COVER_LETTER_DRAFTS_STORE = 'coverLetterDrafts';
 export const OUTBOX_STORE = 'outbox';
 export const TOMBSTONES_STORE = 'tombstones';
+export const COVER_LETTER_TOMBSTONES_STORE = 'coverLetterTombstones';
 export const ACCOUNT_BINDING_STORE = 'accountBinding';
 
 const LOCAL_WORKSPACE_DB_NAME = 'resumeloomr-local-workspace';
-const LOCAL_WORKSPACE_DB_VERSION = 1;
+const LOCAL_WORKSPACE_DB_VERSION = 2;
 const LOCAL_WORKSPACE_LOCK_NAME = 'resumeloomr-local-workspace-mutation';
 
 let dbPromise = null;
@@ -60,6 +63,10 @@ export async function getLocalWorkspaceDb() {
           db.createObjectStore(DRAFTS_STORE, { keyPath: 'resumeId' });
         }
 
+        if (!db.objectStoreNames.contains(COVER_LETTER_DRAFTS_STORE)) {
+          db.createObjectStore(COVER_LETTER_DRAFTS_STORE, { keyPath: 'coverLetterId' });
+        }
+
         if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
           const outboxStore = db.createObjectStore(OUTBOX_STORE, { keyPath: 'id' });
           outboxStore.createIndex('status', 'status');
@@ -69,6 +76,10 @@ export async function getLocalWorkspaceDb() {
 
         if (!db.objectStoreNames.contains(TOMBSTONES_STORE)) {
           db.createObjectStore(TOMBSTONES_STORE, { keyPath: 'resumeId' });
+        }
+
+        if (!db.objectStoreNames.contains(COVER_LETTER_TOMBSTONES_STORE)) {
+          db.createObjectStore(COVER_LETTER_TOMBSTONES_STORE, { keyPath: 'coverLetterId' });
         }
 
         if (!db.objectStoreNames.contains(ACCOUNT_BINDING_STORE)) {
@@ -119,6 +130,27 @@ export async function writeDraftRecord(tx, resumeId, draft, { localRevision = ''
     localRevision: revision,
     cloudVersion: normalizeCloudVersion(draft?.cloudVersion),
     updatedAt: draft?.savedAt || new Date().toISOString(),
+  });
+
+  return revision;
+}
+
+export async function writeCoverLetterDraftRecord(
+  tx,
+  coverLetterId,
+  draft,
+  { localRevision = '' } = {},
+) {
+  const normalizedDraft = normalizeCoverLetterDraft(draft, draft?.coverLetter?.resumeId);
+  const revision = localRevision || normalizedDraft.localRevision || createLocalRevision();
+
+  await tx.objectStore(COVER_LETTER_DRAFTS_STORE).put({
+    coverLetterId,
+    resumeId: normalizedDraft.coverLetter.resumeId,
+    draft: { ...normalizedDraft, localRevision: revision },
+    localRevision: revision,
+    cloudVersion: normalizeCloudVersion(normalizedDraft.cloudVersion),
+    updatedAt: normalizedDraft.savedAt || new Date().toISOString(),
   });
 
   return revision;

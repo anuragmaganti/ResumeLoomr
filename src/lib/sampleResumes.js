@@ -725,6 +725,14 @@ function getSampleResumeForId(resumeId) {
   return SAMPLE_RESUMES[getSampleResumeIndex(resumeId)];
 }
 
+export function getSampleResumeCharacterId(resumeId) {
+  return getSampleResumeForId(resumeId).id;
+}
+
+export function getSampleResumePersonal(resumeId) {
+  return { ...getSampleResumeForId(resumeId).personal };
+}
+
 function formatUrlForSampleDisplay(value) {
   return trimText(value).replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '');
 }

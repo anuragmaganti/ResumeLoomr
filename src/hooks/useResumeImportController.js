@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { importResumeFile } from '../lib/importResume.js';
+import { importDocumentFile } from '../lib/importDocument.js';
 
 const IDLE_IMPORT_STATE = { status: 'idle' };
 
@@ -7,8 +7,7 @@ export function useResumeImportController({
   authUser,
   openAuthModal,
   endTransientSampleEntry,
-  createImportPlaceholderResume,
-  replaceResumeDraft,
+  importDocuments,
   showNotice,
 }) {
   const authUserRef = useRef(authUser);
@@ -22,77 +21,136 @@ export function useResumeImportController({
 
   function openImport() {
     endTransientSampleEntry?.();
-
     if (!authUser) {
       openAuthModal?.();
       return;
     }
-
+    setImportState(IDLE_IMPORT_STATE);
     setIsModalOpen(true);
   }
 
   function closeImport() {
+    if (isImporting) return;
+    setImportState(IDLE_IMPORT_STATE);
     setIsModalOpen(false);
   }
 
-  async function uploadResume(file) {
+  async function commitParsedImports({ selection, resumeImport = null, coverLetterImport = null, importUser }) {
+    if (authUserRef.current?.uid !== importUser.uid) {
+      throw new Error('Your account changed before the imported documents could be saved.');
+    }
+    const result = await importDocuments({
+      resumeImport: resumeImport ? {
+        draft: resumeImport.draft,
+        name: resumeImport.suggestedName || selection.resumeFile?.name,
+      } : null,
+      coverLetterImport: coverLetterImport ? {
+        draft: coverLetterImport.draft,
+        name: coverLetterImport.suggestedName || selection.coverLetterFile?.name,
+      } : null,
+      targetResumeId: selection.targetResumeId,
+      replaceCoverLetterId: selection.replaceCoverLetterId,
+      expectedAccountUid: importUser.uid,
+    });
+    const warningCount = [resumeImport, coverLetterImport]
+      .flatMap((item) => item?.draft?.importWarnings || []).length;
+    showNotice({
+      tone: warningCount > 0 ? 'warning' : 'success',
+      message: warningCount > 0
+        ? 'Import complete. Some details may need review.'
+        : (resumeImport && coverLetterImport
+          ? 'Resume and cover letter imported.'
+          : `${coverLetterImport ? 'Cover letter' : 'Resume'} imported.`),
+    });
+    setImportState(IDLE_IMPORT_STATE);
+    setIsModalOpen(false);
+    return result;
+  }
+
+  async function uploadDocuments(selection) {
     if (!authUser) {
       setIsModalOpen(false);
       openAuthModal?.();
-      return;
+      return { status: 'error' };
     }
-
     const importUser = authUser;
+    const jobs = [
+      selection.resumeFile
+        ? { kind: 'resume', file: selection.resumeFile, resumeId: '' }
+        : null,
+      selection.coverLetterFile
+        ? {
+            kind: 'coverLetter',
+            file: selection.coverLetterFile,
+            resumeId: selection.resumeFile ? '' : selection.targetResumeId,
+          }
+        : null,
+    ].filter(Boolean);
 
-    setIsModalOpen(false);
-    setImportState({ status: 'processing', fileName: file.name });
-
+    setImportState({ status: 'processing', kinds: jobs.map((job) => job.kind) });
     try {
-      const placeholderResumeId = await createImportPlaceholderResume({ sourceFileName: file.name });
-
-      if (!placeholderResumeId) {
-        throw new Error('Create or delete a resume before importing another file.');
-      }
-
-      setImportState({ status: 'processing', fileName: file.name, resumeId: placeholderResumeId });
-
       const idToken = await importUser.getIdToken();
-      const importedDraft = await importResumeFile({ file, idToken });
-
+      const settled = await Promise.allSettled(jobs.map((job) => importDocumentFile({
+        file: job.file,
+        documentKind: job.kind,
+        resumeId: job.resumeId,
+        idToken,
+      })));
       if (authUserRef.current?.uid !== importUser.uid) {
-        showNotice({
-          tone: 'error',
-          message: 'The import finished after your account changed, so it was not applied.',
-        });
-        return;
+        throw new Error('The import finished after your account changed, so it was not applied.');
       }
 
-      await replaceResumeDraft(placeholderResumeId, importedDraft.draft, {
-        name: importedDraft.suggestedName || file.name,
+      const parsedByKind = {};
+      const failures = [];
+      settled.forEach((result, index) => {
+        const job = jobs[index];
+        if (result.status === 'fulfilled') parsedByKind[job.kind] = result.value;
+        else failures.push({ kind: job.kind, message: result.reason?.message || `${job.kind} import failed.` });
       });
 
-      if (importedDraft.draft?.importWarnings?.length > 0) {
-        showNotice({
-          tone: 'warning',
-          message: 'Imported resume added. Some sections may need review.',
+      if (failures.length > 0 && Object.keys(parsedByKind).length > 0) {
+        setImportState({
+          status: 'partial',
+          selection,
+          importUser,
+          resumeImport: parsedByKind.resume || null,
+          coverLetterImport: parsedByKind.coverLetter || null,
+          failures,
         });
+        return { status: 'partial' };
       }
+      if (failures.length > 0) throw new Error(failures[0].message);
+
+      await commitParsedImports({
+        selection,
+        importUser,
+        resumeImport: parsedByKind.resume || null,
+        coverLetterImport: parsedByKind.coverLetter || null,
+      });
+      return { status: 'complete' };
     } catch (error) {
-      showNotice({
-        tone: 'error',
-        message: error?.message || 'Resume import failed. The blank resume is still editable.',
-      });
-    } finally {
-      setImportState(IDLE_IMPORT_STATE);
+      setImportState({ status: 'error', message: error?.message || 'Document import failed.' });
+      return { status: 'error' };
+    }
+  }
+
+  async function importSuccessfulDocument() {
+    if (importState.status !== 'partial') return;
+    setImportState({ status: 'processing', kinds: [] });
+    try {
+      await commitParsedImports(importState);
+    } catch (error) {
+      setImportState({ status: 'error', message: error?.message || 'The imported document could not be saved.' });
     }
   }
 
   return {
     closeImport,
     importState,
+    importSuccessfulDocument,
     isImporting,
     isModalOpen,
     openImport,
-    uploadResume,
+    uploadDocuments,
   };
 }

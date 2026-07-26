@@ -8,10 +8,12 @@ export default function ResumeConflictBanner({
     return null;
   }
 
+  const documentLabel = conflict.type === 'coverLetter' ? 'cover letter' : 'resume';
+
   return (
     <div className="conflictBanner" role="alert">
       <div>
-        <strong>This resume changed in another tab or device.</strong>
+        <strong>This {documentLabel} changed in another tab or device.</strong>
         <span>Choose which version to keep before continuing.</span>
       </div>
       <div className="conflictActions">

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import importDocumentHandler from '../api/import-document.js';
 import importResumeHandler from '../api/import-resume.js';
 import syncSessionHandler from '../api/sync-session.js';
 import syncWorkspaceHandler from '../api/sync-workspace.js';
@@ -33,6 +34,7 @@ async function expectMethodNotAllowed(handler, method, allowedMethods) {
 }
 
 test('deployed API routes reject unsupported methods before authentication', async () => {
+  await expectMethodNotAllowed(importDocumentHandler, 'GET', 'POST');
   await expectMethodNotAllowed(importResumeHandler, 'GET', 'POST');
   await expectMethodNotAllowed(syncSessionHandler, 'PATCH', 'POST, DELETE');
   await expectMethodNotAllowed(syncWorkspaceHandler, 'DELETE', 'GET, POST');

@@ -21,6 +21,15 @@ function ScratchStartIcon() {
     );
 }
 
+function CoverLetterStartIcon() {
+    return (
+        <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path d="M6 3.5h8l4 4v13H6z" />
+            <path d="M14 3.5v4h4M9 12h6M9 15h6M9 18h3" />
+        </svg>
+    );
+}
+
 function StartChoiceArrow() {
     return (
         <svg className="emptyStartArrow" aria-hidden="true" viewBox="0 0 18 18" focusable="false">
@@ -207,6 +216,7 @@ export function EmptyResumeChoice({
     isImportingResume,
     onImportResume,
     onStartFromScratch,
+    onAddCoverLetter,
 }) {
     if (!visible) {
         return null;
@@ -235,8 +245,22 @@ export function EmptyResumeChoice({
                             {isImportingResume ? <span className="buttonSpinner" /> : <ImportStartIcon />}
                         </span>
                         <span className="emptyStartCopy">
-                            <strong>{isImportingResume ? 'Processing resume…' : 'Import resume'}</strong>
+                            <strong>{isImportingResume ? 'Processing documents…' : 'Import resume and/or cover letter'}</strong>
                             <small>Use AI to organize a {IMPORT_FILE_TYPES_LABEL} into editable sections.</small>
+                        </span>
+                        <StartChoiceArrow />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="emptyStartOption emptyStartOption--cover-letter"
+                        onClick={onAddCoverLetter}
+                        disabled={isImportingResume}
+                    >
+                        <span className="emptyStartIcon" aria-hidden="true"><CoverLetterStartIcon /></span>
+                        <span className="emptyStartCopy">
+                            <strong>Add a cover letter</strong>
+                            <small>Attach a matching letter and keep shared contact details linked.</small>
                         </span>
                         <StartChoiceArrow />
                     </button>

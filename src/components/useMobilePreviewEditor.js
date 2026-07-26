@@ -15,6 +15,11 @@ import {
 
 export function useMobilePreviewEditor({
   activeEditorCaret,
+  document: editorDocument,
+  documentId,
+  getTargetInputMode = getPreviewEditorInputMode,
+  getTargetLabel,
+  isTargetMultiline = isPreviewEditorTargetMultiline,
   isPrintRendering,
   onEditTarget,
   onPreviewCaretChange,
@@ -22,10 +27,14 @@ export function useMobilePreviewEditor({
   onPreviewValueChange,
   onPreviewValueCommit,
   pageScale,
+  parseTargetPath = parseEditorTargetPath,
+  readTargetValue = readResumeEditorTargetValue,
   resume,
   resumeId,
   resumeRootRef,
 }) {
+  const sourceDocument = editorDocument ?? resume;
+  const sourceDocumentId = documentId || resumeId;
   const inputRef = useRef(null);
   const sessionRef = useRef(null);
   const caretFrameRef = useRef(0);
@@ -121,11 +130,11 @@ export function useMobilePreviewEditor({
   const openSession = useCallback((
     target,
     valueElement,
-    sourceResume = resume,
+    targetDocument = sourceDocument,
     sourceOffsetOverride = null,
     { synchronous = true } = {},
   ) => {
-    const sourceValue = readResumeEditorTargetValue(sourceResume, target);
+    const sourceValue = readTargetValue(targetDocument, target);
 
     if (sourceValue === null) {
       return false;
@@ -141,11 +150,12 @@ export function useMobilePreviewEditor({
       });
     const nextSession = {
       target,
-      resumeId,
+      documentId: sourceDocumentId,
       value: sourceValue,
       selectionOffset: sourceOffset,
-      isMultiline: isPreviewEditorTargetMultiline(target),
-      inputMode: getPreviewEditorInputMode(target),
+      isMultiline: isTargetMultiline(target),
+      inputMode: getTargetInputMode(target),
+      label: getTargetLabel?.(target),
       proxyStyle: getMobileEditorProxyStyle(valueElement, resumeRootRef.current),
     };
 
@@ -160,7 +170,7 @@ export function useMobilePreviewEditor({
       commitSession();
     }
     return true;
-  }, [resume, resumeId, resumeRootRef]);
+  }, [getTargetInputMode, getTargetLabel, isTargetMultiline, readTargetValue, resumeRootRef, sourceDocument, sourceDocumentId]);
 
   useLayoutEffect(() => {
     if (!session?.target.path) {
@@ -186,7 +196,7 @@ export function useMobilePreviewEditor({
     }
 
     scheduleCaretSync(inputElement);
-  }, [session?.resumeId, session?.selectionOffset, session?.target.path, scheduleCaretSync]);
+  }, [session?.documentId, session?.selectionOffset, session?.target.path, scheduleCaretSync]);
 
   function handleChange(event) {
     const currentSession = sessionRef.current;
@@ -264,10 +274,10 @@ export function useMobilePreviewEditor({
       return;
     }
 
-    if (isPrintRendering || currentSession.resumeId !== resumeId) {
+    if (isPrintRendering || currentSession.documentId !== sourceDocumentId) {
       closeSession();
     }
-  }, [closeSession, isPrintRendering, resumeId]);
+  }, [closeSession, isPrintRendering, sourceDocumentId]);
 
   useLayoutEffect(() => {
     if (!session?.target.path || typeof window === 'undefined') {
@@ -350,7 +360,7 @@ export function useMobilePreviewEditor({
         return;
       }
 
-      const parsedTarget = parseEditorTargetPath(activeEditorCaret.path);
+      const parsedTarget = parseTargetPath(activeEditorCaret.path);
       const valueElement = findPreviewValueElement(activeEditorCaret.path);
 
       if (!parsedTarget || !valueElement) {
@@ -388,7 +398,7 @@ export function useMobilePreviewEditor({
       window.removeEventListener('resize', handoffEditorToMobile);
       mediaQuery.removeEventListener?.('change', handoffEditorToMobile);
     };
-  }, [activeEditorCaret, findPreviewValueElement, isPrintRendering, onEditTarget, openSession]);
+  }, [activeEditorCaret, findPreviewValueElement, isPrintRendering, onEditTarget, openSession, parseTargetPath]);
 
   useEffect(() => {
     if (!session?.target.path || typeof document === 'undefined') {

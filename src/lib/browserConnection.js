@@ -1,4 +1,6 @@
 import {
+  ACTIVE_DOCUMENT_VIEW_STORAGE_KEY,
+  COVER_LETTER_STORAGE_KEY_PREFIX,
   LEGACY_DRAFT_STORAGE_KEY,
   LOCAL_SYNC_CLIENT_ID_KEY,
   LOCAL_SYNC_SEQUENCE_KEY,
@@ -51,6 +53,7 @@ export function createSignOutStoragePreference(mode, currentPreference = DEFAULT
   };
 }
 const WORKSPACE_LOCAL_STORAGE_KEYS = [
+  ACTIVE_DOCUMENT_VIEW_STORAGE_KEY,
   WORKSPACE_INDEX_STORAGE_KEY,
   WORKSPACE_OPEN_FOLDERS_STORAGE_KEY,
   LOCAL_WORKSPACE_PRESENT_KEY,
@@ -174,6 +177,7 @@ export async function clearLocalResumeWorkspaceData(storage) {
     WORKSPACE_LOCAL_STORAGE_KEYS.includes(key) ||
     OBSOLETE_LOCAL_STORAGE_KEYS.includes(key) ||
     key?.startsWith(RESUME_STORAGE_KEY_PREFIX) ||
+    key?.startsWith(COVER_LETTER_STORAGE_KEY_PREFIX) ||
     OBSOLETE_LOCAL_STORAGE_PREFIXES.some((prefix) => key?.startsWith(prefix))
   ));
   const mirrorCleanupResults = keysToRemove.map((key) => removeStorageItem(targetStorage, key));

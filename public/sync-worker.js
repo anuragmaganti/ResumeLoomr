@@ -1,11 +1,13 @@
 // This worker is intentionally self-contained so it remains a classic, root-scoped
 // service worker. tests/syncWorkerParity.test.js locks its protocol to the page path.
 const DB_NAME = 'resumeloomr-local-workspace';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const WORKSPACE_STORE = 'workspace';
 const DRAFTS_STORE = 'drafts';
+const COVER_LETTER_DRAFTS_STORE = 'coverLetterDrafts';
 const OUTBOX_STORE = 'outbox';
 const TOMBSTONES_STORE = 'tombstones';
+const COVER_LETTER_TOMBSTONES_STORE = 'coverLetterTombstones';
 const ACCOUNT_BINDING_STORE = 'accountBinding';
 const ACCOUNT_BINDING_ID = 'current';
 const SYNC_TAG = 'resumeloomr-sync-outbox';
@@ -31,6 +33,10 @@ function openWorkspaceDb() {
         db.createObjectStore('drafts', { keyPath: 'resumeId' });
       }
 
+      if (!db.objectStoreNames.contains(COVER_LETTER_DRAFTS_STORE)) {
+        db.createObjectStore(COVER_LETTER_DRAFTS_STORE, { keyPath: 'coverLetterId' });
+      }
+
       if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
         const outboxStore = db.createObjectStore(OUTBOX_STORE, { keyPath: 'id' });
         outboxStore.createIndex('status', 'status');
@@ -40,6 +46,10 @@ function openWorkspaceDb() {
 
       if (!db.objectStoreNames.contains(TOMBSTONES_STORE)) {
         db.createObjectStore(TOMBSTONES_STORE, { keyPath: 'resumeId' });
+      }
+
+      if (!db.objectStoreNames.contains(COVER_LETTER_TOMBSTONES_STORE)) {
+        db.createObjectStore(COVER_LETTER_TOMBSTONES_STORE, { keyPath: 'coverLetterId' });
       }
 
       if (!db.objectStoreNames.contains(ACCOUNT_BINDING_STORE)) {
@@ -252,15 +262,19 @@ async function markSynced(db, operations) {
   const tx = db.transaction([
     WORKSPACE_STORE,
     DRAFTS_STORE,
+    COVER_LETTER_DRAFTS_STORE,
     OUTBOX_STORE,
     TOMBSTONES_STORE,
+    COVER_LETTER_TOMBSTONES_STORE,
     ACCOUNT_BINDING_STORE,
   ], 'readwrite');
   const done = transactionDone(tx);
   const workspaceStore = tx.objectStore(WORKSPACE_STORE);
   const draftsStore = tx.objectStore(DRAFTS_STORE);
+  const coverLetterDraftsStore = tx.objectStore(COVER_LETTER_DRAFTS_STORE);
   const outboxStore = tx.objectStore(OUTBOX_STORE);
   const tombstoneStore = tx.objectStore(TOMBSTONES_STORE);
+  const coverLetterTombstoneStore = tx.objectStore(COVER_LETTER_TOMBSTONES_STORE);
   const accountBinding = await getRecord(
     tx.objectStore(ACCOUNT_BINDING_STORE),
     ACCOUNT_BINDING_ID,
@@ -307,6 +321,20 @@ async function markSynced(db, operations) {
             draft: { ...draftRecord.draft, cloudVersion },
           });
         }
+      } else if (record.type === 'upsertCoverLetter' && record.coverLetterId) {
+        const draftRecord = await getRecord(coverLetterDraftsStore, record.coverLetterId);
+
+        if (draftRecord) {
+          const cloudVersion = Math.max(
+            normalizeCloudVersion(draftRecord.cloudVersion ?? draftRecord.draft?.cloudVersion),
+            ack.cloudVersion,
+          );
+          await putRecord(coverLetterDraftsStore, {
+            ...draftRecord,
+            cloudVersion,
+            draft: { ...draftRecord.draft, cloudVersion },
+          });
+        }
       }
 
       if (!exactMatch && record.status === 'pending') {
@@ -334,6 +362,21 @@ async function markSynced(db, operations) {
         )
       ) {
         await putRecord(tombstoneStore, {
+          ...tombstone,
+          syncedAt: new Date().toISOString(),
+        });
+      }
+    } else if (record?.type === 'deleteCoverLetter' && record.coverLetterId) {
+      const tombstone = await getRecord(coverLetterTombstoneStore, record.coverLetterId);
+
+      if (
+        tombstone
+        && (
+          !String(tombstone.accountUid || '').trim()
+          || String(tombstone.accountUid || '').trim() === recordAccountUid
+        )
+      ) {
+        await putRecord(coverLetterTombstoneStore, {
           ...tombstone,
           syncedAt: new Date().toISOString(),
         });

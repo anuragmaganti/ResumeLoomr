@@ -259,6 +259,7 @@ export default function ResumePreview({
     showSampleInformation = true,
     onImportResume,
     onStartFromScratch,
+    onAddCoverLetter,
     onToggleSampleInformation,
     onDismissSampleInformation,
 }) {
@@ -2534,6 +2535,7 @@ export default function ResumePreview({
                                 isImportingResume={isImportingResume}
                                 onImportResume={onImportResume}
                                 onStartFromScratch={onStartFromScratch}
+                                onAddCoverLetter={onAddCoverLetter}
                             />
                         </div>
                     </div>

@@ -2,7 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { getSaveStatusPresentation } from '../src/lib/saveStatus.js';
-import { createResumeStorageKey } from '../src/lib/localWorkspaceKeys.js';
+import {
+  ACTIVE_DOCUMENT_VIEW_STORAGE_KEY,
+  createCoverLetterStorageKey,
+  createResumeStorageKey,
+} from '../src/lib/localWorkspaceKeys.js';
+import {
+  normalizeActiveDocumentView,
+  readActiveDocumentView,
+  writeActiveDocumentView,
+} from '../src/lib/activeDocumentView.js';
 import { deriveAccountSwitchGate } from '../src/hooks/useAccountSwitchGate.js';
 import {
   clearLocalResumeWorkspaceData,
@@ -93,8 +102,10 @@ test('account switching gates cloud bootstrap until the browser owner is resolve
 test('browser workspace cleanup removes current and obsolete storage protocols', async () => {
   const values = new Map([
     ['resumeloomr:open-folders:v1', JSON.stringify(['folder-1'])],
+    [ACTIVE_DOCUMENT_VIEW_STORAGE_KEY, JSON.stringify({ resumeId: 'resume-1', type: 'coverLetter', coverLetterId: 'letter-1' })],
     ['resumeloomr:index:v1', '{}'],
     ['resumeloomr:resume:resume-1', '{}'],
+    ['resumeloomr:cover-letter:letter-1', '{}'],
     ['resumeloomr:sync-client-id:v1', 'client-1'],
     ['resumeloomr:sync-sequence:v1', '4'],
     ['resumeloomr:draft:v2', '{}'],
@@ -109,12 +120,45 @@ test('browser workspace cleanup removes current and obsolete storage protocols',
   };
 
   assert.equal(createResumeStorageKey('abc123'), 'resumeloomr:resume:abc123');
+  assert.equal(createCoverLetterStorageKey('letter123'), 'resumeloomr:cover-letter:letter123');
   await clearLocalResumeWorkspaceData(storage);
   assert.equal(storage.getItem('resumeloomr:open-folders:v1'), null);
+  assert.equal(storage.getItem(ACTIVE_DOCUMENT_VIEW_STORAGE_KEY), null);
   assert.equal(storage.getItem('resumeloomr:index:v1'), null);
   assert.equal(storage.getItem('resumeloomr:resume:resume-1'), null);
+  assert.equal(storage.getItem('resumeloomr:cover-letter:letter-1'), null);
   assert.equal(storage.getItem('resumeloomr:sync-client-id:v1'), null);
   assert.equal(storage.getItem('resumeloomr:sync-sequence:v1'), null);
   assert.equal(storage.getItem('resumeloomr:draft:v2'), null);
   assert.equal(storage.getItem('unrelated'), 'keep');
+});
+
+test('active document view remains bounded browser-only state', () => {
+  const values = new Map();
+  const storage = {
+    getItem(key) { return values.get(key) ?? null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); },
+  };
+
+  assert.deepEqual(normalizeActiveDocumentView({
+    resumeId: 'resume-1',
+    type: 'coverLetter',
+    coverLetterId: 'letter-1',
+  }), {
+    resumeId: 'resume-1',
+    type: 'coverLetter',
+    coverLetterId: 'letter-1',
+  });
+  assert.equal(normalizeActiveDocumentView({ resumeId: 'resume-1', type: 'coverLetter' }), null);
+  assert.equal(writeActiveDocumentView({
+    resumeId: 'resume-1',
+    type: 'coverLetter',
+    coverLetterId: 'letter-1',
+  }, storage), true);
+  assert.deepEqual(readActiveDocumentView(storage), {
+    resumeId: 'resume-1',
+    type: 'coverLetter',
+    coverLetterId: 'letter-1',
+  });
 });

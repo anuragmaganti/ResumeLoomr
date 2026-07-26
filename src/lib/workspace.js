@@ -1,4 +1,9 @@
 import { trimText } from './text.js';
+import {
+  getResumeCoverLetterIds,
+  normalizeCoverLetterRegistry,
+  removeWorkspaceCoverLetters,
+} from './coverLetterWorkspace.js';
 export const MAX_WORKSPACE_RESUME_NAME_LENGTH = 50;
 export const MAX_WORKSPACE_RESUMES = 100;
 export const MAX_WORKSPACE_FOLDERS = 100;
@@ -334,6 +339,7 @@ export function normalizeWorkspaceIndex(candidate = {}) {
     resumeIds,
     meta,
     organization: normalizeWorkspaceOrganization(candidate?.organization, resumeIds),
+    coverLetters: normalizeCoverLetterRegistry(candidate?.coverLetters, resumeIds),
   };
 }
 
@@ -679,6 +685,14 @@ export function removeWorkspaceResumes(workspace, requestedResumeIds, { now = ''
   });
 
   const updatedAt = now || new Date().toISOString();
+  const attachedCoverLetterIds = deletedResumeIds.flatMap((resumeId) => (
+    getResumeCoverLetterIds(normalizedWorkspace, resumeId)
+  ));
+  const coverLetterRemoval = removeWorkspaceCoverLetters(
+    normalizedWorkspace,
+    attachedCoverLetterIds,
+    { now: updatedAt },
+  );
   const nextWorkspace = normalizeWorkspaceIndex({
       activeResumeId: nextActiveResumeId,
       resumeIds: remainingResumeIds,
@@ -687,11 +701,13 @@ export function removeWorkspaceResumes(workspace, requestedResumeIds, { now = ''
         ...normalizedWorkspace.organization,
         updatedAt,
       },
+      coverLetters: coverLetterRemoval.registry,
     });
 
   return {
     workspace: nextWorkspace,
     deletedResumeIds,
+    deletedCoverLetterIds: attachedCoverLetterIds,
     rejectedReason: '',
   };
 }

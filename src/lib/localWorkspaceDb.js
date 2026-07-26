@@ -1,8 +1,20 @@
 import { createBlankDraftState } from './workspaceDraft.js';
 import {
+  addWorkspaceResume,
   normalizeWorkspaceIndex,
   removeWorkspaceResumes,
+  sanitizeWorkspaceResumeName,
 } from './workspace.js';
+import {
+  createBlankCoverLetterDraft,
+  createSavedCoverLetterDraft,
+  normalizeCoverLetterDraft,
+} from './coverLetter.js';
+import {
+  addWorkspaceCoverLetter,
+  getResumeCoverLetterIds,
+  removeWorkspaceCoverLetters,
+} from './coverLetterWorkspace.js';
 import { trimText } from './text.js';
 import {
   getDraftStateRevision,
@@ -23,14 +35,19 @@ import {
 } from './outboxProtocol.js';
 import {
   markLocalWorkspacePresent,
+  readLocalStorageCoverLetterDraft,
   readLegacyDraftFromLocalStorage,
   readLegacyWorkspaceSnapshot,
+  removeLocalStorageCoverLetterDraft,
   removeLocalStorageDraft,
+  writeLocalStorageCoverLetterDraft,
   writeLocalStorageDraft,
   writeLocalStorageWorkspace,
 } from './localWorkspaceMirror.js';
 import {
   ACCOUNT_BINDING_STORE,
+  COVER_LETTER_DRAFTS_STORE,
+  COVER_LETTER_TOMBSTONES_STORE,
   DRAFTS_STORE,
   LOCAL_ACCOUNT_BINDING_ID,
   LOCAL_WORKSPACE_ID,
@@ -42,6 +59,7 @@ import {
   getLocalWorkspaceDb,
   readWorkspaceRecord,
   runLocalMutation,
+  writeCoverLetterDraftRecord,
   writeDraftRecord,
   writeWorkspaceRecord,
 } from './localWorkspaceDatabase.js';
@@ -49,25 +67,43 @@ import { getSyncOperationIdentity } from './localOutboxIdentity.js';
 
 export { deleteLocalWorkspaceDatabase } from './localWorkspaceDatabase.js';
 
-function createOutboxRecordId(type, resumeId = '', accountUid = '') {
+function createOutboxRecordId(type, resumeId = '', accountUid = '', coverLetterId = '') {
   const accountScope = encodeURIComponent(trimText(accountUid) || 'guest');
-  const operationKey = type === 'workspace' ? 'workspace' : `${type}:${resumeId}`;
+  const documentId = type.includes('CoverLetter') ? coverLetterId : resumeId;
+  const operationKey = type === 'workspace' ? 'workspace' : `${type}:${documentId}`;
 
   return `${accountScope}:${operationKey}`;
 }
 
-function createOutboxRecord({ type, resumeId = '', workspace = null, draft = null, tombstone = null, accountUid = '', reason = '', baseCloudVersion = 0 }) {
+function createOutboxRecord({
+  type,
+  resumeId = '',
+  coverLetterId = '',
+  workspace = null,
+  draft = null,
+  tombstone = null,
+  accountUid = '',
+  reason = '',
+  baseCloudVersion = 0,
+}) {
   const now = new Date().toISOString();
   const syncIdentity = getSyncOperationIdentity();
-  const id = createOutboxRecordId(type, resumeId, accountUid);
+  const id = createOutboxRecordId(type, resumeId, accountUid, coverLetterId);
+  const isCoverLetter = type.includes('CoverLetter');
+  const normalizedDraft = draft
+    ? (isCoverLetter ? normalizeCoverLetterDraft(draft, resumeId) : normalizeDraftState(draft))
+    : null;
 
   return {
     id,
     type,
     resumeId,
+    coverLetterId,
     workspace: workspace ? normalizeWorkspaceIndex(workspace) : null,
-    draft: draft ? normalizeDraftState(draft) : null,
-    localRevision: draft ? (getDraftStateRevision(draft) || createLocalRevision()) : createLocalRevision(),
+    draft: normalizedDraft,
+    localRevision: normalizedDraft
+      ? (normalizedDraft.localRevision || getDraftStateRevision(normalizedDraft) || createLocalRevision())
+      : createLocalRevision(),
     baseCloudVersion: normalizeCloudVersion(baseCloudVersion),
     clientId: syncIdentity.clientId,
     operationVersion: syncIdentity.operationVersion,
@@ -151,6 +187,44 @@ async function queueDeleteSyncInTx(tx, resumeId, workspace, options = {}) {
     tombstone,
     accountUid: options.accountUid,
     reason: options.reason || 'delete',
+  }));
+}
+
+async function queueCoverLetterSyncInTx(tx, coverLetterId, resumeId, workspace, draft, options = {}) {
+  await putOutboxRecord(tx, createOutboxRecord({
+    type: 'upsertCoverLetter',
+    coverLetterId,
+    resumeId,
+    workspace,
+    draft,
+    baseCloudVersion: options.baseCloudVersion ?? draft?.cloudVersion,
+    accountUid: options.accountUid,
+    reason: options.reason || 'cover-letter',
+  }));
+}
+
+async function queueCoverLetterDeleteSyncInTx(tx, coverLetterId, resumeId, workspace, options = {}) {
+  const now = new Date().toISOString();
+  const tombstone = {
+    coverLetterId,
+    resumeId,
+    deletedAt: now,
+    version: Date.now(),
+    accountUid: options.accountUid || '',
+  };
+
+  await tx.objectStore(COVER_LETTER_TOMBSTONES_STORE).put(tombstone);
+  await tx.objectStore(OUTBOX_STORE).delete(
+    createOutboxRecordId('upsertCoverLetter', resumeId, options.accountUid, coverLetterId),
+  );
+  await putOutboxRecord(tx, createOutboxRecord({
+    type: 'deleteCoverLetter',
+    coverLetterId,
+    resumeId,
+    workspace,
+    tombstone,
+    accountUid: options.accountUid,
+    reason: options.reason || 'delete-cover-letter',
   }));
 }
 
@@ -258,12 +332,48 @@ export async function readLocalDraft(resumeId) {
     : normalizeDraftWithRevision(createBlankDraftState(), createLocalRevision());
 }
 
+export async function readLocalCoverLetterDraft(coverLetterId, resumeId = '') {
+  const db = await getLocalWorkspaceDb();
+
+  if (!db || !coverLetterId) {
+    return readLocalStorageCoverLetterDraft(coverLetterId, resumeId)
+      || createBlankCoverLetterDraft(resumeId);
+  }
+
+  const record = await db.get(COVER_LETTER_DRAFTS_STORE, coverLetterId);
+
+  if (record?.draft) {
+    return normalizeCoverLetterDraft({
+      ...record.draft,
+      localRevision: record.localRevision || record.draft.localRevision,
+      cloudVersion: record.draft.cloudVersion ?? record.cloudVersion,
+    }, resumeId || record.resumeId);
+  }
+
+  return readLocalStorageCoverLetterDraft(coverLetterId, resumeId)
+    || {
+      ...createBlankCoverLetterDraft(resumeId),
+      localRevision: createLocalRevision(),
+    };
+}
+
 async function readAllLocalDrafts(workspace) {
   const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
   const drafts = new Map();
 
   await Promise.all(normalizedWorkspace.resumeIds.map(async (resumeId) => {
     drafts.set(resumeId, await readLocalDraft(resumeId));
+  }));
+
+  return drafts;
+}
+
+async function readAllLocalCoverLetterDrafts(workspace) {
+  const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+  const drafts = new Map();
+
+  await Promise.all(Object.values(normalizedWorkspace.coverLetters.meta).map(async (meta) => {
+    drafts.set(meta.id, await readLocalCoverLetterDraft(meta.id, meta.resumeId));
   }));
 
   return drafts;
@@ -277,6 +387,11 @@ async function readLocalTombstones() {
   }
 
   return db.getAll(TOMBSTONES_STORE);
+}
+
+async function readLocalCoverLetterTombstones() {
+  const db = await getLocalWorkspaceDb();
+  return db ? db.getAll(COVER_LETTER_TOMBSTONES_STORE) : [];
 }
 
 async function readLocalOutboxRecords() {
@@ -293,12 +408,16 @@ export async function readLocalWorkspaceBundle() {
   const snapshot = await readLocalWorkspaceSnapshot();
   const [
     draftsByResumeId,
+    coverLetterDraftsById,
     tombstones,
+    coverLetterTombstones,
     pendingOutbox,
     outboxRecords,
   ] = await Promise.all([
     readAllLocalDrafts(snapshot.workspace),
+    readAllLocalCoverLetterDrafts(snapshot.workspace),
     readLocalTombstones(),
+    readLocalCoverLetterTombstones(),
     readPendingOutbox({ limit: 1000 }),
     readLocalOutboxRecords(),
   ]);
@@ -306,7 +425,9 @@ export async function readLocalWorkspaceBundle() {
   return {
     ...snapshot,
     draftsByResumeId,
+    coverLetterDraftsById,
     tombstones,
+    coverLetterTombstones,
     pendingOutbox,
     outboxRecords,
   };
@@ -420,6 +541,356 @@ export async function persistLocalDraftSnapshot({
   });
 }
 
+export async function persistLocalCoverLetterCreation({
+  workspace,
+  resumeId,
+  coverLetterId = '',
+  name = 'Cover letter',
+  draft = null,
+  accountUid = '',
+  enqueueSync = true,
+  reason = 'create-cover-letter',
+}) {
+  return runLocalMutation(async () => {
+    const db = await getLocalWorkspaceDb();
+    const sourceWorkspace = normalizeWorkspaceIndex(workspace);
+    const addition = addWorkspaceCoverLetter(sourceWorkspace, resumeId, {
+      coverLetterId,
+      name,
+      updatedAt: new Date().toISOString(),
+    });
+
+    if (!addition.coverLetterId) {
+      return { workspace: sourceWorkspace, coverLetterId: '', draft: null };
+    }
+
+    const nextWorkspace = normalizeWorkspaceIndex({
+      ...sourceWorkspace,
+      coverLetters: addition.registry,
+    });
+    const nextDraft = createSavedCoverLetterDraft(
+      draft || createBlankCoverLetterDraft(resumeId),
+    );
+
+    if (!db) {
+      const persistedDraft = {
+        ...nextDraft,
+        localRevision: createLocalRevision(),
+      };
+      writeLocalStorageWorkspace(nextWorkspace);
+      writeLocalStorageCoverLetterDraft(addition.coverLetterId, persistedDraft);
+      return { workspace: nextWorkspace, coverLetterId: addition.coverLetterId, draft: persistedDraft };
+    }
+
+    const tx = db.transaction([
+      WORKSPACE_STORE,
+      COVER_LETTER_DRAFTS_STORE,
+      OUTBOX_STORE,
+      TOMBSTONES_STORE,
+      COVER_LETTER_TOMBSTONES_STORE,
+    ], 'readwrite');
+    const revision = createLocalRevision();
+    const persistedDraft = { ...nextDraft, localRevision: revision };
+
+    await writeWorkspaceRecord(tx, nextWorkspace);
+    await writeCoverLetterDraftRecord(tx, addition.coverLetterId, persistedDraft, { localRevision: revision });
+
+    if (enqueueSync) {
+      await queueWorkspaceSyncInTx(tx, nextWorkspace, { accountUid, reason });
+      await queueCoverLetterSyncInTx(
+        tx,
+        addition.coverLetterId,
+        resumeId,
+        nextWorkspace,
+        persistedDraft,
+        { accountUid, reason },
+      );
+    }
+
+    await tx.done;
+    writeLocalStorageWorkspace(nextWorkspace);
+    writeLocalStorageCoverLetterDraft(addition.coverLetterId, persistedDraft);
+    return { workspace: nextWorkspace, coverLetterId: addition.coverLetterId, draft: persistedDraft };
+  });
+}
+
+export async function persistLocalImportedDocuments({
+  workspace,
+  resumeImport = null,
+  coverLetterImport = null,
+  targetResumeId = '',
+  replaceCoverLetterId = '',
+  accountUid = '',
+  enqueueSync = true,
+  reason = 'document-import',
+}) {
+  return runLocalMutation(async () => {
+    const db = await getLocalWorkspaceDb();
+    let nextWorkspace = normalizeWorkspaceIndex(workspace);
+    let resumeId = trimText(targetResumeId);
+    let resumeDraft = null;
+    let coverLetterId = trimText(replaceCoverLetterId);
+    let coverLetterDraft = null;
+    let workspaceChanged = false;
+
+    if (!resumeImport && !coverLetterImport) {
+      throw new TypeError('At least one imported document is required.');
+    }
+
+    if (resumeImport) {
+      resumeDraft = normalizeDraftState(resumeImport.draft);
+      const addition = addWorkspaceResume(nextWorkspace, {
+        name: sanitizeWorkspaceResumeName(
+          resumeImport.name,
+          `Resume ${nextWorkspace.resumeIds.length + 1}`,
+        ),
+        updatedAt: resumeDraft.savedAt || new Date().toISOString(),
+      });
+      if (!addition.resumeId) throw new Error('The workspace resume limit has been reached.');
+      nextWorkspace = addition.workspace;
+      resumeId = addition.resumeId;
+      workspaceChanged = true;
+    }
+
+    if (!nextWorkspace.resumeIds.includes(resumeId)) {
+      throw new Error('Choose a resume for this cover letter.');
+    }
+
+    if (coverLetterImport) {
+      const existingMeta = coverLetterId ? nextWorkspace.coverLetters.meta[coverLetterId] : null;
+      if (coverLetterId && existingMeta?.resumeId !== resumeId) {
+        throw new Error('The cover letter selected for replacement no longer belongs to this resume.');
+      }
+      if (!coverLetterId) {
+        const existingIds = getResumeCoverLetterIds(nextWorkspace, resumeId);
+        if (existingIds.length > 0) {
+          throw new Error('This resume already has a cover letter. Choose replacement explicitly.');
+        }
+        const addition = addWorkspaceCoverLetter(nextWorkspace, resumeId, {
+          name: coverLetterImport.name || 'Cover letter',
+          updatedAt: new Date().toISOString(),
+        });
+        if (!addition.coverLetterId) throw new Error('The workspace cover letter limit has been reached.');
+        coverLetterId = addition.coverLetterId;
+        nextWorkspace = normalizeWorkspaceIndex({ ...nextWorkspace, coverLetters: addition.registry });
+        workspaceChanged = true;
+      }
+      coverLetterDraft = normalizeCoverLetterDraft(coverLetterImport.draft, resumeId);
+    }
+
+    const now = new Date().toISOString();
+    const resumeRevision = resumeDraft ? createLocalRevision() : '';
+    const coverLetterRevision = coverLetterDraft ? createLocalRevision() : '';
+    const savedResumeDraft = resumeDraft
+      ? normalizeDraftWithRevision({ ...resumeDraft, savedAt: now, cloudVersion: 0 }, resumeRevision)
+      : null;
+
+    if (!db) {
+      const savedCoverLetterDraft = coverLetterDraft
+        ? { ...createSavedCoverLetterDraft(coverLetterDraft, now), localRevision: coverLetterRevision }
+        : null;
+      writeLocalStorageWorkspace(nextWorkspace);
+      if (savedResumeDraft) writeLocalStorageDraft(resumeId, savedResumeDraft);
+      if (savedCoverLetterDraft) writeLocalStorageCoverLetterDraft(coverLetterId, savedCoverLetterDraft);
+      return { workspace: nextWorkspace, resumeId, resumeDraft: savedResumeDraft, coverLetterId, coverLetterDraft: savedCoverLetterDraft };
+    }
+
+    const tx = db.transaction([
+      WORKSPACE_STORE,
+      DRAFTS_STORE,
+      COVER_LETTER_DRAFTS_STORE,
+      OUTBOX_STORE,
+      TOMBSTONES_STORE,
+      COVER_LETTER_TOMBSTONES_STORE,
+    ], 'readwrite');
+    const existingCoverLetterRecord = coverLetterId
+      ? await tx.objectStore(COVER_LETTER_DRAFTS_STORE).get(coverLetterId)
+      : null;
+    const savedCoverLetterDraft = coverLetterDraft
+      ? {
+          ...createSavedCoverLetterDraft({
+            ...coverLetterDraft,
+            coverLetter: { ...coverLetterDraft.coverLetter, resumeId },
+            cloudVersion: normalizeCloudVersion(
+              existingCoverLetterRecord?.cloudVersion
+              ?? existingCoverLetterRecord?.draft?.cloudVersion,
+            ),
+          }, now),
+          localRevision: coverLetterRevision,
+        }
+      : null;
+
+    await writeWorkspaceRecord(tx, nextWorkspace);
+    if (savedResumeDraft) {
+      await writeDraftRecord(tx, resumeId, savedResumeDraft, { localRevision: resumeRevision });
+    }
+    if (savedCoverLetterDraft) {
+      await writeCoverLetterDraftRecord(tx, coverLetterId, savedCoverLetterDraft, {
+        localRevision: coverLetterRevision,
+      });
+    }
+    if (enqueueSync) {
+      if (workspaceChanged) await queueWorkspaceSyncInTx(tx, nextWorkspace, { accountUid, reason });
+      if (savedResumeDraft) {
+        await queueDraftSyncInTx(tx, resumeId, nextWorkspace, savedResumeDraft, { accountUid, reason });
+      }
+      if (savedCoverLetterDraft) {
+        await queueCoverLetterSyncInTx(
+          tx,
+          coverLetterId,
+          resumeId,
+          nextWorkspace,
+          savedCoverLetterDraft,
+          { accountUid, reason },
+        );
+      }
+    }
+    await tx.done;
+
+    writeLocalStorageWorkspace(nextWorkspace);
+    if (savedResumeDraft) writeLocalStorageDraft(resumeId, savedResumeDraft);
+    if (savedCoverLetterDraft) writeLocalStorageCoverLetterDraft(coverLetterId, savedCoverLetterDraft);
+    return { workspace: nextWorkspace, resumeId, resumeDraft: savedResumeDraft, coverLetterId, coverLetterDraft: savedCoverLetterDraft };
+  });
+}
+
+export async function persistLocalCoverLetterDraftSnapshot({
+  coverLetterId,
+  resumeId,
+  workspace,
+  draft,
+  accountUid = '',
+  enqueueSync = true,
+  reason = 'cover-letter-autosave',
+  expectedRevision = '',
+  allowStaleOverwrite = false,
+}) {
+  if (!coverLetterId || !resumeId) {
+    throw new TypeError('Cover letter and parent resume IDs are required.');
+  }
+
+  return runLocalMutation(async () => {
+    const db = await getLocalWorkspaceDb();
+    const normalizedWorkspace = normalizeWorkspaceIndex(workspace);
+    const normalizedDraft = normalizeCoverLetterDraft(draft, resumeId);
+
+    if (normalizedWorkspace.coverLetters.meta[coverLetterId]?.resumeId !== resumeId) {
+      return { workspace: normalizedWorkspace, draft: null, deleted: true, skipped: true };
+    }
+
+    if (!db) {
+      const persistedDraft = {
+        ...createSavedCoverLetterDraft(normalizedDraft),
+        localRevision: createLocalRevision(),
+      };
+      writeLocalStorageCoverLetterDraft(coverLetterId, persistedDraft);
+      return { workspace: normalizedWorkspace, draft: persistedDraft, conflict: false };
+    }
+
+    const tx = db.transaction([
+      COVER_LETTER_DRAFTS_STORE,
+      COVER_LETTER_TOMBSTONES_STORE,
+      OUTBOX_STORE,
+    ], 'readwrite');
+    const [existingRecord, tombstone] = await Promise.all([
+      tx.objectStore(COVER_LETTER_DRAFTS_STORE).get(coverLetterId),
+      tx.objectStore(COVER_LETTER_TOMBSTONES_STORE).get(coverLetterId),
+    ]);
+    const currentRevision = existingRecord?.localRevision || existingRecord?.draft?.localRevision || '';
+
+    if (tombstone && (!tombstone.accountUid || tombstone.accountUid === accountUid)) {
+      await tx.done;
+      return { workspace: normalizedWorkspace, draft: null, deleted: true, skipped: true };
+    }
+
+    if (expectedRevision && currentRevision && currentRevision !== expectedRevision && !allowStaleOverwrite) {
+      await tx.done;
+      return {
+        workspace: normalizedWorkspace,
+        draft: normalizeCoverLetterDraft(existingRecord?.draft, resumeId),
+        conflict: true,
+        expectedRevision,
+        currentRevision,
+      };
+    }
+
+    const revision = createLocalRevision();
+    const persistedDraft = {
+      ...createSavedCoverLetterDraft({
+        ...normalizedDraft,
+        cloudVersion: Math.max(
+          Number(normalizedDraft.cloudVersion || 0),
+          Number(existingRecord?.cloudVersion || existingRecord?.draft?.cloudVersion || 0),
+        ),
+      }),
+      localRevision: revision,
+    };
+
+    await writeCoverLetterDraftRecord(tx, coverLetterId, persistedDraft, { localRevision: revision });
+    if (enqueueSync) {
+      await queueCoverLetterSyncInTx(
+        tx,
+        coverLetterId,
+        resumeId,
+        normalizedWorkspace,
+        persistedDraft,
+        { accountUid, reason },
+      );
+    }
+    await tx.done;
+    writeLocalStorageCoverLetterDraft(coverLetterId, persistedDraft);
+    return { workspace: normalizedWorkspace, draft: persistedDraft, conflict: false };
+  });
+}
+
+export async function persistLocalCoverLetterDelete({
+  coverLetterId,
+  resumeId,
+  workspace,
+  accountUid = '',
+  enqueueSync = true,
+  reason = 'delete-cover-letter',
+}) {
+  return runLocalMutation(async () => {
+    const db = await getLocalWorkspaceDb();
+    const sourceWorkspace = normalizeWorkspaceIndex(workspace);
+    const removal = removeWorkspaceCoverLetters(sourceWorkspace, [coverLetterId]);
+    const nextWorkspace = normalizeWorkspaceIndex({ ...sourceWorkspace, coverLetters: removal.registry });
+
+    if (removal.removedIds.length === 0) return nextWorkspace;
+
+    if (!db) {
+      writeLocalStorageWorkspace(nextWorkspace);
+      removeLocalStorageCoverLetterDraft(coverLetterId);
+      return nextWorkspace;
+    }
+
+    const tx = db.transaction([
+      WORKSPACE_STORE,
+      COVER_LETTER_DRAFTS_STORE,
+      COVER_LETTER_TOMBSTONES_STORE,
+      OUTBOX_STORE,
+      TOMBSTONES_STORE,
+    ], 'readwrite');
+    await writeWorkspaceRecord(tx, nextWorkspace);
+    await tx.objectStore(COVER_LETTER_DRAFTS_STORE).delete(coverLetterId);
+    if (enqueueSync) {
+      await queueWorkspaceSyncInTx(tx, nextWorkspace, { accountUid, reason });
+      await queueCoverLetterDeleteSyncInTx(
+        tx,
+        coverLetterId,
+        resumeId,
+        nextWorkspace,
+        { accountUid, reason },
+      );
+    }
+    await tx.done;
+    writeLocalStorageWorkspace(nextWorkspace);
+    removeLocalStorageCoverLetterDraft(coverLetterId);
+    return nextWorkspace;
+  });
+}
+
 export async function persistLocalWorkspaceSnapshot({
   workspace,
   accountUid = '',
@@ -478,29 +949,44 @@ export async function persistLocalResumeBatchDelete({
     if (!db || deletedResumeIds.length === 0) {
       writeLocalStorageWorkspace(normalizedWorkspace);
       deletedResumeIds.forEach(removeLocalStorageDraft);
+      normalizedWorkspace.coverLetters.removedIds.forEach(removeLocalStorageCoverLetterDraft);
       return normalizedWorkspace;
     }
 
-    const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE], 'readwrite');
+    const tx = db.transaction([
+      WORKSPACE_STORE,
+      DRAFTS_STORE,
+      COVER_LETTER_DRAFTS_STORE,
+      OUTBOX_STORE,
+      TOMBSTONES_STORE,
+      COVER_LETTER_TOMBSTONES_STORE,
+    ], 'readwrite');
     const [existingWorkspaceRecord, allExistingTombstones] = await Promise.all([
       tx.objectStore(WORKSPACE_STORE).get(LOCAL_WORKSPACE_ID),
       tx.objectStore(TOMBSTONES_STORE).getAll(),
     ]);
     const existingTombstones = filterTombstonesForAccount(allExistingTombstones, accountUid);
+    const existingWorkspace = normalizeWorkspaceIndex(existingWorkspaceRecord?.workspace);
+    const coverLettersToDelete = deletedResumeIds.flatMap((resumeId) => (
+      getResumeCoverLetterIds(existingWorkspace, resumeId)
+        .map((coverLetterId) => ({ coverLetterId, resumeId }))
+    ));
     const mergedWorkspace = mergeConcurrentLocalWorkspaces(
-      existingWorkspaceRecord?.workspace,
+      existingWorkspace,
       normalizedWorkspace,
       existingTombstones,
     );
     const deletionResult = removeWorkspaceResumes(mergedWorkspace, deletedResumeIds);
-    const persistedWorkspace = deletionResult.rejectedReason
-      ? normalizedWorkspace
-      : deletionResult.workspace;
+    const persistedWorkspace = deletionResult.rejectedReason ? normalizedWorkspace : deletionResult.workspace;
 
     await writeWorkspaceRecord(tx, persistedWorkspace);
 
     for (const resumeId of deletedResumeIds) {
       await tx.objectStore(DRAFTS_STORE).delete(resumeId);
+    }
+
+    for (const { coverLetterId } of coverLettersToDelete) {
+      await tx.objectStore(COVER_LETTER_DRAFTS_STORE).delete(coverLetterId);
     }
 
     if (enqueueSync) {
@@ -509,11 +995,22 @@ export async function persistLocalResumeBatchDelete({
       for (const resumeId of deletedResumeIds) {
         await queueDeleteSyncInTx(tx, resumeId, persistedWorkspace, { accountUid, reason });
       }
+
+      for (const { coverLetterId, resumeId } of coverLettersToDelete) {
+        await queueCoverLetterDeleteSyncInTx(
+          tx,
+          coverLetterId,
+          resumeId,
+          persistedWorkspace,
+          { accountUid, reason },
+        );
+      }
     }
 
     await tx.done;
     writeLocalStorageWorkspace(persistedWorkspace);
     deletedResumeIds.forEach(removeLocalStorageDraft);
+    coverLettersToDelete.forEach(({ coverLetterId }) => removeLocalStorageCoverLetterDraft(coverLetterId));
     return persistedWorkspace;
   });
 }
@@ -528,10 +1025,24 @@ export async function persistLoginMergedWorkspace({
     const db = await getLocalWorkspaceDb();
     const normalizedWorkspace = normalizeWorkspaceIndex(mergeResult?.workspace);
     const draftsByResumeId = normalizeDraftMap(mergeResult?.draftsByResumeId);
+    const coverLetterDraftsById = new Map(
+      mergeResult?.coverLetterDraftsById instanceof Map
+        ? mergeResult.coverLetterDraftsById
+        : Object.entries(mergeResult?.coverLetterDraftsById || {}),
+    );
     const syncPlan = mergeResult?.syncPlan || {};
     const mergedTombstones = normalizeTombstoneList(mergeResult?.tombstones);
+    const mergedCoverLetterTombstones = Array.isArray(mergeResult?.coverLetterTombstones)
+      ? mergeResult.coverLetterTombstones
+      : [];
     const upsertResumeIds = Array.isArray(syncPlan.upsertResumeIds) ? syncPlan.upsertResumeIds : [];
     const deleteResumeIds = Array.isArray(syncPlan.deleteResumeIds) ? syncPlan.deleteResumeIds : [];
+    const upsertCoverLetterIds = Array.isArray(syncPlan.upsertCoverLetterIds)
+      ? syncPlan.upsertCoverLetterIds
+      : [];
+    const deleteCoverLetterIds = Array.isArray(syncPlan.deleteCoverLetterIds)
+      ? syncPlan.deleteCoverLetterIds
+      : [];
 
     writeLocalStorageWorkspace(normalizedWorkspace);
     draftsByResumeId.forEach((draft, resumeId) => {
@@ -539,20 +1050,35 @@ export async function persistLoginMergedWorkspace({
         writeLocalStorageDraft(resumeId, draft);
       }
     });
+    coverLetterDraftsById.forEach((draft, coverLetterId) => {
+      if (normalizedWorkspace.coverLetters.meta[coverLetterId]) {
+        writeLocalStorageCoverLetterDraft(coverLetterId, draft);
+      }
+    });
 
     if (!db) {
       return {
         workspace: normalizedWorkspace,
         draftsByResumeId,
+        coverLetterDraftsById,
       };
     }
 
-    const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE, TOMBSTONES_STORE, ACCOUNT_BINDING_STORE], 'readwrite');
+    const tx = db.transaction([
+      WORKSPACE_STORE,
+      DRAFTS_STORE,
+      COVER_LETTER_DRAFTS_STORE,
+      OUTBOX_STORE,
+      TOMBSTONES_STORE,
+      COVER_LETTER_TOMBSTONES_STORE,
+      ACCOUNT_BINDING_STORE,
+    ], 'readwrite');
 
     const effectiveAccountUid = trimText(accountUid || account?.uid);
-    const [existingOutboxRecords, existingTombstones] = await Promise.all([
+    const [existingOutboxRecords, existingTombstones, existingCoverLetterTombstones] = await Promise.all([
       tx.objectStore(OUTBOX_STORE).getAll(),
       tx.objectStore(TOMBSTONES_STORE).getAll(),
+      tx.objectStore(COVER_LETTER_TOMBSTONES_STORE).getAll(),
     ]);
     const preservedOutboxRecords = existingOutboxRecords.filter((record) => (
       trimText(record?.accountUid) && trimText(record.accountUid) !== effectiveAccountUid
@@ -560,13 +1086,18 @@ export async function persistLoginMergedWorkspace({
     const preservedTombstones = existingTombstones.filter((record) => (
       trimText(record?.accountUid) && trimText(record.accountUid) !== effectiveAccountUid
     ));
+    const preservedCoverLetterTombstones = existingCoverLetterTombstones.filter((record) => (
+      trimText(record?.accountUid) && trimText(record.accountUid) !== effectiveAccountUid
+    ));
 
     await writeWorkspaceRecord(tx, normalizedWorkspace, {
       cloudVersion: mergeResult?.workspaceCloudVersion,
     });
     await tx.objectStore(DRAFTS_STORE).clear();
+    await tx.objectStore(COVER_LETTER_DRAFTS_STORE).clear();
     await tx.objectStore(OUTBOX_STORE).clear();
     await tx.objectStore(TOMBSTONES_STORE).clear();
+    await tx.objectStore(COVER_LETTER_TOMBSTONES_STORE).clear();
 
     for (const record of preservedOutboxRecords) {
       await tx.objectStore(OUTBOX_STORE).put(record);
@@ -583,11 +1114,31 @@ export async function persistLoginMergedWorkspace({
       });
     }
 
+    for (const tombstone of preservedCoverLetterTombstones) {
+      await tx.objectStore(COVER_LETTER_TOMBSTONES_STORE).put(tombstone);
+    }
+
+    for (const tombstone of mergedCoverLetterTombstones) {
+      await tx.objectStore(COVER_LETTER_TOMBSTONES_STORE).put({
+        ...tombstone,
+        accountUid: tombstone.accountUid || accountUid || account?.uid || '',
+      });
+    }
+
     for (const resumeId of normalizedWorkspace.resumeIds) {
       const draft = draftsByResumeId.get(resumeId);
 
       if (draft) {
         await writeDraftRecord(tx, resumeId, draft, { localRevision: getDraftStateRevision(draft) });
+      }
+    }
+
+    for (const [coverLetterId, draft] of coverLetterDraftsById) {
+      const meta = normalizedWorkspace.coverLetters.meta[coverLetterId];
+      if (meta) {
+        await writeCoverLetterDraftRecord(tx, coverLetterId, draft, {
+          localRevision: draft?.localRevision,
+        });
       }
     }
 
@@ -607,6 +1158,32 @@ export async function persistLoginMergedWorkspace({
       await queueDeleteSyncInTx(tx, resumeId, normalizedWorkspace, { accountUid, reason });
     }
 
+    for (const coverLetterId of upsertCoverLetterIds) {
+      const draft = coverLetterDraftsById.get(coverLetterId);
+      const meta = normalizedWorkspace.coverLetters.meta[coverLetterId];
+      if (draft && meta) {
+        await queueCoverLetterSyncInTx(
+          tx,
+          coverLetterId,
+          meta.resumeId,
+          normalizedWorkspace,
+          draft,
+          { accountUid, reason },
+        );
+      }
+    }
+
+    for (const coverLetterId of deleteCoverLetterIds) {
+      const tombstone = mergedCoverLetterTombstones.find((record) => record.coverLetterId === coverLetterId);
+      await queueCoverLetterDeleteSyncInTx(
+        tx,
+        coverLetterId,
+        tombstone?.resumeId || '',
+        normalizedWorkspace,
+        { accountUid, reason },
+      );
+    }
+
     if (accountUid || account?.uid) {
       await tx.objectStore(ACCOUNT_BINDING_STORE).put({
         id: LOCAL_ACCOUNT_BINDING_ID,
@@ -623,6 +1200,7 @@ export async function persistLoginMergedWorkspace({
     return {
       workspace: normalizedWorkspace,
       draftsByResumeId,
+      coverLetterDraftsById,
     };
   });
 }
@@ -648,16 +1226,17 @@ export async function readDurableLocalBrowserContext() {
     };
   }
 
-  const [workspaceRecord, draftRecords, accountBinding] = await Promise.all([
+  const [workspaceRecord, draftRecords, coverLetterDraftRecords, accountBinding] = await Promise.all([
     db.get(WORKSPACE_STORE, LOCAL_WORKSPACE_ID),
     db.getAll(DRAFTS_STORE),
+    db.getAll(COVER_LETTER_DRAFTS_STORE),
     db.get(ACCOUNT_BINDING_STORE, LOCAL_ACCOUNT_BINDING_ID),
   ]);
   const workspace = normalizeWorkspaceIndex(workspaceRecord?.workspace);
 
   return {
     accountBinding: accountBinding || null,
-    hasWorkspaceData: workspace.resumeIds.length > 0 || draftRecords.length > 0,
+    hasWorkspaceData: workspace.resumeIds.length > 0 || draftRecords.length > 0 || coverLetterDraftRecords.length > 0,
   };
 }
 
@@ -715,8 +1294,10 @@ export async function markOutboxSynced(operations) {
   const tx = db.transaction([
     WORKSPACE_STORE,
     DRAFTS_STORE,
+    COVER_LETTER_DRAFTS_STORE,
     OUTBOX_STORE,
     TOMBSTONES_STORE,
+    COVER_LETTER_TOMBSTONES_STORE,
     ACCOUNT_BINDING_STORE,
   ], 'readwrite');
   const accountBinding = await tx.objectStore(ACCOUNT_BINDING_STORE).get(LOCAL_ACCOUNT_BINDING_ID);
@@ -767,6 +1348,20 @@ export async function markOutboxSynced(operations) {
             },
           });
         }
+      } else if (record.type === 'upsertCoverLetter' && record.coverLetterId) {
+        const draftStore = tx.objectStore(COVER_LETTER_DRAFTS_STORE);
+        const draftRecord = await draftStore.get(record.coverLetterId);
+        if (draftRecord) {
+          const cloudVersion = Math.max(
+            normalizeCloudVersion(draftRecord.cloudVersion ?? draftRecord.draft?.cloudVersion),
+            ack.cloudVersion,
+          );
+          await draftStore.put({
+            ...draftRecord,
+            cloudVersion,
+            draft: { ...draftRecord.draft, cloudVersion },
+          });
+        }
       }
 
       if (!exactMatch && record.status === 'pending') {
@@ -798,6 +1393,15 @@ export async function markOutboxSynced(operations) {
           ...tombstone,
           syncedAt: new Date().toISOString(),
         });
+      }
+    } else if (record?.type === 'deleteCoverLetter' && record.coverLetterId) {
+      const tombstoneStore = tx.objectStore(COVER_LETTER_TOMBSTONES_STORE);
+      const tombstone = await tombstoneStore.get(record.coverLetterId);
+      if (
+        tombstone
+        && (!trimText(tombstone.accountUid) || trimText(tombstone.accountUid) === recordAccountUid)
+      ) {
+        await tombstoneStore.put({ ...tombstone, syncedAt: new Date().toISOString() });
       }
     }
   }

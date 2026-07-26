@@ -87,6 +87,12 @@ export default function ResumeWorkspaceRail({
   onRenameResumeFolder,
   onSetResumeOrganization,
   onDeleteResume,
+  activeDocumentType,
+  activeCoverLetterId,
+  onOpenCoverLetter,
+  onOpenResumeDocument,
+  onRequestCoverLetter,
+  onRequestDeleteCoverLetter,
   workspaceReady,
   authUser,
 }) {
@@ -216,6 +222,11 @@ export default function ResumeWorkspaceRail({
     [organization.rootItems],
   );
   const wouldDeleteEveryResume = selectedResumeIds.size >= resumeList.length;
+  const selectedAttachedCoverLetterCount = useMemo(() => (
+    [...selectedResumeIds].reduce((count, resumeId) => (
+      count + (resumeById.get(resumeId)?.coverLetters?.length || 0)
+    ), 0)
+  ), [resumeById, selectedResumeIds]);
   const sensors = useSensors(
     useSensor(ResumeLoomrPointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(ResumeLoomrKeyboardSensor, {
@@ -1289,6 +1300,12 @@ export default function ResumeWorkspaceRail({
     onCancelRename: cancelRename,
     onDuplicateResume,
     onDeleteResume,
+    activeDocumentType,
+    activeCoverLetterId,
+    onOpenCoverLetter,
+    onOpenResumeDocument,
+    onRequestCoverLetter,
+    onRequestDeleteCoverLetter,
     onMoveResumeToRoot: moveResumeToRoot,
     onToggleSelected: toggleSelection,
   };
@@ -1480,6 +1497,7 @@ export default function ResumeWorkspaceRail({
         <BatchDeleteDialog
           resumeCount={selectedResumeIds.size}
           folderCount={selectedFolderIds.size}
+          attachedCoverLetterCount={selectedAttachedCoverLetterCount}
           isDeleting={isDeleting}
           isSignedIn={Boolean(authUser)}
           onCancel={closeDeleteDialog}

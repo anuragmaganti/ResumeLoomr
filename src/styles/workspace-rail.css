@@ -797,7 +797,10 @@ html[data-theme="dark"] .resumePill.isActive {
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.resumePill.isActive .resumePillMenuHost {
+.resumePill.isActive .resumePillMenuHost,
+.resumePill:hover .resumePillMenuHost,
+.resumePill:focus-within .resumePillMenuHost,
+.resumePill:has(.entryMenu.isOpen) .resumePillMenuHost {
   flex-basis: 30px;
   width: 30px;
   margin-left: 3px;
@@ -805,6 +808,48 @@ html[data-theme="dark"] .resumePill.isActive {
   opacity: 1;
   transform: translateX(0) scale(1);
   pointer-events: auto;
+}
+
+.resumeDocumentSwitch {
+  display: inline-grid;
+  flex: 0 0 26px;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-left: 2px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 72%, transparent);
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--color-surface-elevated) 72%, transparent);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.resumeDocumentSwitch:hover,
+.resumeDocumentSwitch:focus-visible {
+  border-color: var(--color-accent-border);
+  background: color-mix(in srgb, var(--color-accent-soft) 66%, var(--color-surface-elevated));
+  color: var(--color-accent-strong);
+}
+
+.resumeDocumentSwitch:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+  outline-offset: 1px;
+}
+
+.resumeDocumentSwitchIcon {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
 }
 
 .resumePill.isEditing .resumePillMenuHost {
@@ -1063,8 +1108,11 @@ html[data-theme="dark"] .resumePill.isActive {
     pointer-events: auto;
   }
 
-  .resumeFolderMenuHost {
+  .resumeFolderMenuHost,
+  .resumePillMenuHost {
+    flex-basis: 30px;
     width: 30px;
+    margin-left: 3px;
     overflow: visible;
     opacity: 1;
     transform: none;

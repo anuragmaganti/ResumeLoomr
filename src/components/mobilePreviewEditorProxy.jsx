@@ -24,7 +24,7 @@ export default function MobilePreviewEditorProxy({
             ref={inputRef}
             className="mobilePreviewEditorProxy"
             data-mobile-preview-editor="true"
-            aria-label={getPreviewEditorLabel(session.target)}
+            aria-label={session.label || getPreviewEditorLabel(session.target)}
             value={session.value}
             rows={session.isMultiline ? 3 : 1}
             inputMode={session.inputMode}

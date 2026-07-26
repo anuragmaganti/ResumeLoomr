@@ -1,6 +1,7 @@
 import test, { afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import 'fake-indexeddb/auto';
+import { indexedDB } from 'fake-indexeddb';
 
 import {
   createSavedDraftState,
@@ -13,15 +14,29 @@ import {
   markOutboxSynced,
   persistLoginMergedWorkspace,
   persistLocalDraftSnapshot,
+  persistLocalImportedDocuments,
   persistLocalResumeBatchDelete,
   persistLocalWorkspaceSnapshot,
   readDurableLocalBrowserContext,
   readLocalAccountBinding,
+  readLocalCoverLetterDraft,
   readLocalDraft,
   readLocalWorkspaceBundle,
   readPendingOutbox,
   setSyncSessionCleanupRequested,
 } from '../src/lib/localWorkspaceDb.js';
+import {
+  ACCOUNT_BINDING_STORE,
+  COVER_LETTER_DRAFTS_STORE,
+  COVER_LETTER_TOMBSTONES_STORE,
+  DRAFTS_STORE,
+  getLocalWorkspaceDb,
+  OUTBOX_STORE,
+  TOMBSTONES_STORE,
+  WORKSPACE_STORE,
+} from '../src/lib/localWorkspaceDatabase.js';
+import { createBlankCoverLetterDraft } from '../src/lib/coverLetter.js';
+import { createBlankDraftState } from '../src/lib/workspaceDraft.js';
 import {
   createWorkspaceResumeMeta,
   normalizeWorkspaceIndex,
@@ -74,6 +89,129 @@ function addResumeToWorkspace(workspace, resumeId, updatedAt) {
     },
   });
 }
+
+async function seedVersionOneDatabase(workspace, resumeId, draft) {
+  await new Promise((resolve, reject) => {
+    const request = indexedDB.open('resumeloomr-local-workspace', 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      db.createObjectStore(WORKSPACE_STORE, { keyPath: 'id' });
+      db.createObjectStore(DRAFTS_STORE, { keyPath: 'resumeId' });
+      const outbox = db.createObjectStore(OUTBOX_STORE, { keyPath: 'id' });
+      outbox.createIndex('status', 'status');
+      outbox.createIndex('updatedAt', 'updatedAt');
+      outbox.createIndex('resumeId', 'resumeId');
+      db.createObjectStore(TOMBSTONES_STORE, { keyPath: 'resumeId' });
+      db.createObjectStore(ACCOUNT_BINDING_STORE, { keyPath: 'id' });
+    };
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction([WORKSPACE_STORE, DRAFTS_STORE, OUTBOX_STORE], 'readwrite');
+      tx.objectStore(WORKSPACE_STORE).put({
+        id: 'main',
+        workspace,
+        localRevision: 'workspace-v1',
+        cloudVersion: 3,
+      });
+      tx.objectStore(DRAFTS_STORE).put({
+        resumeId,
+        draft,
+        localRevision: 'draft-v1',
+        cloudVersion: 2,
+      });
+      tx.objectStore(OUTBOX_STORE).put({
+        id: 'account-a:upsertDraft:legacy',
+        type: 'upsertDraft',
+        resumeId,
+        accountUid: 'account-a',
+        operationVersion: 1,
+        localRevision: 'draft-v1',
+        status: 'pending',
+      });
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    };
+  });
+}
+
+test('indexeddb version two adds cover letter stores without losing version one resume data', async () => {
+  const resumeId = 'legacy-resume';
+  const draft = createBlankDraftState();
+  draft.resume.personal.name = 'Legacy User';
+  const workspace = normalizeWorkspaceIndex({
+    activeResumeId: resumeId,
+    resumeIds: [resumeId],
+    meta: { [resumeId]: { name: 'Legacy resume', updatedAt: '' } },
+  });
+
+  await seedVersionOneDatabase(workspace, resumeId, draft);
+  const db = await getLocalWorkspaceDb();
+  const bundle = await readLocalWorkspaceBundle();
+  const stores = [...db.objectStoreNames];
+
+  assert.equal(stores.includes(COVER_LETTER_DRAFTS_STORE), true);
+  assert.equal(stores.includes(COVER_LETTER_TOMBSTONES_STORE), true);
+  assert.equal(bundle.workspace.resumeIds.includes(resumeId), true);
+  assert.equal(bundle.draftsByResumeId.get(resumeId).resume.personal.name, 'Legacy User');
+  assert.equal((await readPendingOutbox({ accountUid: 'account-a' })).length, 1);
+});
+
+test('paired document import commits resume, cover letter, registry, and outbox atomically', async () => {
+  const initial = await initializeLocalWorkspace();
+  const resumeDraft = createBlankDraftState();
+  resumeDraft.resume.personal.name = 'Imported User';
+  const coverLetterDraft = createBlankCoverLetterDraft('staged-resume');
+  coverLetterDraft.coverLetter.bodyBlocks[0].text = 'I am applying for the product role.';
+
+  const result = await persistLocalImportedDocuments({
+    workspace: initial.workspace,
+    resumeImport: { name: 'Imported resume', draft: resumeDraft },
+    coverLetterImport: { name: 'Acme cover letter', draft: coverLetterDraft },
+    accountUid: 'account-a',
+  });
+  const bundle = await readLocalWorkspaceBundle();
+  const storedCoverLetter = await readLocalCoverLetterDraft(result.coverLetterId, result.resumeId);
+  const operations = await readPendingOutbox({ accountUid: 'account-a' });
+
+  assert.equal(bundle.workspace.resumeIds.includes(result.resumeId), true);
+  assert.equal(bundle.workspace.coverLetters.meta[result.coverLetterId].resumeId, result.resumeId);
+  assert.deepEqual(bundle.workspace.coverLetters.orderByResumeId[result.resumeId], [result.coverLetterId]);
+  assert.equal(bundle.draftsByResumeId.get(result.resumeId).resume.personal.name, 'Imported User');
+  assert.equal(storedCoverLetter.coverLetter.resumeId, result.resumeId);
+  assert.equal(storedCoverLetter.coverLetter.bodyBlocks[0].text, 'I am applying for the product role.');
+  assert.deepEqual(new Set(operations.map((operation) => operation.type)), new Set([
+    'workspace',
+    'upsertDraft',
+    'upsertCoverLetter',
+  ]));
+});
+
+test('invalid cover-letter-only import leaves the existing workspace untouched', async () => {
+  const initial = await initializeLocalWorkspace();
+  const coverLetterDraft = createBlankCoverLetterDraft('missing-resume');
+  const before = await readLocalWorkspaceBundle();
+
+  await assert.rejects(
+    persistLocalImportedDocuments({
+      workspace: initial.workspace,
+      coverLetterImport: { name: 'Cover letter', draft: coverLetterDraft },
+      targetResumeId: 'missing-resume',
+      accountUid: 'account-a',
+    }),
+    /Choose a resume/,
+  );
+
+  const after = await readLocalWorkspaceBundle();
+  assert.deepEqual(after.workspace, before.workspace);
+  assert.equal(after.coverLetterDraftsById.size, 0);
+  assert.equal((await readPendingOutbox({ accountUid: 'account-a' })).length, 0);
+});
 
 test('divergent tab workspace writes preserve both additions', async () => {
   const initial = await initializeLocalWorkspace();

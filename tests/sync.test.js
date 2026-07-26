@@ -48,6 +48,7 @@ import {
   shouldAcceptDraftSyncOperation,
   shouldAcceptCloudVersion,
   shouldAcceptSyncOperation,
+  validateCoverLetterSyncOperation,
 } from '../server/syncWorkspace.js';
 import {
   createDraft,
@@ -418,9 +419,43 @@ test('sync API workspace documents round trip folder organization', () => {
   });
   const restored = cloudWorkspaceFromDoc(cloudDocument);
 
-  assert.equal(cloudDocument.schemaVersion, 2);
+  assert.equal(cloudDocument.schemaVersion, 3);
   assert.equal(restored.organization.folders['folder-1'].toneIndex, 3);
   assert.deepEqual(restored.organization, workspace.organization);
+});
+
+test('cover letter sync requires a live matching parent resume', () => {
+  const workspace = normalizeWorkspaceIndex({
+    ...createWorkspace(['resume-1']),
+    coverLetters: {
+      orderByResumeId: { 'resume-1': ['letter-1'] },
+      meta: {
+        'letter-1': {
+          id: 'letter-1',
+          resumeId: 'resume-1',
+          name: 'Cover letter',
+        },
+      },
+    },
+  });
+  const operation = {
+    type: 'upsertCoverLetter',
+    coverLetterId: 'letter-1',
+    resumeId: 'resume-1',
+    workspace,
+    draft: { coverLetter: { resumeId: 'resume-1' } },
+  };
+
+  assert.equal(validateCoverLetterSyncOperation(operation, { parentExists: true }), '');
+  assert.equal(validateCoverLetterSyncOperation(operation, {}), 'parent-missing');
+  assert.equal(validateCoverLetterSyncOperation(operation, {
+    parentExists: true,
+    parentDeleted: true,
+  }), 'parent-deleted');
+  assert.equal(validateCoverLetterSyncOperation({
+    ...operation,
+    draft: { coverLetter: { resumeId: 'resume-2' } },
+  }, { parentExists: true }), 'parent-mismatch');
 });
 
 test('cloud workspace writes preserve concurrent browser folders and honor deletes', () => {
@@ -782,7 +817,7 @@ test('local persistence serializes editor saves and database clears', () => {
   const browserConnection = fs.readFileSync('src/lib/browserConnection.js', 'utf8');
 
   assert.match(builderHook, /const editorSaveQueueRef = useRef\(Promise\.resolve\(\)\)/);
-  assert.match(builderHook, /const saveResult = await persistCurrentEditorDraft\(\{ reason: 'switch-resume'/);
+  assert.match(builderHook, /const saveResult = await saveActiveDocumentFromRefs\(\{ reason: 'switch-resume'/);
   assert.match(builderHook, /saveResult\?\.conflict \|\|\s*saveResult\?\.error \|\|\s*saveResult\?\.skipped/);
   assert.match(browserConnection, /await deleteLocalWorkspaceDatabase\(\)/);
 });

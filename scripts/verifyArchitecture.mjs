@@ -18,6 +18,7 @@ const SOURCE_EXTENSIONS = new Set(['.js', '.jsx', '.mjs', '.css']);
 const RESOLVABLE_EXTENSIONS = ['.js', '.jsx', '.mjs', '.json', '.css'];
 const ENTRYPOINTS = [
   'src/main.jsx',
+  'api/import-document.js',
   'api/import-resume.js',
   'api/sync-session.js',
   'api/sync-workspace.js',

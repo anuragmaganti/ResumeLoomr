@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { validateImportResumeFile } from '../src/lib/importResume.js';
+import { validateImportDocumentFile } from '../src/lib/importDocument.js';
 import {
   IMPORT_FILE_ACCEPT,
   normalizeResumeImportMimeType,
@@ -55,12 +55,12 @@ test('import file normalization rejects unsupported or oversized uploads', () =>
 });
 
 test('import file validation accepts PDF DOCX PNG JPG and JPEG files', () => {
-  assert.equal(validateImportResumeFile({ name: 'resume.pdf', type: 'application/pdf', size: 12 }), '');
-  assert.equal(validateImportResumeFile({ name: 'resume.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 12 }), '');
-  assert.equal(validateImportResumeFile({ name: 'resume.png', type: 'image/png', size: 12 }), '');
-  assert.equal(validateImportResumeFile({ name: 'resume.jpg', type: 'image/jpeg', size: 12 }), '');
-  assert.equal(validateImportResumeFile({ name: 'resume.jpeg', type: 'image/jpeg', size: 12 }), '');
-  assert.match(validateImportResumeFile({ name: 'resume.gif', type: 'image/gif', size: 12 }), /PDF, DOCX, PNG, JPG, or JPEG/);
+  assert.equal(validateImportDocumentFile({ name: 'resume.pdf', type: 'application/pdf', size: 12 }, 'resume'), '');
+  assert.equal(validateImportDocumentFile({ name: 'resume.docx', type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 12 }, 'resume'), '');
+  assert.equal(validateImportDocumentFile({ name: 'resume.png', type: 'image/png', size: 12 }, 'resume'), '');
+  assert.equal(validateImportDocumentFile({ name: 'resume.jpg', type: 'image/jpeg', size: 12 }, 'resume'), '');
+  assert.equal(validateImportDocumentFile({ name: 'resume.jpeg', type: 'image/jpeg', size: 12 }, 'resume'), '');
+  assert.match(validateImportDocumentFile({ name: 'resume.gif', type: 'image/gif', size: 12 }, 'resume'), /PDF, DOCX, PNG, JPG, or JPEG/);
 });
 
 test('shared import type contract preserves browser and server normalization rules', () => {

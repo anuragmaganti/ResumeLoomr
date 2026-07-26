@@ -3,10 +3,15 @@ import {
   serializeDraftState,
 } from './draftState.js';
 import {
+  createCoverLetterStorageKey,
   LOCAL_WORKSPACE_PRESENT_KEY,
   WORKSPACE_INDEX_STORAGE_KEY,
   createResumeStorageKey,
 } from './localWorkspaceKeys.js';
+import {
+  normalizeCoverLetterDraft,
+  serializeCoverLetterDraft,
+} from './coverLetter.js';
 import { normalizeWorkspaceIndex } from './workspace.js';
 import { createBlankDraftState, createFreshWorkspaceDraft } from './workspaceDraft.js';
 import {
@@ -63,6 +68,33 @@ export function removeLocalStorageDraft(resumeId) {
   }
 
   return removeStorageItem(getLocalWorkspaceStorage(), createResumeStorageKey(resumeId));
+}
+
+export function writeLocalStorageCoverLetterDraft(coverLetterId, draft) {
+  if (!coverLetterId) return false;
+
+  const written = writeJsonStorageItem(
+    getLocalWorkspaceStorage(),
+    createCoverLetterStorageKey(coverLetterId),
+    serializeCoverLetterDraft(draft),
+  );
+
+  if (written) markLocalWorkspacePresent();
+  return written;
+}
+
+export function readLocalStorageCoverLetterDraft(coverLetterId, resumeId = '') {
+  if (!coverLetterId) return null;
+  const draft = readJsonStorageItem(
+    getLocalWorkspaceStorage(),
+    createCoverLetterStorageKey(coverLetterId),
+  );
+  return draft ? normalizeCoverLetterDraft(draft, resumeId) : null;
+}
+
+export function removeLocalStorageCoverLetterDraft(coverLetterId) {
+  if (!coverLetterId) return false;
+  return removeStorageItem(getLocalWorkspaceStorage(), createCoverLetterStorageKey(coverLetterId));
 }
 
 export function readLegacyDraftFromLocalStorage(resumeId) {
