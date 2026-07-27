@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import CoverLetterSettingsRail from './coverLetterSettingsRail.jsx';
+import SettingsRailPanel from './settingsRailPanel.jsx';
 import {
   COVER_LETTER_EDITOR_GROUPS,
   getCoverLetterWordCount,
@@ -273,9 +274,9 @@ export default function CoverLetterEditorPanel({
     <section className="editorPanel coverLetterEditorPanel">
       <div className="editorWorkspace" style={editorWorkspaceStyle}>
         <div className="editorSidebar">
-          <aside className="settingsRail panel">
+          <SettingsRailPanel>
             <CoverLetterSettingsRail coverLetter={coverLetter} template={template} onTemplateChange={onTemplateChange} onAdjustSetting={actions.updateSetting} />
-          </aside>
+          </SettingsRailPanel>
           <aside className="editorRail panel">
             <div className="coverLetterTabs" role="tablist" aria-label="Cover letter editor groups">
               {COVER_LETTER_EDITOR_GROUPS.map((group) => (

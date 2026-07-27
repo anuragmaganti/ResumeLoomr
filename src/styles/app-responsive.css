@@ -164,22 +164,95 @@
   }
 
   .editorSidebar {
-    position: static;
-    max-height: none;
-    overflow: visible;
-    padding-right: 0;
+    display: contents;
   }
 
   .editorRail {
+    order: 1;
     position: static;
   }
 
   .editorStage {
+    order: 2;
     position: static;
     width: auto;
     max-width: none;
     max-height: none;
     justify-self: stretch;
+  }
+
+  .settingsRail {
+    order: 3;
+    position: relative;
+    padding: 0;
+  }
+
+  .settingsRailToggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 42px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 750;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+  }
+
+  .settingsRailToggle:hover,
+  .settingsRailToggle:focus-visible {
+    background: color-mix(in srgb, var(--color-surface-muted) 72%, transparent);
+  }
+
+  .settingsRailToggle:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-accent) 36%, transparent);
+    outline-offset: -3px;
+  }
+
+  .settingsRailToggleIcon {
+    width: 7px;
+    height: 7px;
+    margin-right: 3px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    color: var(--color-text-muted);
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .settingsRail.isExpanded .settingsRailToggleIcon {
+    transform: translateY(2px) rotate(225deg);
+  }
+
+  .settingsRailCollapse {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      grid-template-rows 260ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 150ms ease;
+  }
+
+  .settingsRail.isExpanded .settingsRailCollapse {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .settingsRailCollapseClip {
+    overflow: hidden;
+  }
+
+  .settingsRailCollapseContent {
+    margin: 0 12px 12px;
+    padding-top: 9px;
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
   }
 
   .formContainer {
@@ -246,7 +319,6 @@
 
   .topbar,
   .resumeSubbar,
-  .settingsRail,
   .editorRail,
   .editorStage,
   .previewPanel {

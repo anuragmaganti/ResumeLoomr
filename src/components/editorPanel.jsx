@@ -4,6 +4,7 @@ import PersonalForm from "./forms/personalForm";
 import SectionBlockForm from "./forms/sectionBlockForm";
 import EntryActionMenu from "./forms/entryActionMenu";
 import EditorSettingsRail from "./editorSettingsRail";
+import SettingsRailPanel from "./settingsRailPanel";
 import {
     createEditorTargetAttributes,
     getEditorEntryIdentity,
@@ -368,12 +369,12 @@ export default function EditorPanel({
         <section className="editorPanel">
             <div className="editorWorkspace" style={editorWorkspaceStyle}>
                 <div className="editorSidebar">
-                    <aside
-                        className={`settingsRail panel${isStartPending ? " isStartPending" : ""}`}
-                        aria-disabled={isStartPending}
+                    <SettingsRailPanel
+                        isDisabled={isStartPending}
                         onPointerDownCapture={handleStartPendingInteraction}
                         onClickCapture={handleStartPendingInteraction}
                         onFocusCapture={handleStartPendingFocus}
+                        overlay={renderStartPendingOverlay()}
                     >
                         <EditorSettingsRail
                             settings={resume.settings}
@@ -382,8 +383,7 @@ export default function EditorPanel({
                             templateOptions={templateOptions}
                             onTemplateChange={onTemplateChange}
                         />
-                        {renderStartPendingOverlay()}
-                    </aside>
+                    </SettingsRailPanel>
 
                     <aside className="editorRail panel">
                         <SectionTabs
