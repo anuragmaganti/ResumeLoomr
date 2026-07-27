@@ -11,6 +11,10 @@ ResumeLoomr is a local-first, AI-assisted workspace for creating, importing, edi
 
 The app uses block-first document models, IndexedDB as the working store, Firebase Auth and Firestore for account backup, Vercel API routes for secure server work, and Gemini-powered PDF, DOCX, and image import. Users can work without an account, then sign in for cloud backup, cross-device restore, or resume and cover-letter import.
 
+## Product Demo
+
+https://github.com/user-attachments/assets/dda39056-2d09-4950-b3fb-fce75a83e7d4
+
 ## Features
 
 ### Resume Editing
