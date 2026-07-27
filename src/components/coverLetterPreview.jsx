@@ -454,7 +454,6 @@ export default function CoverLetterPreview({
                       onDismissSampleInformation={onDismissSampleInformation}
                     />
                     <div className="resumePageContent coverLetterPageContent" data-preview-page-content="true">
-                      {isSamplePreview ? <p className="coverLetterSampleLabel">Sample cover letter. Disappears as you replace it.</p> : null}
                       <header className="coverLetterSender">
                         <h1 {...targetAttributes(coverLetterSenderPath('name'))}>
                           {renderEditableText(renderedSender.name, coverLetterSenderPath('name'), { fallback: isPrintRendering ? '' : 'Your Name' })}

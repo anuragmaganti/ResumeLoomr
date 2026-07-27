@@ -493,7 +493,12 @@ html[data-theme="dark"] .resumeFolderTone4 {
 }
 
 .resumeFolderClusterGrid .resumeRailCell {
+  z-index: var(--resume-folder-item-layer, 1);
   pointer-events: auto;
+}
+
+.resumeFolderClusterGrid .resumeRailCell:has(.entryMenu.isOpen) {
+  z-index: 250;
 }
 
 .resumeFolderClusterGrid > .resumeRailCell:has(.resumeFolderTile) {

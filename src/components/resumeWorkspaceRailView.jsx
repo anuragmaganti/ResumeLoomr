@@ -780,7 +780,7 @@ export function FolderCluster({
                     },
                     style: {
                       pointerEvents: 'auto',
-                      zIndex: index + 2,
+                      '--resume-folder-item-layer': index + 2,
                     },
                   }}
                 />

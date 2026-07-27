@@ -416,15 +416,6 @@
   min-height: calc(1056px - var(--resume-page-margin-top) - var(--resume-page-margin-bottom));
 }
 
-.coverLetterSampleLabel {
-  margin: 0 0 16px;
-  color: var(--resume-page-subtle);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
 .coverLetterSender {
   margin-bottom: 28px;
   padding-bottom: 14px;
@@ -659,7 +650,6 @@
 }
 
 @media print {
-  .coverLetterSampleLabel,
   .coverLetterDragPreviewFrame,
   .coverLetterDragPreview {
     display: none !important;

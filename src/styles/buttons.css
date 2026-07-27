@@ -505,6 +505,7 @@
   font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1;
+  text-align: left;
   cursor: pointer;
   transition:
     background-color var(--transition-base),

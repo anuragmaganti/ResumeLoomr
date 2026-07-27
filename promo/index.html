@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ResumeLoomr Promo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="stage" aria-label="ResumeLoomr product film">
+      <div class="ambient ambient--blue"></div>
+      <div class="ambient ambient--pink"></div>
+      <div class="grain"></div>
+
+      <section class="scene scene--hero" id="sceneHero">
+        <img class="heroLogo" src="../public/loomr-logo-light.png" alt="ResumeLoomr" />
+        <div class="heroKicker">A better application workflow</div>
+        <h1 class="heroTitle">
+          <span>Every role deserves</span>
+          <span class="heroTitleAccent">its own story.</span>
+        </h1>
+        <p class="heroSubhead">Build, tailor, and organize the documents that get you hired.</p>
+        <div class="heroThread" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </section>
+
+      <section class="scene scene--import" id="sceneImport">
+        <div class="copyBlock copyBlock--left">
+          <div class="eyebrow">01 / START</div>
+          <h2>Start with what<br />you already have.</h2>
+          <p>Import a resume, a cover letter, or both. ResumeLoomr turns the result into an editable workspace.</p>
+        </div>
+        <div class="appFrame appFrame--start" id="importFrame">
+          <div class="appFrameChrome">
+            <div class="traffic"><i></i><i></i><i></i></div>
+            <div class="address">resumeloomr.app</div>
+          </div>
+          <div class="appFrameViewport appFrameViewport--start">
+            <img src="./assets/blank.png" alt="ResumeLoomr new resume screen" />
+          </div>
+          <div class="importDialogBackdropDemo" id="importDialogBackdrop"></div>
+          <div class="importDialogDemo" id="importDialogDemo">
+            <div class="importDialogHeaderDemo">
+              <div>
+                <h3>Import resume and/or cover letter</h3>
+                <p>Upload PDF, DOCX, PNG, JPG, or JPEG files up to 3 MB each.</p>
+              </div>
+              <span aria-hidden="true">&times;</span>
+            </div>
+            <div class="importDocumentGridDemo">
+              <div class="importDocumentSlotDemo" id="resumeImportSlot">
+                <div class="importDocumentSlotHeaderDemo"><strong>Resume</strong><span>Optional</span></div>
+                <div class="importDropzoneDemo">
+                  <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M15 6h13.5L38 15.5V40a2 2 0 0 1-2 2H15a5 5 0 0 1-5-5V11a5 5 0 0 1 5-5Z" /><path d="M28 7v9h9M24 18v14m0 0-5-5m5 5 5-5M17 36h14" /></svg>
+                  <strong id="resumeImportFile">Choose resume</strong>
+                </div>
+              </div>
+              <div class="importDocumentSlotDemo">
+                <div class="importDocumentSlotHeaderDemo"><strong>Cover letter</strong><span>Optional</span></div>
+                <div class="importDropzoneDemo">
+                  <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M15 6h13.5L38 15.5V40a2 2 0 0 1-2 2H15a5 5 0 0 1-5-5V11a5 5 0 0 1 5-5Z" /><path d="M28 7v9h9M24 18v14m0 0-5-5m5 5 5-5M17 36h14" /></svg>
+                  <strong>Choose cover letter</strong>
+                </div>
+              </div>
+            </div>
+            <div class="importDialogActionsDemo">
+              <span>Cancel</span>
+              <strong id="importActionLabel">Import resume</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene scene--edit" id="sceneEdit">
+        <div class="appFrame appFrame--wide" id="editFrame">
+          <div class="appFrameChrome">
+            <div class="traffic"><i></i><i></i><i></i></div>
+            <div class="address">resumeloomr.app / Resume 1</div>
+          </div>
+          <div class="appFrameViewport">
+            <img src="./assets/workspace_populated.png" alt="ResumeLoomr populated resume workspace" />
+            <div class="demoSyncPill"><span>&#10003;</span> Saved locally</div>
+            <div class="previewNameEdit" id="previewNameEdit"><strong id="previewNameValue">Erlich Bachman</strong><i></i></div>
+          </div>
+        </div>
+        <div class="floatingCopy floatingCopy--edit">
+          <div class="eyebrow">02 / TAILOR</div>
+          <h2>Every line<br />stays editable.</h2>
+          <p>Click the preview and write where the change belongs.</p>
+        </div>
+      </section>
+
+      <section class="scene scene--layout" id="sceneLayout">
+        <div class="copyBlock copyBlock--right">
+          <div class="eyebrow">03 / SHAPE</div>
+          <h2>Move the structure.<br />Not just the text.</h2>
+          <p>Reorder sections, entries, bullets, and the details inside each role.</p>
+        </div>
+        <div class="appFrame appFrame--layout" id="layoutFrame">
+          <div class="appFrameChrome">
+            <div class="traffic"><i></i><i></i><i></i></div>
+            <div class="address">Live preview layout</div>
+          </div>
+          <div class="appFrameViewport">
+            <img src="./assets/header_layout_hover.png" alt="ResumeLoomr role header layout controls" />
+            <div class="demoSyncPill"><span>&#10003;</span> Saved locally</div>
+          </div>
+        </div>
+        <div class="layoutDemo" id="layoutDemo" aria-hidden="true">
+          <div class="layoutLine">
+            <span class="layoutChip layoutChip--org">Aviato</span>
+            <span class="layoutSlot layoutSlot--target"></span>
+            <span class="layoutChip layoutChip--location">San Francisco, CA</span>
+          </div>
+          <div class="layoutLine">
+            <span class="layoutChip layoutChip--role" id="roleChip">Founder &amp; CEO</span>
+            <span class="layoutSlot"></span>
+            <span class="layoutChip layoutChip--date">2018-2020</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene scene--margins" id="sceneMargins">
+        <div class="copyBlock copyBlock--left copyBlock--margins">
+          <div class="eyebrow">04 / FIT</div>
+          <h2>Tune the page<br />where you see it.</h2>
+          <p>Adjust margins and spacing directly on the live document, without guessing.</p>
+        </div>
+        <div class="appFrame appFrame--margins" id="marginFrame">
+          <div class="appFrameChrome">
+            <div class="traffic"><i></i><i></i><i></i></div>
+            <div class="address">One-page fit</div>
+          </div>
+          <div class="appFrameViewport">
+            <img src="./assets/margin_controls.png" alt="ResumeLoomr live margin controls" />
+            <div class="demoSyncPill"><span>&#10003;</span> Saved locally</div>
+          </div>
+        </div>
+        <div class="marginBadge" id="marginBadge"><b>+</b><span>0</span><b>-</b></div>
+      </section>
+
+      <section class="scene scene--organize" id="sceneOrganize">
+        <div class="floatingCopy floatingCopy--organize">
+          <div class="eyebrow">05 / ORGANIZE</div>
+          <h2>One workspace.<br />Every opportunity.</h2>
+          <p>Keep tailored versions together in folders that move as smoothly as the work does.</p>
+        </div>
+        <div class="appFrame appFrame--organize" id="organizeFrame">
+          <div class="appFrameChrome">
+            <div class="traffic"><i></i><i></i><i></i></div>
+            <div class="address">Application workspace</div>
+          </div>
+          <div class="appFrameViewport organizeViewport">
+            <img class="organizeClosed" id="organizeClosed" src="./assets/workspace_folders.png" alt="Resume folders" />
+            <img class="organizeOpen" id="organizeOpen" src="./assets/folder_open.png" alt="Open resume folder" />
+            <div class="demoSyncPill"><span>&#10003;</span> Saved locally</div>
+          </div>
+        </div>
+        <div class="folderCallout" id="folderCallout"><span></span> Product engineering <b>3</b></div>
+      </section>
+
+      <section class="scene scene--cover" id="sceneCover">
+        <div class="copyBlock copyBlock--cover">
+          <div class="eyebrow">06 / COMPLETE</div>
+          <h2>Add the letter<br />that belongs with it.</h2>
+          <p>Shared details stay linked. The message stays specific to the role.</p>
+        </div>
+        <div class="appFrame appFrame--coverChoice" id="coverChoiceFrame">
+          <div class="appFrameChrome"><div class="traffic"><i></i><i></i><i></i></div><div class="address">Choose a cover letter</div></div>
+          <div class="appFrameViewport appFrameViewport--coverChoice"><img src="./assets/cover_template.png" alt="Cover letter template picker" /></div>
+        </div>
+        <div class="appFrame appFrame--coverEditor" id="coverEditorFrame">
+          <div class="appFrameChrome"><div class="traffic"><i></i><i></i><i></i></div><div class="address">Attached to Resume 11</div></div>
+          <div class="appFrameViewport appFrameViewport--coverEditor"><img src="./assets/cover_letter_full.png" alt="ResumeLoomr cover letter editor with the complete letter visible" /></div>
+        </div>
+        <div class="coverLetterSheet" id="coverLetterSheet">
+          <img src="./assets/cover_letter_page.png" alt="Complete ResumeLoomr cover letter" />
+          <div class="coverAttachmentBadge"><span>&#10003;</span> Attached to Resume 11</div>
+        </div>
+      </section>
+
+      <section class="scene scene--final" id="sceneFinal">
+        <div class="documentFan" aria-hidden="true">
+          <div class="documentCard documentCard--resume"><img src="./assets/resume_light.png" alt="" /></div>
+          <div class="documentCard documentCard--letter"><img src="./assets/cover_letter_page.png" alt="" /></div>
+        </div>
+        <div class="finalMark">
+          <img src="../public/loomr-logo-light.png" alt="ResumeLoomr" />
+          <h2>Build. Tailor. Organize.</h2>
+          <p>Your resume and cover letter, woven into one application workspace.</p>
+          <div class="finalPill"><span></span> ResumeLoomr</div>
+        </div>
+      </section>
+
+      <div class="cursor" id="cursor" aria-hidden="true">
+        <svg viewBox="0 0 34 42"><path d="M3 2.5 29 24l-12.1 1.7 6.4 11.2-6.2 3.5-6.2-11.2L3 37.1Z" /></svg>
+        <span></span>
+      </div>
+      <div class="progress" aria-hidden="true"><span id="progressBar"></span></div>
+    </main>
+    <script src="./timeline.js"></script>
+  </body>
+</html>
