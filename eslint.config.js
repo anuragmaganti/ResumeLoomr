@@ -47,6 +47,21 @@ export default defineConfig([
     },
   },
   {
+    files: ['promo/timeline.js'],
+    languageOptions: {
+      globals: globals.browser,
+    },
+  },
+  {
+    files: ['promo/render.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+      },
+    },
+  },
+  {
     files: [
       'api/**/*.js',
       'server/**/*.js',

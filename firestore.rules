@@ -23,11 +23,7 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    match /users/{uid}/coverLetterTombstones/{coverLetterId} {
-      allow read: if isOwner(uid);
-      allow write: if false;
-    }
-
+    // Tombstones, sync cursors, and unknown documents are server-only.
     match /{document=**} {
       allow read, write: if false;
     }
