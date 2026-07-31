@@ -38,13 +38,6 @@
   align-items: center;
 }
 
-.resumeTailoringIntro {
-  margin: 7px 0 15px;
-  color: var(--color-text-subtle);
-  font-size: 0.78rem;
-  line-height: 1.45;
-}
-
 .resumeTailoringForm,
 .resumeTailoringSourcePanel {
   display: grid;
@@ -199,10 +192,9 @@
 }
 
 .resumeTailoringPrivacy {
-  padding: 9px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-muted);
+  justify-self: center;
+  max-width: 90%;
+  text-align: center;
 }
 
 .resumeTailoringActions {

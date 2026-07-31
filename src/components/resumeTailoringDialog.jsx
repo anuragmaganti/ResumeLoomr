@@ -94,15 +94,9 @@ export default function ResumeTailoringDialog({
         aria-labelledby="resume-tailoring-title"
       >
         <div className="authDialogHeader resumeTailoringHeader">
-          <div>
-            <p className="authEyebrow">AI suggestions</p>
-            <h2 id="resume-tailoring-title">Tailor resume to a job</h2>
-          </div>
+          <h2 id="resume-tailoring-title">Tailor your resume to a job</h2>
           <button type="button" className="authCloseButton" onClick={onClose} aria-label="Close" disabled={busy}>×</button>
         </div>
-        <p className="resumeTailoringIntro">
-          Add one job listing. Nothing changes until you approve suggestions in the preview.
-        </p>
 
         <form className="resumeTailoringForm" onSubmit={handleSubmit}>
           <div className="resumeTailoringSourceTabs" role="tablist" aria-label="Job listing source">
