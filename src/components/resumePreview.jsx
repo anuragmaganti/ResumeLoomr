@@ -96,6 +96,7 @@ import {
     useWrappedEntryHeaderSeparators,
 } from './useResumePreviewLayout.js';
 import ThemedSwitch from './themedSwitch.jsx';
+import { TailoringReviewDock } from './resumeTailoringReview.jsx';
 
 function templateClassName(template) {
     return `resumePage--${template}`;
@@ -262,6 +263,13 @@ export default function ResumePreview({
     onAddCoverLetter,
     onToggleSampleInformation,
     onDismissSampleInformation,
+    tailoringReview,
+    tailoringChangeByPath,
+    onTailoringChangeOpen,
+    onTailoringApproveAll,
+    onTailoringRejectAll,
+    onTailoringApply,
+    onTailoringCancel,
 }) {
     const resumeRef = useRef(null);
     const previewFrameRef = useRef(null);
@@ -280,7 +288,8 @@ export default function ResumePreview({
     const [isPersonalChromeActive, setIsPersonalChromeActive] = useState(false);
     const [summaryWidthDrag, setSummaryWidthDrag] = useState(null);
     const isPreviewDragActive = Boolean(activeDragMeta?.type);
-    const canShowHeaderLayoutHover = !activeDragMeta?.type || activeDragMeta.type === 'headerSlot';
+    const isTailoringReviewActive = Boolean(tailoringReview?.changes?.length);
+    const canShowHeaderLayoutHover = !isTailoringReviewActive && (!activeDragMeta?.type || activeDragMeta.type === 'headerSlot');
     const presentationVars = useMemo(() => getResumePresentationVars(settings, template), [settings, template]);
     const printPageRule = useMemo(() => getResumePrintPageRule(settings, template), [settings, template]);
     const pageMetrics = useResumePreviewPageMetrics({
@@ -537,7 +546,12 @@ export default function ResumePreview({
         return entryTarget(block.id, entry.id, getEntryContainerField(block, entry, fallbackField));
     }
 
-    function renderTextWithCaret(value, path, { prefix = '', suffix = '', fallback = '' } = {}) {
+    function renderTextWithCaret(value, path, {
+        prefix = '',
+        suffix = '',
+        fallback = '',
+        tailoringChange: explicitTailoringChange = null,
+    } = {}) {
         const text = value === undefined || value === null ? '' : String(value);
         const displayText = text || fallback;
         const hasUserCaretValue = typeof activeEditorCaret?.value === 'string' && activeEditorCaret.value.length > 0;
@@ -560,7 +574,7 @@ export default function ResumePreview({
             ? (caretText || fallback)
             : displayText;
 
-        return (
+        const content = (
             <>
                 {prefix ? (
                     <span data-preview-caret-decoration="prefix">{prefix}</span>
@@ -588,6 +602,32 @@ export default function ResumePreview({
                     <span data-preview-caret-decoration="suffix">{suffix}</span>
                 ) : null}
             </>
+        );
+        const tailoringChange = explicitTailoringChange || tailoringChangeByPath?.get(path);
+
+        if (!tailoringChange) return content;
+
+        function openTailoringChange(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            onTailoringChangeOpen?.(tailoringChange.id, event.currentTarget.getBoundingClientRect());
+        }
+
+        return (
+            <span
+                className={`tailoringPreviewChange tailoringPreviewChange--${tailoringChange.operation} is-${tailoringChange.decision}`}
+                data-tailoring-change-id={tailoringChange.id}
+                data-preview-no-drag="true"
+                role="button"
+                tabIndex="0"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={openTailoringChange}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') openTailoringChange(event);
+                }}
+            >
+                {content}
+            </span>
         );
     }
 
@@ -682,7 +722,11 @@ export default function ResumePreview({
             return;
         }
 
-        if (!onEditTarget) {
+        if (event.target.closest('[data-tailoring-change-id]')) {
+            return;
+        }
+
+        if (!onEditTarget || isTailoringReviewActive) {
             return;
         }
 
@@ -1113,6 +1157,7 @@ export default function ResumePreview({
         const normalizedItems = items.map((item, index) => ({
             text: getPreviewBulletText(item),
             sourceIndex: getPreviewBulletSourceIndex(item, index),
+            tailoringChange: item?.tailoringChange || null,
         }));
         const bulletIds = normalizedItems.map((item) => bulletDragId(sectionId, entryId, field, item.sourceIndex));
         const bulletList = (
@@ -1122,7 +1167,7 @@ export default function ResumePreview({
 
                     return sortable ? (
                             <SortablePreviewBullet
-                                key={`${entryId}-${field}-${item.sourceIndex}`}
+                                key={item.tailoringChange?.id || `${entryId}-${field}-${item.sourceIndex}`}
                                 sectionId={sectionId}
                                 entryId={entryId}
                                 field={field}
@@ -1130,14 +1175,14 @@ export default function ResumePreview({
                                 editProps={createTarget ? createTarget(item.sourceIndex) : {}}
                                 previewScale={pageMetrics.scale}
                             >
-                                {renderTextWithCaret(item.text, bulletPath)}
+                                {renderTextWithCaret(item.text, bulletPath, { tailoringChange: item.tailoringChange })}
                             </SortablePreviewBullet>
                         ) : (
                             <StaticPreviewBullet
-                                key={`${entryId}-${field}-${item.sourceIndex}`}
+                                key={item.tailoringChange?.id || `${entryId}-${field}-${item.sourceIndex}`}
                                 editProps={createTarget ? createTarget(item.sourceIndex) : {}}
                             >
-                                {renderTextWithCaret(item.text, bulletPath)}
+                                {renderTextWithCaret(item.text, bulletPath, { tailoringChange: item.tailoringChange })}
                             </StaticPreviewBullet>
                         );
                 })}
@@ -2005,16 +2050,27 @@ export default function ResumePreview({
                                 >
                                     {renderTextWithCaret(entry.category, sectionEntryEditorPath(block.id, entry.id, 'category'))}
                                 </span>
-                                {entry.items && <span className="skillGroupSeparator">: </span>}
+                                {(entry.items || entry.tailoringSkillItems?.length) && <span className="skillGroupSeparator">: </span>}
                             </>
                         )}
-                        {entry.items && (
+                        {(entry.items || entry.tailoringSkillItems?.length) && (
                             <span
                                 className="skillGroupItems"
                                 {...entryTarget(block.id, entry.id, 'items')}
                                 {...(!entry.category ? entryHandleProps : {})}
                             >
-                                {renderTextWithCaret(entry.items, sectionEntryEditorPath(block.id, entry.id, 'items'))}
+                                {entry.tailoringSkillItems?.length
+                                    ? entry.tailoringSkillItems.map((item, index) => (
+                                        <Fragment key={item.tailoringChange?.id || `${entry.id}-skill-${item.sourceIndex ?? index}`}>
+                                            {index > 0 ? ', ' : ''}
+                                            {renderTextWithCaret(
+                                                item.text,
+                                                sectionEntryEditorPath(block.id, entry.id, 'items'),
+                                                { tailoringChange: item.tailoringChange },
+                                            )}
+                                        </Fragment>
+                                    ))
+                                    : renderTextWithCaret(entry.items, sectionEntryEditorPath(block.id, entry.id, 'items'))}
                             </span>
                         )}
                     </>
@@ -2397,7 +2453,7 @@ export default function ResumePreview({
     );
     const orderedSections = [
         renderPersonalSection({ showSeparator: visibleSectionBlocks.length > 0 }),
-        isHeaderLayoutModeActive ? (
+        isHeaderLayoutModeActive || isTailoringReviewActive ? (
             visibleSectionBlocks.map((block, index) => {
                 const showSeparator = sectionSeparatorPosition === 'belowSectionName'
                     ? true
@@ -2463,7 +2519,7 @@ export default function ResumePreview({
                             <div className="previewPageScaleLayer">
                                 <div
                                     ref={resumeRef}
-                                    className={`resumePage ${templateClassName(template)}${isSamplePreview ? ' resumePage--sample' : ''}${isHeaderLayoutModeActive ? ' resumePage--headerLayoutMode' : ''}${isPreviewDragActive ? ' resumePage--dragging' : ''}${isPersonalChromeActive ? ' resumePage--personalChromeActive' : ''}`}
+                                    className={`resumePage ${templateClassName(template)}${isSamplePreview ? ' resumePage--sample' : ''}${isHeaderLayoutModeActive ? ' resumePage--headerLayoutMode' : ''}${isPreviewDragActive ? ' resumePage--dragging' : ''}${isPersonalChromeActive ? ' resumePage--personalChromeActive' : ''}${isTailoringReviewActive ? ' resumePage--tailoringReview' : ''}`}
                                     style={presentationVars}
                                     onClick={handlePreviewClick}
                                     onPointerMoveCapture={captureResumePagePointer}
@@ -2472,7 +2528,7 @@ export default function ResumePreview({
                                     onPointerDownCapture={handlePreviewDragHandleCapture}
                                     onKeyDownCapture={handlePreviewDragHandleCapture}
                                 >
-                                    {previewModel.showPersonal && previewModel.hasContent ? (
+                                    {previewModel.showPersonal && previewModel.hasContent && !isTailoringReviewActive ? (
                                         <PersonalAlignmentControls
                                             activeAlignment={personalAlignment}
                                             onAlignmentChange={handlePersonalAlignmentChange}
@@ -2480,13 +2536,13 @@ export default function ResumePreview({
                                     ) : null}
                                     <PreviewMarginControls
                                         settings={settings}
-                                        hidden={showEmptyResumeChoice}
+                                        hidden={showEmptyResumeChoice || isTailoringReviewActive}
                                         onAdjustSetting={onAdjustSetting}
                                         onInteraction={suppressNextPreviewClick}
                                     />
                                     {previewModel.hasContent ? (
                                         <DndContext
-                                            sensors={sensors}
+                                            sensors={isTailoringReviewActive ? [] : sensors}
                                             measuring={previewDragMeasuring}
                                             collisionDetection={(args) => previewCollisionDetection(
                                                 args,
@@ -2498,7 +2554,7 @@ export default function ResumePreview({
                                             onDragEnd={handlePreviewDragEnd}
                                         >
                                             <SampleInformationToggle
-                                                enabled={showSampleInformationToggle}
+                                                enabled={showSampleInformationToggle && !isTailoringReviewActive}
                                                 personalAlignment={personalAlignment}
                                                 showSampleInformation={showSampleInformation}
                                                 onToggleSampleInformation={onToggleSampleInformation}
@@ -2539,6 +2595,15 @@ export default function ResumePreview({
                             />
                         </div>
                     </div>
+                    {isTailoringReviewActive && !isPrintRendering ? (
+                        <TailoringReviewDock
+                            review={tailoringReview}
+                            onApproveAll={onTailoringApproveAll}
+                            onRejectAll={onTailoringRejectAll}
+                            onApply={onTailoringApply}
+                            onCancel={onTailoringCancel}
+                        />
+                    ) : null}
                 </div>
             </section>
             <MobilePreviewEditorProxy

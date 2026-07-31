@@ -21,6 +21,8 @@ import {
 import SeparatorSettingsPopup from './components/separatorSettingsPopup';
 import NoticeToast from './components/noticeToast.jsx';
 import ResumeConflictBanner from './components/resumeConflictBanner.jsx';
+import ResumeTailoringDialog from './components/resumeTailoringDialog.jsx';
+import { TailoringChangePopover } from './components/resumeTailoringReview.jsx';
 import { useResumeBuilder } from './hooks/useResumeBuilder.js';
 import { useFirebaseAuth } from './hooks/useFirebaseAuth.js';
 import { useAccountSwitchGate } from './hooks/useAccountSwitchGate.js';
@@ -29,6 +31,7 @@ import { useCoverLetterPreviewEditorController } from './hooks/useCoverLetterPre
 import { useSeparatorSettingsController } from './hooks/useSeparatorSettingsController.js';
 import { useSignOutController } from './hooks/useSignOutController.js';
 import { useResumeImportController } from './hooks/useResumeImportController.js';
+import { useResumeTailoringController } from './hooks/useResumeTailoringController.js';
 import { useAppTheme } from './hooks/useAppTheme.js';
 import { useEditorStageMaxHeight } from './hooks/useEditorStageMaxHeight.js';
 import { useResumePrint } from './hooks/useResumePrint.js';
@@ -44,6 +47,7 @@ import {
   createMixedSampleCoverLetterModel,
   createSampleCoverLetterPlaceholderResolver,
 } from './lib/sampleCoverLetters.js';
+import { createTailoringPreviewModel } from './lib/resumeTailoring.js';
 
 const EMPTY_SAMPLE_ORDER_OVERRIDES = {};
 
@@ -279,6 +283,22 @@ function App() {
     importDocuments,
     showNotice,
   });
+  const tailoring = useResumeTailoringController({
+    actions,
+    activeDocumentType,
+    activeResumeId,
+    authUser: auth.user,
+    openAuthModal: auth.openAuthModal,
+    resume,
+    showNotice,
+  });
+  const tailoringPreview = useMemo(
+    () => createTailoringPreviewModel(displayPreviewModel, tailoring.review),
+    [displayPreviewModel, tailoring.review],
+  );
+  const resumePreviewModel = isPrintRendering
+    ? displayPreviewModel
+    : tailoringPreview.previewModel;
 
   const handlePreviewLayoutChange = useCallback((nextLayout) => {
     setPreviewLayout((currentLayout) => (
@@ -383,6 +403,9 @@ function App() {
           authUser={auth.user}
           authReady={auth.authReady}
           firebaseEnabled={auth.firebaseEnabled}
+          canTailorResume={tailoring.canTailor}
+          isTailoringResume={tailoring.isGenerating}
+          onTailorResume={tailoring.openDialog}
           onOpenAuth={auth.openAuthModal}
           onSignOut={handleSignOut}
         />
@@ -406,6 +429,23 @@ function App() {
           onClose={closeImportResume}
           onUpload={handleImportResumeUpload}
           onImportSuccessful={importSuccessfulDocument}
+        />
+
+        {tailoring.isDialogOpen ? (
+          <ResumeTailoringDialog
+            isOpen
+            busy={tailoring.isGenerating}
+            error={tailoring.error}
+            onClose={tailoring.closeDialog}
+            onSubmit={tailoring.generateSuggestions}
+          />
+        ) : null}
+
+        <TailoringChangePopover
+          review={tailoring.review}
+          activeChange={tailoring.activeChange}
+          onDecision={tailoring.setDecision}
+          onClose={tailoring.closeChange}
         />
 
         {coverLetterCreateRequest ? (
@@ -582,7 +622,7 @@ function App() {
               <ResumePreview
               resume={resume}
               resumeId={activeResumeId}
-              previewModel={displayPreviewModel}
+              previewModel={resumePreviewModel}
               template={template}
               settings={resume.settings}
               isSamplePreview={isSamplePreview}
@@ -619,6 +659,13 @@ function App() {
               onAddCoverLetter={() => handleRequestCoverLetter(activeResumeId)}
               onToggleSampleInformation={actions.setSampleInformationVisible}
               onDismissSampleInformation={actions.dismissSampleInformation}
+              tailoringReview={tailoring.review}
+              tailoringChangeByPath={tailoringPreview.changeByPath}
+              onTailoringChangeOpen={tailoring.openChange}
+              onTailoringApproveAll={() => tailoring.setAllDecisions('approved')}
+              onTailoringRejectAll={() => tailoring.setAllDecisions('rejected')}
+              onTailoringApply={tailoring.applyReview}
+              onTailoringCancel={tailoring.cancelReview}
               />
             )}
           </div>

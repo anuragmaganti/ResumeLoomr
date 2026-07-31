@@ -33,6 +33,7 @@ import {
   updateSectionTitle,
 } from './resume.js';
 import { materializeAndReorderSectionBlockEntries } from './resumeSampleProjection.js';
+import { applyApprovedTailoringChanges } from './resumeTailoring.js';
 
 export function createResumeEditorActions({
   updateResume,
@@ -71,6 +72,9 @@ export function createResumeEditorActions({
     },
     setSectionEntryHeaderLayout(sectionId, layout) {
       updateResume((resume) => setSectionEntryHeaderLayout(resume, sectionId, layout));
+    },
+    applyTailoringReview(review) {
+      updateResume((resume) => applyApprovedTailoringChanges(resume, review));
     },
     startFromScratch() {
       updateResume((resume) => updateSampleDisplay(resume, { hasStarted: true }));

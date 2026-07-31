@@ -5,6 +5,7 @@ import importDocumentHandler from '../api/import-document.js';
 import importResumeHandler from '../api/import-resume.js';
 import syncSessionHandler from '../api/sync-session.js';
 import syncWorkspaceHandler from '../api/sync-workspace.js';
+import tailorResumeHandler from '../api/tailor-resume.js';
 
 function createResponse() {
   const headers = new Map();
@@ -38,6 +39,7 @@ test('deployed API routes reject unsupported methods before authentication', asy
   await expectMethodNotAllowed(importResumeHandler, 'GET', 'POST');
   await expectMethodNotAllowed(syncSessionHandler, 'PATCH', 'POST, DELETE');
   await expectMethodNotAllowed(syncWorkspaceHandler, 'DELETE', 'GET, POST');
+  await expectMethodNotAllowed(tailorResumeHandler, 'GET', 'POST');
 });
 
 test('deleting a sync session clears the private HTTP-only cookie', async () => {

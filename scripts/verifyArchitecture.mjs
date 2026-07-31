@@ -22,6 +22,7 @@ const ENTRYPOINTS = [
   'api/import-resume.js',
   'api/sync-session.js',
   'api/sync-workspace.js',
+  'api/tailor-resume.js',
   'public/sync-worker.js',
 ];
 const SERVER_ENTRYPOINTS = ENTRYPOINTS.filter((path) => path.startsWith('api/'));

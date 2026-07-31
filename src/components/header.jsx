@@ -28,6 +28,15 @@ function AccountIcon({ signedIn }) {
   );
 }
 
+function TailorIcon() {
+  return (
+    <svg className="topbarActionIcon" aria-hidden="true" viewBox="0 0 20 20" focusable="false">
+      <path d="m10 2 .7 2.4a4 4 0 0 0 2.8 2.8L16 8l-2.5.8a4 4 0 0 0-2.8 2.8L10 14l-.7-2.4a4 4 0 0 0-2.8-2.8L4 8l2.5-.8a4 4 0 0 0 2.8-2.8L10 2Z" />
+      <path d="m15.5 13 .35 1.15a2 2 0 0 0 1.15 1.2l1 .35-1 .35a2 2 0 0 0-1.15 1.2l-.35 1.15-.35-1.15A2 2 0 0 0 14 16.05l-1-.35 1-.35a2 2 0 0 0 1.15-1.2L15.5 13Z" />
+    </svg>
+  );
+}
+
 export default function Header({
   onPrint,
   resumeList,
@@ -53,6 +62,9 @@ export default function Header({
   authUser,
   authReady,
   firebaseEnabled,
+  canTailorResume,
+  isTailoringResume,
+  onTailorResume,
   onOpenAuth,
   onSignOut,
 }) {
@@ -67,6 +79,18 @@ export default function Header({
 
         <div className="topbarSide">
           <div className="topbarMeta">
+            {activeDocumentType === 'resume' ? (
+              <button
+                type="button"
+                className="button buttonSecondary tailorResumeButton"
+                onClick={onTailorResume}
+                disabled={!canTailorResume || isTailoringResume}
+                title={canTailorResume ? 'Create reviewable suggestions for a job listing' : 'Add resume content first'}
+              >
+                <TailorIcon />
+                {isTailoringResume ? 'Tailoring…' : 'Tailor to a job'}
+              </button>
+            ) : null}
             <button type="button" className="button buttonSecondary printButton" onClick={onPrint}>
               <PrintIcon />
               Print/Save

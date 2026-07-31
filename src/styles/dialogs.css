@@ -28,6 +28,204 @@
   width: min(480px, 100%);
 }
 
+.resumeTailoringDialog {
+  width: min(610px, 100%);
+  padding: 20px;
+  border-radius: var(--radius-dialog);
+}
+
+.resumeTailoringHeader {
+  align-items: center;
+}
+
+.resumeTailoringIntro {
+  margin: 7px 0 15px;
+  color: var(--color-text-subtle);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.resumeTailoringForm,
+.resumeTailoringSourcePanel {
+  display: grid;
+  gap: 12px;
+}
+
+.resumeTailoringSourceTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-item);
+  background: var(--color-surface-muted);
+}
+
+.resumeTailoringSourceTabs button {
+  min-height: 32px;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--color-text-subtle);
+  font-size: 0.74rem;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.resumeTailoringSourceTabs button.isActive {
+  background: var(--color-surface-elevated);
+  color: var(--color-text);
+  box-shadow: var(--shadow-xs);
+}
+
+.resumeTailoringField {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-subtle);
+  font-size: 0.73rem;
+  font-weight: 760;
+}
+
+.resumeTailoringField > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.resumeTailoringField small {
+  color: var(--color-text-muted);
+  font-size: 0.65rem;
+  font-weight: 650;
+}
+
+.resumeTailoringField input,
+.resumeTailoringField textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-item);
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.45;
+  outline: none;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.resumeTailoringField input {
+  min-height: 40px;
+  padding: 0 11px;
+}
+
+.resumeTailoringField textarea {
+  min-height: 78px;
+  padding: 9px 11px;
+  resize: vertical;
+}
+
+.resumeTailoringField input:focus,
+.resumeTailoringField textarea:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.resumeTailoringFile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 12px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.resumeTailoringFile.hasFile {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent-soft) 38%, var(--color-surface));
+}
+
+.resumeTailoringFile input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.resumeTailoringFileIcon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-elevated);
+  color: var(--color-accent-strong);
+  box-shadow: var(--shadow-xs);
+}
+
+.resumeTailoringFileIcon svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.45;
+}
+
+.resumeTailoringFile > span:last-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.resumeTailoringFile strong {
+  overflow: hidden;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resumeTailoringFile small,
+.resumeTailoringPrivacy {
+  color: var(--color-text-muted);
+  font-size: 0.66rem;
+  line-height: 1.4;
+}
+
+.resumeTailoringPrivacy {
+  padding: 9px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+}
+
+.resumeTailoringActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.resumeTailoringActions .button {
+  min-height: 36px;
+  font-size: 0.75rem;
+}
+
+@media screen and (max-width: 640px) {
+  .resumeTailoringOverlay { padding: 10px; }
+  .resumeTailoringDialog {
+    max-height: calc(100dvh - 20px);
+    padding: 16px;
+    overflow: auto;
+  }
+  .resumeTailoringActions .button { flex: 1; }
+}
+
 .settingsLauncher {
   position: fixed;
   left: 18px;

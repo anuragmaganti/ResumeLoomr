@@ -62,6 +62,244 @@ html[data-theme="dark"] .resumePage {
   --preview-edit-pulse-ring: color-mix(in srgb, #93c5fd 28%, transparent);
 }
 
+.tailoringPreviewChange {
+  padding: 1px 2px;
+  margin: -1px -2px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-accent-soft) 72%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--color-accent) 55%, transparent);
+  cursor: pointer;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.tailoringPreviewChange:hover,
+.tailoringPreviewChange:focus-visible {
+  background: color-mix(in srgb, var(--color-accent-soft) 100%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--color-accent) 72%, transparent);
+  outline: none;
+}
+
+.tailoringPreviewChange.is-approved {
+  background: color-mix(in srgb, var(--color-success-soft) 82%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--color-success) 62%, transparent);
+}
+
+.tailoringPreviewChange--add::before {
+  content: "+";
+  margin-right: 2px;
+  color: var(--color-success);
+  font-weight: 800;
+}
+
+.tailoringPreviewChange--remove {
+  background: color-mix(in srgb, var(--color-error-soft) 82%, transparent);
+  color: color-mix(in srgb, var(--resume-page-muted) 72%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: var(--color-error);
+}
+
+.tailoringReviewDock {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(520px, calc(100% - 24px));
+  padding: 8px 9px 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, var(--color-border));
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-popover-bg) 96%, transparent);
+  color: var(--color-text);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(10px);
+}
+
+.tailoringReviewDockCopy {
+  display: grid;
+  gap: 2px;
+  min-width: 118px;
+  margin-right: auto;
+}
+
+.tailoringReviewDockCopy strong {
+  font-size: 0.73rem;
+  line-height: 1.2;
+}
+
+.tailoringReviewDockCopy span {
+  color: var(--color-text-muted);
+  font-size: 0.63rem;
+}
+
+.tailoringReviewDockActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tailoringReviewDock .button {
+  min-height: 30px;
+  padding-inline: 10px;
+  border-radius: var(--radius-small);
+  font-size: 0.68rem;
+}
+
+.tailoringDockTextButton,
+.tailoringDockClose {
+  min-height: 28px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-subtle);
+  font-size: 0.65rem;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.tailoringDockTextButton:hover { color: var(--color-accent-strong); }
+
+.tailoringDockClose {
+  width: 26px;
+  padding: 0;
+  border-radius: var(--radius-small);
+  font-size: 1rem;
+}
+
+.tailoringDockClose:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+.tailoringChangePopover {
+  position: fixed;
+  z-index: 1300;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 24%, var(--color-border));
+  border-radius: var(--radius-popover);
+  background: var(--color-popover-bg);
+  color: var(--color-text);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+}
+
+.tailoringChangeHeader,
+.tailoringChangeActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tailoringChangeLabels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tailoringChangeLabels span {
+  padding: 4px 6px;
+  border-radius: var(--radius-capsule);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-size: 0.59rem;
+  font-weight: 760;
+}
+
+.tailoringChangeHeader > button {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.tailoringChangeHeader > button:hover { background: var(--color-surface-muted); }
+
+.tailoringChangeDiff {
+  display: grid;
+  gap: 6px;
+}
+
+.tailoringChangeDiff > div {
+  padding: 8px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+}
+
+.tailoringChangeDiff > div:last-child {
+  border-color: color-mix(in srgb, var(--color-accent) 28%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent-soft) 36%, var(--color-surface));
+}
+
+.tailoringChangeDiff span {
+  color: var(--color-text-muted);
+  font-size: 0.57rem;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tailoringChangeDiff p,
+.tailoringChangeNote {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.tailoringChangeNote {
+  color: var(--color-text-subtle);
+}
+
+.tailoringChangeActions {
+  justify-content: flex-end;
+}
+
+.tailoringChangeActions .button {
+  min-height: 32px;
+  padding-inline: 12px;
+  font-size: 0.7rem;
+}
+
+.tailoringDecisionButton--approve:hover,
+.tailoringDecisionButton--approve.isSelected {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+.tailoringDecisionButton--reject.isSelected {
+  border-color: color-mix(in srgb, var(--color-error) 42%, var(--color-border));
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}
+
+@media screen and (max-width: 720px) {
+  .tailoringReviewDock {
+    position: fixed;
+    top: auto;
+    right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    left: 10px;
+    width: auto;
+    flex-wrap: wrap;
+  }
+  .tailoringReviewDockActions { margin-left: auto; }
+  .tailoringDockTextButton { display: none; }
+}
+
 .resumePageContent {
   position: relative;
   z-index: 1;
@@ -2222,6 +2460,8 @@ html[data-theme="dark"] .personalSection {
   .sampleInformationToggle,
   .previewAttachedControl,
   .sectionSeparatorControl,
+  .tailoringReviewDock,
+  .tailoringChangePopover,
   .resumeEmptyChoiceOverlay,
   .resumeEmptyState {
     display: none !important;

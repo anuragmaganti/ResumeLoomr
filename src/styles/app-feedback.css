@@ -35,6 +35,21 @@
   color: var(--color-accent-strong);
 }
 
+.topbarMeta .tailorResumeButton {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent-soft) 62%, transparent);
+  color: var(--color-accent-strong);
+}
+
+.button.tailorResumeButton {
+  min-height: 34px;
+  padding-inline: 11px;
+  border-radius: var(--radius-control);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .topbarMeta .button:not(:disabled):hover {
   border-color: color-mix(in srgb, var(--color-accent) 34%, var(--color-border));
   background: color-mix(in srgb, var(--color-accent-soft) 62%, transparent);
