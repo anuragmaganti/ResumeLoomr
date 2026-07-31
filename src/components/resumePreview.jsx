@@ -96,7 +96,7 @@ import {
     useWrappedEntryHeaderSeparators,
 } from './useResumePreviewLayout.js';
 import ThemedSwitch from './themedSwitch.jsx';
-import { TailoringReviewDock } from './resumeTailoringReview.jsx';
+import { TailoringChangeText, TailoringReviewDock } from './resumeTailoringReview.jsx';
 
 function templateClassName(template) {
     return `resumePage--${template}`;
@@ -603,31 +603,13 @@ export default function ResumePreview({
                 ) : null}
             </>
         );
-        const tailoringChange = explicitTailoringChange || tailoringChangeByPath?.get(path);
-
-        if (!tailoringChange) return content;
-
-        function openTailoringChange(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            onTailoringChangeOpen?.(tailoringChange.id, event.currentTarget.getBoundingClientRect());
-        }
-
         return (
-            <span
-                className={`tailoringPreviewChange tailoringPreviewChange--${tailoringChange.operation} is-${tailoringChange.decision}`}
-                data-tailoring-change-id={tailoringChange.id}
-                data-preview-no-drag="true"
-                role="button"
-                tabIndex="0"
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={openTailoringChange}
-                onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') openTailoringChange(event);
-                }}
+            <TailoringChangeText
+                change={explicitTailoringChange || tailoringChangeByPath?.get(path)}
+                onOpen={onTailoringChangeOpen}
             >
                 {content}
-            </span>
+            </TailoringChangeText>
         );
     }
 

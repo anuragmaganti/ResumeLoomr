@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { trapTabKey } from '../lib/focusTrap.js';
+import { useDialogKeyboard } from '../hooks/useDialogKeyboard.js';
 import {
   JOB_LISTING_FILE_ACCEPT,
   JOB_LISTING_FILE_MAX_MEGABYTES,
@@ -17,7 +17,6 @@ const SOURCE_OPTIONS = [
 ];
 
 export default function ResumeTailoringDialog({
-  isOpen,
   busy,
   error,
   onClose,
@@ -31,54 +30,37 @@ export default function ResumeTailoringDialog({
   const [instructions, setInstructions] = useState('');
   const [validationError, setValidationError] = useState('');
 
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    const frameId = window.requestAnimationFrame(() => dialogRef.current?.querySelector('input, textarea, button')?.focus());
+  useDialogKeyboard({ busy, dialogRef, initialFocus: 'input, textarea, button', onClose });
 
-    function handleKeyDown(event) {
-      if (event.key === 'Escape' && !busy) {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      trapTabKey(event, dialogRef.current);
+  if (typeof document === 'undefined') return null;
+
+  function prepareSource() {
+    if (sourceType === 'url') {
+      const normalizedUrl = normalizePublicJobListingUrl(url);
+      return normalizedUrl
+        ? { type: 'url', url: normalizedUrl }
+        : 'Enter a complete, public job listing URL.';
     }
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [busy, isOpen, onClose]);
-
-  if (!isOpen || typeof document === 'undefined') return null;
-
-  function validateSource() {
-    if (sourceType === 'url' && !normalizePublicJobListingUrl(url)) {
-      return 'Enter a complete, public job listing URL.';
+    if (sourceType === 'file') {
+      return validateJobListingFile(file) || { type: 'file', file };
     }
-    if (sourceType === 'file') return validateJobListingFile(file);
-    if (sourceType === 'text' && trimText(listingText).length < 80) {
-      return 'Paste more of the job listing so the role can be matched accurately.';
-    }
-    return '';
+    const text = trimText(listingText);
+    return text.length >= 80
+      ? { type: 'text', text }
+      : 'Paste more of the job listing so the role can be matched accurately.';
   }
 
   function handleSubmit(event) {
     event.preventDefault();
-    const nextError = validateSource();
-    if (nextError) {
-      setValidationError(nextError);
+    const source = prepareSource();
+    if (typeof source === 'string') {
+      setValidationError(source);
       return;
     }
 
     setValidationError('');
     onSubmit({
-      source: sourceType === 'url'
-        ? { type: 'url', url: normalizePublicJobListingUrl(url) }
-        : sourceType === 'file'
-          ? { type: 'file', file }
-          : { type: 'text', text: trimText(listingText) },
+      source,
       instructions: trimText(instructions),
     });
   }
@@ -93,19 +75,19 @@ export default function ResumeTailoringDialog({
         aria-modal="true"
         aria-labelledby="resume-tailoring-title"
       >
-        <div className="authDialogHeader resumeTailoringHeader">
+        <div className="authDialogHeader importResumeHeader">
           <h2 id="resume-tailoring-title">Tailor your resume to a job</h2>
           <button type="button" className="authCloseButton" onClick={onClose} aria-label="Close" disabled={busy}>×</button>
         </div>
 
         <form className="resumeTailoringForm" onSubmit={handleSubmit}>
-          <div className="resumeTailoringSourceTabs" role="tablist" aria-label="Job listing source">
+          <div className="authModeTabs resumeTailoringSourceTabs" role="tablist" aria-label="Job listing source">
             {SOURCE_OPTIONS.map((option) => (
               <button
                 type="button"
                 role="tab"
                 aria-selected={sourceType === option.id}
-                className={sourceType === option.id ? 'isActive' : ''}
+                className={`authModeTab${sourceType === option.id ? ' isActive' : ''}`}
                 key={option.id}
                 onClick={() => {
                   setSourceType(option.id);
@@ -120,7 +102,7 @@ export default function ResumeTailoringDialog({
 
           <div className="resumeTailoringSourcePanel">
             {sourceType === 'url' ? (
-              <label className="resumeTailoringField">
+              <label className="authField resumeTailoringField">
                 <span>Job listing link</span>
                 <input
                   type="url"
@@ -148,7 +130,7 @@ export default function ResumeTailoringDialog({
               </label>
             ) : null}
             {sourceType === 'text' ? (
-              <label className="resumeTailoringField">
+              <label className="authField resumeTailoringField">
                 <span>Job listing text</span>
                 <textarea
                   rows="8"
@@ -161,7 +143,7 @@ export default function ResumeTailoringDialog({
             ) : null}
           </div>
 
-          <label className="resumeTailoringField">
+          <label className="authField resumeTailoringField">
             <span>Additional direction <small>Optional</small></span>
             <textarea
               rows="3"
@@ -177,7 +159,7 @@ export default function ResumeTailoringDialog({
           <div className="resumeTailoringPrivacy">
             Contact details, dates, locations, layout settings, and storage metadata are not sent for tailoring.
           </div>
-          <div className="resumeTailoringActions">
+          <div className="importResumeActions resumeTailoringActions">
             <button type="button" className="button buttonSecondary" onClick={onClose} disabled={busy}>Cancel</button>
             <button type="submit" className="button buttonPrimary" disabled={busy}>
               {busy ? 'Generating suggestions…' : 'Generate suggestions'}

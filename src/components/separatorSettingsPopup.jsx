@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useDismissibleLayer } from '../hooks/useDismissibleLayer.js';
+
 const POPUP_MARGIN = 12;
 const POPUP_OFFSET = 10;
 
@@ -143,30 +145,12 @@ export default function SeparatorSettingsPopup({
     setPosition(getPopupPosition(anchor, popupElement.getBoundingClientRect()));
   }, [anchor]);
 
-  useEffect(() => {
-    function handlePointerDown(event) {
-      if (!popupRef.current?.contains(event.target)) {
-        onClose();
-      }
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onClose();
-      }
-    }
-
-    window.addEventListener('resize', onClose);
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('resize', onClose);
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [onClose]);
+  useDismissibleLayer({
+    closeOnResize: true,
+    layerRef: popupRef,
+    onDismiss: onClose,
+    preventEscapeDefault: true,
+  });
 
   useEffect(() => {
     popupRef.current?.focus();

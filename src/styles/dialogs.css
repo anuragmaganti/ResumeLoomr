@@ -34,10 +34,6 @@
   border-radius: var(--radius-dialog);
 }
 
-.resumeTailoringHeader {
-  align-items: center;
-}
-
 .resumeTailoringForm,
 .resumeTailoringSourcePanel {
   display: grid;
@@ -45,36 +41,20 @@
 }
 
 .resumeTailoringSourceTabs {
-  display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 3px;
+  margin: 0;
   padding: 3px;
-  border: 1px solid var(--color-border);
   border-radius: var(--radius-item);
-  background: var(--color-surface-muted);
 }
 
-.resumeTailoringSourceTabs button {
-  min-height: 32px;
-  border: 0;
+.resumeTailoringSourceTabs .authModeTab {
   border-radius: var(--radius-small);
-  background: transparent;
-  color: var(--color-text-subtle);
   font-size: 0.74rem;
   font-weight: 760;
-  cursor: pointer;
 }
 
-.resumeTailoringSourceTabs button.isActive {
-  background: var(--color-surface-elevated);
-  color: var(--color-text);
-  box-shadow: var(--shadow-xs);
-}
-
-.resumeTailoringField {
-  display: grid;
-  gap: 6px;
-  color: var(--color-text-subtle);
+.authField.resumeTailoringField {
   font-size: 0.73rem;
   font-weight: 760;
 }
@@ -91,13 +71,9 @@
   font-weight: 650;
 }
 
-.resumeTailoringField input,
-.resumeTailoringField textarea {
+.authField.resumeTailoringField input,
+.authField.resumeTailoringField textarea {
   width: 100%;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-item);
-  background: var(--color-input-bg);
-  color: var(--color-text);
   font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.45;
@@ -105,19 +81,19 @@
   transition: border-color var(--transition-base), box-shadow var(--transition-base);
 }
 
-.resumeTailoringField input {
+.authField.resumeTailoringField input {
   min-height: 40px;
   padding: 0 11px;
 }
 
-.resumeTailoringField textarea {
+.authField.resumeTailoringField textarea {
   min-height: 78px;
   padding: 9px 11px;
   resize: vertical;
 }
 
-.resumeTailoringField input:focus,
-.resumeTailoringField textarea:focus {
+.authField.resumeTailoringField input:focus,
+.authField.resumeTailoringField textarea:focus {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
@@ -197,13 +173,7 @@
   text-align: center;
 }
 
-.resumeTailoringActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.resumeTailoringActions .button {
+.importResumeActions.resumeTailoringActions .button {
   min-height: 36px;
   font-size: 0.75rem;
 }
@@ -1262,7 +1232,7 @@ html[data-theme="dark"] .signedOutPrompt {
   font-weight: 800;
 }
 
-.authField input {
+.authField :is(input, textarea) {
   min-height: 38px;
   padding: 0 12px;
   border: 1px solid var(--color-border);
@@ -1271,7 +1241,7 @@ html[data-theme="dark"] .signedOutPrompt {
   color: var(--color-text);
 }
 
-.authField input:focus {
+.authField :is(input, textarea):focus {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: 0 0 0 4px var(--color-accent-soft);

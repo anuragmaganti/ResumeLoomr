@@ -16,14 +16,14 @@ export function validateImportDocumentFile(file, label = 'document') {
   }
   return '';
 }
-function readFileAsBase64(file) {
+export function readDocumentFileAsBase64(file, errorMessage = 'The selected file could not be read.') {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const result = typeof reader.result === 'string' ? reader.result : '';
       resolve(result.includes(',') ? result.split(',').pop() : result);
     };
-    reader.onerror = () => reject(new Error('The selected file could not be read.'));
+    reader.onerror = () => reject(new Error(errorMessage));
     reader.readAsDataURL(file);
   });
 }
@@ -33,7 +33,7 @@ export async function importDocumentFile({ file, documentKind, idToken, resumeId
   const validationError = validateImportDocumentFile(file, label);
   if (validationError) throw new Error(validationError);
 
-  const fileDataBase64 = await readFileAsBase64(file);
+  const fileDataBase64 = await readDocumentFileAsBase64(file);
   const response = await fetch('/api/import-document', {
     method: 'POST',
     headers: {

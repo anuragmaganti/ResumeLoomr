@@ -1,16 +1,5 @@
 import { validateJobListingFile } from './jobListingInput.js';
-
-function readFileAsBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : '';
-      resolve(result.includes(',') ? result.split(',').pop() : result);
-    };
-    reader.onerror = () => reject(new Error('The selected job listing could not be read.'));
-    reader.readAsDataURL(file);
-  });
-}
+import { readDocumentFileAsBase64 } from './importDocument.js';
 
 export async function requestResumeTailoring({ catalogRequest, source, instructions, idToken, signal }) {
   const requestSource = { type: source.type };
@@ -20,7 +9,10 @@ export async function requestResumeTailoring({ catalogRequest, source, instructi
     if (validationError) throw new Error(validationError);
     requestSource.fileName = source.file.name;
     requestSource.mimeType = source.file.type;
-    requestSource.fileDataBase64 = await readFileAsBase64(source.file);
+    requestSource.fileDataBase64 = await readDocumentFileAsBase64(
+      source.file,
+      'The selected job listing could not be read.',
+    );
   } else if (source.type === 'url') {
     requestSource.url = source.url;
   } else {

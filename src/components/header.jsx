@@ -82,7 +82,7 @@ export default function Header({
             {activeDocumentType === 'resume' ? (
               <button
                 type="button"
-                className="button buttonSecondary tailorResumeButton"
+                className="button buttonSecondary printButton tailorResumeButton"
                 onClick={onTailorResume}
                 disabled={!canTailorResume || isTailoringResume}
                 title={canTailorResume ? 'Create reviewable suggestions for a job listing' : 'Add resume content first'}

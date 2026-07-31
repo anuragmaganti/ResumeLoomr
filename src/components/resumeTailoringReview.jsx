@@ -1,24 +1,53 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useRef } from 'react';
 import { createPortal } from 'react-dom';
 
-import { summarizeTailoringReview } from '../lib/resumeTailoring.js';
+import { useDismissibleLayer } from '../hooks/useDismissibleLayer.js';
 
 const LABEL_COPY = {
-  'role-focused': 'Role focused',
   'keyword-alignment': 'Keyword aligned',
   impact: 'Stronger impact',
   clarity: 'Clearer',
   concise: 'More concise',
-  grammar: 'Grammar',
-  spelling: 'Spelling',
-  reworded: 'Reworded',
-  reordered: 'Reordered',
-  added: 'Added',
-  removed: 'Removed',
 };
+const DECISION_OPTIONS = [['rejected', 'Reject'], ['approved', 'Approve']];
+
+function labelCopy(label) {
+  const copy = LABEL_COPY[label] || label.replaceAll('-', ' ');
+  return `${copy.charAt(0).toUpperCase()}${copy.slice(1)}`;
+}
+
+export function TailoringChangeText({ change, children, onOpen }) {
+  if (!change) return children;
+
+  function openChange(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    onOpen?.(change.id, event.currentTarget.getBoundingClientRect());
+  }
+
+  return (
+    <span
+      className={`tailoringPreviewChange tailoringPreviewChange--${change.operation} is-${change.decision}`}
+      data-tailoring-change-id={change.id}
+      data-preview-no-drag="true"
+      role="button"
+      tabIndex="0"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={openChange}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') openChange(event);
+      }}
+    >
+      {children}
+    </span>
+  );
+}
 
 export function TailoringReviewDock({ review, onApproveAll, onRejectAll, onApply, onCancel }) {
-  const counts = summarizeTailoringReview(review);
+  const counts = { approved: 0, pending: 0 };
+  for (const change of review.changes) {
+    if (change.decision in counts) counts[change.decision] += 1;
+  }
 
   return (
     <aside className="tailoringReviewDock" aria-label="Tailoring review">
@@ -53,28 +82,15 @@ function getPopoverPosition(anchorRect) {
 
 export function TailoringChangePopover({ review, activeChange, onDecision, onClose }) {
   const popoverRef = useRef(null);
-  const change = useMemo(
-    () => review?.changes.find((candidate) => candidate.id === activeChange?.changeId) || null,
-    [activeChange?.changeId, review],
-  );
+  const change = review?.changes.find((candidate) => candidate.id === activeChange?.changeId) || null;
 
-  useEffect(() => {
-    if (!change) return undefined;
-    function handlePointerDown(event) {
-      if (!popoverRef.current?.contains(event.target)) onClose();
-    }
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') onClose();
-    }
-    window.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('resize', onClose);
-    return () => {
-      window.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('resize', onClose);
-    };
-  }, [change, onClose]);
+  useDismissibleLayer({
+    closeOnResize: true,
+    enabled: Boolean(change),
+    eventTarget: 'window',
+    layerRef: popoverRef,
+    onDismiss: onClose,
+  });
 
   if (!change || typeof document === 'undefined') return null;
   const style = getPopoverPosition(activeChange.anchorRect);
@@ -96,7 +112,7 @@ export function TailoringChangePopover({ review, activeChange, onDecision, onClo
     >
       <div className="tailoringChangeHeader">
         <div className="tailoringChangeLabels">
-          {change.labels.map((label) => <span key={label}>{LABEL_COPY[label] || label}</span>)}
+          {change.labels.map((label) => <span key={label}>{labelCopy(label)}</span>)}
         </div>
         <button type="button" onClick={onClose} aria-label="Close suggestion">×</button>
       </div>
@@ -106,20 +122,16 @@ export function TailoringChangePopover({ review, activeChange, onDecision, onClo
       </div>
       {change.note ? <p className="tailoringChangeNote">{change.note}</p> : null}
       <div className="tailoringChangeActions">
-        <button
-          type="button"
-          className={`button buttonSecondary tailoringDecisionButton tailoringDecisionButton--reject${change.decision === 'rejected' ? ' isSelected' : ''}`}
-          onClick={() => onDecision(change.id, 'rejected')}
-        >
-          Reject
-        </button>
-        <button
-          type="button"
-          className={`button buttonSecondary tailoringDecisionButton tailoringDecisionButton--approve${change.decision === 'approved' ? ' isSelected' : ''}`}
-          onClick={() => onDecision(change.id, 'approved')}
-        >
-          Approve
-        </button>
+        {DECISION_OPTIONS.map(([decision, label]) => (
+          <button
+            type="button"
+            className={`button buttonSecondary tailoringDecisionButton tailoringDecisionButton--${decision === 'rejected' ? 'reject' : 'approve'}${change.decision === decision ? ' isSelected' : ''}`}
+            key={decision}
+            onClick={() => onDecision(change.id, decision)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </aside>,
     document.body,

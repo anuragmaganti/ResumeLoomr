@@ -8,8 +8,13 @@ import {
   normalizeJobListingMimeType,
   normalizePublicJobListingUrl,
 } from '../src/lib/jobListingInput.js';
-import { TAILORING_LABELS } from '../src/lib/resumeTailoring.js';
+import {
+  TAILORING_LABELS,
+  TAILORING_OPERATIONS,
+  isTailoringOperationAllowed,
+} from '../src/lib/resumeTailoring.js';
 import { trimText } from '../src/lib/text.js';
+import { HttpProtocolError } from './httpProtocol.js';
 import { extractDocxText } from './resumeImport/fileText.js';
 import {
   DEFAULT_GEMINI_IMPORT_MODEL,
@@ -23,33 +28,26 @@ const MAX_REQUEST_BYTES = Math.ceil(JOB_LISTING_FILE_MAX_BYTES * (4 / 3)) + (768
 const MAX_TARGETS = 240;
 const MAX_CHANGES = 120;
 
-export class ResumeTailoringError extends Error {
-  constructor(message, {
-    statusCode = 400,
-    code = 'tailor/invalid-request',
-    expose = statusCode < 500,
-    diagnostics = null,
-  } = {}) {
-    super(message);
+export class ResumeTailoringError extends HttpProtocolError {
+  constructor(message, options = {}) {
+    super(message, { code: 'tailor/invalid-request', ...options });
     this.name = 'ResumeTailoringError';
-    this.statusCode = statusCode;
-    this.code = code;
-    this.expose = expose;
-    this.diagnostics = diagnostics;
+    this.diagnostics = options.diagnostics || null;
   }
+}
+
+function fail(message, code, options = {}) {
+  throw new ResumeTailoringError(message, { code, ...options });
 }
 
 const entryContextSchema = z.record(z.string(), z.string().max(240)).default({});
 const targetSchema = z.object({
   id: z.string().min(1).max(40),
   type: z.enum(['scalar', 'list', 'listItem']),
-  fieldType: z.string().min(1).max(80),
-  currentValue: z.string().max(2400),
-  sectionTitle: z.string().max(120),
-  entryContext: entryContextSchema,
+  fieldType: z.string().min(1).max(80), currentValue: z.string().max(2400),
+  sectionTitle: z.string().max(120), entryContext: entryContextSchema,
   itemIndex: z.number().int().min(0).max(199).optional(),
-  listTargetId: z.string().max(40).optional(),
-  listLength: z.number().int().min(0).max(200).optional(),
+  listTargetId: z.string().max(40).optional(), listLength: z.number().int().min(0).max(200).optional(),
 }).strict();
 const requestSchema = z.object({
   resume: z.object({
@@ -60,8 +58,7 @@ const requestSchema = z.object({
     z.object({ type: z.literal('text'), text: z.string().min(80).max(100000) }).strict(),
     z.object({
       type: z.literal('file'),
-      fileName: z.string().min(1).max(240),
-      mimeType: z.string().max(120).default(''),
+      fileName: z.string().min(1).max(240), mimeType: z.string().max(120).default(''),
       fileDataBase64: z.string().min(1),
     }).strict(),
   ]),
@@ -69,12 +66,9 @@ const requestSchema = z.object({
 }).strict();
 const responseSchema = z.object({
   changes: z.array(z.object({
-    targetId: z.string().min(1).max(40),
-    operation: z.enum(['replace', 'remove', 'add', 'move']),
-    value: z.string().max(2400),
-    position: z.number().int().min(-1).max(199),
-    labels: z.array(z.enum(TAILORING_LABELS)).max(6),
-    note: z.string().max(240),
+    targetId: z.string().min(1).max(40), operation: z.enum(TAILORING_OPERATIONS),
+    value: z.string().max(2400), position: z.number().int().min(-1).max(199),
+    labels: z.array(z.enum(TAILORING_LABELS)).max(6), note: z.string().max(240),
   }).strict()).max(MAX_CHANGES),
 }).strict();
 
@@ -86,10 +80,8 @@ const responseJsonSchema = {
       items: {
         type: 'object',
         properties: {
-          targetId: { type: 'string' },
-          operation: { type: 'string', enum: ['replace', 'remove', 'add', 'move'] },
-          value: { type: 'string' },
-          position: { type: 'integer' },
+          targetId: { type: 'string' }, operation: { type: 'string', enum: TAILORING_OPERATIONS },
+          value: { type: 'string' }, position: { type: 'integer' },
           labels: {
             type: 'array',
             items: { type: 'string', enum: TAILORING_LABELS },
@@ -108,9 +100,7 @@ const responseJsonSchema = {
 function normalizeBase64(value) {
   const compact = trimText(value).replace(/\s/g, '');
   if (!/^[a-zA-Z0-9+/]*={0,2}$/.test(compact)) {
-    throw new ResumeTailoringError('The uploaded job listing could not be read.', {
-      code: 'tailor/invalid-file-data',
-    });
+    fail('The uploaded job listing could not be read.', 'tailor/invalid-file-data');
   }
   return compact;
 }
@@ -118,20 +108,14 @@ function normalizeBase64(value) {
 function normalizeFileSource(source) {
   const mimeType = normalizeJobListingMimeType(source.fileName, source.mimeType);
   if (!mimeType) {
-    throw new ResumeTailoringError('Upload a PDF or DOCX job listing.', {
-      statusCode: 415,
-      code: 'tailor/unsupported-file-type',
-    });
+    fail('Upload a PDF or DOCX job listing.', 'tailor/unsupported-file-type', { statusCode: 415 });
   }
 
   const base64 = normalizeBase64(source.fileDataBase64);
   const buffer = Buffer.from(base64, 'base64');
-  if (buffer.length === 0) throw new ResumeTailoringError('The uploaded job listing is empty.', { code: 'tailor/empty-file' });
+  if (buffer.length === 0) fail('The uploaded job listing is empty.', 'tailor/empty-file');
   if (buffer.length > JOB_LISTING_FILE_MAX_BYTES) {
-    throw new ResumeTailoringError(`Upload a job listing smaller than ${JOB_LISTING_FILE_MAX_MEGABYTES} MB.`, {
-      statusCode: 413,
-      code: 'tailor/file-too-large',
-    });
+    fail(`Upload a job listing smaller than ${JOB_LISTING_FILE_MAX_MEGABYTES} MB.`, 'tailor/file-too-large', { statusCode: 413 });
   }
 
   return { ...source, mimeType, base64, buffer };
@@ -142,22 +126,17 @@ export async function parseResumeTailoringRequest(req, readJsonRequestBody) {
   try {
     body = await readJsonRequestBody(req, { maxBytes: MAX_REQUEST_BYTES });
   } catch (error) {
-    throw new ResumeTailoringError(
-      error?.statusCode === 413
-        ? 'The tailoring request is too large.'
-        : 'The tailoring request could not be read.',
-      {
-        statusCode: error?.statusCode === 413 ? 413 : 400,
-        code: error?.statusCode === 413 ? 'tailor/request-too-large' : 'tailor/invalid-json',
-      },
+    const tooLarge = error?.statusCode === 413;
+    fail(
+      tooLarge ? 'The tailoring request is too large.' : 'The tailoring request could not be read.',
+      tooLarge ? 'tailor/request-too-large' : 'tailor/invalid-json',
+      { statusCode: tooLarge ? 413 : 400 },
     );
   }
 
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
-    throw new ResumeTailoringError('Choose one job listing source and provide a valid resume.', {
-      code: 'tailor/invalid-request',
-    });
+    fail('Choose one job listing source and provide a valid resume.', 'tailor/invalid-request');
   }
 
   const source = parsed.data.source.type === 'file'
@@ -167,14 +146,10 @@ export async function parseResumeTailoringRequest(req, readJsonRequestBody) {
       : { ...parsed.data.source, text: trimText(parsed.data.source.text) };
 
   if (source.type === 'url' && !source.url) {
-    throw new ResumeTailoringError('Enter a complete, public job listing URL.', {
-      code: 'tailor/invalid-url',
-    });
+    fail('Enter a complete, public job listing URL.', 'tailor/invalid-url');
   }
   if (source.type === 'text' && source.text.length < 80) {
-    throw new ResumeTailoringError('Paste more of the job listing so the role can be matched accurately.', {
-      code: 'tailor/listing-too-short',
-    });
+    fail('Paste more of the job listing so the role can be matched accurately.', 'tailor/listing-too-short');
   }
 
   return {
@@ -229,9 +204,7 @@ async function createGeminiContents(request) {
   if (request.source.mimeType === JOB_LISTING_DOCX_MIME) {
     const text = await extractDocxText({ buffer: request.source.buffer });
     if (!text) {
-      throw new ResumeTailoringError('No readable text was found in that Word document.', {
-        code: 'tailor/no-readable-content',
-      });
+      fail('No readable text was found in that Word document.', 'tailor/no-readable-content');
     }
     return [{ text: createPrompt(request, `JOB LISTING DOCUMENT TEXT:\n${text}`) }];
   }
@@ -245,37 +218,21 @@ async function createGeminiContents(request) {
 export function validateResumeTailoringProposals(payload, request) {
   const parsed = responseSchema.safeParse(payload);
   if (!parsed.success) {
-    throw new ResumeTailoringError('The AI response could not be validated. Try again.', {
-      statusCode: 502,
-      code: 'tailor/invalid-ai-response',
-      expose: true,
-    });
+    fail('The AI response could not be validated. Try again.', 'tailor/invalid-ai-response', { statusCode: 502, expose: true });
   }
 
   const targetById = new Map(request.resume.targets.map((target) => [target.id, target]));
-  const seen = new Set();
-  const addCounts = new Map();
+  const operationCounts = new Map();
   const changes = [];
 
   for (const proposal of parsed.data.changes) {
     const target = targetById.get(proposal.targetId);
     if (!target) continue;
-    const validOperation = (
-      (target.type === 'scalar' && proposal.operation === 'replace')
-      || (target.type === 'listItem' && ['replace', 'remove', 'move'].includes(proposal.operation))
-      || (target.type === 'list' && proposal.operation === 'add')
-    );
-    if (!validOperation) continue;
+    if (!isTailoringOperationAllowed(target.type, proposal.operation)) continue;
 
-    if (proposal.operation === 'add') {
-      const count = addCounts.get(target.id) || 0;
-      if (count >= 4) continue;
-      addCounts.set(target.id, count + 1);
-    } else if (seen.has(target.id)) {
-      continue;
-    } else {
-      seen.add(target.id);
-    }
+    const count = operationCounts.get(target.id) || 0;
+    if (count >= (proposal.operation === 'add' ? 4 : 1)) continue;
+    operationCounts.set(target.id, count + 1);
 
     const value = trimText(proposal.value);
     if (['replace', 'add'].includes(proposal.operation) && !value) continue;
@@ -293,11 +250,7 @@ export function validateResumeTailoringProposals(payload, request) {
 export async function tailorResumeToJob(request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new ResumeTailoringError('Gemini is not configured.', {
-      statusCode: 500,
-      code: 'tailor/gemini-missing',
-      expose: false,
-    });
+    fail('Gemini is not configured.', 'tailor/gemini-missing', { statusCode: 500, expose: false });
   }
 
   const model = trimText(process.env.GEMINI_MODEL) || DEFAULT_GEMINI_IMPORT_MODEL;
@@ -320,25 +273,19 @@ export async function tailorResumeToJob(request) {
     if (error instanceof ResumeTailoringError) throw error;
     const statusCode = Number(error?.statusCode || 0);
     const invalidResponse = error?.code === 'import/invalid-ai-response';
-    throw new ResumeTailoringError(
-      statusCode === 429
-        ? 'AI tailoring is busy or has reached its quota. Try again later.'
-        : invalidResponse
-          ? 'The AI suggestions could not be validated. Try again.'
-        : 'The AI could not tailor this resume. Try again.',
-      {
-        statusCode: statusCode === 429 ? 429 : invalidResponse ? 502 : 503,
-        code: statusCode === 429
-          ? 'tailor/rate-limited'
-          : invalidResponse
-            ? 'tailor/invalid-ai-response'
-            : 'tailor/provider-failed',
-        expose: true,
-        diagnostics: error?.diagnostics || {
-          providerCode: error?.code,
-          providerMessage: trimText(error?.message).slice(0, 500),
-        },
+    const failure = statusCode === 429
+      ? { message: 'AI tailoring is busy or has reached its quota. Try again later.', statusCode: 429, code: 'tailor/rate-limited' }
+      : invalidResponse
+        ? { message: 'The AI suggestions could not be validated. Try again.', statusCode: 502, code: 'tailor/invalid-ai-response' }
+        : { message: 'The AI could not tailor this resume. Try again.', statusCode: 503, code: 'tailor/provider-failed' };
+    throw new ResumeTailoringError(failure.message, {
+      statusCode: failure.statusCode,
+      code: failure.code,
+      expose: true,
+      diagnostics: error?.diagnostics || {
+        providerCode: error?.code,
+        providerMessage: trimText(error?.message).slice(0, 500),
       },
-    );
+    });
   }
 }

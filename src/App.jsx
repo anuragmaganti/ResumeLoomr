@@ -433,7 +433,6 @@ function App() {
 
         {tailoring.isDialogOpen ? (
           <ResumeTailoringDialog
-            isOpen
             busy={tailoring.isGenerating}
             error={tailoring.error}
             onClose={tailoring.closeDialog}

@@ -1,32 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useDialogKeyboard } from '../hooks/useDialogKeyboard.js';
 import { COVER_LETTER_TEMPLATE_OPTIONS } from '../lib/coverLetter.js';
-import { trapTabKey } from '../lib/focusTrap.js';
-
-function useDialogKeyboard({ isOpen, busy, onClose, dialogRef, initialFocus = 'button' }) {
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    const frameId = window.requestAnimationFrame(() => (
-      dialogRef.current?.querySelector(initialFocus)?.focus()
-    ));
-
-    function handleKeyDown(event) {
-      if (event.key === 'Escape' && !busy) {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      trapTabKey(event, dialogRef.current);
-    }
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [busy, dialogRef, initialFocus, isOpen, onClose]);
-}
 
 function TemplateMiniature({ template }) {
   return (

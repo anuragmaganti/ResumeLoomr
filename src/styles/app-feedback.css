@@ -42,12 +42,8 @@
 }
 
 .button.tailorResumeButton {
-  min-height: 34px;
   padding-inline: 11px;
-  border-radius: var(--radius-control);
-  font-size: 0.8125rem;
   font-weight: 800;
-  white-space: nowrap;
 }
 
 .topbarMeta .button:not(:disabled):hover {

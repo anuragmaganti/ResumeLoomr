@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+
+import { useDismissibleLayer } from "../../hooks/useDismissibleLayer.js";
 
 function MoreActionsIcon() {
   return (
@@ -28,31 +30,11 @@ export default function EntryActionMenu({
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
 
-  useEffect(() => {
-    if (!isOpen) {
-      return undefined;
-    }
-
-    const handlePointerDown = (event) => {
-      if (!menuRef.current?.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen]);
+  useDismissibleLayer({
+    enabled: isOpen,
+    layerRef: menuRef,
+    onDismiss: () => setIsOpen(false),
+  });
 
   const runAction = (callback) => {
     setIsOpen(false);
